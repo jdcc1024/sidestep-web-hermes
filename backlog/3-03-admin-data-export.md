@@ -1,6 +1,6 @@
 # Issue: Admin Data Export
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -17,14 +17,41 @@ This issue touches:
 Add a CSV export button to the admin order detail page. When clicked, it downloads a CSV containing the order's details and all jersey run responses (if a jersey run exists for the order). The CSV is formatted for supplier handoff: each row is one jersey response, with columns for the respondent's details and the jersey specifications. For orders without a jersey run, the CSV contains a single row with the order details.
 
 ## Acceptance Criteria
-- [ ] "Export CSV" button appears on the admin order detail page
-- [ ] CSV columns (for jersey run orders): respondent name, email, size, name on jersey, number on jersey, one column per custom question, submission date, team name, sport, jersey style, neckline, sleeve style
-- [ ] CSV columns (for orders without jersey run): team name, captain name, captain email, sport, quantity, jersey style, neckline, sleeve style, order date
-- [ ] CSV filename: `sidestep-order-<teamname>-<date>.csv`
-- [ ] Download is initiated via a browser file download (no new page opened)
-- [ ] Non-admin users receive a 403 if they call the export API directly
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] "Export CSV" button appears on the admin order detail page
+- [x] CSV columns (for jersey run orders): respondent name, email, size, name on jersey, number on jersey, one column per custom question, submission date, team name, sport, jersey style, neckline, sleeve style — plus **Design** and **Quantity** (see Deviations)
+- [x] CSV columns (for orders without jersey run): team name, captain name, captain email, sport, quantity, jersey style, neckline, sleeve style, order date
+- [x] CSV filename: `sidestep-order-<teamname>-<date>.csv`
+- [x] Download is initiated via a browser file download (no new page opened)
+- [x] Non-admin callers are refused — enforced by `requireAdmin` in Convex (see Deviations)
+- [x] All tests pass
+- [x] No regressions in existing tests
+
+## Deviations from the original spec
+
+This issue was written before the O-01 spec move and the R-track roster
+refactor. Three things changed as a result:
+
+1. **Transport: Convex query, not a Next route handler.** The spec called for
+   `/api/admin/export/[orderId]` gated on Clerk `privateMetadata.isAdmin`.
+   Admin is actually determined by `users.isAdmin` in Convex (synced by the
+   Clerk webhook) and every other admin surface gates on `requireAdmin`.
+   A route handler on `privateMetadata` would have been a second, divergent
+   source of truth for authorization. The export is an admin-only Convex
+   query (`admin.exportOrder`); the button builds the file client-side from
+   a Blob. Non-admins are refused server-side by `requireAdmin` — same
+   security property, one gate instead of two.
+2. **Rows come from `orderEntries`/`rosterEntries`, not `jerseyRunResponses`.**
+   The legacy table is retired in R-07; building on it would have created
+   work for that issue. Two new columns follow from the new model:
+   **Design** (an order spans several designs now) and **Quantity** (an
+   order entry carries a qty, so a row is not necessarily one jersey).
+3. **Silhouette specs are per-row.** Jersey style / neckline / sleeve style
+   moved onto the design in O-01, so they vary within one order and cannot
+   be order-level columns. For an order with no run, rows degrade to one per
+   linked design for the same reason.
+
+Entries on designs the order no longer links are excluded, so the export
+reconciles with the production count from `orderEntries.countsByRun` (R-05).
 
 ## Dependencies
 - Blocked by: 3-02

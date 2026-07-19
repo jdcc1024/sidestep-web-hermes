@@ -163,6 +163,114 @@ export const updateOrderStages = mutation({
   },
 });
 
+// The supplier-handoff export payload for one order (3-03). Admin only;
+// null for a missing order so the caller renders "not found" rather than
+// downloading an empty file. CSV formatting lives in lib/orderExport.ts —
+// this query only joins.
+//
+// With a run, a row is one order entry (one jersey line to produce),
+// carrying its roster slot's name/number when it has one and its design's
+// silhouette specs (which live on the design since O-01). Entries on
+// designs the order no longer links are excluded, so the export reconciles
+// with the production count from `orderEntries.countsByRun` (R-05).
+//
+// Without a run there are no jerseys to enumerate, so rows degrade to one
+// per linked design — enough for the specs, with the order's own details
+// riding alongside.
+export const exportOrder = query({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, { orderId }) => {
+    await requireAdmin(ctx);
+
+    const order = await ctx.db.get(orderId);
+    if (!order) return null;
+
+    const captain = await ctx.db.get(order.captainId);
+    const designs = new Map<string, Doc<"designs">>();
+    for (const designId of order.designIds) {
+      const design = await ctx.db.get(designId);
+      if (design) designs.set(designId, design);
+    }
+
+    const specsOf = (design: Doc<"designs"> | undefined) => ({
+      designTitle: design?.title ?? "Untitled design",
+      jerseyStyle: design?.jerseyStyle ?? "",
+      neckline: design?.neckline ?? "",
+      sleeveStyle: design?.sleeveStyle ?? "",
+    });
+
+    const base = {
+      teamName: order.teamName,
+      sport: order.sport,
+      captainName: captain?.name ?? "Unknown",
+      captainEmail: captain?.email ?? "",
+      estimatedQuantity: order.estimatedQuantity,
+      orderDate: order.createdAt,
+    };
+
+    const run = await ctx.db
+      .query("jerseyRuns")
+      .withIndex("by_order", (q) => q.eq("orderId", order._id))
+      .unique();
+
+    if (!run) {
+      return {
+        ...base,
+        hasRun: false,
+        customQuestions: [],
+        rows: order.designIds.map((designId) => ({
+          ...specsOf(designs.get(designId)),
+          nameOnJersey: "",
+          numberOnJersey: "",
+          size: "",
+          qty: 0,
+          submitterName: "",
+          submitterEmail: "",
+          submittedAt: 0,
+          customAnswers: {} as Record<string, string>,
+        })),
+      };
+    }
+
+    const entries = (
+      await ctx.db
+        .query("orderEntries")
+        .withIndex("by_run", (q) => q.eq("runId", run._id))
+        .collect()
+    ).filter((e) => designs.has(e.designId));
+
+    // Group by the order's own design sequence so the file reads the way
+    // the captain arranged it, then oldest submission first within a design.
+    const designRank = new Map(order.designIds.map((id, i) => [id as string, i]));
+    entries.sort(
+      (a, b) =>
+        (designRank.get(a.designId) ?? 0) - (designRank.get(b.designId) ?? 0) ||
+        a.createdAt - b.createdAt,
+    );
+
+    const rows = await Promise.all(
+      entries.map(async (entry) => {
+        const slot = entry.rosterEntryId
+          ? await ctx.db.get(entry.rosterEntryId)
+          : null;
+        return {
+          ...specsOf(designs.get(entry.designId)),
+          nameOnJersey: slot?.name ?? "",
+          numberOnJersey: slot?.number ?? "",
+          size: entry.size,
+          qty: entry.qty,
+          submitterName: entry.submitterName,
+          submitterEmail: entry.submitterEmail,
+          submittedAt: entry.createdAt,
+          customAnswers: entry.customAnswers ?? {},
+        };
+      }),
+    );
+
+    return { ...base, hasRun: true, customQuestions: run.customQuestions, rows };
+  },
+});
+
 // Every jersey run across every customer. Used by the admin oversight
 // page (issue 3-02). Joins team name from the linked order and captain
 // name/email from the user record so the list table can render without

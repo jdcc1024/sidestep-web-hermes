@@ -7,6 +7,7 @@ import { ArrowLeft, FileDown } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { ExportOrderButton } from "@/components/admin/ExportOrderButton";
 import { OrderStageChecklist } from "@/components/admin/OrderStageChecklist";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,20 +47,23 @@ export default function AdminOrderDetailPage({
         <ArrowLeft className="size-4" aria-hidden /> All orders
       </Link>
 
-      <header className="mt-4">
-        <Badge
-          variant="secondary"
-          className="bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200"
-        >
-          Admin · Order
-        </Badge>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          {order.teamName}
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Created {formatDate(order.createdAt)} · {order.sport} ·{" "}
-          {order.estimatedQuantity} jerseys
-        </p>
+      <header className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <Badge
+            variant="secondary"
+            className="bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200"
+          >
+            Admin · Order
+          </Badge>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            {order.teamName}
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            Created {formatDate(order.createdAt)} · {order.sport} ·{" "}
+            {order.estimatedQuantity} jerseys
+          </p>
+        </div>
+        <ExportOrderButton orderId={order._id} />
       </header>
 
       <Card className="mt-8">

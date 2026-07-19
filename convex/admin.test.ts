@@ -1,4 +1,4 @@
-// @vitest-environment edge-runtime
+﻿// @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
@@ -173,5 +173,270 @@ describe("admin.updateOrderStages", () => {
         stages: fullStages(),
       }),
     ).rejects.toThrow(/not found/i);
+  });
+});
+
+
+// ─── 3-03 Admin data export ────────────────────────────────────────────
+
+async function seedDesign(
+  t: ReturnType<typeof convexTest>,
+  ownerId: Id<"users">,
+  title: string,
+  specs: Partial<{ jerseyStyle: string; neckline: string; sleeveStyle: string }> = {},
+): Promise<Id<"designs">> {
+  const now = Date.now();
+  return t.run((ctx) =>
+    ctx.db.insert("designs", {
+      ownerId,
+      title,
+      brief: "",
+      fileIds: [],
+      jerseyStyle: specs.jerseyStyle,
+      neckline: specs.neckline,
+      sleeveStyle: specs.sleeveStyle,
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
+}
+
+async function seedRun(
+  t: ReturnType<typeof convexTest>,
+  orderId: Id<"orders">,
+  captainId: Id<"users">,
+  customQuestions: Array<{ id: string; label: string }> = [],
+): Promise<Id<"jerseyRuns">> {
+  const now = Date.now();
+  return t.run((ctx) =>
+    ctx.db.insert("jerseyRuns", {
+      orderId,
+      captainId,
+      sizeOptions: ["S", "M", "L"],
+      namesMode: "open",
+      customQuestions,
+      deadline: now + 86_400_000,
+      status: "open",
+      createdAt: now,
+    }),
+  );
+}
+
+describe("admin.exportOrder", () => {
+  it("rejects a non-admin caller", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId, asUser: asCaptain } = await seedUser(t, "captain");
+    const orderId = await seedOrder(t, captainId);
+
+    await expect(
+      asCaptain.query(api.admin.exportOrder, { orderId }),
+    ).rejects.toThrow(/Admin access required/);
+  });
+
+  it("returns null for a missing order", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    await t.run((ctx) => ctx.db.delete(orderId));
+
+    expect(await asAdmin.query(api.admin.exportOrder, { orderId })).toBeNull();
+  });
+
+  it("exports order details and linked designs when there is no jersey run", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain", {
+      name: "Ana Ruiz",
+      email: "ana@example.com",
+    });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    const designId = await seedDesign(t, captainId, "Home", {
+      jerseyStyle: "Pro",
+      neckline: "V-neck",
+      sleeveStyle: "Short",
+    });
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
+
+    const data = await asAdmin.query(api.admin.exportOrder, { orderId });
+    expect(data).not.toBeNull();
+    expect(data!.hasRun).toBe(false);
+    expect(data!.teamName).toBe("Falcons");
+    expect(data!.captainName).toBe("Ana Ruiz");
+    expect(data!.captainEmail).toBe("ana@example.com");
+    expect(data!.rows).toHaveLength(1);
+    expect(data!.rows[0]).toMatchObject({
+      designTitle: "Home",
+      jerseyStyle: "Pro",
+      neckline: "V-neck",
+      sleeveStyle: "Short",
+    });
+  });
+
+  it("exports one row per order entry with roster, design and answer data", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    const designId = await seedDesign(t, captainId, "Home", {
+      jerseyStyle: "Pro",
+      neckline: "V-neck",
+      sleeveStyle: "Short",
+    });
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
+    const runId = await seedRun(t, orderId, captainId, [
+      { id: "q1", label: "Pickup location" },
+    ]);
+
+    const now = Date.now();
+    const rosterEntryId = await t.run((ctx) =>
+      ctx.db.insert("rosterEntries", {
+        runId,
+        orderId,
+        designId,
+        name: "Gretzky",
+        number: "99",
+        source: "fan",
+        createdAt: now,
+      }),
+    );
+    await t.run((ctx) =>
+      ctx.db.insert("orderEntries", {
+        runId,
+        designId,
+        rosterEntryId,
+        size: "L",
+        qty: 2,
+        source: "fan",
+        submitterName: "Ben Chu",
+        submitterEmail: "ben@example.com",
+        customAnswers: { q1: "Gym" },
+        createdAt: now,
+      }),
+    );
+
+    const data = await asAdmin.query(api.admin.exportOrder, { orderId });
+    expect(data!.hasRun).toBe(true);
+    expect(data!.customQuestions).toEqual([
+      { id: "q1", label: "Pickup location" },
+    ]);
+    expect(data!.rows).toHaveLength(1);
+    expect(data!.rows[0]).toMatchObject({
+      designTitle: "Home",
+      jerseyStyle: "Pro",
+      neckline: "V-neck",
+      sleeveStyle: "Short",
+      nameOnJersey: "Gretzky",
+      numberOnJersey: "99",
+      size: "L",
+      qty: 2,
+      submitterName: "Ben Chu",
+      submitterEmail: "ben@example.com",
+      customAnswers: { q1: "Gym" },
+    });
+  });
+
+  it("leaves jersey name and number blank for a bulk line with no roster slot", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    const designId = await seedDesign(t, captainId, "Home");
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
+    const runId = await seedRun(t, orderId, captainId);
+
+    await t.run((ctx) =>
+      ctx.db.insert("orderEntries", {
+        runId,
+        designId,
+        size: "M",
+        qty: 3,
+        source: "fan",
+        submitterName: "Cy Okafor",
+        submitterEmail: "cy@example.com",
+        createdAt: Date.now(),
+      }),
+    );
+
+    const data = await asAdmin.query(api.admin.exportOrder, { orderId });
+    expect(data!.rows[0]).toMatchObject({
+      nameOnJersey: "",
+      numberOnJersey: "",
+      customAnswers: {},
+      qty: 3,
+    });
+  });
+
+  it("excludes entries on designs the order no longer links, matching the production count", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    const keptId = await seedDesign(t, captainId, "Home");
+    const removedId = await seedDesign(t, captainId, "Away");
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [keptId] }));
+    const runId = await seedRun(t, orderId, captainId);
+
+    const now = Date.now();
+    for (const designId of [keptId, removedId]) {
+      await t.run((ctx) =>
+        ctx.db.insert("orderEntries", {
+          runId,
+          designId,
+          size: "M",
+          qty: 1,
+          source: "fan",
+          submitterName: "Fan",
+          submitterEmail: "fan@example.com",
+          createdAt: now,
+        }),
+      );
+    }
+
+    const data = await asAdmin.query(api.admin.exportOrder, { orderId });
+    expect(data!.rows).toHaveLength(1);
+    expect(data!.rows[0].designTitle).toBe("Home");
+  });
+
+  it("groups rows by the order's design sequence, then by submission time", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    const homeId = await seedDesign(t, captainId, "Home");
+    const awayId = await seedDesign(t, captainId, "Away");
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [homeId, awayId] }));
+    const runId = await seedRun(t, orderId, captainId);
+
+    const now = Date.now();
+    // Inserted away-first and out of time order, so sorting is observable.
+    const lines: Array<[Id<"designs">, string, number]> = [
+      [awayId, "Second away", now + 20],
+      [homeId, "Second home", now + 10],
+      [awayId, "First away", now],
+      [homeId, "First home", now],
+    ];
+    for (const [designId, submitterName, createdAt] of lines) {
+      await t.run((ctx) =>
+        ctx.db.insert("orderEntries", {
+          runId,
+          designId,
+          size: "M",
+          qty: 1,
+          source: "fan",
+          submitterName,
+          submitterEmail: `${submitterName}@example.com`,
+          createdAt,
+        }),
+      );
+    }
+
+    const data = await asAdmin.query(api.admin.exportOrder, { orderId });
+    expect(data!.rows.map((r) => r.submitterName)).toEqual([
+      "First home",
+      "Second home",
+      "First away",
+      "Second away",
+    ]);
   });
 });

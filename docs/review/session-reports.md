@@ -33,3 +33,40 @@ One entry per completed loop task. This is the human's fast path for UX critique
   3. **Relabel got no UI at all** — entries key off `designId`, so a rename carries submissions over and renders under the new title automatically. R-05's convex relabel test already covers the data behaviour; adding a relabel warning would have been a warning about nothing.
   4. Warning is scoped to **edit mode with an existing run** — a new order, or an order that never started collecting, can't orphan anyone, so the run lookup is skipped entirely.
 - Follow-ups filed: none as DAG nodes. Two things noted above need a human, not an agent: re-running `snap.mjs --login`, and deciding whether the stale-session breakage deserves its own tracked task.
+
+## 2026-07-19 — 3-03: Admin Data Export
+
+- What shipped:
+  - `lib/orderExport.ts` — pure CSV builder (RFC 4180 escaping, spreadsheet
+    formula neutralization, ISO dates, filename slug).
+  - `convex/admin.ts` `exportOrder` — admin-only join over order / captain /
+    designs / roster + order entries; excludes entries on removed designs so
+    the file reconciles with `countsByRun`.
+  - `components/admin/ExportOrderButton.tsx` — fetch-on-click, Blob download,
+    wired into the admin order detail header.
+- UX surfaces to eyeball: `/admin/orders/<id>` — the "Export CSV" button now
+  sits right-aligned in the header next to the team name (header became a
+  flex row on `sm:`). **No screenshots this time** — see below.
+- Decisions I made that a human may want to veto:
+  - **Convex query instead of the specced `/api/admin/export/[orderId]` route
+    handler.** The spec gated on Clerk `privateMetadata.isAdmin`, but admin
+    here is `users.isAdmin` in Convex and every other admin surface uses
+    `requireAdmin`. A route handler would have been a second, divergent authz
+    source. Rationale written up in the backlog file under "Deviations".
+  - **Two new columns, Design and Quantity**, forced by the R-track model (an
+    order spans designs; an order entry carries a qty). Silhouette specs are
+    per-row now, not per-order, because O-01 moved them onto the design.
+  - **Removed-design entries are excluded** from the export, matching R-05
+    count semantics. Arguable — a supplier arguably wants everything ordered,
+    but the production basis is the current design list.
+  - **Values starting with `= + - @` get an apostrophe prefix** so a fan-
+    supplied name can't execute as a formula when the supplier opens the file.
+    Visible as a leading `'` in a raw text editor; spreadsheets strip it.
+  - **UTF-8 BOM** prepended so Excel doesn't mangle accented names.
+- Screenshots: **none — blocked, needs human setup.** `snap.mjs` renders
+  `/admin/orders` as "403 — Access Denied": the saved Clerk session in
+  `.auth/state.json` is not an admin account. Even with admin access the
+  detail route needs a real order id. To get review screenshots of this
+  surface, re-run `node scripts/snap.mjs --login` signed in as an admin.
+  I deleted the captured 403 image rather than leave a misleading artifact.
+- Follow-ups filed: none
