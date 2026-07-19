@@ -1,3 +1,8 @@
+---
+name: review-batch
+description: Catch human review up to master, chunk by chunk. Turns a wall of ralph-loop commits into issue-sized review sessions where the human judges taste, UX, and business fit — not syntax.
+---
+
 # /review-batch — Human Review Catch-Up
 
 ## Purpose
