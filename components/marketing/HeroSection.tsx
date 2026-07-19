@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { JerseyCarousel } from "@/components/marketing/JerseyCarousel";
 
 export function HeroSection() {
   return (
@@ -39,25 +40,7 @@ export function HeroSection() {
           </p>
         </div>
 
-        {/* TODO: replace with client jersey photos */}
-        <div
-          aria-label="Custom sublimated jersey photo placeholder"
-          role="img"
-          className="relative mx-auto flex aspect-[4/5] w-full max-w-md items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-teal-500 via-teal-600 to-teal-800 shadow-xl ring-1 ring-teal-900/10"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.25),transparent_55%)]" />
-          <div className="relative z-10 px-6 text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-              Sidestep
-            </p>
-            <p className="mt-3 font-mono text-5xl font-bold text-white drop-shadow-sm">
-              #07
-            </p>
-            <p className="mt-3 text-sm font-medium text-white/85">
-              Your design here
-            </p>
-          </div>
-        </div>
+        <JerseyCarousel />
       </div>
     </section>
   );
