@@ -16,10 +16,19 @@
  *     terminal, and the session is saved to .auth/state.json (gitignored).
  *     All later runs reuse it automatically.
  *
+ *     Sign in with a Clerk EMAIL/PASSWORD (or email-code) test user — NOT
+ *     "Continue with Google". Google's OAuth page detects CDP-driven browsers
+ *     (the mechanism Playwright uses) and blocks sign-in on purpose; no launch
+ *     flag defeats this. Clerk's own Cloudflare bot check on the email/password
+ *     path IS handled here via @clerk/testing's testing-token bypass, so that
+ *     path works without hitting a CAPTCHA at all.
+ *
  * Env:
  *   SNAP_BASE  base URL (default http://localhost:8080, per `npm run dev`)
+ *   Reads CLERK_SECRET_KEY / NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY from .env.local
+ *   for the testing-token bypass (--login only).
  *
- * Requires: npm i -D playwright && npx playwright install chromium
+ * Requires: npm i -D playwright @clerk/testing && npx playwright install chromium
  * Note: dark mode is emulated via prefers-color-scheme, which next-themes
  * respects when the toggle is on "system" (the default for a fresh profile).
  */
@@ -71,18 +80,32 @@ async function ensureServer() {
 
 async function login() {
   fs.mkdirSync(path.dirname(AUTH_STATE), { recursive: true });
+  try { process.loadEnvFile(path.join(ROOT, '.env.local')); } catch { /* no .env.local — clerkSetup will error below */ }
+
+  const { clerkSetup, setupClerkTestingToken } = await import('@clerk/testing/playwright');
+  await clerkSetup(); // fetches a testing token from the Clerk Backend API using CLERK_SECRET_KEY
+
   const server = await ensureServer();
-  const browser = await chromium.launch({ headless: false });
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const userDataDir = path.join(ROOT, '.auth', 'chrome-profile');
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    headless: false,
+    channel: 'chrome', // real installed Chrome, not the Playwright test build — fewer automation tells
+    viewport: { width: 1280, height: 800 },
+    args: ['--disable-blink-features=AutomationControlled'],
+    ignoreDefaultArgs: ['--enable-automation'],
+  });
+  await setupClerkTestingToken({ context }); // bypasses Clerk's Cloudflare bot check for this session
   const page = await context.newPage();
   await page.goto(BASE);
-  console.log('\n[snap] Sign in in the browser window, then press Enter here to save the session...');
+  console.log('\n[snap] Sign in with a Clerk EMAIL/PASSWORD (or email-code) test user.');
+  console.log('[snap] Do NOT use "Continue with Google" — Google blocks automated browsers at the OAuth step no matter what.');
+  console.log('[snap] Then press Enter here to save the session...');
   await new Promise(resolve => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     rl.question('', () => { rl.close(); resolve(); });
   });
   await context.storageState({ path: AUTH_STATE });
-  await browser.close();
+  await context.close();
   server?.kill();
   console.log(`[snap] Session saved to ${path.relative(ROOT, AUTH_STATE)} — authenticated snaps will now work.`);
 }
