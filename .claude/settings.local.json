@@ -58,7 +58,8 @@
       "mcp__convex-mcp__run",
       "Bash(git grep *)",
       "Bash(find app *)",
-      "Bash(find components *)"
+      "Bash(find components *)",
+      "Bash(netstat -ano)"
     ]
   }
 }
