@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { MarketingShell } from "@/components/layout/MarketingShell";
 import { IntakeForm } from "@/components/intake/IntakeForm";
@@ -28,7 +29,9 @@ export default function IntakePage() {
 
       <section className="bg-background">
         <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-          <IntakeForm />
+          <Suspense fallback={null}>
+            <IntakeForm />
+          </Suspense>
         </div>
       </section>
     </MarketingShell>

@@ -16,6 +16,10 @@ describe("IntakeForm", () => {
     const user = userEvent.setup();
     render(<IntakeForm />);
 
+    // Estimated jersey count defaults to a prefilled, valid value (10) so the
+    // team can start from the homepage's quantity; clear it to also exercise
+    // the minimum-order validation on an otherwise-empty submit.
+    await user.clear(screen.getByLabelText(/estimated jersey count/i));
     await user.click(screen.getByRole("button", { name: /send my inquiry/i }));
 
     expect(

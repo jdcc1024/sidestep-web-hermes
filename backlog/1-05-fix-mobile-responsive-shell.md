@@ -1,6 +1,6 @@
 # Issue: Fix Mobile Responsive Shell
 
-## Status: pending
+## Status: done
 
 ## Phase: 1
 
@@ -50,3 +50,6 @@ See: docs/prd/sidestep-website-phase1.md — Section 7 (Technical Constraints �
 - After restart, re-confirm by grepping the compiled CSS for `lg\:hidden`
 - Visual verification in Chrome DevTools responsive mode at 375 / 768 / 1024 / 1280 is required — typecheck and curl alone are insufficient
 - If a deeper Tailwind config fix is needed (e.g., explicit `@source` directives in `app/globals.css`), document it in the commit and update CLAUDE.md so future tasks don't trip on the same issue
+
+## Resolution
+`components/layout/SidebarShell.tsx` (the file with the broken `md:` classes) no longer exists — it was replaced by `PortalShell.tsx` and `AdminShell.tsx` during the shadcn migration (S-05 pilot, then S-12 admin sweep). Both already implement this issue's acceptance criteria exactly: a Sheet-based hamburger header at `lg:hidden` (covers 375px and 768px) and a fixed sidebar at `lg:flex` (1024px+), with `aria-current="page"` active-link highlighting. Verified live in a real browser via `docs/review/1-05/` screenshots (portal + marketing home, 375/768/1280, light+dark). No code change needed; closing as already fixed.

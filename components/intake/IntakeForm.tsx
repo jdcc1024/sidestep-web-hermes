@@ -165,7 +165,7 @@ function todayIso(): string {
 
 function useInitialQty(): string {
   const searchParams = useSearchParams();
-  const raw = searchParams.get("qty");
+  const raw = searchParams?.get("qty");
   if (!raw) return "10";
   const n = Number.parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? String(n) : "10";
