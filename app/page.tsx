@@ -10,8 +10,8 @@ export default function Home() {
   return (
     <MarketingShell>
       <HeroSection />
-      <CustomizeSection />
       <ProcessSection />
+      <CustomizeSection />
       <PricingSection />
       <FaqSection />
       <QuoteCtaSection />
