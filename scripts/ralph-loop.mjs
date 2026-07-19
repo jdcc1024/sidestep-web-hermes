@@ -83,11 +83,14 @@ function summarize(dag) {
 
 function runIteration(iter, logFile) {
   const prompt = fs.readFileSync(PROMPT_FILE, 'utf-8');
-  const args = ['-p', prompt, '--dangerously-skip-permissions'];
+  // Prompt is piped over stdin, not passed as an argv string: on Windows, spawn's
+  // shell:true routes through cmd.exe, whose line-based parser mangles any argument
+  // containing a newline (truncates at the first line break, regardless of quoting).
+  const args = ['-p', '--dangerously-skip-permissions'];
   if (MODEL) args.push('--model', MODEL);
 
   return new Promise(resolve => {
-    const child = spawn('claude', args, { cwd: ROOT, shell: true });
+    const child = spawn('claude', args, { cwd: ROOT, shell: true, stdio: ['pipe', 'pipe', 'pipe'] });
     const log = fs.createWriteStream(logFile, { flags: 'a' });
     log.write(`\n===== Iteration ${iter} — ${new Date().toISOString()} =====\n`);
 
@@ -103,6 +106,9 @@ function runIteration(iter, logFile) {
       log.end(`\n[ralph-loop] iteration ${iter} exited with code ${code}\n`);
       resolve(code);
     });
+
+    child.stdin.write(prompt);
+    child.stdin.end();
   });
 }
 
