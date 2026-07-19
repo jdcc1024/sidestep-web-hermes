@@ -24,6 +24,7 @@ export function PricingCalculator() {
 
   const parsed = Number.parseInt(quantityText, 10);
   const estimate = calculateEstimate(parsed, hasDesignFee);
+  const intakeQty = Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
 
   const quantityId = useId();
   const designFeeId = useId();
@@ -133,7 +134,7 @@ export function PricingCalculator() {
           size="lg"
           className="h-11 bg-teal-600 px-5 text-sm text-white shadow-sm hover:bg-teal-700"
         >
-          <Link href="/intake">
+          <Link href={`/intake?qty=${intakeQty}`}>
             Get your official quote
             <ArrowRightIcon aria-hidden="true" />
           </Link>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -145,7 +146,6 @@ const formSchema = z.object({
       QUESTIONS_MAX_LENGTH,
       `Please keep this under ${QUESTIONS_MAX_LENGTH} characters.`,
     ),
-  newsletterOptIn: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -163,9 +163,18 @@ function todayIso(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function useInitialQty(): string {
+  const searchParams = useSearchParams();
+  const raw = searchParams.get("qty");
+  if (!raw) return "10";
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? String(n) : "10";
+}
+
 export function IntakeForm() {
   const submitIntake = useMutation(api.intakes.submitIntake);
   const [submitted, setSubmitted] = useState(false);
+  const initialQty = useInitialQty();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -175,7 +184,7 @@ export function IntakeForm() {
       email: "",
       phone: "",
       sport: "",
-      estimatedQuantity: "",
+      estimatedQuantity: initialQty,
       // designPreference starts unselected. zod rejects undefined with the
       // "Pick the option that fits best." message; the cast satisfies the
       // typed RadioGroup binding.
@@ -184,7 +193,6 @@ export function IntakeForm() {
       deadline: "",
       brief: "",
       questions: "",
-      newsletterOptIn: false,
     },
   });
 
@@ -202,7 +210,7 @@ export function IntakeForm() {
         deadline: values.deadline,
         brief: values.brief,
         questions: values.questions,
-        newsletterOptIn: values.newsletterOptIn,
+        newsletterOptIn: false,
       });
       await submitIntake(payload);
       setSubmitted(true);
@@ -499,33 +507,11 @@ export function IntakeForm() {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="newsletterOptIn"
-            render={({ field }) => (
-              <FormItem>
-                <label className="flex cursor-pointer items-start gap-3 text-sm text-foreground">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={(next) => field.onChange(next === true)}
-                      className="mt-0.5"
-                    />
-                  </FormControl>
-                  <span>Send me occasional updates from Sidestep</span>
-                </label>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </FieldSection>
 
         <Separator />
 
-        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            We&apos;ll reply within one business day.
-          </p>
+        <div className="flex justify-end">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Sending…" : "Send my inquiry"}
           </Button>
