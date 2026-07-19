@@ -8,6 +8,7 @@ import {
   checkRosterName,
   checkRosterNumber,
 } from "../lib/rosterEntry/rules";
+import { isLocked } from "../lib/jerseyRun/lock";
 
 // Create a roster entry — a name+number player slot on one of the order's
 // designs (R-01 foundation; the captain-seeding UI lands in R-03, the fan
@@ -27,6 +28,9 @@ export const create = mutation({
     const run = await ctx.db.get(args.runId);
     if (!run) throw new ConvexError("Jersey run not found.");
     const { order } = await requireOrderOwnership(ctx, run.orderId);
+
+    if (isLocked(run))
+      throw new ConvexError("This jersey run is locked.");
 
     // A roster entry belongs to a design the order actually links — a
     // slot on a design that isn't on the order has no home.
@@ -68,6 +72,9 @@ export const update = mutation({
     if (!run) throw new ConvexError("Jersey run not found.");
     await requireOrderOwnership(ctx, run.orderId);
 
+    if (isLocked(run))
+      throw new ConvexError("This jersey run is locked.");
+
     const nameCheck = checkRosterName(args.name);
     if (!nameCheck.ok) throw new ConvexError(nameCheck.error);
     const numberCheck = checkRosterNumber(args.number);
@@ -93,6 +100,9 @@ export const remove = mutation({
     const run = await ctx.db.get(entry.runId);
     if (!run) throw new ConvexError("Jersey run not found.");
     await requireOrderOwnership(ctx, run.orderId);
+
+    if (isLocked(run))
+      throw new ConvexError("This jersey run is locked.");
 
     const attached = await ctx.db
       .query("orderEntries")

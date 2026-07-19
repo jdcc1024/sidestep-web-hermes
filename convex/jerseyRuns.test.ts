@@ -227,6 +227,212 @@ describe("jerseyRuns.closeRunByAdmin", () => {
   });
 });
 
+describe("jerseyRuns.lock / unlock (R-06)", () => {
+  async function seedAdmin(t: ReturnType<typeof convexTest>) {
+    await t.run((ctx) =>
+      ctx.db.insert("users", {
+        clerkId: "user_admin_clerk",
+        email: "admin@example.com",
+        name: "Admin",
+        isAdmin: true,
+        createdAt: Date.now(),
+      }),
+    );
+    return t.withIdentity({
+      subject: "user_admin_clerk",
+      email: "admin@example.com",
+      name: "Admin",
+    });
+  }
+
+  it("captain locks an open run: status becomes locked and a count snapshot is stored", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+
+    const designId = await t.run((ctx) =>
+      ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Home",
+        brief: "b",
+        fileIds: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
+    await t.run((ctx) =>
+      ctx.db.insert("orderEntries", {
+        runId,
+        designId,
+        size: "M",
+        qty: 3,
+        source: "captain",
+        submitterName: "Sam",
+        submitterEmail: "sam@example.com",
+        createdAt: Date.now(),
+      }),
+    );
+
+    await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+
+    const run = await t.run((ctx) => ctx.db.get(runId));
+    expect(run?.status).toBe("locked");
+    expect(run?.lockSnapshot?.total).toBe(3);
+    expect(run?.lockSnapshot?.byDesign).toEqual([
+      { designId, title: "Home", total: 3 },
+    ]);
+    expect(run?.lockSnapshot?.lockedAt).toBeTypeOf("number");
+  });
+
+  it("admin can lock a captain's run", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const asAdmin = await seedAdmin(t);
+
+    await asAdmin.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+    expect((await t.run((ctx) => ctx.db.get(runId)))?.status).toBe("locked");
+  });
+
+  it("rejects locking from a stranger (not the captain, not an admin)", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const { asUser: asStranger } = await seedCaptainWithOrder(
+      t,
+      "user_stranger_clerk",
+    );
+
+    await expect(
+      asStranger.mutation(api.jerseyRuns.lock, { jerseyRunId: runId }),
+    ).rejects.toThrow(/access/i);
+  });
+
+  it("rejects locking an already-locked run", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+
+    await expect(
+      asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId }),
+    ).rejects.toThrow(/already locked/i);
+  });
+
+  it("a past-deadline run can still be locked explicitly (materializes the snapshot)", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    await t.run((ctx) =>
+      ctx.db.patch(runId, { deadline: Date.now() - 1000 }),
+    );
+
+    await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+    const run = await t.run((ctx) => ctx.db.get(runId));
+    expect(run?.status).toBe("locked");
+    expect(run?.lockSnapshot).toBeTruthy();
+  });
+
+  it("admin unlocks a still-pre-deadline locked run back to open", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+    const asAdmin = await seedAdmin(t);
+
+    await asAdmin.mutation(api.jerseyRuns.unlock, { jerseyRunId: runId });
+    const run = await t.run((ctx) => ctx.db.get(runId));
+    expect(run?.status).toBe("open");
+    expect(run?.lockSnapshot).toBeUndefined();
+  });
+
+  it("admin unlocks a past-deadline locked run to closed, not open (so it doesn't instantly re-lock)", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    await t.run((ctx) =>
+      ctx.db.patch(runId, {
+        status: "locked",
+        deadline: Date.now() - 1000,
+        lockSnapshot: { lockedAt: Date.now(), total: 0, byDesign: [] },
+      }),
+    );
+    const asAdmin = await seedAdmin(t);
+
+    await asAdmin.mutation(api.jerseyRuns.unlock, { jerseyRunId: runId });
+    const run = await t.run((ctx) => ctx.db.get(runId));
+    expect(run?.status).toBe("closed");
+  });
+
+  it("captain can unlock their own run while the deadline hasn't passed", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+
+    await asUser.mutation(api.jerseyRuns.unlock, { jerseyRunId: runId });
+    expect((await t.run((ctx) => ctx.db.get(runId)))?.status).toBe("open");
+  });
+
+  it("rejects a captain unlocking after the deadline has passed — admin only", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    await t.run((ctx) =>
+      ctx.db.patch(runId, {
+        status: "locked",
+        deadline: Date.now() - 1000,
+        lockSnapshot: { lockedAt: Date.now(), total: 0, byDesign: [] },
+      }),
+    );
+
+    await expect(
+      asUser.mutation(api.jerseyRuns.unlock, { jerseyRunId: runId }),
+    ).rejects.toThrow(/deadline/i);
+  });
+
+  it("rejects unlocking a run that isn't locked", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+
+    await expect(
+      asUser.mutation(api.jerseyRuns.unlock, { jerseyRunId: runId }),
+    ).rejects.toThrow(/not locked/i);
+  });
+});
+
 describe("jerseyRuns.getPublic", () => {
   it("returns the order's designs with seeded roster slots for the form", async () => {
     const t = convexTest(schema, modules);

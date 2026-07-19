@@ -30,12 +30,21 @@ import {
   checkSize,
   isJerseyRunClosed,
 } from "../lib/jerseyRunResponse/rules";
+import {
+  canLock,
+  canUnlock,
+  effectiveStatus,
+  statusAfterUnlock,
+} from "../lib/jerseyRun/lock";
 
 // Get the jersey run linked to one of the captain's orders. Returns null
 // if no run exists yet — the order detail page uses that to show the
 // "set up jersey run" CTA instead of the run details. Throws if the
 // caller doesn't own the order (a stronger signal than "not found", so
 // the UI can distinguish a missing run from an access violation).
+// `effectiveStatus` (R-06) is the lazily-resolved status (accounting for
+// a passed deadline) so the order page (O-06) can render read-only
+// without recomputing the lock rule itself.
 export const getByOrder = query({
   args: { orderId: v.id("orders") },
   handler: async (ctx, { orderId }) => {
@@ -47,10 +56,13 @@ export const getByOrder = query({
     if (order.captainId !== user._id)
       throw new ConvexError("You don't have access to this order.");
 
-    return ctx.db
+    const run = await ctx.db
       .query("jerseyRuns")
       .withIndex("by_order", (q) => q.eq("orderId", orderId))
       .unique();
+    if (!run) return null;
+
+    return { ...run, effectiveStatus: effectiveStatus(run) };
   },
 });
 
@@ -62,6 +74,9 @@ export const getByOrder = query({
 // per-design picker (collapsing to one implicit choice for a single-
 // design order) and, in fixed mode, let the fan pick a pre-seeded name.
 // Only slot name/number are exposed — never submitter emails or other PII.
+// `effectiveStatus` (R-06) is the lazily-resolved status, so the public
+// form and captain run-detail view can show "locked" the moment the
+// deadline passes without a scheduler having touched the row yet.
 export const getPublic = query({
   args: { jerseyRunId: v.id("jerseyRuns") },
   handler: async (ctx, { jerseyRunId }) => {
@@ -93,6 +108,7 @@ export const getPublic = query({
 
     return {
       run,
+      effectiveStatus: effectiveStatus(run),
       teamName: order?.teamName ?? "",
       captainName: captain?.name ?? "",
       designs,
@@ -379,6 +395,87 @@ export const closeRunByAdmin = mutation({
       { jerseyRunId },
     );
     return { alreadyClosed: false };
+  },
+});
+
+// Freeze the confirmed production basis (R-06). Captain or admin only.
+// Takes a Σ-qty-by-design snapshot the same way orderEntries.countsByRun
+// computes it, so the frozen number matches what the captain saw live
+// right before locking. Works on a run whose deadline has already passed
+// (lazily "locked" but never materialized) — this is how that state gets
+// written to the DB with a snapshot.
+export const lock = mutation({
+  args: { jerseyRunId: v.id("jerseyRuns") },
+  handler: async (ctx, { jerseyRunId }) => {
+    const user = await requireCurrentUser(ctx);
+    const run = await ctx.db.get(jerseyRunId);
+    if (!run) throw new ConvexError("Jersey run not found.");
+    if (run.captainId !== user._id && !user.isAdmin)
+      throw new ConvexError("You don't have access to this jersey run.");
+
+    if (!canLock(run))
+      throw new ConvexError("This jersey run is already locked.");
+
+    const order = await ctx.db.get(run.orderId);
+    if (!order) throw new ConvexError("Order not found.");
+
+    const entries = await ctx.db
+      .query("orderEntries")
+      .withIndex("by_run", (q) => q.eq("runId", jerseyRunId))
+      .collect();
+    const qtyByDesign = new Map<string, number>();
+    for (const e of entries)
+      qtyByDesign.set(e.designId, (qtyByDesign.get(e.designId) ?? 0) + e.qty);
+
+    const byDesign = await Promise.all(
+      order.designIds.map(async (designId) => {
+        const design = await ctx.db.get(designId);
+        return {
+          designId,
+          title: design?.title ?? "Untitled design",
+          total: qtyByDesign.get(designId) ?? 0,
+        };
+      }),
+    );
+    const total = byDesign.reduce((sum, d) => sum + d.total, 0);
+
+    await ctx.db.patch(jerseyRunId, {
+      status: "locked",
+      lockSnapshot: { lockedAt: Date.now(), total, byDesign },
+    });
+    return jerseyRunId;
+  },
+});
+
+// Reverse a lock (R-06). Admin can always unlock; a captain only while
+// the run's deadline hasn't passed (PRD §6). A run unlocked before its
+// deadline reopens fully ("open"); one unlocked after its deadline goes
+// to "closed" instead, so the unlock actually sticks — see
+// lib/jerseyRun/lock.ts for why "open" would instantly re-lock there.
+// The frozen snapshot is cleared: an unlocked run has no confirmed basis,
+// live counts apply again.
+export const unlock = mutation({
+  args: { jerseyRunId: v.id("jerseyRuns") },
+  handler: async (ctx, { jerseyRunId }) => {
+    const user = await requireCurrentUser(ctx);
+    const run = await ctx.db.get(jerseyRunId);
+    if (!run) throw new ConvexError("Jersey run not found.");
+    if (run.captainId !== user._id && !user.isAdmin)
+      throw new ConvexError("You don't have access to this jersey run.");
+
+    if (effectiveStatus(run) !== "locked")
+      throw new ConvexError("This jersey run is not locked.");
+
+    if (!canUnlock(run, { isAdmin: user.isAdmin }))
+      throw new ConvexError(
+        "The deadline has passed — ask an admin to unlock this run.",
+      );
+
+    await ctx.db.patch(jerseyRunId, {
+      status: statusAfterUnlock(run),
+      lockSnapshot: undefined,
+    });
+    return jerseyRunId;
   },
 });
 

@@ -6,3 +6,4 @@
 
 export * from "./rules";
 export * from "./form";
+export * from "./lock";

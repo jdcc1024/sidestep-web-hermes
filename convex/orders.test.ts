@@ -279,6 +279,39 @@ describe("orders.updateOrder", () => {
       }),
     ).rejects.toThrow(/Not authenticated/);
   });
+
+  it("rejects updating an order once its jersey run is locked (R-06)", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedCaptain(t);
+    const orderId = await seedOrder(t, asUser);
+    const now = Date.now();
+    const runId = await t.run((ctx) =>
+      ctx.db.insert("jerseyRuns", {
+        orderId,
+        captainId: userId,
+        sizeOptions: ["S", "M", "L"],
+        namesMode: "open",
+        customQuestions: [],
+        deadline: now + 7 * 24 * 60 * 60 * 1000,
+        status: "locked",
+        lockSnapshot: { lockedAt: now, total: 0, byDesign: [] },
+        createdAt: now,
+      }),
+    );
+
+    await expect(
+      asUser.mutation(api.orders.updateOrder, {
+        orderId,
+        teamName: "Renamed FC",
+        sport: VALID_ORDER.sport,
+        estimatedQuantity: VALID_ORDER.estimatedQuantity,
+        hasOwnDesign: VALID_ORDER.hasOwnDesign,
+        designIds: [],
+      }),
+    ).rejects.toThrow(/locked/i);
+    // Sanity: the run really is the one we just locked, not a stray guard.
+    expect((await t.run((ctx) => ctx.db.get(runId)))?.status).toBe("locked");
+  });
 });
 
 describe("orders.getMyOrder", () => {

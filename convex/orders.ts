@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { getCurrentUserOrNull, requireCurrentUser } from "./_auth";
+import { isLocked } from "../lib/jerseyRun/lock";
 
 // Server-side guards. Mirror lib/order.ts so the client and server cap
 // values the same way — defense in depth against a hand-rolled client that
@@ -177,6 +178,16 @@ export const updateOrder = mutation({
     const order = await ctx.db.get(orderId);
     if (!order || order.captainId !== user._id)
       throw new ConvexError("You don't have access to this order.");
+
+    // Once the order's jersey run is locked (R-06), the order details —
+    // including which designs it links — are frozen along with the
+    // roster/order-entry rows.
+    const run = await ctx.db
+      .query("jerseyRuns")
+      .withIndex("by_order", (q) => q.eq("orderId", orderId))
+      .unique();
+    if (run && isLocked(run))
+      throw new ConvexError("This order's jersey run is locked.");
 
     const fields = await normalizeOrderFields(ctx, user._id, args);
 

@@ -6,6 +6,8 @@
 // server can't drift on length caps, email shape, or trim/normalization
 // behavior.
 
+import { effectiveStatus } from "../jerseyRun/lock";
+
 export const RESPONDENT_NAME_MAX_LENGTH = 120;
 export const EMAIL_MAX_LENGTH = 254;
 export const JERSEY_NAME_MAX_LENGTH = 40;
@@ -39,11 +41,10 @@ export function isJerseyRunClosed(
   run: Pick<JerseyRunForResponse, "status" | "deadline">,
   now: number = Date.now(),
 ): boolean {
-  // A locked run is also closed to new submissions — it's the confirmed
-  // production basis (R-06). Nothing flips a run to `locked` until R-06,
-  // so this is forward-looking but harmless today.
-  if (run.status === "closed" || run.status === "locked") return true;
-  return run.deadline < now;
+  // A locked run (manually, or lazily once its deadline passes — R-06)
+  // is also closed to new submissions: it's the confirmed production
+  // basis.
+  return effectiveStatus(run, now) !== "open";
 }
 
 export function checkRespondentName(raw: string): CheckResult<string> {

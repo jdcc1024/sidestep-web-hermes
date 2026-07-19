@@ -74,6 +74,24 @@ export default defineSchema({
       v.literal("closed"),
       v.literal("locked"),
     ),
+    // The confirmed-count snapshot taken at lock time (R-06) — Σ qty and
+    // the same grouped by design, same shape as orderEntries.countsByRun,
+    // so the order page reads a frozen number instead of a live one once
+    // locked. Cleared (not overwritten with zeros) on unlock, since an
+    // unlocked run has no frozen basis and live counts apply again.
+    lockSnapshot: v.optional(
+      v.object({
+        lockedAt: v.number(),
+        total: v.number(),
+        byDesign: v.array(
+          v.object({
+            designId: v.id("designs"),
+            title: v.string(),
+            total: v.number(),
+          }),
+        ),
+      }),
+    ),
     createdAt: v.number(),
   })
     .index("by_order", ["orderId"])

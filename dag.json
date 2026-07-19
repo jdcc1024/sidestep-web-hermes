@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-19T07:14:47.199Z",
+  "lastUpdated": "2026-07-19T07:47:17.302Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1130,7 +1130,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Once the roster is locked, freeze the order: details go read-only and edit mutations are rejected so the production basis cannot drift. Reacts to the external locked run state; standalone designs stay editable. BLOCKED on the external Confirm/Lock slice (jerseyRuns.locked status).",
-      "status": "blocked",
+      "status": "pending",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -1294,10 +1294,10 @@
       "phase": "phase-2",
       "type": "feature",
       "description": "The lock that freezes the production basis. Captain/admin can lock manually; a run auto-locks lazily when its deadline passes. Admin can always unlock, captain only pre-deadline. Locked runs reject roster/order/design mutations and freeze a count snapshot.",
-      "status": "pending",
-      "agent": null,
-      "startedAt": null,
-      "completedAt": null,
+      "status": "completed",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-19T07:34:49.914Z",
+      "completedAt": "2026-07-19T07:47:17.301Z",
       "issueFile": "backlog/R-06-lock-freeze.md",
       "prdRef": "docs/prd/roster-manager-and-lock.md#6-implementation-decisions",
       "acceptanceCriteria": [
@@ -1312,7 +1312,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Cleanup slice: migrate admin oversight, run responses page, participation history and response views onto the new model, then delete jerseyRunResponses + jerseyRuns.fixedRoster. Done last so every writer is migrated before the legacy table is dropped.",
-      "status": "blocked",
+      "status": "pending",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -1990,31 +1990,10 @@
       "name": "Ralph Loop",
       "status": "idle",
       "currentTask": null,
-      "tasksCompleted": 2
+      "tasksCompleted": 3
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-24T16:43:09.840Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "agent-claude-opus47-s10",
-      "message": "Claude Opus 4.7 (S-10 Intake Form) joined the workforce"
-    },
-    {
-      "timestamp": "2026-05-24T16:43:22.532Z",
-      "event": "task_started",
-      "nodeId": "S-10",
-      "agent": "agent-claude-opus47-s10",
-      "message": "Claude Opus 4.7 (S-10 Intake Form) picked up: IntakeForm → RHF + zod + shadcn Form"
-    },
-    {
-      "timestamp": "2026-05-24T19:09:40.313Z",
-      "event": "task_completed",
-      "nodeId": "S-10",
-      "agent": "agent-claude-opus47-s10",
-      "message": "Completed: IntakeForm → RHF + zod + shadcn Form"
-    },
     {
       "timestamp": "2026-05-24T19:11:52.599Z",
       "event": "agent_joined",
@@ -2693,6 +2672,27 @@
       "nodeId": "B-01",
       "agent": "ralph-loop",
       "message": "Completed: Fix Broken useSearchParams in IntakeForm"
+    },
+    {
+      "timestamp": "2026-07-19T07:30:16.355Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-19T07:34:49.914Z",
+      "event": "task_started",
+      "nodeId": "R-06",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Lock & Freeze"
+    },
+    {
+      "timestamp": "2026-07-19T07:47:17.302Z",
+      "event": "task_completed",
+      "nodeId": "R-06",
+      "agent": "ralph-loop",
+      "message": "Completed: Lock & Freeze"
     }
   ]
 }

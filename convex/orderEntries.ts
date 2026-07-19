@@ -17,6 +17,7 @@ import {
   rosterMatchKey,
 } from "../lib/rosterEntry/rules";
 import { checkCustomAnswer, isJerseyRunClosed } from "../lib/jerseyRunResponse/rules";
+import { isLocked } from "../lib/jerseyRun/lock";
 
 // Create one order entry — a jersey to produce (R-01 foundation; the
 // multi-line public fan submission lands in R-02). Gated on order
@@ -39,6 +40,9 @@ export const create = mutation({
     const run = await ctx.db.get(args.runId);
     if (!run) throw new ConvexError("Jersey run not found.");
     const { order } = await requireOrderOwnership(ctx, run.orderId);
+
+    if (isLocked(run))
+      throw new ConvexError("This jersey run is locked.");
 
     if (!order.designIds.includes(args.designId))
       throw new ConvexError("That design isn't part of this order.");

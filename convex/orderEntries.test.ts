@@ -178,6 +178,22 @@ describe("orderEntries.create", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("rejects creating an order entry once the run is locked (R-06)", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    await asCaptain.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+
+    await expect(
+      asCaptain.mutation(api.orderEntries.create, {
+        runId,
+        designId,
+        size: "M",
+        qty: 1,
+        ...submitter,
+      }),
+    ).rejects.toThrow(/locked/i);
+  });
 });
 
 describe("orderEntries.listByRun", () => {

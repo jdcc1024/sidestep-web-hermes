@@ -314,6 +314,52 @@ describe("rosterEntries.remove", () => {
   });
 });
 
+describe("rosterEntries freeze guard when the run is locked (R-06)", () => {
+  it("rejects create, update, and remove on a locked run", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    const id = await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Spare",
+    });
+    await asCaptain.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.create, {
+        runId,
+        designId,
+        name: "Too late",
+      }),
+    ).rejects.toThrow(/locked/i);
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.update, {
+        rosterEntryId: id,
+        name: "Renamed",
+      }),
+    ).rejects.toThrow(/locked/i);
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.remove, { rosterEntryId: id }),
+    ).rejects.toThrow(/locked/i);
+  });
+
+  it("rejects create on a run whose deadline has lazily passed, even without an explicit lock", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    await t.run((ctx) => ctx.db.patch(runId, { deadline: Date.now() - 1000 }));
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.create, {
+        runId,
+        designId,
+        name: "Too late",
+      }),
+    ).rejects.toThrow(/locked/i);
+  });
+});
+
 describe("rosterEntries.listForRun", () => {
   it("groups slots by design and marks a seeded slot not yet filled", async () => {
     const t = convexTest(schema, modules);
