@@ -25,6 +25,13 @@
  *   - Refuses to start on a dirty git tree
  *   - Never pushes; you review via /review-batch and push yourself
  *   - Each iteration's output is logged to docs/review/loop-runs/
+ *
+ * Status visibility:
+ *   claude is run with --output-format stream-json --verbose instead of the default
+ *   text mode, which prints nothing until the whole turn finishes. Each tool call the
+ *   agent makes is echoed as a one-line `[claude] → ...` status; a heartbeat line prints
+ *   every ~30s of silence (e.g. mid-way through a slow test run) so a long-but-working
+ *   iteration doesn't look indistinguishable from a hang.
  */
 
 import fs from 'node:fs';
@@ -49,6 +56,7 @@ const MAX_ITER = parseInt(flag('max-iterations', '5'), 10);
 const MODEL = flag('model', null);
 const TIMEOUT_MS = parseInt(flag('timeout', '60'), 10) * 60 * 1000;
 const DRY_RUN = argv.includes('--dry-run');
+const HEARTBEAT_MS = 30_000; // console "still alive" ping if no stream event for this long
 
 // --- helpers ---
 function sh(cmd) {
@@ -81,12 +89,85 @@ function summarize(dag) {
   return `${JSON.stringify(counts)}${nh ? ` | needs-human: ${nh}` : ''}`;
 }
 
+// stdout chunks from `claude --output-format stream-json` are arbitrary slices of a
+// newline-delimited JSON stream: one chunk can hold zero, one, or many complete lines,
+// and can split a line (even mid-JSON-token) across chunks.
+class NdjsonLineBuffer {
+  constructor(onLine) {
+    this.buf = '';
+    this.onLine = onLine;
+  }
+  push(chunkStr) {
+    this.buf += chunkStr;
+    const lines = this.buf.split('\n');
+    this.buf = lines.pop(); // last element is the partial tail (or '' if chunk ended in \n)
+    for (const line of lines) {
+      if (line.trim()) this.onLine(line);
+    }
+  }
+  flush() {
+    if (this.buf.trim()) this.onLine(this.buf);
+    this.buf = '';
+  }
+}
+
+function safeParseJson(line) {
+  try { return JSON.parse(line); } catch { return null; }
+}
+
+const TOOL_PATH_KEYS = new Set(['Read', 'Edit', 'Write', 'NotebookEdit']);
+function describeToolUse(block) {
+  const input = block.input || {};
+  if (block.name === 'Bash') {
+    const cmd = String(input.command || '').replace(/\s+/g, ' ').trim();
+    return `Bash: ${cmd.length > 100 ? cmd.slice(0, 100) + '…' : cmd}`;
+  }
+  if (TOOL_PATH_KEYS.has(block.name) && input.file_path) {
+    return `${block.name} ${path.relative(ROOT, input.file_path) || input.file_path}`;
+  }
+  if ((block.name === 'Glob' || block.name === 'Grep') && input.pattern) {
+    return `${block.name}: ${input.pattern}`;
+  }
+  let fallback = JSON.stringify(input);
+  if (fallback && fallback.length > 100) fallback = fallback.slice(0, 100) + '…';
+  return `${block.name}${fallback ? `: ${fallback}` : ''}`;
+}
+
+// Dispatches one parsed NDJSON stream event to a condensed, human-readable console/log
+// line via `emit`. Unhandled types (system/init, user/tool_result, rate_limit_event, and
+// any future type not seen yet) fall through silently — the raw line is already logged
+// by the caller regardless, so nothing is lost, it's just not echoed to the console.
+function handleStreamEvent(evt, emit) {
+  switch (evt.type) {
+    case 'assistant': {
+      const blocks = evt.message?.content || [];
+      for (const block of blocks) {
+        if (block?.type === 'tool_use') emit(`[claude] → ${describeToolUse(block)}`);
+      }
+      break;
+    }
+    case 'result': {
+      const meta = [];
+      if (evt.duration_ms != null) meta.push(`${(evt.duration_ms / 1000).toFixed(0)}s`);
+      if (evt.num_turns != null) meta.push(`${evt.num_turns} turns`);
+      if (evt.total_cost_usd != null) meta.push(`$${evt.total_cost_usd.toFixed(2)}`);
+      emit(`[claude] result${meta.length ? ` (${meta.join(', ')})` : ''}:`);
+      if (evt.result) emit(evt.result);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 function runIteration(iter, logFile) {
   const prompt = fs.readFileSync(PROMPT_FILE, 'utf-8');
   // Prompt is piped over stdin, not passed as an argv string: on Windows, spawn's
   // shell:true routes through cmd.exe, whose line-based parser mangles any argument
   // containing a newline (truncates at the first line break, regardless of quoting).
-  const args = ['-p', '--dangerously-skip-permissions'];
+  // --output-format stream-json (+ required --verbose) gives real-time per-tool-call
+  // events instead of the default text mode's total silence until the final response.
+  const args = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose'];
   if (MODEL) args.push('--model', MODEL);
 
   return new Promise(resolve => {
@@ -94,15 +175,43 @@ function runIteration(iter, logFile) {
     const log = fs.createWriteStream(logFile, { flags: 'a' });
     log.write(`\n===== Iteration ${iter} — ${new Date().toISOString()} =====\n`);
 
+    const iterStart = Date.now();
+    let lastEventAt = iterStart;
+    const emit = line => { console.log(line); log.write(line + '\n'); };
+
     const timer = setTimeout(() => {
       log.write('\n[ralph-loop] TIMEOUT — killing iteration\n');
       child.kill('SIGTERM');
     }, TIMEOUT_MS);
 
-    child.stdout.on('data', d => { process.stdout.write(d); log.write(d); });
-    child.stderr.on('data', d => { process.stderr.write(d); log.write(d); });
+    const heartbeat = setInterval(() => {
+      const idleMs = Date.now() - lastEventAt;
+      if (idleMs >= HEARTBEAT_MS) {
+        const elapsedMin = ((Date.now() - iterStart) / 60000).toFixed(1);
+        console.log(`[ralph-loop] iteration ${iter} still running — ${elapsedMin}m elapsed, ${(idleMs / 1000).toFixed(0)}s since last event`);
+      }
+    }, HEARTBEAT_MS);
+
+    const lineBuffer = new NdjsonLineBuffer(line => {
+      log.write(line + '\n'); // raw NDJSON — full fidelity for after-the-fact debugging
+      const evt = safeParseJson(line);
+      if (evt) handleStreamEvent(evt, emit);
+      else emit(`[claude] (unparsed line) ${line.slice(0, 200)}`);
+    });
+
+    child.stdout.on('data', d => {
+      lastEventAt = Date.now();
+      lineBuffer.push(d.toString('utf-8'));
+    });
+    child.stderr.on('data', d => {
+      lastEventAt = Date.now();
+      process.stderr.write(d);
+      log.write(d);
+    });
     child.on('close', code => {
+      lineBuffer.flush();
       clearTimeout(timer);
+      clearInterval(heartbeat);
       log.end(`\n[ralph-loop] iteration ${iter} exited with code ${code}\n`);
       resolve(code);
     });
@@ -151,25 +260,27 @@ async function main() {
     console.log(`[ralph-loop] Eligible: ${eligible.map(n => n.id).join(', ')}`);
 
     if (DRY_RUN) {
-      console.log(`[ralph-loop] DRY RUN — would spawn: claude -p <ralph-prompt.md> --dangerously-skip-permissions${MODEL ? ` --model ${MODEL}` : ''}`);
+      console.log(`[ralph-loop] DRY RUN — would spawn: claude -p --output-format stream-json --verbose --dangerously-skip-permissions${MODEL ? ` --model ${MODEL}` : ''}  (prompt piped via stdin)`);
       break;
     }
 
     const headBefore = sh('git rev-parse HEAD');
     const fpBefore = dagFingerprint(dag);
+    const iterStartedAt = Date.now();
 
     await runIteration(iter, logFile);
 
+    const elapsedMin = ((Date.now() - iterStartedAt) / 60000).toFixed(1);
     const headAfter = sh('git rev-parse HEAD');
     const fpAfter = dagFingerprint(readDag());
     const progressed = headAfter !== headBefore || fpAfter !== fpBefore;
 
     if (progressed) {
       noProgressStreak = 0;
-      console.log(`[ralph-loop] Progress: ${headAfter !== headBefore ? 'new commit(s)' : 'DAG state change'}.`);
+      console.log(`[ralph-loop] Progress: ${headAfter !== headBefore ? 'new commit(s)' : 'DAG state change'} (${elapsedMin}m).`);
     } else {
       noProgressStreak++;
-      console.log(`[ralph-loop] No progress detected (${noProgressStreak}/2).`);
+      console.log(`[ralph-loop] No progress detected (${noProgressStreak}/2) (${elapsedMin}m).`);
       if (noProgressStreak >= 2) {
         console.log('[ralph-loop] Two stalled iterations — halting. Check ' + path.relative(ROOT, logFile));
         break;
