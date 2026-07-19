@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-19T07:47:17.302Z",
+  "lastUpdated": "2026-07-19T07:50:29.765Z",
   "phases": [
     {
       "id": "phase-1",
@@ -522,7 +522,7 @@
       "phase": "phase-2",
       "type": "feature",
       "description": "Let intake-form visitors optionally attach photos or mood-board images (jerseys they like, team colors, inspiration). Files attach to the intake record so design conversations can start with visual context. Anonymous uploads create real abuse risk — open-write storage would let anyone fill our bucket — so the abuse-control approach needs a decision before implementation.",
-      "status": "pending",
+      "status": "blocked",
       "agent": null,
       "startedAt": "2026-05-27T06:36:39.442Z",
       "completedAt": null,
@@ -536,7 +536,9 @@
         "Uploaded files linked to the intake record so 2-13 admin view can preview them",
         "Files visible alongside the intake in the admin lead view (2-13)",
         "Mobile responsive — picker works on iOS Safari and Android Chrome"
-      ]
+      ],
+      "needsHuman": true,
+      "humanQuestion": "Which abuse-control mechanism (Turnstile / per-IP rate limit / signed URLs / server-side proxy) should gate anonymous uploads on the public intake form?"
     },
     {
       "id": "A-01",
@@ -1995,20 +1997,6 @@
   ],
   "log": [
     {
-      "timestamp": "2026-05-24T19:11:52.599Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "agent-claude-opus47-s11",
-      "message": "Claude Opus 4.7 (S-11 Public Run Form) joined the workforce"
-    },
-    {
-      "timestamp": "2026-05-24T19:11:55.274Z",
-      "event": "task_started",
-      "nodeId": "S-11",
-      "agent": "agent-claude-opus47-s11",
-      "message": "Claude Opus 4.7 (S-11 Public Run Form) picked up: JerseyRunPublicForm → RHF + zod + shadcn Form"
-    },
-    {
       "timestamp": "2026-05-24T19:30:44.688Z",
       "event": "task_completed",
       "nodeId": "S-11",
@@ -2693,6 +2681,20 @@
       "nodeId": "R-06",
       "agent": "ralph-loop",
       "message": "Completed: Lock & Freeze"
+    },
+    {
+      "timestamp": "2026-07-19T07:47:41.472Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-19T07:50:29.765Z",
+      "event": "needs_human",
+      "nodeId": "2-14",
+      "agent": "ralph-loop",
+      "message": "Needs human: Optional Intake Image Uploads — Which abuse-control mechanism (Turnstile / per-IP rate limit / signed URLs / server-side proxy) should gate anonymous uploads on the public intake form?"
     }
   ]
 }
