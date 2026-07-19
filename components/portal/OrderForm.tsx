@@ -20,7 +20,9 @@ import {
   toOrderPayload,
   type OrderMilestone,
 } from "@/lib/order";
+import { pendingDesignRemovals } from "@/lib/designRemoval";
 import { cn } from "@/lib/utils";
+import { DesignRemovalWarning } from "@/components/portal/DesignRemoval";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,6 +99,13 @@ export function OrderForm({ order }: { order?: EditableOrder } = {}) {
   const createOrder = useMutation(api.orders.createOrder);
   const updateOrder = useMutation(api.orders.updateOrder);
   const designs = useQuery(api.designs.listMyDesigns);
+  // Only an edit of an order that has already started collecting can orphan
+  // anyone, so the run lookup — and the whole removal-warning path — is
+  // skipped on New.
+  const run = useQuery(
+    api.jerseyRuns.getByOrder,
+    order ? { orderId: order._id } : "skip",
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -130,6 +139,17 @@ export function OrderForm({ order }: { order?: EditableOrder } = {}) {
     designIds: watched.designIds ?? [],
   });
   const hasLinkedDesign = linkedDesignCount(watched.designIds ?? []) >= 1;
+
+  // Designs unchecked since the order was saved. Each gets its own warning
+  // naming who ordered it (O-08) — a preview, not a gate: the save path
+  // below is untouched, so removing is always possible.
+  const removals =
+    order && run
+      ? pendingDesignRemovals(
+          order.designIds as unknown as string[],
+          watched.designIds ?? [],
+        )
+      : [];
 
   async function onSubmit(values: FormValues) {
     try {
@@ -295,6 +315,14 @@ export function OrderForm({ order }: { order?: EditableOrder } = {}) {
                   value={field.value}
                   onChange={field.onChange}
                 />
+                {run &&
+                  removals.map((designId) => (
+                    <DesignRemovalWarning
+                      key={designId}
+                      runId={run._id}
+                      designId={designId as Id<"designs">}
+                    />
+                  ))}
                 {!hasLinkedDesign && (
                   <p
                     role="note"

@@ -8,6 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { OrderTimeline } from "@/components/portal/OrderTimeline";
+import { RemovedDesigns } from "@/components/portal/DesignRemoval";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -172,6 +173,10 @@ export default function OrderDetailPage({ params }: PageProps) {
           </div>
         )}
       </section>
+
+      {/* Designs dropped from the order after people had already ordered
+          them (O-08). Renders nothing until that actually happens. */}
+      <RemovedDesigns runId={run?._id ?? null} />
 
       <CollectSection
         orderId={orderId}
