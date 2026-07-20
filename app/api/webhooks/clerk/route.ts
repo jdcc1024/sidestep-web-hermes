@@ -1,23 +1,37 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { ConvexHttpClient } from "convex/browser";
+import { Resend } from "resend";
 import { api } from "@/convex/_generated/api";
+import {
+  notifyNewRegistration,
+  type ClerkRegistrationData,
+  type EmailSender,
+} from "@/lib/registrationNotification";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 type ClerkUserEvent = {
   type: "user.created" | "user.updated";
-  data: {
-    id: string;
-    email_addresses: Array<{ email_address: string; primary: boolean }>;
-    first_name: string | null;
-    last_name: string | null;
+  data: ClerkRegistrationData & {
     // privateMetadata is server-only by Clerk's design — never sent to the
     // browser. We read it here and forward to Convex so admin status is
     // anchored to Clerk as the source of truth.
     private_metadata?: { is_admin?: unknown };
   };
 };
+
+// Null when Resend isn't configured (local dev, preview deploys) so the
+// notification is skipped instead of failing the webhook.
+function resendSender(): EmailSender | null {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  const resend = new Resend(apiKey);
+  return async (message) => {
+    const { error } = await resend.emails.send(message);
+    if (error) throw error;
+  };
+}
 
 export async function POST(req: Request) {
   const secret = process.env.CLERK_WEBHOOK_SECRET;
@@ -67,6 +81,22 @@ export async function POST(req: Request) {
     name,
     isAdmin,
   });
+
+  // Ops gets a heads-up only for brand-new captains who found us on their
+  // own; invite-link sign-ups are already tracked as intake leads.
+  if (event.type === "user.created") {
+    const result = await notifyNewRegistration(event.data, {
+      send: resendSender(),
+      env: process.env,
+      onError: (error) =>
+        console.error("Registration notification failed", { id, error }),
+    });
+    if (result === "skipped-unconfigured") {
+      console.warn("RESEND_API_KEY not set — registration email skipped", {
+        id,
+      });
+    }
+  }
 
   return new Response(null, { status: 200 });
 }

@@ -1,6 +1,6 @@
 # Issue: Registration Email Notification
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -31,7 +31,11 @@ Extend the Clerk webhook handler (built in 1-03) to send a Resend notification e
 See: docs/prd/sidestep-website-phase1.md — Section 6 (Implementation Decisions — Email)
 
 ## Implementation Notes
-- Detect self-registration: after invite-link sign-up, set `publicMetadata.registeredViaInvite = true` on the Clerk user; webhook reads this flag to skip the email
+- Detect self-registration: the sign-up page passes `unsafeMetadata.registeredViaInvite = true`
+  to `<SignUp>` when the `sidestep_invite_token` cookie is present, so the flag is part of the
+  sign-up request and already on the user when `user.created` fires — no post-hoc metadata
+  write to race the webhook. `publicMetadata.registeredViaInvite` is honoured too, so a future
+  server-side promotion of the flag keeps working.
 - Resend SDK already installed from 1-01; use `resend.emails.send()`
 - Send from `noreply@sidestep.design` — domain must be verified in Resend dashboard first
 - Wrap Resend call in try/catch so a Resend failure never breaks the webhook response

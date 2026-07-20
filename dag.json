@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-20T03:04:07.866Z",
+  "lastUpdated": "2026-07-20T03:06:50.060Z",
   "phases": [
     {
       "id": "phase-1",
@@ -464,9 +464,9 @@
       "phase": "phase-3",
       "type": "feature",
       "description": "Resend email to info@sidestep.design when a new captain self-registers without an invite link. Triggered via the Clerk webhook user.created event. Email includes captain name and email address.",
-      "status": "pending",
-      "agent": null,
-      "startedAt": null,
+      "status": "in-progress",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-20T03:06:50.059Z",
       "completedAt": null,
       "issueFile": "backlog/3-06-registration-email-notification.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#6-implementation-decisions",
@@ -1986,8 +1986,8 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "idle",
-      "currentTask": null,
+      "status": "working",
+      "currentTask": "3-06",
       "tasksCompleted": 6
     },
     {
@@ -1999,20 +1999,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-25T01:20:15.809Z",
-      "event": "task_completed",
-      "nodeId": "S-15",
-      "agent": "agent-claude-opus47-s15",
-      "message": "Completed: Portal Shell Dark-Mode Fix"
-    },
-    {
-      "timestamp": "2026-05-27T06:36:28.542Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "claude-2-14",
-      "message": "Claude (2-14) joined the workforce"
-    },
     {
       "timestamp": "2026-05-27T06:36:39.443Z",
       "event": "task_started",
@@ -2698,6 +2684,20 @@
       "nodeId": "2-14",
       "agent": "ralph-loop",
       "message": "Completed: Intake form — inspiration links (no anonymous uploads)"
+    },
+    {
+      "timestamp": "2026-07-20T03:04:40.249Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-20T03:06:50.060Z",
+      "event": "task_started",
+      "nodeId": "3-06",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Registration Email Notification"
     }
   ]
 }

@@ -111,3 +111,47 @@ One entry per completed loop task. This is the human's fast path for UX critique
     `backlog/2-13-admin-customer-management.md` instead of inventing an admin
     surface inside this issue.
 - Follow-ups filed: none (2-13 criterion amended in place rather than a new node)
+
+## 2026-07-19 — 3-06: Registration Email Notification
+
+- What shipped:
+  - `lib/registrationNotification.ts` — decides whether a Clerk `user.created`
+    event deserves an ops email, renders it, and sends via an **injected**
+    sender. Returns a result string (`sent` / `skipped-invite` /
+    `skipped-no-email` / `skipped-unconfigured` / `failed`) instead of throwing,
+    so the webhook always answers Clerk with a 200. 15 tests in
+    `lib/registrationNotification.test.ts`.
+  - `app/api/webhooks/clerk/route.ts` — after the existing Convex `syncUser`,
+    `user.created` (not `user.updated`) fires the notification with a
+    Resend-backed sender, or `null` when `RESEND_API_KEY` is unset.
+  - `app/(auth)/sign-up/[[...sign-up]]/page.tsx` — now an async server
+    component; reads the `sidestep_invite_token` cookie that middleware sets on
+    `/invite?token=…` and passes `unsafeMetadata={{ registeredViaInvite: true }}`
+    to `<SignUp>`. That is what distinguishes an invited captain from a walk-in.
+- UX surfaces to eyeball: none visually. `/sign-up` renders the stock Clerk
+  component exactly as before — the change is a metadata prop. (I ran
+  `snap.mjs` on `/sign-up` and deleted the output: the saved auth session
+  redirects `/sign-up` → `/`, so it screenshotted the homepage, which would be a
+  misleading review artifact.) The real surface to eyeball is the **email**:
+  subject `New Sidestep registration: <name>`, body lists name + email.
+- Decisions I made that a human may want to veto:
+  - **`unsafeMetadata` at sign-up, not `publicMetadata` after it.** The issue
+    suggested setting `publicMetadata.registeredViaInvite` on the user after an
+    invite sign-up, but that races `user.created` — the webhook usually fires
+    first and would email on every invited captain. `unsafeMetadata` is part of
+    the sign-up request, so it is already on the payload. It is client-writable,
+    which here only means someone could suppress their own notification email —
+    no security consequence. The webhook still honours `publicMetadata` if we
+    ever promote the flag server-side.
+  - **From-address.** The criterion says `noreply@sidestep.design`; I made that
+    the *default* but kept the existing `RESEND_FROM_EMAIL` override that
+    `jerseyRunActions.ts` already uses. `.env.local.example` currently sets that
+    to `hello@sidestep.design`, so in a real deployment this mail will come from
+    `hello@` unless you change the env. One verified sender identity seemed
+    better than hardcoding a second — say the word and I'll pin it to `noreply@`.
+  - **No email when the user has no primary email address** (`skipped-no-email`)
+    rather than mailing ops a blank row.
+  - Not verified end-to-end against a live Clerk + Resend — the issue's step 4
+    (register a real account, confirm the mail lands) still needs a human with
+    the production keys.
+- Follow-ups filed: none
