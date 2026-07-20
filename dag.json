@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-20T07:28:08.141Z",
+  "lastUpdated": "2026-07-20T07:33:21.108Z",
   "phases": [
     {
       "id": "phase-1",
@@ -343,7 +343,7 @@
       "phase": "phase-2",
       "type": "feature",
       "description": "Admin customer list with New badge for recent signups, intake leads list with Send Invite Link button, and inline editing for any order, design, or customer record field.",
-      "status": "blocked",
+      "status": "pending",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -642,10 +642,10 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Extract the captainCache/ownerCache pattern repeated in convex/admin.ts:listOrders, listDesigns, and listJerseyRuns into a single joinUsersById helper in convex/_users.ts. Each admin query shrinks to ~6 lines: collect, joinUsersById, map. Land before 2-13 adds a fourth admin list view.",
-      "status": "in-progress",
+      "status": "completed",
       "agent": "ralph-loop",
       "startedAt": "2026-07-20T07:28:08.140Z",
-      "completedAt": null,
+      "completedAt": "2026-07-20T07:33:21.107Z",
       "issueFile": "backlog/A-06-extract-admin-join-users-by-id-helper.md",
       "prdRef": "docs/architecture/improvement-report-2026-05-22.md#priority-3",
       "acceptanceCriteria": [
@@ -1986,9 +1986,9 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "working",
-      "currentTask": "A-06",
-      "tasksCompleted": 7
+      "status": "idle",
+      "currentTask": null,
+      "tasksCompleted": 8
     },
     {
       "id": "review-batch",
@@ -1999,20 +1999,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-27T06:40:35.817Z",
-      "event": "task_started",
-      "nodeId": "2-15",
-      "agent": "claude-2-14",
-      "message": "Claude (2-14) picked up: Jersey Run Submit and Add Another"
-    },
-    {
-      "timestamp": "2026-05-27T06:53:03.641Z",
-      "event": "task_completed",
-      "nodeId": "2-15",
-      "agent": "claude-2-14",
-      "message": "Completed: Jersey Run Submit and Add Another"
-    },
     {
       "timestamp": "2026-05-27T07:17:09.217Z",
       "event": "nodes_added",
@@ -2698,6 +2684,20 @@
       "nodeId": "A-06",
       "agent": "ralph-loop",
       "message": "Ralph Loop picked up: Extract Admin Join Users By Id Helper"
+    },
+    {
+      "timestamp": "2026-07-20T07:32:12.295Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-20T07:33:21.107Z",
+      "event": "task_completed",
+      "nodeId": "A-06",
+      "agent": "ralph-loop",
+      "message": "Completed: Extract Admin Join Users By Id Helper"
     }
   ]
 }
