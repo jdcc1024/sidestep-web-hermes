@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-20T03:06:50.060Z",
+  "lastUpdated": "2026-07-20T03:11:49.144Z",
   "phases": [
     {
       "id": "phase-1",
@@ -464,10 +464,10 @@
       "phase": "phase-3",
       "type": "feature",
       "description": "Resend email to info@sidestep.design when a new captain self-registers without an invite link. Triggered via the Clerk webhook user.created event. Email includes captain name and email address.",
-      "status": "in-progress",
+      "status": "completed",
       "agent": "ralph-loop",
       "startedAt": "2026-07-20T03:06:50.059Z",
-      "completedAt": null,
+      "completedAt": "2026-07-20T03:11:49.143Z",
       "issueFile": "backlog/3-06-registration-email-notification.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#6-implementation-decisions",
       "acceptanceCriteria": [
@@ -483,7 +483,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Revisit the client-side query+mutation pattern for syncing Clerk users into Convex. Current approach runs a Convex query on every page load for authenticated users. Evaluate: Clerk webhook handled entirely as a Convex HTTP action, or a Convex auth trigger, to guarantee sync fires exactly once on sign-up with no client-side overhead.",
-      "status": "blocked",
+      "status": "pending",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -1986,9 +1986,9 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "working",
-      "currentTask": "3-06",
-      "tasksCompleted": 6
+      "status": "idle",
+      "currentTask": null,
+      "tasksCompleted": 7
     },
     {
       "id": "review-batch",
@@ -1999,13 +1999,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-27T06:36:39.443Z",
-      "event": "task_started",
-      "nodeId": "2-14",
-      "agent": "claude-2-14",
-      "message": "Claude (2-14) picked up: Optional Intake Image Uploads"
-    },
     {
       "timestamp": "2026-05-27T06:40:23.785Z",
       "event": "task_failed",
@@ -2698,6 +2691,13 @@
       "nodeId": "3-06",
       "agent": "ralph-loop",
       "message": "Ralph Loop picked up: Registration Email Notification"
+    },
+    {
+      "timestamp": "2026-07-20T03:11:49.144Z",
+      "event": "task_completed",
+      "nodeId": "3-06",
+      "agent": "ralph-loop",
+      "message": "Completed: Registration Email Notification"
     }
   ]
 }
