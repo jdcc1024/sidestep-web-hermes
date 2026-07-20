@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-20T03:11:49.144Z",
+  "lastUpdated": "2026-07-20T07:28:08.141Z",
   "phases": [
     {
       "id": "phase-1",
@@ -642,9 +642,9 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Extract the captainCache/ownerCache pattern repeated in convex/admin.ts:listOrders, listDesigns, and listJerseyRuns into a single joinUsersById helper in convex/_users.ts. Each admin query shrinks to ~6 lines: collect, joinUsersById, map. Land before 2-13 adds a fourth admin list view.",
-      "status": "pending",
-      "agent": null,
-      "startedAt": null,
+      "status": "in-progress",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-20T07:28:08.140Z",
       "completedAt": null,
       "issueFile": "backlog/A-06-extract-admin-join-users-by-id-helper.md",
       "prdRef": "docs/architecture/improvement-report-2026-05-22.md#priority-3",
@@ -1986,8 +1986,8 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "idle",
-      "currentTask": null,
+      "status": "working",
+      "currentTask": "A-06",
       "tasksCompleted": 7
     },
     {
@@ -1999,20 +1999,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-27T06:40:23.785Z",
-      "event": "task_failed",
-      "nodeId": "2-14",
-      "agent": "claude-2-14",
-      "message": "Failed: Optional Intake Image Uploads — wrong node — backlog ID collision; real work tracked on 2-15 (jersey run submit and add another)"
-    },
-    {
-      "timestamp": "2026-05-27T06:40:32.007Z",
-      "event": "nodes_added",
-      "nodeId": "2-15",
-      "agent": null,
-      "message": "New task added: Jersey Run Submit and Add Another"
-    },
     {
       "timestamp": "2026-05-27T06:40:35.817Z",
       "event": "task_started",
@@ -2698,6 +2684,20 @@
       "nodeId": "3-06",
       "agent": "ralph-loop",
       "message": "Completed: Registration Email Notification"
+    },
+    {
+      "timestamp": "2026-07-20T07:27:44.627Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-20T07:28:08.141Z",
+      "event": "task_started",
+      "nodeId": "A-06",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Extract Admin Join Users By Id Helper"
     }
   ]
 }

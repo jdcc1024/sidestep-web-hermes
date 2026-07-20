@@ -10,6 +10,7 @@
 
 import type * as _auth from "../_auth.js";
 import type * as _schemaSmokeTest from "../_schemaSmokeTest.js";
+import type * as _users from "../_users.js";
 import type * as admin from "../admin.js";
 import type * as crons from "../crons.js";
 import type * as designs from "../designs.js";
@@ -30,6 +31,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   _auth: typeof _auth;
   _schemaSmokeTest: typeof _schemaSmokeTest;
+  _users: typeof _users;
   admin: typeof admin;
   crons: typeof crons;
   designs: typeof designs;

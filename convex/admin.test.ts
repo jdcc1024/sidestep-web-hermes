@@ -440,3 +440,132 @@ describe("admin.exportOrder", () => {
     ]);
   });
 });
+
+// The three admin list views all join a user row onto each record. These
+// pin the joined shape — including the fallbacks for a user row that no
+// longer exists — so the shared join helper can't silently change them.
+describe("admin list-view user joins", () => {
+  it("joins captain name and email onto each order", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain", {
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+    });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    await seedOrder(t, captainId);
+
+    const orders = await asAdmin.query(api.admin.listOrders, {});
+    expect(orders).toHaveLength(1);
+    expect(orders[0]).toMatchObject({
+      teamName: "Falcons",
+      captainName: "Ada Lovelace",
+      captainEmail: "ada@example.com",
+    });
+  });
+
+  it("falls back to Unknown for an order whose captain row is gone", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    await seedOrder(t, captainId);
+    await t.run((ctx) => ctx.db.delete(captainId));
+
+    const orders = await asAdmin.query(api.admin.listOrders, {});
+    expect(orders[0]).toMatchObject({ captainName: "Unknown", captainEmail: "" });
+  });
+
+  it("joins owner name and email onto each design", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner", {
+      name: "Grace Hopper",
+      email: "grace@example.com",
+    });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    await seedDesign(t, ownerId, "Home");
+
+    const designs = await asAdmin.query(api.admin.listDesigns, {});
+    expect(designs).toHaveLength(1);
+    expect(designs[0]).toMatchObject({
+      title: "Home",
+      ownerName: "Grace Hopper",
+      ownerEmail: "grace@example.com",
+    });
+  });
+
+  it("falls back to Unknown for a design whose owner row is gone", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    await seedDesign(t, ownerId, "Home");
+    await t.run((ctx) => ctx.db.delete(ownerId));
+
+    const designs = await asAdmin.query(api.admin.listDesigns, {});
+    expect(designs[0]).toMatchObject({ ownerName: "Unknown", ownerEmail: "" });
+  });
+
+  it("joins team name, captain, and response count onto each jersey run", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain", {
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+    });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    const runId = await seedRun(t, orderId, captainId);
+    await t.run((ctx) =>
+      ctx.db.insert("jerseyRunResponses", {
+        jerseyRunId: runId,
+        respondentName: "Fan",
+        respondentEmail: "fan@example.com",
+        size: "M",
+        customAnswers: {},
+        submittedAt: Date.now(),
+      }),
+    );
+
+    const runs = await asAdmin.query(api.admin.listJerseyRuns, {});
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      teamName: "Falcons",
+      captainName: "Ada Lovelace",
+      captainEmail: "ada@example.com",
+      responseCount: 1,
+      namesMode: "open",
+      status: "open",
+    });
+  });
+
+  it("falls back to Unknown team and captain when both rows are gone", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    await seedRun(t, orderId, captainId);
+    await t.run(async (ctx) => {
+      await ctx.db.delete(orderId);
+      await ctx.db.delete(captainId);
+    });
+
+    const runs = await asAdmin.query(api.admin.listJerseyRuns, {});
+    expect(runs[0]).toMatchObject({
+      teamName: "Unknown team",
+      captainName: "Unknown",
+      captainEmail: "",
+    });
+  });
+
+  it("rejects non-admin callers on every list view", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser: asCaptain } = await seedUser(t, "captain");
+
+    await expect(asCaptain.query(api.admin.listOrders, {})).rejects.toThrow(
+      /Admin access required/,
+    );
+    await expect(asCaptain.query(api.admin.listDesigns, {})).rejects.toThrow(
+      /Admin access required/,
+    );
+    await expect(asCaptain.query(api.admin.listJerseyRuns, {})).rejects.toThrow(
+      /Admin access required/,
+    );
+  });
+});

@@ -155,3 +155,34 @@ One entry per completed loop task. This is the human's fast path for UX critique
     (register a real account, confirm the mail lands) still needs a human with
     the production keys.
 - Follow-ups filed: none
+
+## 2026-07-20 — A-06: Extract Admin Join Users By Id Helper
+
+- What shipped:
+  - New `convex/_users.ts` with `joinUsersById(ctx, rows, keyOf)` — dedupes the
+    referenced user ids, fetches each once in parallel, returns a
+    `Map<Id<"users">, Doc<"users"> | null>` lookup. Sits next to `_auth.ts`.
+  - `admin.listOrders`, `admin.listDesigns`, and `admin.listJerseyRuns` now
+    collect → join → map synchronously instead of each hand-rolling a
+    `Promise.all` with its own `captainCache`/`ownerCache` and an inline
+    `undefined`-means-unfetched branch. `listJerseyRuns` keeps a `Promise.all`
+    only because it still counts responses per run.
+  - Characterization tests first: the three list queries had zero coverage, so
+    `convex/admin.test.ts` gained an "admin list-view user joins" block (joined
+    shape, deleted-user fallbacks, non-admin rejection) plus a new
+    `convex/_users.test.ts` for the helper itself.
+- UX surfaces to eyeball: none — no UI touched, no route changed, no query
+  return shape changed. Admin orders/designs/jersey-runs lists render exactly
+  the same payload. No screenshots.
+- Decisions I made that a human may want to veto:
+  - **Returns a lookup, not merged rows.** The helper hands back a `Map` and
+    leaves the `"Unknown"` / `""` fallbacks at the call site, per the issue's
+    criterion. That keeps presentation strings out of the data-access layer and
+    lets each caller name its field (`captainName` vs `ownerName`) freely.
+  - **Missing user is `null` in the map, not an absent key** — so a caller can
+    tell "no such user row" from "never asked for it".
+  - **`listJerseyRuns`' order join stayed inline.** It's the same dedupe-then-
+    fetch shape but on the `orders` table; generalizing to a `joinDocsById<T>`
+    for one caller felt like the wrong amount of abstraction today. If 2-13
+    wants an order join too, promote it then.
+- Follow-ups filed: none

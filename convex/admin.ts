@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { requireAdmin } from "./_auth";
+import { joinUsersById } from "./_users";
 import { INTERNAL_STAGES } from "../lib/orderStages";
 
 const INTERNAL_STAGE_NAMES = new Set<string>(INTERNAL_STAGES);
@@ -12,25 +13,16 @@ export const listOrders = query({
     await requireAdmin(ctx);
 
     const orders = await ctx.db.query("orders").order("desc").collect();
+    const captains = await joinUsersById(ctx, orders, (o) => o.captainId);
 
-    // N+1 captain lookup is fine — Sidestep's phase 1 volume is small and
-    // captains repeat across orders. Caching by captainId keeps it lean.
-    const captainCache = new Map<string, Doc<"users"> | null>();
-    return Promise.all(
-      orders.map(async (order) => {
-        const key = order.captainId;
-        let captain = captainCache.get(key);
-        if (captain === undefined) {
-          captain = await ctx.db.get(order.captainId);
-          captainCache.set(key, captain);
-        }
-        return {
-          ...order,
-          captainName: captain?.name ?? "Unknown",
-          captainEmail: captain?.email ?? "",
-        };
-      }),
-    );
+    return orders.map((order) => {
+      const captain = captains.get(order.captainId);
+      return {
+        ...order,
+        captainName: captain?.name ?? "Unknown",
+        captainEmail: captain?.email ?? "",
+      };
+    });
   },
 });
 
@@ -40,23 +32,16 @@ export const listDesigns = query({
     await requireAdmin(ctx);
 
     const designs = await ctx.db.query("designs").order("desc").collect();
+    const owners = await joinUsersById(ctx, designs, (d) => d.ownerId);
 
-    const ownerCache = new Map<string, Doc<"users"> | null>();
-    return Promise.all(
-      designs.map(async (design) => {
-        const key = design.ownerId;
-        let owner = ownerCache.get(key);
-        if (owner === undefined) {
-          owner = await ctx.db.get(design.ownerId);
-          ownerCache.set(key, owner);
-        }
-        return {
-          ...design,
-          ownerName: owner?.name ?? "Unknown",
-          ownerEmail: owner?.email ?? "",
-        };
-      }),
-    );
+    return designs.map((design) => {
+      const owner = owners.get(design.ownerId);
+      return {
+        ...design,
+        ownerName: owner?.name ?? "Unknown",
+        ownerEmail: owner?.email ?? "",
+      };
+    });
   },
 });
 
@@ -283,21 +268,16 @@ export const listJerseyRuns = query({
 
     const runs = await ctx.db.query("jerseyRuns").order("desc").collect();
 
-    const orderCache = new Map<string, Doc<"orders"> | null>();
-    const captainCache = new Map<string, Doc<"users"> | null>();
+    const captains = await joinUsersById(ctx, runs, (r) => r.captainId);
+    // Same dedupe-then-fetch shape as joinUsersById, on the orders table.
+    const orderIds = [...new Set(runs.map((r) => r.orderId))];
+    const orderRows = await Promise.all(orderIds.map((id) => ctx.db.get(id)));
+    const orders = new Map(orderIds.map((id, i) => [id, orderRows[i]]));
 
     return Promise.all(
       runs.map(async (run) => {
-        let order = orderCache.get(run.orderId);
-        if (order === undefined) {
-          order = await ctx.db.get(run.orderId);
-          orderCache.set(run.orderId, order);
-        }
-        let captain = captainCache.get(run.captainId);
-        if (captain === undefined) {
-          captain = await ctx.db.get(run.captainId);
-          captainCache.set(run.captainId, captain);
-        }
+        const order = orders.get(run.orderId);
+        const captain = captains.get(run.captainId);
 
         const responses = await ctx.db
           .query("jerseyRunResponses")
