@@ -186,3 +186,60 @@ One entry per completed loop task. This is the human's fast path for UX critique
     for one caller felt like the wrong amount of abstraction today. If 2-13
     wants an order join too, promote it then.
 - Follow-ups filed: none
+
+## 2026-07-20 — 2-13: Admin Customer Management
+
+- What shipped:
+  - **Customer management**: `/admin/customers` (list with registration date,
+    order count, "New" badge for sign-ups inside 7 days) and
+    `/admin/customers/[id]` (profile with their orders and designs, plus inline
+    editing of name and email). Backed by new `admin.listCustomers`,
+    `admin.getCustomer`, `admin.updateUser`.
+  - **Leads**: `/admin/leads` lists every intake submission newest-first;
+    expanding a row shows the full brief, questions, contact details,
+    `inspirationLinks` as plain `target="_blank" rel="noreferrer"` anchors (no
+    fetching or previewing), and a "Send invite link" button that copies
+    `/invite?token=<intakeId>`.
+  - **Inline record editing everywhere**: one `InlineEditField` primitive
+    (pencil → input → Save/Cancel, injected validation, toast on both
+    outcomes) now drives the order detail page (team name, sport, quantity) and
+    a new `/admin/designs/[id]` page (title, brief, silhouette specs), via
+    `admin.updateOrder` / `admin.updateDesign` / `admin.updateUser` — all
+    partial-update mutations, all `requireAdmin`-gated.
+  - **Security fix found on the way**: `intakes.listIntakes` had no auth gate at
+    all — anyone could read every lead's name, email, phone and brief. It now
+    requires admin, with tests for anonymous and signed-in-non-admin callers.
+- UX surfaces to eyeball: `/admin/customers`, `/admin/customers/<id>`,
+  `/admin/leads`, `/admin/designs/<id>`, `/admin/orders/<id>`. Look for: the
+  inline-edit affordance (is a bare pencil discoverable enough?), the leads
+  expand-row vs. a modal, and whether "New" deserves more prominence.
+  **No screenshots this run** — `.auth/state.json` has gone stale (Clerk logs
+  "Refreshing the session token resulted in an infinite redirect loop", every
+  authed route 404s in the browser), so `snap.mjs` times out on every
+  `/admin/*` route. Public routes still snap fine, so this is the saved
+  session, not the app. Fix is the one-time human step:
+  `node scripts/snap.mjs --login`. I also had to kill a two-day-old stale
+  `next dev` (PID 52128) holding port 8080 — Next refuses a second dev server
+  for the same directory — and started a fresh one.
+- Decisions I made that a human may want to veto:
+  - **"Jersey specs" on the order detail page are edited on the design, not the
+    order.** The issue's acceptance criteria predate O-01, which moved
+    silhouette specs onto `designs`. Rather than resurrect order-level specs I
+    linked each design from the order page to `/admin/designs/[id]`, where the
+    specs are editable. The order page still edits team name, sport, quantity.
+  - **Mutations are named `admin.updateUser` / `updateOrder` / `updateDesign`**,
+    not the issue's `adminUpdateUser` etc. — they're already namespaced by the
+    `admin` module, matching `admin.updateOrderStages`.
+  - **`updateUser` writes only the Convex row.** Clerk stays the identity source
+    of truth and its webhook can overwrite an admin's correction on the
+    customer's next profile edit. The profile card says so in copy. Properly
+    resolving this is 3-07 (User Sync Architecture Revisit).
+  - **Admin edits are not blocked by a locked roster.** O-06 will decide what
+    freezing means; admin override felt like the right default for a
+    correction tool, but that's a product call.
+  - **Leads expand inline rather than opening a dialog** — one open at a time.
+  - **`listCustomers` returns every user including admins** (badged as such)
+    rather than filtering staff out.
+  - Empty-name users exist in the dev data, so both customer surfaces fall back
+    to "Unnamed customer" instead of rendering a blank link.
+- Follow-ups filed: none

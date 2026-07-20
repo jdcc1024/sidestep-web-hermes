@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { use } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { ArrowLeft, FileDown } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { ExportOrderButton } from "@/components/admin/ExportOrderButton";
+import { InlineEditField } from "@/components/admin/InlineEditField";
 import { OrderStageChecklist } from "@/components/admin/OrderStageChecklist";
+import { validateQuantity, validateRequiredText } from "@/lib/adminRecords";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -24,9 +26,9 @@ export default function AdminOrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const result = useQuery(api.admin.getOrder, {
-    orderId: id as Id<"orders">,
-  });
+  const orderId = id as Id<"orders">;
+  const result = useQuery(api.admin.getOrder, { orderId });
+  const updateOrder = useMutation(api.admin.updateOrder);
 
   if (result === undefined) {
     return <DetailSkeleton />;
@@ -73,7 +75,17 @@ export default function AdminOrderDetailPage({
         <CardContent>
           {captain ? (
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <Field label="Name" value={captain.name} />
+              <Field
+                label="Name"
+                value={
+                  <Link
+                    href={`/admin/customers/${captain._id}`}
+                    className="text-teal-700 hover:underline dark:text-teal-300"
+                  >
+                    {captain.name}
+                  </Link>
+                }
+              />
               <Field
                 label="Email"
                 value={
@@ -99,19 +111,43 @@ export default function AdminOrderDetailPage({
           <CardTitle>Order specs</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl className="grid gap-3 text-sm sm:grid-cols-2">
-            <Field label="Team name" value={order.teamName} />
-            <Field label="Sport" value={order.sport} />
-            <Field label="Quantity" value={String(order.estimatedQuantity)} />
-            <Field
-              label="Customer has own design"
-              value={order.hasOwnDesign ? "Yes" : "No"}
+          <p className="-mt-1 mb-4 text-xs text-muted-foreground">
+            Edit any field to correct the record. Changes are visible to the
+            customer immediately. Silhouette specs live on each design —
+            open a linked design below to change its cut.
+          </p>
+          <div className="grid gap-4 text-sm sm:grid-cols-2">
+            <InlineEditField
+              label="Team name"
+              value={order.teamName}
+              validate={(v) => validateRequiredText(v, "Team name")}
+              onSave={(teamName) => updateOrder({ orderId, teamName })}
             />
-            <Field
-              label="Last updated"
-              value={formatDate(order.updatedAt)}
+            <InlineEditField
+              label="Sport"
+              value={order.sport}
+              validate={(v) => validateRequiredText(v, "Sport")}
+              onSave={(sport) => updateOrder({ orderId, sport })}
             />
-          </dl>
+            <InlineEditField
+              label="Quantity"
+              type="number"
+              value={String(order.estimatedQuantity)}
+              validate={validateQuantity}
+              onSave={(qty) =>
+                updateOrder({ orderId, estimatedQuantity: Number(qty) })
+              }
+            />
+            <dl>
+              <Field
+                label="Customer has own design"
+                value={order.hasOwnDesign ? "Yes" : "No"}
+              />
+            </dl>
+            <dl>
+              <Field label="Last updated" value={formatDate(order.updatedAt)} />
+            </dl>
+          </div>
         </CardContent>
       </Card>
 
@@ -131,8 +167,13 @@ export default function AdminOrderDetailPage({
                   key={design._id}
                   className="rounded-md border border-border p-4"
                 >
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {design.title}
+                  <h3 className="text-sm font-semibold">
+                    <Link
+                      href={`/admin/designs/${design._id}`}
+                      className="text-teal-700 hover:underline dark:text-teal-300"
+                    >
+                      {design.title}
+                    </Link>
                   </h3>
                   {design.brief && (
                     <p className="mt-1 text-sm text-muted-foreground">

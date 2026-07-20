@@ -569,3 +569,292 @@ describe("admin list-view user joins", () => {
     );
   });
 });
+
+// ─── 2-13 Customer management & record editing ─────────────────────────
+
+describe("admin.listCustomers", () => {
+  it("returns every user with their order and design counts", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain", {
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+    });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    await seedOrder(t, captainId);
+    await seedOrder(t, captainId);
+    await seedDesign(t, captainId, "Home kit");
+
+    const customers = await asAdmin.query(api.admin.listCustomers, {});
+    const ada = customers.find((c) => c.email === "ada@example.com");
+
+    expect(ada).toMatchObject({
+      name: "Ada Lovelace",
+      orderCount: 2,
+      designCount: 1,
+      isAdmin: false,
+    });
+    // The admin themself is a user too — the list is everyone.
+    expect(customers).toHaveLength(2);
+  });
+
+  it("never leaks the Clerk id to the client", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+
+    const customers = await asAdmin.query(api.admin.listCustomers, {});
+    expect(customers[0]).not.toHaveProperty("clerkId");
+  });
+
+  it("rejects a non-admin caller", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser: asCaptain } = await seedUser(t, "captain");
+
+    await expect(asCaptain.query(api.admin.listCustomers, {})).rejects.toThrow(
+      /Admin access required/,
+    );
+  });
+});
+
+describe("admin.getCustomer", () => {
+  it("returns the user with their orders and designs", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain", {
+      name: "Ada Lovelace",
+    });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    const designId = await seedDesign(t, captainId, "Home kit");
+
+    const result = await asAdmin.query(api.admin.getCustomer, {
+      userId: captainId,
+    });
+
+    expect(result?.user.name).toBe("Ada Lovelace");
+    expect(result?.orders.map((o) => o._id)).toEqual([orderId]);
+    expect(result?.designs.map((d) => d._id)).toEqual([designId]);
+  });
+
+  it("returns null for a user that no longer exists", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: goneId } = await seedUser(t, "gone");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    await t.run((ctx) => ctx.db.delete(goneId));
+
+    expect(
+      await asAdmin.query(api.admin.getCustomer, { userId: goneId }),
+    ).toBeNull();
+  });
+
+  it("rejects a non-admin caller", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId, asUser: asCaptain } = await seedUser(t, "captain");
+
+    await expect(
+      asCaptain.query(api.admin.getCustomer, { userId: captainId }),
+    ).rejects.toThrow(/Admin access required/);
+  });
+});
+
+describe("admin.updateUser", () => {
+  it("updates a customer's name", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedUser(t, "captain", { name: "Ada" });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+
+    await asAdmin.mutation(api.admin.updateUser, {
+      userId,
+      name: "Ada Lovelace",
+    });
+
+    const user = await t.run((ctx) => ctx.db.get(userId));
+    expect(user?.name).toBe("Ada Lovelace");
+  });
+
+  it("leaves omitted fields untouched", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedUser(t, "captain", {
+      name: "Ada",
+      email: "ada@example.com",
+    });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+
+    await asAdmin.mutation(api.admin.updateUser, { userId, name: "Ada L" });
+
+    const user = await t.run((ctx) => ctx.db.get(userId));
+    expect(user?.email).toBe("ada@example.com");
+  });
+
+  it("trims values before storing them", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+
+    await asAdmin.mutation(api.admin.updateUser, {
+      userId,
+      name: "  Ada Lovelace  ",
+      email: "  ADA@example.com ",
+    });
+
+    const user = await t.run((ctx) => ctx.db.get(userId));
+    expect(user?.name).toBe("Ada Lovelace");
+    expect(user?.email).toBe("ADA@example.com");
+  });
+
+  it("rejects a blank name and a malformed email", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+
+    await expect(
+      asAdmin.mutation(api.admin.updateUser, { userId, name: "   " }),
+    ).rejects.toThrow(/required/);
+    await expect(
+      asAdmin.mutation(api.admin.updateUser, { userId, email: "nope" }),
+    ).rejects.toThrow(/valid email/);
+  });
+
+  it("rejects a non-admin caller", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser: asCaptain } = await seedUser(t, "captain");
+
+    await expect(
+      asCaptain.mutation(api.admin.updateUser, { userId, name: "Hacked" }),
+    ).rejects.toThrow(/Admin access required/);
+
+    const user = await t.run((ctx) => ctx.db.get(userId));
+    expect(user?.name).toBe("captain");
+  });
+});
+
+describe("admin.updateOrder", () => {
+  it("applies a partial update and bumps updatedAt", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+    const before = await t.run((ctx) => ctx.db.get(orderId));
+
+    await asAdmin.mutation(api.admin.updateOrder, {
+      orderId,
+      teamName: "Falcons FC",
+      estimatedQuantity: 30,
+    });
+
+    const order = await t.run((ctx) => ctx.db.get(orderId));
+    expect(order?.teamName).toBe("Falcons FC");
+    expect(order?.estimatedQuantity).toBe(30);
+    expect(order?.sport).toBe("Soccer");
+    expect(order?.updatedAt).toBeGreaterThanOrEqual(before!.updatedAt);
+  });
+
+  it("rejects a blank team name and an out-of-range quantity", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId } = await seedUser(t, "captain");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const orderId = await seedOrder(t, captainId);
+
+    await expect(
+      asAdmin.mutation(api.admin.updateOrder, { orderId, teamName: " " }),
+    ).rejects.toThrow(/required/);
+    await expect(
+      asAdmin.mutation(api.admin.updateOrder, {
+        orderId,
+        estimatedQuantity: 1,
+      }),
+    ).rejects.toThrow(/at least/);
+  });
+
+  it("rejects a non-admin caller even for their own order", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: captainId, asUser: asCaptain } = await seedUser(t, "captain");
+    const orderId = await seedOrder(t, captainId);
+
+    await expect(
+      asCaptain.mutation(api.admin.updateOrder, { orderId, sport: "Hockey" }),
+    ).rejects.toThrow(/Admin access required/);
+  });
+});
+
+describe("admin.updateDesign", () => {
+  it("updates the title, brief and silhouette specs", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const designId = await seedDesign(t, ownerId, "Home kit");
+
+    await asAdmin.mutation(api.admin.updateDesign, {
+      designId,
+      title: "Home kit v2",
+      brief: "Navy with gold trim",
+      neckline: "V-neck",
+    });
+
+    const design = await t.run((ctx) => ctx.db.get(designId));
+    expect(design).toMatchObject({
+      title: "Home kit v2",
+      brief: "Navy with gold trim",
+      neckline: "V-neck",
+    });
+  });
+
+  it("clears an optional spec when sent an empty string", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const designId = await seedDesign(t, ownerId, "Home kit", {
+      neckline: "Crew",
+    });
+
+    await asAdmin.mutation(api.admin.updateDesign, { designId, neckline: "" });
+
+    const design = await t.run((ctx) => ctx.db.get(designId));
+    expect(design?.neckline).toBeUndefined();
+  });
+
+  it("rejects a blank title", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const designId = await seedDesign(t, ownerId, "Home kit");
+
+    await expect(
+      asAdmin.mutation(api.admin.updateDesign, { designId, title: "  " }),
+    ).rejects.toThrow(/required/);
+  });
+
+  it("rejects a non-admin caller", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId, asUser: asOwner } = await seedUser(t, "owner");
+    const designId = await seedDesign(t, ownerId, "Home kit");
+
+    await expect(
+      asOwner.mutation(api.admin.updateDesign, { designId, title: "Nope" }),
+    ).rejects.toThrow(/Admin access required/);
+  });
+});
+
+describe("admin.getDesign", () => {
+  it("returns the design with its owner and signed file urls", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner", {
+      name: "Grace Hopper",
+    });
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const designId = await seedDesign(t, ownerId, "Home kit");
+
+    const result = await asAdmin.query(api.admin.getDesign, { designId });
+    expect(result?.design.title).toBe("Home kit");
+    expect(result?.owner?.name).toBe("Grace Hopper");
+    expect(result?.fileUrls).toEqual([]);
+  });
+
+  it("rejects a non-admin caller", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId, asUser: asOwner } = await seedUser(t, "owner");
+    const designId = await seedDesign(t, ownerId, "Home kit");
+
+    await expect(
+      asOwner.query(api.admin.getDesign, { designId }),
+    ).rejects.toThrow(/Admin access required/);
+  });
+});

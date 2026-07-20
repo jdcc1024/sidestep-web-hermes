@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./_auth";
 import {
   normalizeInspirationLinks,
   validateInspirationLinks,
@@ -120,10 +121,13 @@ export const submitIntake = mutation({
   },
 });
 
-// Admin lead view (issue 2-13) consumes this. Newest first.
+// Admin lead view (issue 2-13) consumes this. Newest first. Admin-gated:
+// submitting an intake is public, but reading the pile of them — names,
+// emails, phone numbers, briefs — is not.
 export const listIntakes = query({
   args: {},
   handler: async (ctx) => {
+    await requireAdmin(ctx);
     return ctx.db.query("intakes").withIndex("by_submittedAt").order("desc").collect();
   },
 });

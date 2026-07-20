@@ -1,6 +1,6 @@
 # Issue: Admin Customer Management
 
-## Status: pending
+## Status: done
 
 ## Phase: 2
 
@@ -35,6 +35,13 @@ Build the admin customer management area: a customer list showing all registered
 See: docs/prd/sidestep-website-phase1.md — Section 4 (User Stories — Admin, customer management, record editing, intake leads)
 
 ## Implementation Notes
+
+> **Built 2026-07-20.** Two criteria were reinterpreted against the current
+> schema: "jersey specs" moved off the order onto the design in O-01, so they
+> are edited on the new `/admin/designs/[id]` page (linked from the order),
+> not on the order detail page. Mutations are `admin.updateUser` /
+> `admin.updateOrder` / `admin.updateDesign` — already namespaced, so no
+> `admin` prefix on the function names themselves.
 - Routes: `app/(admin)/customers/page.tsx`, `app/(admin)/customers/[id]/page.tsx`, `app/(admin)/leads/page.tsx`
 - "New" badge: compare `user.createdAt` to `Date.now() - 7 * 24 * 60 * 60 * 1000`
 - "Send invite link" button: the invite URL is `/invite?token=<intakeId>` — use `navigator.clipboard.writeText()` and show a "Copied!" toast

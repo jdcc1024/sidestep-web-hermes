@@ -4,6 +4,13 @@ import type { Doc } from "./_generated/dataModel";
 import { requireAdmin } from "./_auth";
 import { joinUsersById } from "./_users";
 import { INTERNAL_STAGES } from "../lib/orderStages";
+import {
+  MAX_BRIEF,
+  validateEmail,
+  validateOptionalText,
+  validateQuantity,
+  validateRequiredText,
+} from "../lib/adminRecords";
 
 const INTERNAL_STAGE_NAMES = new Set<string>(INTERNAL_STAGES);
 
@@ -253,6 +260,232 @@ export const exportOrder = query({
     );
 
     return { ...base, hasRun: true, customQuestions: run.customQuestions, rows };
+  },
+});
+
+// ─── Customer management and record editing (issue 2-13) ───────────────
+
+// Field rules are shared with the inline-edit UI via lib/adminRecords so the
+// two can't drift. `reject` turns a validator's message into a ConvexError.
+function reject(message: string | null): void {
+  if (message) throw new ConvexError(message);
+}
+
+// Presentation-safe view of a user row: everything except the Clerk id,
+// which is an auth-system secret the admin UI has no use for.
+function publicUserFields(user: Doc<"users">) {
+  return {
+    _id: user._id,
+    _creationTime: user._creationTime,
+    name: user.name,
+    email: user.email,
+    isAdmin: user.isAdmin,
+    createdAt: user.createdAt,
+  };
+}
+
+// Every registered user with the counts the customer list table shows.
+// Orders and designs are collected once and grouped in memory rather than
+// queried per user — one pass beats N index reads at any volume we'll see.
+export const listCustomers = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+
+    const users = await ctx.db.query("users").collect();
+    const orders = await ctx.db.query("orders").collect();
+    const designs = await ctx.db.query("designs").collect();
+
+    const tally = <T>(rows: readonly T[], keyOf: (row: T) => string) => {
+      const counts = new Map<string, number>();
+      for (const row of rows) {
+        const key = keyOf(row);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      return counts;
+    };
+
+    const orderCounts = tally(orders, (o) => o.captainId);
+    const designCounts = tally(designs, (d) => d.ownerId);
+
+    return users
+      .map((user) => ({
+        ...publicUserFields(user),
+        orderCount: orderCounts.get(user._id) ?? 0,
+        designCount: designCounts.get(user._id) ?? 0,
+      }))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  },
+});
+
+// One customer's profile: their record plus everything they own, so the
+// profile page renders without follow-up queries. null when the row is gone.
+export const getCustomer = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    await requireAdmin(ctx);
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_captain", (q) => q.eq("captainId", userId))
+      .order("desc")
+      .collect();
+
+    const designs = await ctx.db
+      .query("designs")
+      .withIndex("by_owner", (q) => q.eq("ownerId", userId))
+      .order("desc")
+      .collect();
+
+    return { user: publicUserFields(user), orders, designs };
+  },
+});
+
+// Admin correction of a customer record. Partial by construction: an omitted
+// arg is left alone, so the inline-edit UI can save one field at a time.
+//
+// Note this writes only the Convex row — Clerk remains the source of truth
+// for the identity behind it, and the webhook can overwrite these values on
+// the customer's next profile change. That's an accepted limitation for
+// phase 2 (see 3-07, User Sync Architecture Revisit).
+export const updateUser = mutation({
+  args: {
+    userId: v.id("users"),
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, name, email }) => {
+    await requireAdmin(ctx);
+
+    const user = await ctx.db.get(userId);
+    if (!user) throw new ConvexError("Customer not found.");
+
+    const patch: Partial<Doc<"users">> = {};
+    if (name !== undefined) {
+      reject(validateRequiredText(name, "Name"));
+      patch.name = name.trim();
+    }
+    if (email !== undefined) {
+      reject(validateEmail(email));
+      patch.email = email.trim();
+    }
+
+    if (Object.keys(patch).length > 0) await ctx.db.patch(userId, patch);
+  },
+});
+
+// Admin correction of an order's own fields. Silhouette specs are not here —
+// they moved onto the design in O-01 and are edited via `updateDesign`.
+export const updateOrder = mutation({
+  args: {
+    orderId: v.id("orders"),
+    teamName: v.optional(v.string()),
+    sport: v.optional(v.string()),
+    estimatedQuantity: v.optional(v.number()),
+    hasOwnDesign: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { orderId, ...fields }) => {
+    await requireAdmin(ctx);
+
+    const order = await ctx.db.get(orderId);
+    if (!order) throw new ConvexError("Order not found.");
+
+    const patch: Partial<Doc<"orders">> = {};
+    if (fields.teamName !== undefined) {
+      reject(validateRequiredText(fields.teamName, "Team name"));
+      patch.teamName = fields.teamName.trim();
+    }
+    if (fields.sport !== undefined) {
+      reject(validateRequiredText(fields.sport, "Sport"));
+      patch.sport = fields.sport.trim();
+    }
+    if (fields.estimatedQuantity !== undefined) {
+      reject(validateQuantity(fields.estimatedQuantity));
+      patch.estimatedQuantity = fields.estimatedQuantity;
+    }
+    if (fields.hasOwnDesign !== undefined)
+      patch.hasOwnDesign = fields.hasOwnDesign;
+
+    if (Object.keys(patch).length > 0)
+      await ctx.db.patch(orderId, { ...patch, updatedAt: Date.now() });
+  },
+});
+
+// Admin correction of a design: its title, brief, and the silhouette specs
+// that live on it since O-01. The optional specs are clearable — an empty
+// string removes the field rather than storing "".
+export const updateDesign = mutation({
+  args: {
+    designId: v.id("designs"),
+    title: v.optional(v.string()),
+    brief: v.optional(v.string()),
+    jerseyStyle: v.optional(v.string()),
+    neckline: v.optional(v.string()),
+    sleeveStyle: v.optional(v.string()),
+  },
+  handler: async (ctx, { designId, ...fields }) => {
+    await requireAdmin(ctx);
+
+    const design = await ctx.db.get(designId);
+    if (!design) throw new ConvexError("Design not found.");
+
+    const patch: Partial<Doc<"designs">> = {};
+    if (fields.title !== undefined) {
+      reject(validateRequiredText(fields.title, "Title"));
+      patch.title = fields.title.trim();
+    }
+    if (fields.brief !== undefined) {
+      reject(validateOptionalText(fields.brief, "Brief", MAX_BRIEF));
+      patch.brief = fields.brief.trim();
+    }
+    for (const key of ["jerseyStyle", "neckline", "sleeveStyle"] as const) {
+      const value = fields[key];
+      if (value === undefined) continue;
+      reject(validateOptionalText(value, key));
+      const trimmed = value.trim();
+      // Convex treats `undefined` in a patch as "remove this field".
+      patch[key] = trimmed === "" ? undefined : trimmed;
+    }
+
+    if (Object.keys(patch).length > 0)
+      await ctx.db.patch(designId, { ...patch, updatedAt: Date.now() });
+  },
+});
+
+// One design for the admin design detail page, with its owner and the
+// short-lived signed URLs for its uploaded files (same treatment as
+// `getOrder`). null when the design is gone.
+export const getDesign = query({
+  args: { designId: v.id("designs") },
+  handler: async (ctx, { designId }) => {
+    await requireAdmin(ctx);
+
+    const design = await ctx.db.get(designId);
+    if (!design) return null;
+
+    const owner = await ctx.db.get(design.ownerId);
+    const fileUrls = await Promise.all(
+      design.fileIds.map(async (storageId) => ({
+        storageId,
+        url: await ctx.storage.getUrl(storageId),
+      })),
+    );
+
+    // Which orders reference this design — an admin editing a design wants
+    // to know what it's committed to before changing the cut.
+    const orders = (await ctx.db.query("orders").collect()).filter((o) =>
+      o.designIds.includes(designId),
+    );
+
+    return {
+      design,
+      owner: owner ? publicUserFields(owner) : null,
+      fileUrls,
+      orders: orders.map((o) => ({ _id: o._id, teamName: o.teamName })),
+    };
   },
 });
 

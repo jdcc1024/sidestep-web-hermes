@@ -6,46 +6,41 @@ import { useQuery } from "convex/react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
+import { isNewCustomer } from "@/lib/adminRecords";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type SortKey = "title" | "ownerName" | "fileCount" | "createdAt";
+type SortKey = "name" | "email" | "createdAt" | "orderCount";
 type SortDirection = "asc" | "desc";
 
-type ColumnDef = {
-  key: SortKey;
-  label: string;
-};
-
-const COLUMNS: ReadonlyArray<ColumnDef> = [
-  { key: "title", label: "Title" },
-  { key: "ownerName", label: "Owner" },
-  { key: "fileCount", label: "Files" },
-  { key: "createdAt", label: "Created" },
+const COLUMNS: ReadonlyArray<{ key: SortKey; label: string }> = [
+  { key: "name", label: "Name" },
+  { key: "email", label: "Email" },
+  { key: "createdAt", label: "Registered" },
+  { key: "orderCount", label: "Orders" },
 ];
 
-export default function AdminDesignsPage() {
-  const designs = useQuery(api.admin.listDesigns);
+export default function AdminCustomersPage() {
+  const customers = useQuery(api.admin.listCustomers);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [direction, setDirection] = useState<SortDirection>("desc");
 
+  // "New" is relative to when the page opened. Pinned in state so every
+  // badge agrees on "now" and re-renders don't reach for the clock mid-render.
+  const [now] = useState(() => Date.now());
+
   const rows = useMemo(() => {
-    if (!designs) return [];
-    return designs
-      .map((design) => ({
-        ...design,
-        fileCount: design.fileIds.length,
-      }))
-      .sort((a, b) => compareBy(a, b, sortKey, direction));
-  }, [designs, sortKey, direction]);
+    if (!customers) return [];
+    return [...customers].sort((a, b) => compareBy(a, b, sortKey, direction));
+  }, [customers, sortKey, direction]);
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) {
       setDirection(direction === "asc" ? "desc" : "asc");
     } else {
       setSortKey(key);
-      setDirection(key === "createdAt" || key === "fileCount" ? "desc" : "asc");
+      setDirection(key === "createdAt" || key === "orderCount" ? "desc" : "asc");
     }
   };
 
@@ -59,20 +54,21 @@ export default function AdminDesignsPage() {
           Admin
         </Badge>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          All designs
+          Customers
         </h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Every design uploaded across every customer.
+          Everyone with a Sidestep account. Click a name to open their profile
+          and correct their details.
         </p>
       </header>
 
       <Card className="mt-8 gap-0 p-0">
-        {designs === undefined ? (
-          <TableSkeleton label="Loading designs" />
+        {customers === undefined ? (
+          <TableSkeleton label="Loading customers" />
         ) : rows.length === 0 ? (
           <EmptyState
-            title="No designs yet"
-            body="Designs will appear here as customers upload them."
+            title="No customers yet"
+            body="Registered users will appear here."
           />
         ) : (
           <div className="overflow-x-auto">
@@ -97,24 +93,38 @@ export default function AdminDesignsPage() {
                     className="transition-colors hover:bg-muted/40"
                   >
                     <td className="px-4 py-3 text-sm font-medium">
-                      <Link
-                        href={`/admin/designs/${row._id}`}
-                        className="text-teal-700 hover:underline dark:text-teal-300"
-                      >
-                        {row.title}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="text-foreground">{row.ownerName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {row.ownerEmail}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Clerk profiles can carry no name at all — never
+                            render an empty, unclickable link. */}
+                        <Link
+                          href={`/admin/customers/${row._id}`}
+                          className="text-teal-700 hover:underline dark:text-teal-300"
+                        >
+                          {row.name || "Unnamed customer"}
+                        </Link>
+                        {isNewCustomer(row.createdAt, now) && (
+                          <Badge className="bg-teal-600 text-white dark:bg-teal-500">
+                            New
+                          </Badge>
+                        )}
+                        {row.isAdmin && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200"
+                          >
+                            Admin
+                          </Badge>
+                        )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {row.fileCount}
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      {row.email}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {formatDate(row.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-foreground">
+                      {row.orderCount}
                     </td>
                   </tr>
                 ))}
