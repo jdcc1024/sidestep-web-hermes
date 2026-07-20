@@ -1,6 +1,6 @@
-# Issue: Optional Intake Image Uploads
+# Issue: Intake form — inspiration links (no anonymous uploads)
 
-## Status: blocked (needs human decision)
+## Status: pending
 
 ## Phase: 2
 
@@ -8,45 +8,67 @@
 
 ## Vertical Slice
 This issue touches:
-- [ ] Database: `intakeSubmissions` (or equivalent) record gains a list of file/storage IDs
-- [ ] API: Convex storage `generateUploadUrl` + a mutation to attach uploaded file IDs to the intake record; an abuse-control check gating anonymous upload URL issuance (mechanism TBD — see Open Question below)
-- [ ] Frontend: `components/intake/IntakeForm.tsx` (public, unauthenticated) — optional file picker for photos/mood-board images
-- [ ] Tests: Submitting without files works unchanged; submitting with files attaches them to the intake record and they're visible in the admin lead view (2-13); oversized/disallowed-MIME files are rejected server-side; abuse-control mechanism is exercised by a test
+- [ ] Database: `intakeSubmissions` record gains an optional list of inspiration URLs (plain strings — no file storage)
+- [x] API: the intake mutation accepts and validates a small list of share-folder URLs
+- [x] Frontend: `components/intake/IntakeForm.tsx` (public, unauthenticated) — optional "paste a link to your inspiration" field(s)
+- [x] Tests: submitting without links works unchanged; valid share-folder links attach to the intake record and show in the admin lead view (2-13); malformed or disallowed URLs are rejected server-side
 
-## Description
-Let intake-form visitors optionally attach photos or mood-board images (jerseys they like, team colors, inspiration) when submitting the public intake form. Files attach to the intake record so design conversations can start with visual context. This form is public and unauthenticated (no Clerk session), so anonymous uploads create a real abuse risk — an open-write storage endpoint would let anyone script-fill the Convex storage bucket. **The abuse-control approach needs a decision before implementation** (see Open Question below) — this is why this task is parked rather than picked up directly by the loop.
+## Decision (2026-07-19, human)
+**No anonymous file uploads on the public intake form.** The original scope —
+letting unauthenticated visitors upload photos/mood-board images — is dropped
+because an open-write storage endpoint on a public form is an abuse surface we
+don't want to own. Instead:
+
+1. **Intake form takes _links_, not files.** Visitors paste URLs to a shared
+   folder they already keep their inspiration in (OneDrive, Dropbox, Google
+   Drive). We store the URLs as text; we never receive or host their files, so
+   there is no bucket to fill and no MIME/size/rate-limit abuse-control problem
+   to solve first.
+2. **Actual image upload lives in the customer portal only** — when a
+   signed-in customer starts a Design (2-05, already shipped, behind Clerk
+   auth). That is the one place binary uploads happen, and it is authenticated.
+
+This supersedes the earlier "abuse-control mechanism" open question, which is
+now moot — see `backlog/QUESTIONS.md` (Answered).
 
 ## Acceptance Criteria
-- [ ] Upload UI is fully optional — submitting without files works exactly as today
-- [ ] Abuse-control approach decided and documented (e.g. Cloudflare Turnstile, per-IP rate limit, signed upload URLs, or a server-side proxy) before any code lands
-- [ ] Per-file size cap and MIME allowlist (jpeg/png/webp/heic) enforced server-side, not just in the browser
-- [ ] Total per-intake file count and aggregate size capped
-- [ ] Uploaded files linked to the intake record so 2-13 admin view can preview them
-- [ ] Files visible alongside the intake in the admin lead view (2-13)
-- [ ] Mobile responsive — picker works on iOS Safari and Android Chrome
+- [ ] The link field is fully optional — submitting without any link works exactly as today
+- [ ] Visitors can add one or more inspiration URLs (a small cap, e.g. up to 5)
+- [ ] URLs are validated server-side: well-formed `https://` URLs, and (soft) recognised as a known share host (OneDrive / Dropbox / Google Drive / iCloud) — reject obviously malformed input, don't hard-block an unrecognised-but-valid `https` URL
+- [ ] Total link count and per-URL length capped server-side (defence against a script pasting megabytes of text)
+- [ ] Stored links attach to the intake record and render as clickable links in the admin lead view (2-13)
+- [ ] Mobile responsive — the field works on iOS Safari and Android Chrome
 - [ ] All tests pass
 - [ ] No regressions in existing tests
 
+## Out of Scope
+- File/binary upload of any kind on the public intake form.
+- Fetching, previewing, or thumbnailing the linked content — we store and
+  display the raw URL only. (Many share links require auth to open; that's the
+  customer's call, not ours.)
+
 ## Dependencies
-- Blocked by: 2-03 (done)
+- Blocked by: 2-03 (done — the intake form and its mutation)
 - Blocks: none
-- Parked pending human decision (see Open Question)
 
 ## PRD Reference
-See: docs/prd/sidestep-website-phase1.md#5-scope — "Public intake form" (In Scope) and "File storage: Convex built-in storage" (In Scope). Note the PRD's intake form field list (name, team name, sport type, estimated quantity, rough idea/brief) predates this optional-image addition.
+See: docs/prd/sidestep-website-phase1.md#5-scope — "Public intake form" (In
+Scope). The PRD's original field list (name, team name, sport, estimated
+quantity, rough idea/brief) predates this optional-links addition.
 
-## Open Question (parked — see backlog/QUESTIONS.md)
-**How should anonymous uploads on the public intake form be rate-limited/abuse-controlled?** Unlike the portal's design-creation uploads (2-05), which sit behind Clerk auth, the intake form has no account and no login — anyone with the URL can hit it. Options and a recommendation are recorded in `backlog/QUESTIONS.md` under node `2-14`.
+## Implementation Notes
+- Add the URLs to the existing intake mutation args as an optional
+  `string[]`; validate shape + host + caps in the mutation, not just in the
+  browser. No Convex storage, no `generateUploadUrl` — this is plain text.
+- Render in the 2-13 admin lead view as `<a target="_blank" rel="noreferrer">`
+  chips/links, not embedded previews.
+- Anonymous submission still writes to `intakeSubmissions`; a per-IP rate
+  limit on the intake mutation is a reasonable general hardening but is no
+  longer a blocker for this feature (no storage at risk).
 
-## Implementation Notes (once unparked)
-- Convex file upload flow mirrors 2-05: `generateUploadUrl` → browser `PUT` → mutation with returned storage IDs, but the mutation/URL-issuing step needs the chosen abuse-control check in front of it
-- Enforce MIME allowlist and size cap server-side in the attach mutation, not just via the `<input accept>` attribute (that's client-only and trivially bypassed)
-- Reuse the admin lead view from 2-13 to render thumbnails/download links for attached files
-
-## TDD Approach (once unparked)
-1. Write test: submit intake form without files → record created with no file IDs, unchanged from current behavior
-2. Write test: submit with an allowed-MIME file under the size cap → file ID attached to intake record
-3. Write test: submit with a disallowed MIME type or oversized file → rejected server-side with a clear error, no record mutation
-4. Write test: exercise the chosen abuse-control mechanism (e.g. rate-limit trips after N requests from the same source, or Turnstile token is verified) per whatever gets decided
-5. Implement: wire the upload UI, server-side validation, and abuse-control check
-6. Verify: submit from an incognito window with a photo attached; confirm it renders in the 2-13 admin lead view
+## TDD Approach
+1. Write test: submit intake without links → record created with an empty/absent link list, unchanged from current behaviour.
+2. Write test: submit with valid share-folder links → links attached to the record.
+3. Write test: submit with a malformed URL or over the count/length cap → rejected server-side with a clear error, no record mutation.
+4. Implement: add the optional link field to `IntakeForm`, server-side validation in the intake mutation, and the admin lead-view rendering.
+5. Verify: submit from an incognito window with a couple of Drive links; confirm they render as clickable links in the 2-13 admin lead view.

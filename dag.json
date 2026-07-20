@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-19T16:29:19.265Z",
+  "lastUpdated": "2026-07-19T17:03:07.277Z",
   "phases": [
     {
       "id": "phase-1",
@@ -518,27 +518,23 @@
     },
     {
       "id": "2-14",
-      "title": "Optional Intake Image Uploads",
+      "title": "Intake form — inspiration links (no anonymous uploads)",
       "phase": "phase-2",
       "type": "feature",
-      "description": "Let intake-form visitors optionally attach photos or mood-board images (jerseys they like, team colors, inspiration). Files attach to the intake record so design conversations can start with visual context. Anonymous uploads create real abuse risk — open-write storage would let anyone fill our bucket — so the abuse-control approach needs a decision before implementation.",
-      "status": "blocked",
+      "description": "Public intake form takes optional LINKS to a share folder (OneDrive/Dropbox/Google Drive) instead of file uploads — plain-text URLs, no storage, so the anonymous-upload abuse question is moot. Actual image upload stays portal-only, behind auth, when a customer starts a Design (2-05). Human decision 2026-07-19.",
+      "status": "pending",
       "agent": null,
       "startedAt": "2026-05-27T06:36:39.442Z",
       "completedAt": null,
       "issueFile": "backlog/2-14-optional-intake-image-uploads.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#5-scope",
       "acceptanceCriteria": [
-        "Upload UI is fully optional — submitting without files works exactly as today",
-        "Abuse-control approach decided and documented (e.g. Cloudflare Turnstile, per-IP rate limit, signed upload URLs, or a server-side proxy) before any code lands",
-        "Per-file size cap and MIME allowlist (jpeg/png/webp/heic) enforced server-side, not just in the browser",
-        "Total per-intake file count and aggregate size capped",
-        "Uploaded files linked to the intake record so 2-13 admin view can preview them",
-        "Files visible alongside the intake in the admin lead view (2-13)",
-        "Mobile responsive — picker works on iOS Safari and Android Chrome"
-      ],
-      "needsHuman": true,
-      "humanQuestion": "Which abuse-control mechanism (Turnstile / per-IP rate limit / signed URLs / server-side proxy) should gate anonymous uploads on the public intake form?"
+        "Link field is fully optional — submitting without links works exactly as today",
+        "Visitors can add one or more inspiration URLs (small cap, e.g. up to 5)",
+        "URLs validated server-side (well-formed https, soft-known share host); count + per-URL length capped",
+        "Stored links attach to the intake record and render as clickable links in the admin lead view (2-13)",
+        "No file/binary upload on the public form; mobile responsive; tests pass, no regressions"
+      ]
     },
     {
       "id": "A-01",
@@ -1993,30 +1989,16 @@
       "status": "working",
       "currentTask": "3-03",
       "tasksCompleted": 4
+    },
+    {
+      "id": "review-batch",
+      "name": "Review Batch",
+      "status": "idle",
+      "currentTask": null,
+      "tasksCompleted": 0
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-24T22:48:38.319Z",
-      "event": "task_started",
-      "nodeId": "S-07",
-      "agent": "agent-claude-opus47-s07",
-      "message": "Claude Opus 4.7 (S-07 DesignForm) picked up: DesignForm → RHF + zod + shadcn Form"
-    },
-    {
-      "timestamp": "2026-05-24T22:52:26.119Z",
-      "event": "task_completed",
-      "nodeId": "S-07",
-      "agent": "agent-claude-opus47-s07",
-      "message": "Completed: DesignForm → RHF + zod + shadcn Form"
-    },
-    {
-      "timestamp": "2026-05-25T00:16:54.913Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "agent-claude-opus47-s13",
-      "message": "Claude Opus 4.7 (S-13) joined the workforce"
-    },
     {
       "timestamp": "2026-05-25T00:17:00.854Z",
       "event": "task_started",
@@ -2695,6 +2677,27 @@
       "nodeId": "3-03",
       "agent": "ralph-loop",
       "message": "Ralph Loop picked up: Admin Data Export"
+    },
+    {
+      "timestamp": "2026-07-19T17:03:06.983Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "review-batch",
+      "message": "Review Batch joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-19T17:03:07.073Z",
+      "event": "nodes_added",
+      "nodeId": "R-08",
+      "agent": null,
+      "message": "New task added: Guard design rename against a locked run"
+    },
+    {
+      "timestamp": "2026-07-19T17:03:07.275Z",
+      "event": "question_answered",
+      "nodeId": "2-14",
+      "agent": "human",
+      "message": "Question answered, task unparked: Optional Intake Image Uploads"
     }
   ]
 }
