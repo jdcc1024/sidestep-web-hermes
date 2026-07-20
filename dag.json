@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-20T02:51:26.212Z",
+  "lastUpdated": "2026-07-20T03:04:07.866Z",
   "phases": [
     {
       "id": "phase-1",
@@ -522,10 +522,10 @@
       "phase": "phase-2",
       "type": "feature",
       "description": "Public intake form takes optional LINKS to a share folder (OneDrive/Dropbox/Google Drive) instead of file uploads — plain-text URLs, no storage, so the anonymous-upload abuse question is moot. Actual image upload stays portal-only, behind auth, when a customer starts a Design (2-05). Human decision 2026-07-19.",
-      "status": "in-progress",
+      "status": "completed",
       "agent": "ralph-loop",
       "startedAt": "2026-07-20T02:51:26.211Z",
-      "completedAt": null,
+      "completedAt": "2026-07-20T03:04:07.865Z",
       "issueFile": "backlog/2-14-optional-intake-image-uploads.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#5-scope",
       "acceptanceCriteria": [
@@ -1986,9 +1986,9 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "working",
-      "currentTask": "2-14",
-      "tasksCompleted": 5
+      "status": "idle",
+      "currentTask": null,
+      "tasksCompleted": 6
     },
     {
       "id": "review-batch",
@@ -1999,20 +1999,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-25T01:13:13.662Z",
-      "event": "nodes_added",
-      "nodeId": "S-15",
-      "agent": null,
-      "message": "New task added: Portal Shell Dark-Mode Fix"
-    },
-    {
-      "timestamp": "2026-05-25T01:13:17.967Z",
-      "event": "task_started",
-      "nodeId": "S-15",
-      "agent": "agent-claude-opus47-s15",
-      "message": "Claude Opus 4.7 (S-15 Portal Shell DM) picked up: Portal Shell Dark-Mode Fix"
-    },
     {
       "timestamp": "2026-05-25T01:20:15.809Z",
       "event": "task_completed",
@@ -2698,6 +2684,20 @@
       "nodeId": "2-14",
       "agent": "ralph-loop",
       "message": "Ralph Loop picked up: Intake form — inspiration links (no anonymous uploads)"
+    },
+    {
+      "timestamp": "2026-07-20T03:03:07.410Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-20T03:04:07.866Z",
+      "event": "task_completed",
+      "nodeId": "2-14",
+      "agent": "ralph-loop",
+      "message": "Completed: Intake form — inspiration links (no anonymous uploads)"
     }
   ]
 }
