@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-19T17:03:07.277Z",
+  "lastUpdated": "2026-07-20T02:51:26.212Z",
   "phases": [
     {
       "id": "phase-1",
@@ -403,10 +403,10 @@
       "phase": "phase-3",
       "type": "feature",
       "description": "CSV export button on admin order detail. Downloads a file with order info and all jersey run responses formatted for supplier handoff. Admin-only API route.",
-      "status": "in-progress",
+      "status": "completed",
       "agent": "ralph-loop",
       "startedAt": "2026-07-19T16:29:19.264Z",
-      "completedAt": null,
+      "completedAt": "2026-07-20T02:51:13.123Z",
       "issueFile": "backlog/3-03-admin-data-export.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#4-user-stories",
       "acceptanceCriteria": [
@@ -522,9 +522,9 @@
       "phase": "phase-2",
       "type": "feature",
       "description": "Public intake form takes optional LINKS to a share folder (OneDrive/Dropbox/Google Drive) instead of file uploads — plain-text URLs, no storage, so the anonymous-upload abuse question is moot. Actual image upload stays portal-only, behind auth, when a customer starts a Design (2-05). Human decision 2026-07-19.",
-      "status": "pending",
-      "agent": null,
-      "startedAt": "2026-05-27T06:36:39.442Z",
+      "status": "in-progress",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-20T02:51:26.211Z",
       "completedAt": null,
       "issueFile": "backlog/2-14-optional-intake-image-uploads.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#5-scope",
@@ -1987,8 +1987,8 @@
       "id": "ralph-loop",
       "name": "Ralph Loop",
       "status": "working",
-      "currentTask": "3-03",
-      "tasksCompleted": 4
+      "currentTask": "2-14",
+      "tasksCompleted": 5
     },
     {
       "id": "review-batch",
@@ -1999,27 +1999,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-25T00:17:00.854Z",
-      "event": "task_started",
-      "nodeId": "S-13",
-      "agent": "agent-claude-opus47-s13",
-      "message": "Claude Opus 4.7 (S-13) picked up: Layout Sweep and Migration Audit"
-    },
-    {
-      "timestamp": "2026-05-25T00:30:55.139Z",
-      "event": "task_completed",
-      "nodeId": "S-13",
-      "agent": "agent-claude-opus47-s13",
-      "message": "Completed: Layout Sweep and Migration Audit"
-    },
-    {
-      "timestamp": "2026-05-25T01:13:02.185Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "agent-claude-opus47-s15",
-      "message": "Claude Opus 4.7 (S-15 Portal Shell DM) joined the workforce"
-    },
     {
       "timestamp": "2026-05-25T01:13:13.662Z",
       "event": "nodes_added",
@@ -2698,6 +2677,27 @@
       "nodeId": "2-14",
       "agent": "human",
       "message": "Question answered, task unparked: Optional Intake Image Uploads"
+    },
+    {
+      "timestamp": "2026-07-20T02:50:03.585Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-20T02:51:13.124Z",
+      "event": "task_completed",
+      "nodeId": "3-03",
+      "agent": "ralph-loop",
+      "message": "Completed: Admin Data Export"
+    },
+    {
+      "timestamp": "2026-07-20T02:51:26.211Z",
+      "event": "task_started",
+      "nodeId": "2-14",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Intake form — inspiration links (no anonymous uploads)"
     }
   ]
 }

@@ -70,3 +70,44 @@ One entry per completed loop task. This is the human's fast path for UX critique
   surface, re-run `node scripts/snap.mjs --login` signed in as an admin.
   I deleted the captured 403 image rather than leave a misleading artifact.
 - Follow-ups filed: none
+
+## 2026-07-19 — 2-14: Intake form — inspiration links (no anonymous uploads)
+
+- What shipped:
+  - Optional "Link us to your inspiration" field on the public intake form
+    (`/intake`, step 03): up to 5 rows, add/remove, `https://`-only, 500-char
+    per-URL cap. No file uploads — per the human's 2026-07-19 decision that an
+    open-write storage endpoint on a public form is an abuse surface we don't
+    want to own.
+  - Validation lives once in `lib/intake.ts`
+    (`validateInspirationLinks` / `normalizeInspirationLinks` /
+    `isKnownShareHost`) and is imported by both the zod form schema and the
+    Convex `submitIntake` mutation, so client and server can't drift. Links are
+    trimmed, blank rows dropped, deduped, order preserved.
+  - `intakes.inspirationLinks` added to the schema as `v.optional(v.array(v.string()))`;
+    a submission with no links writes no field at all, so existing rows and
+    existing behaviour are untouched.
+- UX surfaces to eyeball: `/intake` — step 03, below the brief. Screenshots in
+  `docs/review/2-14/` (375/768/1280, light + dark). Look at: the field's
+  explanatory copy ("We don't take file uploads here." — is that the tone you
+  want, or too blunt?), the "Add another link" button styling next to the
+  outline/ghost buttons elsewhere, and the soft hint text that appears under an
+  unrecognized host.
+- Decisions I made that a human may want to veto:
+  - **Host recognition is a hint, not a gate.** An unlisted but well-formed
+    `https` URL submits fine; the visitor just sees "Not a share host we
+    recognize — that's fine, we'll still take a look." This follows the issue's
+    "don't hard-block an unrecognised-but-valid https URL", but the wording is
+    yours to change.
+  - **`http://` is rejected, not upgraded.** Every real share host is https;
+    accepting plain http buys nothing and mixed-content-warns if we ever render
+    these.
+  - **One error message per list**, shown under the whole field rather than
+    per-row. Simpler than per-index zod issues and the caps are low enough that
+    "which row" is obvious.
+  - **The admin-rendering acceptance criterion was carried forward to 2-13,
+    not built here.** `/admin/leads` doesn't exist yet (2-13 is still blocked on
+    2-11), so there is nowhere to render them. I added an explicit criterion to
+    `backlog/2-13-admin-customer-management.md` instead of inventing an admin
+    surface inside this issue.
+- Follow-ups filed: none (2-13 criterion amended in place rather than a new node)

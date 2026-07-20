@@ -1,15 +1,19 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const submitIntake = vi.fn(async () => "intake_new_test_id");
+// Typed by its signature so assertions on `mock.calls[0][0]` see the payload.
+const submitIntake = vi.fn<(payload: Record<string, unknown>) => Promise<string>>(
+  async () => "intake_new_test_id",
+);
 
 vi.mock("convex/react", () => ({
   useMutation: () => submitIntake,
 }));
 
 import { IntakeForm } from "./IntakeForm";
+import { MAX_INSPIRATION_LINKS } from "@/lib/intake";
 
 describe("IntakeForm", () => {
   it("surfaces RHF + zod validation errors when the user submits an empty form", async () => {
@@ -40,5 +44,118 @@ describe("IntakeForm", () => {
       screen.getByText(/tell us a bit about your team/i),
     ).toBeInTheDocument();
     expect(submitIntake).not.toHaveBeenCalled();
+  });
+});
+
+const DRIVE_LINK = "https://drive.google.com/drive/folders/abc123";
+
+async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText(/your name/i), "Sam Captain");
+  await user.type(
+    screen.getByLabelText(/team or organization/i),
+    "Falcons",
+  );
+  await user.type(screen.getByLabelText(/^email$/i), "sam@example.com");
+  await user.type(screen.getByLabelText(/sport or activity/i), "Soccer");
+  await user.click(screen.getByText(/i need help designing/i));
+  await user.type(
+    screen.getByLabelText(/tell us about your team/i),
+    "Navy kit with gold trim.",
+  );
+}
+
+describe("IntakeForm — inspiration links", () => {
+  it("submits without any link, unchanged from before the field existed", async () => {
+    const user = userEvent.setup();
+    submitIntake.mockClear();
+    render(<IntakeForm />);
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole("button", { name: /send my inquiry/i }));
+
+    await screen.findByText(/thanks — we've got it/i);
+    expect(submitIntake).toHaveBeenCalledTimes(1);
+    expect(submitIntake.mock.calls[0][0]).not.toHaveProperty(
+      "inspirationLinks",
+    );
+  });
+
+  it("sends a pasted share-folder link with the submission", async () => {
+    const user = userEvent.setup();
+    submitIntake.mockClear();
+    render(<IntakeForm />);
+
+    await fillRequiredFields(user);
+    await user.type(screen.getByLabelText(/^inspiration link 1$/i), DRIVE_LINK);
+    await user.click(screen.getByRole("button", { name: /send my inquiry/i }));
+
+    await screen.findByText(/thanks — we've got it/i);
+    expect(submitIntake.mock.calls[0][0]).toMatchObject({
+      inspirationLinks: [DRIVE_LINK],
+    });
+  });
+
+  it("blocks submission and explains when a link is malformed", async () => {
+    const user = userEvent.setup();
+    submitIntake.mockClear();
+    render(<IntakeForm />);
+
+    await fillRequiredFields(user);
+    await user.type(screen.getByLabelText(/^inspiration link 1$/i), "nope");
+    await user.click(screen.getByRole("button", { name: /send my inquiry/i }));
+
+    expect(await screen.findByText(/https:\/\//i)).toBeInTheDocument();
+    expect(submitIntake).not.toHaveBeenCalled();
+  });
+
+  it("adds and removes link rows, stopping at the cap", async () => {
+    const user = userEvent.setup();
+    render(<IntakeForm />);
+
+    const addButton = () =>
+      screen.queryByRole("button", { name: /add another link/i });
+
+    expect(screen.getAllByLabelText(/^inspiration link \d$/i)).toHaveLength(1);
+    // A lone row has no remove button — nothing to fall back to.
+    expect(
+      screen.queryByRole("button", { name: /remove inspiration link/i }),
+    ).not.toBeInTheDocument();
+
+    for (let i = 1; i < MAX_INSPIRATION_LINKS; i++) {
+      await user.click(addButton()!);
+    }
+    expect(screen.getAllByLabelText(/^inspiration link \d$/i)).toHaveLength(
+      MAX_INSPIRATION_LINKS,
+    );
+    expect(addButton()).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getAllByRole("button", { name: /remove inspiration link/i })[0],
+    );
+    expect(screen.getAllByLabelText(/^inspiration link \d$/i)).toHaveLength(
+      MAX_INSPIRATION_LINKS - 1,
+    );
+    expect(addButton()).toBeInTheDocument();
+  });
+
+  it("hints when the host is unrecognized without blocking it", async () => {
+    const user = userEvent.setup();
+    submitIntake.mockClear();
+    render(<IntakeForm />);
+
+    await fillRequiredFields(user);
+    await user.type(
+      screen.getByLabelText(/^inspiration link 1$/i),
+      "https://example.com/photos",
+    );
+    expect(
+      await screen.findByText(/not a share host we recognize/i),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /send my inquiry/i }));
+    await screen.findByText(/thanks — we've got it/i);
+    expect(submitIntake.mock.calls[0][0]).toMatchObject({
+      inspirationLinks: ["https://example.com/photos"],
+    });
   });
 });

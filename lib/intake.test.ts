@@ -2,11 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BRIEF_MAX_LENGTH,
   EMPTY_INTAKE,
+  INSPIRATION_LINK_MAX_LENGTH,
+  MAX_INSPIRATION_LINKS,
   MIN_QUANTITY,
   QUESTIONS_MAX_LENGTH,
+  isKnownShareHost,
   parseDeadlineToMs,
   toIntakePayload,
   validateIntake,
+  validateInspirationLinks,
   type IntakeInput,
 } from "./intake";
 
@@ -23,10 +27,14 @@ function validInput(overrides: Partial<IntakeInput> = {}): IntakeInput {
     deadline: "",
     brief: "We're a co-ed Tuesday league looking for retro-inspired kits.",
     questions: "",
+    inspirationLinks: [],
     newsletterOptIn: false,
     ...overrides,
   };
 }
+
+const DRIVE_LINK = "https://drive.google.com/drive/folders/abc123";
+const DROPBOX_LINK = "https://www.dropbox.com/scl/fo/xyz789";
 
 describe("validateIntake — happy path", () => {
   it("returns no errors for a fully populated valid submission", () => {
@@ -270,6 +278,131 @@ describe("validateIntake — length caps", () => {
   });
 });
 
+describe("validateIntake — inspiration links", () => {
+  it("accepts no links at all (fully optional)", () => {
+    expect(
+      validateIntake(validInput({ inspirationLinks: [] })).inspirationLinks,
+    ).toBeUndefined();
+  });
+
+  it("ignores blank rows the visitor left empty", () => {
+    expect(
+      validateIntake(validInput({ inspirationLinks: ["", "   "] }))
+        .inspirationLinks,
+    ).toBeUndefined();
+  });
+
+  it("accepts a valid https share-folder link", () => {
+    expect(
+      validateIntake(validInput({ inspirationLinks: [DRIVE_LINK] }))
+        .inspirationLinks,
+    ).toBeUndefined();
+  });
+
+  it("accepts several valid links", () => {
+    expect(
+      validateIntake(
+        validInput({ inspirationLinks: [DRIVE_LINK, DROPBOX_LINK] }),
+      ).inspirationLinks,
+    ).toBeUndefined();
+  });
+
+  it("accepts an unrecognised but well-formed https host (soft host check)", () => {
+    expect(
+      validateIntake(
+        validInput({ inspirationLinks: ["https://pinterest.ca/board/kits"] }),
+      ).inspirationLinks,
+    ).toBeUndefined();
+  });
+
+  it("rejects a malformed URL", () => {
+    expect(
+      validateIntake(validInput({ inspirationLinks: ["not a url at all"] }))
+        .inspirationLinks,
+    ).toBeTruthy();
+  });
+
+  it("rejects a non-https scheme", () => {
+    expect(
+      validateIntake(
+        validInput({ inspirationLinks: ["http://drive.google.com/x"] }),
+      ).inspirationLinks,
+    ).toBeTruthy();
+    expect(
+      validateIntake(
+        validInput({ inspirationLinks: ["javascript:alert(1)"] }),
+      ).inspirationLinks,
+    ).toBeTruthy();
+  });
+
+  it(`rejects more than ${MAX_INSPIRATION_LINKS} links`, () => {
+    const tooMany = Array.from(
+      { length: MAX_INSPIRATION_LINKS + 1 },
+      (_, i) => `https://drive.google.com/drive/folders/f${i}`,
+    );
+    expect(
+      validateIntake(validInput({ inspirationLinks: tooMany }))
+        .inspirationLinks,
+    ).toBeTruthy();
+  });
+
+  it(`accepts exactly ${MAX_INSPIRATION_LINKS} links`, () => {
+    const atCap = Array.from(
+      { length: MAX_INSPIRATION_LINKS },
+      (_, i) => `https://drive.google.com/drive/folders/f${i}`,
+    );
+    expect(
+      validateIntake(validInput({ inspirationLinks: atCap })).inspirationLinks,
+    ).toBeUndefined();
+  });
+
+  it("rejects a link longer than the per-URL cap", () => {
+    const long = `https://drive.google.com/${"x".repeat(
+      INSPIRATION_LINK_MAX_LENGTH,
+    )}`;
+    expect(
+      validateIntake(validInput({ inspirationLinks: [long] }))
+        .inspirationLinks,
+    ).toBeTruthy();
+  });
+});
+
+describe("validateInspirationLinks", () => {
+  it("returns null when every link is fine", () => {
+    expect(validateInspirationLinks([DRIVE_LINK, ""])).toBeNull();
+  });
+
+  it("returns a message naming the offending link", () => {
+    const message = validateInspirationLinks(["nope"]);
+    expect(message).toBeTruthy();
+    expect(message).toMatch(/https/i);
+  });
+});
+
+describe("isKnownShareHost", () => {
+  it.each([
+    "https://drive.google.com/drive/folders/abc",
+    "https://www.dropbox.com/scl/fo/x",
+    "https://1drv.ms/f/s!abc",
+    "https://onedrive.live.com/?id=1",
+    "https://www.icloud.com/sharedalbum/#B0abc",
+  ])("recognises %s", (url) => {
+    expect(isKnownShareHost(url)).toBe(true);
+  });
+
+  it("does not recognise an arbitrary host", () => {
+    expect(isKnownShareHost("https://example.com/photos")).toBe(false);
+  });
+
+  it("returns false for a malformed URL rather than throwing", () => {
+    expect(isKnownShareHost("not a url")).toBe(false);
+  });
+
+  it("is not fooled by a lookalike host suffix", () => {
+    expect(isKnownShareHost("https://drive.google.com.evil.tld/x")).toBe(false);
+  });
+});
+
 describe("toIntakePayload", () => {
   it("trims whitespace and coerces quantity to a number", () => {
     const payload = toIntakePayload(
@@ -324,6 +457,37 @@ describe("toIntakePayload", () => {
   it("omits questions when blank", () => {
     const payload = toIntakePayload(validInput({ questions: "" }));
     expect(payload.questions).toBeUndefined();
+  });
+
+  it("omits inspirationLinks when none were entered", () => {
+    expect(
+      toIntakePayload(validInput({ inspirationLinks: [] })).inspirationLinks,
+    ).toBeUndefined();
+  });
+
+  it("drops blank rows and trims, omitting the field when nothing survives", () => {
+    expect(
+      toIntakePayload(validInput({ inspirationLinks: ["", "  "] }))
+        .inspirationLinks,
+    ).toBeUndefined();
+    expect(
+      toIntakePayload(validInput({ inspirationLinks: [`  ${DRIVE_LINK}  `] }))
+        .inspirationLinks,
+    ).toEqual([DRIVE_LINK]);
+  });
+
+  it("dedupes repeated links", () => {
+    expect(
+      toIntakePayload(
+        validInput({ inspirationLinks: [DRIVE_LINK, DRIVE_LINK, DROPBOX_LINK] }),
+      ).inspirationLinks,
+    ).toEqual([DRIVE_LINK, DROPBOX_LINK]);
+  });
+
+  it("throws on an invalid link (defensive — caller should validate first)", () => {
+    expect(() =>
+      toIntakePayload(validInput({ inspirationLinks: ["not a url"] })),
+    ).toThrow();
   });
 
   it("preserves the newsletter opt-in flag", () => {

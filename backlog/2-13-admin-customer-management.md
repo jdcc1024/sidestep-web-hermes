@@ -20,6 +20,7 @@ Build the admin customer management area: a customer list showing all registered
 - [ ] `/admin/customers` page: table of all users — columns: name, email, registration date, order count, "New" badge if registered within the last 7 days; clicking a user opens their profile
 - [ ] Customer profile page: all user fields, their orders list (linked), their designs list (linked); admin can edit customer name and email (inline edit with save button)
 - [ ] `/admin/leads` page: table of all intake submissions — columns: name, team name, sport, quantity, brief preview, submission date; clicking shows full brief; "Send invite link" button copies an invite link (`/invite?token=<intakeId>`) to clipboard
+- [ ] The lead detail view renders `intake.inspirationLinks` (optional `string[]`, added by 2-14) as clickable `<a target="_blank" rel="noreferrer">` links — raw URLs only, no fetching or previewing the linked content
 - [ ] Admin can edit any field on the admin order detail page (team name, sport, quantity, jersey specs) via inline edit fields
 - [ ] Admin can edit the design title and brief on the admin design detail page
 - [ ] All mutations enforce admin-only access in Convex

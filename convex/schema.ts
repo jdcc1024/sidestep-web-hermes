@@ -173,6 +173,9 @@ export default defineSchema({
     deadline: v.optional(v.number()),
     brief: v.string(),
     questions: v.optional(v.string()),
+    // Links to a share folder the customer already keeps (Drive, Dropbox, …).
+    // Plain text — we never receive or host their files. See issue 2-14.
+    inspirationLinks: v.optional(v.array(v.string())),
     newsletterOptIn: v.optional(v.boolean()),
     submittedAt: v.number(),
   })

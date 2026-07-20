@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
+import {
+  INSPIRATION_LINK_MAX_LENGTH,
+  MAX_INSPIRATION_LINKS,
+} from "../lib/intake";
 
 const modules = import.meta.glob("./**/*.*s");
 
@@ -52,5 +56,87 @@ describe("intakes.submitIntake", () => {
         estimatedQuantity: 2,
       }),
     ).rejects.toThrow(/Quantity must be at least/);
+  });
+});
+
+describe("intakes.submitIntake — inspiration links", () => {
+  const DRIVE_LINK = "https://drive.google.com/drive/folders/abc123";
+  const DROPBOX_LINK = "https://www.dropbox.com/scl/fo/xyz789";
+
+  it("stores no link field when none are submitted", async () => {
+    const t = convexTest(schema, modules);
+    const intakeId = await t.mutation(api.intakes.submitIntake, VALID_INTAKE);
+    const row = await t.run((ctx) => ctx.db.get(intakeId));
+    expect(row?.inspirationLinks).toBeUndefined();
+  });
+
+  it("attaches valid share-folder links to the record", async () => {
+    const t = convexTest(schema, modules);
+    const intakeId = await t.mutation(api.intakes.submitIntake, {
+      ...VALID_INTAKE,
+      inspirationLinks: [`  ${DRIVE_LINK}  `, DROPBOX_LINK, DRIVE_LINK],
+    });
+    const row = await t.run((ctx) => ctx.db.get(intakeId));
+    // Trimmed and deduped, original order preserved.
+    expect(row?.inspirationLinks).toEqual([DRIVE_LINK, DROPBOX_LINK]);
+  });
+
+  it("accepts an unrecognised but well-formed https host", async () => {
+    const t = convexTest(schema, modules);
+    const intakeId = await t.mutation(api.intakes.submitIntake, {
+      ...VALID_INTAKE,
+      inspirationLinks: ["https://pinterest.ca/board/kits"],
+    });
+    const row = await t.run((ctx) => ctx.db.get(intakeId));
+    expect(row?.inspirationLinks).toEqual(["https://pinterest.ca/board/kits"]);
+  });
+
+  it("rejects a malformed link and writes nothing", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(api.intakes.submitIntake, {
+        ...VALID_INTAKE,
+        inspirationLinks: ["not a url"],
+      }),
+    ).rejects.toThrow(/https/i);
+    const rows = await t.run((ctx) => ctx.db.query("intakes").collect());
+    expect(rows).toHaveLength(0);
+  });
+
+  it("rejects a non-https scheme", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(api.intakes.submitIntake, {
+        ...VALID_INTAKE,
+        inspirationLinks: ["javascript:alert(1)"],
+      }),
+    ).rejects.toThrow(/https/i);
+  });
+
+  it("rejects more links than the cap", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(api.intakes.submitIntake, {
+        ...VALID_INTAKE,
+        inspirationLinks: Array.from(
+          { length: MAX_INSPIRATION_LINKS + 1 },
+          (_, i) => `https://drive.google.com/drive/folders/f${i}`,
+        ),
+      }),
+    ).rejects.toThrow(/link/i);
+  });
+
+  it("rejects a link over the per-URL length cap", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(api.intakes.submitIntake, {
+        ...VALID_INTAKE,
+        inspirationLinks: [
+          `https://drive.google.com/${"x".repeat(
+            INSPIRATION_LINK_MAX_LENGTH,
+          )}`,
+        ],
+      }),
+    ).rejects.toThrow(/too long/i);
   });
 });

@@ -1,5 +1,9 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+  normalizeInspirationLinks,
+  validateInspirationLinks,
+} from "../lib/intake";
 
 const designPreferenceValidator = v.union(
   v.literal("own-design"),
@@ -48,6 +52,7 @@ export const submitIntake = mutation({
     deadline: v.optional(v.number()),
     brief: v.string(),
     questions: v.optional(v.string()),
+    inspirationLinks: v.optional(v.array(v.string())),
     newsletterOptIn: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -88,6 +93,14 @@ export const submitIntake = mutation({
       ? Array.from(new Set(args.usageContext))
       : undefined;
 
+    // Caps and shape live in lib/intake.ts so the form and this mutation can't
+    // drift. Validate before the insert — a rejected list writes nothing.
+    const inspirationLinks = normalizeInspirationLinks(
+      args.inspirationLinks ?? [],
+    );
+    const linkError = validateInspirationLinks(inspirationLinks);
+    if (linkError) throw new ConvexError(linkError);
+
     return ctx.db.insert("intakes", {
       name,
       teamName,
@@ -100,6 +113,7 @@ export const submitIntake = mutation({
       ...(deadline !== undefined ? { deadline } : {}),
       brief,
       ...(questions ? { questions } : {}),
+      ...(inspirationLinks.length > 0 ? { inspirationLinks } : {}),
       newsletterOptIn: args.newsletterOptIn,
       submittedAt: now,
     });

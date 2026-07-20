@@ -6,17 +6,20 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, PlusIcon, XIcon } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   BRIEF_MAX_LENGTH,
   DESIGN_PREFERENCES,
+  MAX_INSPIRATION_LINKS,
   MIN_QUANTITY,
   QUESTIONS_MAX_LENGTH,
   USAGE_CONTEXTS,
+  isKnownShareHost,
   parseDeadlineToMs,
   toIntakePayload,
+  validateInspirationLinks,
   type DesignPreference,
 } from "@/lib/intake";
 import { Button } from "@/components/ui/button";
@@ -146,6 +149,12 @@ const formSchema = z.object({
       QUESTIONS_MAX_LENGTH,
       `Please keep this under ${QUESTIONS_MAX_LENGTH} characters.`,
     ),
+  // Blank rows are the normal state — the whole field is optional. The shared
+  // helper ignores them and reports the first real problem it finds.
+  inspirationLinks: z.array(z.string()).superRefine((links, ctx) => {
+    const message = validateInspirationLinks(links);
+    if (message) ctx.addIssue({ code: "custom", message });
+  }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -193,6 +202,8 @@ export function IntakeForm() {
       deadline: "",
       brief: "",
       questions: "",
+      // One empty row so the field is visible and usable without a click.
+      inspirationLinks: [""],
     },
   });
 
@@ -210,6 +221,7 @@ export function IntakeForm() {
         deadline: values.deadline,
         brief: values.brief,
         questions: values.questions,
+        inspirationLinks: values.inspirationLinks,
         newsletterOptIn: false,
       });
       await submitIntake(payload);
@@ -476,6 +488,82 @@ export function IntakeForm() {
                   name="brief"
                   max={BRIEF_MAX_LENGTH}
                 />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="inspirationLinks"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Link us to your inspiration</FormLabel>
+                <FormDescription>
+                  Optional — paste a link to a folder you already share
+                  (Google Drive, Dropbox, OneDrive, iCloud). Up to{" "}
+                  {MAX_INSPIRATION_LINKS}. We don&apos;t take file uploads
+                  here.
+                </FormDescription>
+                <FormControl>
+                  <div className="space-y-3">
+                    {field.value.map((link, index) => {
+                      const trimmed = link.trim();
+                      return (
+                        <div key={index} className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              type="url"
+                              inputMode="url"
+                              autoComplete="off"
+                              spellCheck={false}
+                              placeholder="https://drive.google.com/drive/folders/…"
+                              aria-label={`Inspiration link ${index + 1}`}
+                              value={link}
+                              onChange={(event) => {
+                                const next = [...field.value];
+                                next[index] = event.target.value;
+                                field.onChange(next);
+                              }}
+                            />
+                            {trimmed && !isKnownShareHost(trimmed) ? (
+                              <p className="mt-1.5 text-xs text-muted-foreground">
+                                Not a share host we recognize — that&apos;s
+                                fine, we&apos;ll still take a look.
+                              </p>
+                            ) : null}
+                          </div>
+                          {field.value.length > 1 ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Remove inspiration link ${index + 1}`}
+                              onClick={() =>
+                                field.onChange(
+                                  field.value.filter((_, i) => i !== index),
+                                )
+                              }
+                            >
+                              <XIcon className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                    {field.value.length < MAX_INSPIRATION_LINKS ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => field.onChange([...field.value, ""])}
+                      >
+                        <PlusIcon className="h-4 w-4" aria-hidden="true" />
+                        Add another link
+                      </Button>
+                    ) : null}
+                  </div>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

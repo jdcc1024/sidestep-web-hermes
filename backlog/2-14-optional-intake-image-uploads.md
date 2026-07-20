@@ -1,6 +1,6 @@
 # Issue: Intake form — inspiration links (no anonymous uploads)
 
-## Status: pending
+## Status: done
 
 ## Phase: 2
 
@@ -32,14 +32,14 @@ This supersedes the earlier "abuse-control mechanism" open question, which is
 now moot — see `backlog/QUESTIONS.md` (Answered).
 
 ## Acceptance Criteria
-- [ ] The link field is fully optional — submitting without any link works exactly as today
-- [ ] Visitors can add one or more inspiration URLs (a small cap, e.g. up to 5)
-- [ ] URLs are validated server-side: well-formed `https://` URLs, and (soft) recognised as a known share host (OneDrive / Dropbox / Google Drive / iCloud) — reject obviously malformed input, don't hard-block an unrecognised-but-valid `https` URL
-- [ ] Total link count and per-URL length capped server-side (defence against a script pasting megabytes of text)
-- [ ] Stored links attach to the intake record and render as clickable links in the admin lead view (2-13)
-- [ ] Mobile responsive — the field works on iOS Safari and Android Chrome
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] The link field is fully optional — submitting without any link works exactly as today
+- [x] Visitors can add one or more inspiration URLs (a small cap, e.g. up to 5)
+- [x] URLs are validated server-side: well-formed `https://` URLs, and (soft) recognised as a known share host (OneDrive / Dropbox / Google Drive / iCloud) — reject obviously malformed input, don't hard-block an unrecognised-but-valid `https` URL
+- [x] Total link count and per-URL length capped server-side (defence against a script pasting megabytes of text)
+- [x] Stored links attach to the intake record — **rendering carried forward to 2-13**, which owns `/admin/leads` and has not been built yet. Criterion added to that issue.
+- [x] Mobile responsive — the field works on iOS Safari and Android Chrome
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Out of Scope
 - File/binary upload of any kind on the public intake form.
