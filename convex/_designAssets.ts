@@ -89,6 +89,49 @@ export async function fileCountsByDesign(
   return new Map(unique.map((designId, i) => [designId, counts[i]!]));
 }
 
+// The picture that stands in for a design on a summary surface, with its URL
+// already resolved. Content type travels with it because the resolver may
+// hand back an explicitly flagged non-image — the renderer, not the query,
+// decides whether an <img> can show it.
+export type DesignMainImage = {
+  url: string | null;
+  filename: string;
+  contentType: string;
+};
+
+export type DesignAssetSummary = {
+  fileCount: number;
+  mainImage: DesignMainImage | null;
+};
+
+// Everything a summary surface needs about a design's files in one read: how
+// many there are, and the one image that represents them (D-07). Resolution
+// happens over metadata, so storage is asked for exactly one URL per design —
+// the order page shows a thumbnail, not the whole pool.
+export async function assetSummariesByDesign(
+  ctx: QueryCtx | MutationCtx,
+  designIds: readonly Id<"designs">[],
+): Promise<Map<Id<"designs">, DesignAssetSummary>> {
+  const unique = [...new Set(designIds)];
+  const summaries = await Promise.all(
+    unique.map(async (designId): Promise<DesignAssetSummary> => {
+      const assets = await listDesignAssets(ctx, designId);
+      const main = resolveMainAsset(assets);
+      return {
+        fileCount: assets.length,
+        mainImage: main
+          ? {
+              url: await ctx.storage.getUrl(main.storageId),
+              filename: main.filename,
+              contentType: main.contentType,
+            }
+          : null,
+      };
+    }),
+  );
+  return new Map(unique.map((designId, i) => [designId, summaries[i]!]));
+}
+
 // Records uploads against a design. Filename and content type are normalized
 // here (blank names and parameterized mime strings both arrive from real
 // browsers), and the uploader's admin status is snapshotted so the delete

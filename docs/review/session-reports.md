@@ -580,3 +580,46 @@ One entry per completed loop task. This is the human's fast path for UX critique
   D-01 → D-06 in one pass.
 
 - Follow-ups filed: none. D-09 still needs the human `--login`.
+
+## 2026-07-26 — D-07: Order Page Design Main Image
+
+- What shipped:
+  - `convex/_designAssets.ts` gains `assetSummariesByDesign` — the count and
+    the picture in one pass per design. It resolves the main asset over
+    metadata (the D-01 resolver, unchanged) and asks storage for exactly one
+    signed URL per design rather than resolving the whole pool.
+  - `orders.getMyOrder` now returns `mainImage` beside `fileCount` for each
+    linked design; one image per design, never an order-level one.
+  - Each design section on `/portal/orders/<id>` leads with a 56px thumbnail
+    beside its file-count badge, with a labelled placeholder covering all four
+    no-image cases.
+  - New `app/portal/orders/[id]/page.test.tsx` (first render test for this
+    page) plus four `getMyOrder` cases; 22 tests over the two files.
+
+- UX surfaces to eyeball: `/portal/orders/<id>` — the Designs section. Worth
+  judging: the thumbnail size (56px, chosen to sit inside the existing card
+  header without pushing the title down), whether a design's picture should
+  instead be a wide banner across the section, and how the grey placeholder
+  icon reads next to a real photo when an order mixes designs with and without
+  artwork. **No screenshots** — see below.
+
+- Decisions I made that a human may want to veto:
+  - **Thumbnail beside the title, not above the section.** The issue says
+    "picture and number, not either/or" and the card header already pairs
+    title + count, so the image joins that row. A banner treatment would
+    change the section's rhythm — that's D-08 territory if you want it.
+  - **The renderer, not the query, decides renderability.** `mainImage`
+    carries `contentType`, so an owner who explicitly flagged a print template
+    as main still gets the placeholder rather than a broken image — the same
+    rule the D-05 asset pool applies.
+  - **Added an `onError` fallback.** Convex signed URLs are short-lived, so a
+    page left open can hold a stale URL; the thumbnail swaps itself for the
+    placeholder instead of showing a broken-image glyph.
+
+- Blocked: **screenshots, seventh slice running.** `.auth/state.json` is still
+  the session saved 2026-07-19 and `/portal/orders/<id>` is behind Clerk, so a
+  capture would photograph the sign-in wall again. Didn't re-capture.
+  `node scripts/snap.mjs --login` then unparking D-09 now covers D-01 → D-07.
+
+- Follow-ups filed: none. D-08 is unblocked by this on the code side; it still
+  waits on D-09.

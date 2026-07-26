@@ -62,6 +62,37 @@ async function seedDesign(
   );
 }
 
+// One uploaded file on a design. Storage ids in convex-test are opaque
+// strings from ctx.storage.store — no real bytes needed, the main-image
+// resolver keys off content type and `createdAt`.
+async function seedAsset(
+  t: ReturnType<typeof convexTest>,
+  designId: Id<"designs">,
+  uploadedByUserId: Id<"users">,
+  overrides: {
+    filename?: string;
+    contentType?: string;
+    isMain?: boolean;
+    createdAt?: number;
+  } = {},
+) {
+  return t.run(async (ctx) => {
+    const storageId = await ctx.storage.store(
+      new Blob(["x"], { type: "text/plain" }),
+    );
+    return ctx.db.insert("designAssets", {
+      designId,
+      storageId,
+      filename: overrides.filename ?? "artwork.png",
+      contentType: overrides.contentType ?? "image/png",
+      isMain: overrides.isMain ?? false,
+      uploadedByUserId,
+      uploadedByAdmin: false,
+      createdAt: overrides.createdAt ?? Date.now(),
+    });
+  });
+}
+
 describe("orders.createOrder", () => {
   it("inserts an order for an authenticated captain", async () => {
     const t = convexTest(schema, modules);
@@ -344,5 +375,103 @@ describe("orders.getMyOrder", () => {
       neckline: "V-Neck",
       sleeveStyle: "Raglan",
     });
+  });
+
+  it("resolves each design's main image alongside its file count (D-07)", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedCaptain(t);
+
+    const designId = await seedDesign(t, userId, "Home kit");
+    // A print template uploaded first, then the artwork: the resolver skips
+    // the PDF and picks the oldest web-safe image.
+    await seedAsset(t, designId, userId, {
+      filename: "print-template.pdf",
+      contentType: "application/pdf",
+      createdAt: 1,
+    });
+    await seedAsset(t, designId, userId, {
+      filename: "crest.png",
+      contentType: "image/png",
+      createdAt: 2,
+    });
+
+    const orderId = await asUser.mutation(api.orders.createOrder, {
+      ...VALID_ORDER,
+      designIds: [designId],
+    });
+
+    const design = (await asUser.query(api.orders.getMyOrder, { orderId }))
+      ?.designs[0];
+    expect(design?.fileCount).toBe(2);
+    expect(design?.mainImage).toMatchObject({
+      filename: "crest.png",
+      contentType: "image/png",
+    });
+    expect(typeof design?.mainImage?.url).toBe("string");
+  });
+
+  it("honours an explicitly flagged main image over upload order", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedCaptain(t);
+
+    const designId = await seedDesign(t, userId, "Away kit");
+    await seedAsset(t, designId, userId, {
+      filename: "first.png",
+      createdAt: 1,
+    });
+    await seedAsset(t, designId, userId, {
+      filename: "chosen.png",
+      createdAt: 2,
+      isMain: true,
+    });
+
+    const orderId = await asUser.mutation(api.orders.createOrder, {
+      ...VALID_ORDER,
+      designIds: [designId],
+    });
+
+    const design = (await asUser.query(api.orders.getMyOrder, { orderId }))
+      ?.designs[0];
+    expect(design?.mainImage?.filename).toBe("chosen.png");
+  });
+
+  it("returns a null main image for a design with no files at all", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedCaptain(t);
+
+    const designId = await seedDesign(t, userId, "Docs only");
+    const orderId = await asUser.mutation(api.orders.createOrder, {
+      ...VALID_ORDER,
+      designIds: [designId],
+    });
+
+    const design = (await asUser.query(api.orders.getMyOrder, { orderId }))
+      ?.designs[0];
+    expect(design?.fileCount).toBe(0);
+    expect(design?.mainImage).toBeNull();
+  });
+
+  it("resolves one main image per linked design, not one for the order", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedCaptain(t);
+
+    const homeId = await seedDesign(t, userId, "Home kit");
+    const awayId = await seedDesign(t, userId, "Away kit");
+    await seedAsset(t, homeId, userId, { filename: "home.png", createdAt: 1 });
+    await seedAsset(t, awayId, userId, { filename: "away.png", createdAt: 1 });
+
+    const orderId = await asUser.mutation(api.orders.createOrder, {
+      ...VALID_ORDER,
+      designIds: [homeId, awayId],
+    });
+
+    const designs = (await asUser.query(api.orders.getMyOrder, { orderId }))
+      ?.designs;
+    expect(
+      designs?.map((d) => [d.title, d.mainImage?.filename ?? null]),
+    ).toEqual([
+      ["Home kit", "home.png"],
+      ["Away kit", "away.png"],
+    ]);
   });
 });

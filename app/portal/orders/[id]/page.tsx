@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { use } from "react";
+import { use, useState } from "react";
 import { useQuery } from "convex/react";
+import { ImageIcon } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
+import { isWebSafeImage } from "@/lib/designAsset";
 import { cn } from "@/lib/utils";
 import { OrderTimeline } from "@/components/portal/OrderTimeline";
 import { RemovedDesigns } from "@/components/portal/DesignRemoval";
@@ -32,6 +34,13 @@ type OrderDesign = {
   neckline?: string;
   sleeveStyle?: string;
   fileCount: number;
+  // The design's resolved main image (D-07). Null when it has no files;
+  // `url` is null when the file itself has gone from storage.
+  mainImage: {
+    url: string | null;
+    filename: string;
+    contentType: string;
+  } | null;
 };
 
 export default function OrderDetailPage({ params }: PageProps) {
@@ -196,15 +205,21 @@ function DesignSection({ design }: { design: OrderDesign }) {
     <Card aria-label={`Design: ${design.title}`} className="py-6">
       <CardHeader className="gap-1.5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base">{design.title}</CardTitle>
-            <Badge variant={design.fileCount === 0 ? "outline" : "secondary"}>
-              {design.fileCount === 0
-                ? "No files yet"
-                : `${design.fileCount} file${
-                    design.fileCount === 1 ? "" : "s"
-                  }`}
-            </Badge>
+          <div className="flex min-w-0 items-center gap-3">
+            <DesignThumbnail
+              title={design.title}
+              mainImage={design.mainImage}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">{design.title}</CardTitle>
+              <Badge variant={design.fileCount === 0 ? "outline" : "secondary"}>
+                {design.fileCount === 0
+                  ? "No files yet"
+                  : `${design.fileCount} file${
+                      design.fileCount === 1 ? "" : "s"
+                    }`}
+              </Badge>
+            </div>
           </div>
           <Link
             href={`/portal/designs/${design._id}`}
@@ -240,6 +255,53 @@ function DesignSection({ design }: { design: OrderDesign }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// The design's picture at a glance (D-07) — deliberately modest, sitting
+// beside the file count rather than replacing it: the count says how much
+// material exists, the thumbnail says what it looks like.
+//
+// Three things stop an image rendering, and all of them land on the same
+// placeholder: the design has no files, the main file isn't something a
+// browser draws (a print template can be the owner's explicit pick), or its
+// short-lived storage URL went stale between the query and the render.
+function DesignThumbnail({
+  title,
+  mainImage,
+}: {
+  title: string;
+  mainImage: OrderDesign["mainImage"];
+}) {
+  const [failed, setFailed] = useState(false);
+  const src =
+    !failed && mainImage?.url && isWebSafeImage(mainImage.contentType)
+      ? mainImage.url
+      : null;
+
+  return (
+    <div className="size-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted/50">
+      {src ? (
+        // Convex storage serves short-lived signed URLs from a per-deployment
+        // host, so next/image optimization doesn't apply.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={`${title} main image`}
+          className="size-full object-cover"
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div
+          role="img"
+          aria-label={`No image yet for ${title}`}
+          className="flex size-full items-center justify-center text-muted-foreground"
+        >
+          <ImageIcon className="size-5" aria-hidden />
+        </div>
+      )}
+    </div>
   );
 }
 

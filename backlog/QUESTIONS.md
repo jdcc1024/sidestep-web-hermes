@@ -58,6 +58,8 @@ Once that's re-run, D-09 can capture D-01/D-02/D-03/D-04 in one pass — and no 
 
 **Update (2026-07-26, ralph-loop):** D-06 shipped — the pass now covers **D-01 → D-06**, and adds `/admin/designs/<id>`, which is behind the admin role as well as Clerk, so it needs the saved session to be an *admin's*. Still no `--login` since 2026-07-19; no sign-in walls photographed.
 
+**Update (2026-07-26, ralph-loop):** D-07 shipped — the pass now covers **D-01 → D-07**, adding the design thumbnails on `/portal/orders/<id>`, which is behind Clerk (captain session is enough there; the admin design page still needs an admin's). Still no `--login` since 2026-07-19; no sign-in walls photographed.
+
 **Answer:** _(human fills in — or just re-run `--login` and unpark D-09 with `node scripts/dag-update.js answer D-09`)_
 
 ## Answered

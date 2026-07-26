@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T08:35:46.869Z",
+  "lastUpdated": "2026-07-26T16:27:25.596Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1455,9 +1455,9 @@
       "phase": "phase-3",
       "type": "feature",
       "description": "Show each linked design's resolved main image next to its file count on the order page. Thin read-side + UI slice over the D-01 resolver.",
-      "status": "pending",
-      "agent": null,
-      "startedAt": null,
+      "status": "in-progress",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-26T16:27:25.595Z",
       "completedAt": null,
       "issueFile": "backlog/D-07-order-page-design-main-image.md",
       "prdRef": "docs/prd/design-page-blocks.md#5-scope",
@@ -2195,8 +2195,8 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "idle",
-      "currentTask": null,
+      "status": "working",
+      "currentTask": "D-07",
       "tasksCompleted": 15
     },
     {
@@ -2208,20 +2208,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-06-01T07:30:12.488Z",
-      "event": "task_started",
-      "nodeId": "O-02",
-      "agent": "opus-o02",
-      "message": "Opus 4.8 picked up: Design Form Captures Specs"
-    },
-    {
-      "timestamp": "2026-06-01T07:34:59.678Z",
-      "event": "task_completed",
-      "nodeId": "O-02",
-      "agent": "opus-o02",
-      "message": "Completed: Design Form Captures Specs"
-    },
     {
       "timestamp": "2026-06-01T07:40:06.963Z",
       "event": "agent_joined",
@@ -2907,6 +2893,20 @@
       "nodeId": "D-06",
       "agent": "ralph-loop",
       "message": "Completed: Admin Design Page Uses Shared Editor"
+    },
+    {
+      "timestamp": "2026-07-26T16:23:48.536Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-26T16:27:25.596Z",
+      "event": "task_started",
+      "nodeId": "D-07",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Order Page Design Main Image"
     }
   ]
 }

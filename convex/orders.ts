@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { getCurrentUserOrNull, requireCurrentUser } from "./_auth";
-import { fileCountsByDesign } from "./_designAssets";
+import { assetSummariesByDesign } from "./_designAssets";
 import { overviewOf } from "../lib/designBlock";
 import { isLocked } from "../lib/jerseyRun/lock";
 
@@ -115,7 +115,9 @@ export const getMyOrder = query({
       await Promise.all(order.designIds.map((id) => ctx.db.get(id)))
     ).filter((d): d is Doc<"designs"> => d !== null);
 
-    const fileCounts = await fileCountsByDesign(
+    // Count and picture together: the order page shows both per design, so
+    // one pass over each design's assets answers both (D-07).
+    const assetSummaries = await assetSummariesByDesign(
       ctx,
       linkedDesigns.map((d) => d._id),
     );
@@ -133,7 +135,10 @@ export const getMyOrder = query({
         jerseyStyle: design.jerseyStyle,
         neckline: design.neckline,
         sleeveStyle: design.sleeveStyle,
-        fileCount: fileCounts.get(design._id) ?? 0,
+        fileCount: assetSummaries.get(design._id)?.fileCount ?? 0,
+        // The design's representative image (D-07) — null for a design with
+        // no image at all, which is legitimate for a docs-only design.
+        mainImage: assetSummaries.get(design._id)?.mainImage ?? null,
       })),
     );
 
