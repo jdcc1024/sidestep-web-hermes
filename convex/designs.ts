@@ -6,6 +6,14 @@ import {
   isNeckline,
   isSleeveStyle,
 } from "../lib/design/rules";
+import {
+  countDesignAssets,
+  fileCountsByDesign,
+  insertDesignAssets,
+  mainAssetOf,
+  resolveDesignAssets,
+  uploadedFileValidator,
+} from "./_designAssets";
 
 // Server-side guards. Mirror lib/design so the client and server cap
 // values the same way — defense in depth against a hand-rolled client that
@@ -86,23 +94,35 @@ function normalizeSpecs(args: {
 
 // Captain's own designs, newest first. Mirrors the auth/scoping shape of
 // listMyOrders so the portal dashboard can fetch both with the same
-// guarantees.
+// guarantees. Carries `fileCount` because every list surface shows it and
+// the count now lives in designAssets rather than on the design doc.
 export const listMyDesigns = query({
   args: {},
   handler: async (ctx) => {
     const user = await getCurrentUserOrNull(ctx);
     if (!user) return [];
 
-    return ctx.db
+    const designs = await ctx.db
       .query("designs")
       .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
       .order("desc")
       .collect();
+
+    const counts = await fileCountsByDesign(
+      ctx,
+      designs.map((d) => d._id),
+    );
+    return designs.map((design) => ({
+      ...design,
+      fileCount: counts.get(design._id) ?? 0,
+    }));
   },
 });
 
-// Fetches one design with its file URLs already resolved so the detail
-// page can render download links without a second round-trip per file.
+// Fetches one design with its assets already resolved (metadata + a
+// short-lived storage URL each) so the detail page can render thumbnails and
+// download links without a round-trip per file. `mainAsset` is the resolved
+// representative image — the same answer the order page will show (D-07).
 // Returns null for an unauthenticated caller or a not-found id; throws on
 // access violation so the UI can surface "you don't have access" instead
 // of silently rendering empty.
@@ -117,14 +137,9 @@ export const getMyDesign = query({
     if (design.ownerId !== user._id)
       throw new ConvexError("You don't have access to this design.");
 
-    const files = await Promise.all(
-      design.fileIds.map(async (storageId) => ({
-        storageId,
-        url: await ctx.storage.getUrl(storageId),
-      })),
-    );
+    const assets = await resolveDesignAssets(ctx, designId);
 
-    return { ...design, files };
+    return { ...design, assets, mainAsset: mainAssetOf(assets) };
   },
 });
 
@@ -145,7 +160,10 @@ export const createDesign = mutation({
     title: v.string(),
     brief: v.string(),
     canvaLink: v.optional(v.string()),
-    fileIds: v.array(v.id("_storage")),
+    // Uploaded files carry their own metadata now (D-01) — the client sends
+    // filename + content type alongside each storage id, and the server
+    // records who uploaded them.
+    files: v.array(uploadedFileValidator),
     jerseyStyle: v.optional(v.string()),
     neckline: v.optional(v.string()),
     sleeveStyle: v.optional(v.string()),
@@ -158,20 +176,23 @@ export const createDesign = mutation({
     const canvaLink = normalizeCanvaLink(args.canvaLink);
     const specs = normalizeSpecs(args);
 
-    if (args.fileIds.length < 1)
+    if (args.files.length < 1)
       throw new ConvexError("At least one file is required.");
 
     const now = Date.now();
-    return ctx.db.insert("designs", {
+    const designId = await ctx.db.insert("designs", {
       ownerId: user._id,
       title,
       brief,
       ...(canvaLink ? { canvaLink } : {}),
       ...specs,
-      fileIds: args.fileIds,
       createdAt: now,
       updatedAt: now,
     });
+
+    await insertDesignAssets(ctx, designId, args.files, user);
+
+    return designId;
   },
 });
 
@@ -183,7 +204,7 @@ export const updateDesign = mutation({
     title: v.string(),
     brief: v.string(),
     canvaLink: v.optional(v.string()),
-    addFileIds: v.array(v.id("_storage")),
+    addFiles: v.array(uploadedFileValidator),
     jerseyStyle: v.optional(v.string()),
     neckline: v.optional(v.string()),
     sleeveStyle: v.optional(v.string()),
@@ -200,9 +221,13 @@ export const updateDesign = mutation({
     const canvaLink = normalizeCanvaLink(args.canvaLink);
     const specs = normalizeSpecs(args);
 
-    const nextFileIds = [...design.fileIds, ...args.addFileIds];
-    if (nextFileIds.length < 1)
+    // The guard reads the stored rows, not the submitted array: a metadata-only
+    // edit sends no files, and the design still has to end up with at least one.
+    const existingCount = await countDesignAssets(ctx, args.designId);
+    if (existingCount + args.addFiles.length < 1)
       throw new ConvexError("At least one file is required.");
+
+    await insertDesignAssets(ctx, args.designId, args.addFiles, user);
 
     await ctx.db.patch(args.designId, {
       title,
@@ -213,7 +238,6 @@ export const updateDesign = mutation({
       ...(canvaLink ? { canvaLink } : { canvaLink: undefined }),
       // Apply any supplied silhouette specs; omitted specs are left as-is.
       ...specs,
-      fileIds: nextFileIds,
       updatedAt: Date.now(),
     });
 

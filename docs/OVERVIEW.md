@@ -72,14 +72,19 @@ The split that matters most: **`convex/` is the backend, `app/` and
 
 ## 4. Data model (`convex/schema.ts`)
 
-Six tables. Read `schema.ts` directly — it's short and authoritative.
+Nine tables. Read `schema.ts` directly — it's short and authoritative.
 Field-level mental model:
 
 - **`users`** — One row per Clerk user. `clerkId` is the join key.
   `isAdmin` is mirrored from Clerk `privateMetadata` by the webhook,
   never written from the browser.
-- **`designs`** — Owned by a user. `fileIds` are Convex storage IDs
-  (any file type, downloaded via signed URLs).
+- **`designs`** — Owned by a user. Files live in `designAssets`, not on
+  the design doc.
+- **`designAssets`** — One row per uploaded file, `by_design`. Carries
+  `filename` + `contentType` (so a page can tell a PNG from a print
+  template), uploader provenance, and an `isMain` flag. URLs are signed
+  per query; `lib/designAsset.ts` owns the web-safe predicate, the
+  main-image resolver, and the upload/delete permission rules.
 - **`orders`** — Owned by a captain (`captainId`). `designIds` links
   one or more designs. `internalStages` is an array of `{name,
   completedAt?}` — see §6 for how the customer-facing stage is derived.

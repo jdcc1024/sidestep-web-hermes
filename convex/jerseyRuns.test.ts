@@ -258,7 +258,6 @@ describe("jerseyRuns.lock / unlock (R-06)", () => {
         ownerId: userId,
         title: "Home",
         brief: "b",
-        fileIds: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }),
@@ -449,7 +448,6 @@ describe("jerseyRuns.getPublic", () => {
         ownerId: userId,
         title: "Home",
         brief: "h",
-        fileIds: [],
         createdAt: now,
         updatedAt: now,
       });
@@ -457,7 +455,6 @@ describe("jerseyRuns.getPublic", () => {
         ownerId: userId,
         title: "Away",
         brief: "a",
-        fileIds: [],
         createdAt: now,
         updatedAt: now,
       });

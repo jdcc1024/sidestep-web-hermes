@@ -5,6 +5,11 @@ import { requireAdmin } from "./_auth";
 import { joinUsersById } from "./_users";
 import { INTERNAL_STAGES } from "../lib/orderStages";
 import {
+  fileCountsByDesign,
+  mainAssetOf,
+  resolveDesignAssets,
+} from "./_designAssets";
+import {
   MAX_BRIEF,
   validateEmail,
   validateOptionalText,
@@ -40,6 +45,10 @@ export const listDesigns = query({
 
     const designs = await ctx.db.query("designs").order("desc").collect();
     const owners = await joinUsersById(ctx, designs, (d) => d.ownerId);
+    const fileCounts = await fileCountsByDesign(
+      ctx,
+      designs.map((d) => d._id),
+    );
 
     return designs.map((design) => {
       const owner = owners.get(design.ownerId);
@@ -47,6 +56,7 @@ export const listDesigns = query({
         ...design,
         ownerName: owner?.name ?? "Unknown",
         ownerEmail: owner?.email ?? "",
+        fileCount: fileCounts.get(design._id) ?? 0,
       };
     });
   },
@@ -72,15 +82,10 @@ export const getOrder = query({
     // so the admin can click through to the raw file. null is returned for
     // storage ids that no longer exist.
     const designs = await Promise.all(
-      linkedDesigns.map(async (design) => {
-        const fileUrls = await Promise.all(
-          design.fileIds.map(async (storageId) => ({
-            storageId,
-            url: await ctx.storage.getUrl(storageId),
-          })),
-        );
-        return { ...design, fileUrls };
-      }),
+      linkedDesigns.map(async (design) => ({
+        ...design,
+        assets: await resolveDesignAssets(ctx, design._id),
+      })),
     );
 
     const jerseyRun = await ctx.db
@@ -340,7 +345,19 @@ export const getCustomer = query({
       .order("desc")
       .collect();
 
-    return { user: publicUserFields(user), orders, designs };
+    const fileCounts = await fileCountsByDesign(
+      ctx,
+      designs.map((d) => d._id),
+    );
+
+    return {
+      user: publicUserFields(user),
+      orders,
+      designs: designs.map((design) => ({
+        ...design,
+        fileCount: fileCounts.get(design._id) ?? 0,
+      })),
+    };
   },
 });
 
@@ -467,12 +484,7 @@ export const getDesign = query({
     if (!design) return null;
 
     const owner = await ctx.db.get(design.ownerId);
-    const fileUrls = await Promise.all(
-      design.fileIds.map(async (storageId) => ({
-        storageId,
-        url: await ctx.storage.getUrl(storageId),
-      })),
-    );
+    const assets = await resolveDesignAssets(ctx, designId);
 
     // Which orders reference this design — an admin editing a design wants
     // to know what it's committed to before changing the cut.
@@ -483,7 +495,8 @@ export const getDesign = query({
     return {
       design,
       owner: owner ? publicUserFields(owner) : null,
-      fileUrls,
+      assets,
+      mainAsset: mainAssetOf(assets),
       orders: orders.map((o) => ({ _id: o._id, teamName: o.teamName })),
     };
   },

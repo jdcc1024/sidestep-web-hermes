@@ -35,7 +35,7 @@ export default function AdminDesignDetailPage({
   if (result === undefined) return <DetailSkeleton />;
   if (result === null) return <NotFound />;
 
-  const { design, owner, fileUrls, orders } = result;
+  const { design, owner, assets, orders } = result;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -132,23 +132,23 @@ export default function AdminDesignDetailPage({
           <CardTitle>Files</CardTitle>
         </CardHeader>
         <CardContent>
-          {fileUrls.length === 0 ? (
+          {assets.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No files uploaded for this design.
             </p>
           ) : (
             <ul className="flex flex-wrap gap-2">
-              {fileUrls.map((file, idx) =>
-                file.url ? (
-                  <li key={file.storageId}>
+              {assets.map((asset) =>
+                asset.url ? (
+                  <li key={asset._id}>
                     <Badge
                       variant="secondary"
                       render={
-                        <a href={file.url} target="_blank" rel="noreferrer" />
+                        <a href={asset.url} target="_blank" rel="noreferrer" />
                       }
                     >
                       <FileDown aria-hidden />
-                      File {idx + 1}
+                      {asset.filename}
                     </Badge>
                   </li>
                 ) : null,

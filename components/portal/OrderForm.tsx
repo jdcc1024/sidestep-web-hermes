@@ -491,7 +491,7 @@ function DesignChecklist({
   value,
   onChange,
 }: {
-  designs: Array<Doc<"designs">> | undefined;
+  designs: Array<Doc<"designs"> & { fileCount: number }> | undefined;
   value: string[];
   onChange: (next: string[]) => void;
 }) {
@@ -513,7 +513,7 @@ function DesignChecklist({
       {designs.map((design) => {
         const id = design._id as unknown as string;
         const isSelected = selected.has(id);
-        const fileCount = design.fileIds.length;
+        const fileCount = design.fileCount;
         return (
           <li key={design._id}>
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-input bg-background px-4 py-3 transition hover:border-ring has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5">

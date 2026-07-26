@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 
 /**
@@ -5,10 +6,16 @@ import { internalMutation } from "./_generated/server";
  * shapes documented in backlog/1-02-database-schema.md. Run with:
  *   npx convex run _schemaSmokeTest:run
  * Inserts then deletes — no residue.
+ *
+ * `designAssets` needs a real storage id, and a mutation can't create one
+ * (ctx.storage.store is action-only), so that table is only round-tripped
+ * when you pass an id from an existing upload:
+ *   npx convex run _schemaSmokeTest:run '{"storageId": "<id>"}'
+ * The storage object itself is left alone — we only insert/delete the row.
  */
 export const run = internalMutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { storageId: v.optional(v.id("_storage")) },
+  handler: async (ctx, { storageId }) => {
     const now = Date.now();
 
     const userId = await ctx.db.insert("users", {
@@ -23,10 +30,22 @@ export const run = internalMutation({
       ownerId: userId,
       title: "Smoke Design",
       brief: "smoke",
-      fileIds: [],
       createdAt: now,
       updatedAt: now,
     });
+
+    const designAssetId = storageId
+      ? await ctx.db.insert("designAssets", {
+          designId,
+          storageId,
+          filename: "smoke.png",
+          contentType: "image/png",
+          isMain: true,
+          uploadedByUserId: userId,
+          uploadedByAdmin: false,
+          createdAt: now,
+        })
+      : null;
 
     const orderId = await ctx.db.insert("orders", {
       captainId: userId,
@@ -96,6 +115,9 @@ export const run = internalMutation({
     const inserted = {
       user: await ctx.db.get(userId),
       design: await ctx.db.get(designId),
+      ...(designAssetId
+        ? { designAsset: await ctx.db.get(designAssetId) }
+        : {}),
       order: await ctx.db.get(orderId),
       run: await ctx.db.get(runId),
       response: await ctx.db.get(responseId),
@@ -119,10 +141,11 @@ export const run = internalMutation({
     await ctx.db.delete(responseId);
     await ctx.db.delete(runId);
     await ctx.db.delete(orderId);
+    if (designAssetId) await ctx.db.delete(designAssetId);
     await ctx.db.delete(designId);
     await ctx.db.delete(intakeId);
     await ctx.db.delete(userId);
 
-    return { ok: true, tablesChecked: 8 };
+    return { ok: true, tablesChecked: Object.keys(inserted).length };
   },
 });

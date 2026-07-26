@@ -15,7 +15,6 @@ export default defineSchema({
     title: v.string(),
     brief: v.string(),
     canvaLink: v.optional(v.string()),
-    fileIds: v.array(v.id("_storage")),
     // Silhouette specs live on the design now (moved off the order in O-01)
     // so a reusable design carries its own cut. Optional: a design can be
     // saved before its specs are decided; the design form wires them in O-02.
@@ -25,6 +24,24 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_owner", ["ownerId"]),
+
+  // One row per uploaded file (D-01), replacing the bare `designs.fileIds`
+  // array. `filename` + `contentType` are what let the design page render a
+  // real thumbnail and tell an image from a PDF; the uploader pair is a
+  // provenance snapshot (admin status can change later) that drives the
+  // delete rules in lib/designAsset. `isMain` is the owner's explicit pick
+  // for the design's representative image — see resolveMainAsset for the
+  // fallback when it's unset.
+  designAssets: defineTable({
+    designId: v.id("designs"),
+    storageId: v.id("_storage"),
+    filename: v.string(),
+    contentType: v.string(),
+    isMain: v.boolean(),
+    uploadedByUserId: v.id("users"),
+    uploadedByAdmin: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_design", ["designId"]),
 
   orders: defineTable({
     captainId: v.id("users"),

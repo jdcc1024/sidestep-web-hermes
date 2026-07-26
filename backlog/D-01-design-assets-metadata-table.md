@@ -1,6 +1,6 @@
 # Issue: Design Assets Metadata Table
 
-## Status: pending
+## Status: done
 
 ## Phase: 1
 
@@ -8,24 +8,24 @@
 
 ## Vertical Slice
 This issue touches:
-- [ ] Database: new `designAssets` table (`by_design` index); remove `designs.fileIds`
-- [ ] API: `designs.createDesign` / `updateDesign` create asset rows with `filename` + `contentType`; `getMyDesign` + admin `getDesign` return resolved assets; shared main-image resolver
-- [ ] Frontend: `DesignForm` upload path sends filename + content type; detail pages read assets from the new shape
-- [ ] Tests: resolver unit tests (all fallback branches), web-safe content-type predicate, upload/permission smoke tests
+- [x] Database: new `designAssets` table (`by_design` index); remove `designs.fileIds`
+- [x] API: `designs.createDesign` / `updateDesign` create asset rows with `filename` + `contentType`; `getMyDesign` + admin `getDesign` return resolved assets; shared main-image resolver
+- [x] Frontend: `DesignForm` upload path sends filename + content type; detail pages read assets from the new shape
+- [x] Tests: resolver unit tests (all fallback branches), web-safe content-type predicate, upload/permission smoke tests
 
 ## Description
 Replace the bare `designs.fileIds: v.array(v.id("_storage"))` with a dedicated `designAssets` table carrying one row per file — `filename`, `contentType`, uploader provenance, and an `isMain` flag — so the rest of the feature can render real thumbnails and tell an image from a PDF/AI file. Adds a shared main-image resolver used by later slices and the order page. Foundation slice for the whole PRD.
 
 ## Acceptance Criteria
-- [ ] `designAssets` table exists with `designId`, `storageId`, `filename`, `contentType`, `isMain`, `uploadedByUserId`, `uploadedByAdmin` (snapshot), `createdAt`, indexed `by_design`
-- [ ] `designs.fileIds` is removed from the schema; dummy designs wiped once (no migration script)
-- [ ] Upload flow persists `filename` + `contentType` per asset (client sends them; server records provenance)
-- [ ] `getMyDesign` and admin `getDesign` return assets with resolved storage URLs, handling `null` URLs gracefully
-- [ ] Shared main-image resolver: explicit `isMain` → first web-safe image by `createdAt` → none
-- [ ] Web-safe predicate covers `image/png|jpeg|webp|gif|svg+xml`
-- [ ] Permission helpers: upload = owner or admin; delete = owner for own uploads, admin for any; admin uploads are admin-delete-only
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] `designAssets` table exists with `designId`, `storageId`, `filename`, `contentType`, `isMain`, `uploadedByUserId`, `uploadedByAdmin` (snapshot), `createdAt`, indexed `by_design`
+- [x] `designs.fileIds` is removed from the schema; **the one dummy design in the dev deployment still has to be deleted by hand** before `npx convex dev` will accept the new schema (see session report)
+- [x] Upload flow persists `filename` + `contentType` per asset (client sends them; server records provenance)
+- [x] `getMyDesign` and admin `getDesign` return assets with resolved storage URLs, handling `null` URLs gracefully
+- [x] Shared main-image resolver: explicit `isMain` → first web-safe image by `createdAt` → none
+- [x] Web-safe predicate covers `image/png|jpeg|webp|gif|svg+xml`
+- [x] Permission helpers: upload = owner or admin; delete = owner for own uploads, admin for any; admin uploads are admin-delete-only
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: none

@@ -30,7 +30,6 @@ async function seedRun(
       ownerId: userId,
       title: "Home",
       brief: "home kit",
-      fileIds: [],
       createdAt: now,
       updatedAt: now,
     });
@@ -125,7 +124,6 @@ describe("rosterEntries.create", () => {
         ownerId: userId,
         title: "Stray",
         brief: "x",
-        fileIds: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }),

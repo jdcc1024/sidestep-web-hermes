@@ -191,7 +191,6 @@ async function seedDesign(
       ownerId,
       title,
       brief: "",
-      fileIds: [],
       jerseyStyle: specs.jerseyStyle,
       neckline: specs.neckline,
       sleeveStyle: specs.sleeveStyle,
@@ -199,6 +198,38 @@ async function seedDesign(
       updatedAt: now,
     }),
   );
+}
+
+// Attaches one uploaded file to a design. Storage ids in convex-test come
+// from ctx.storage.store — the bytes don't matter, only that the id resolves
+// to a URL the way a real upload would.
+async function seedDesignAsset(
+  t: ReturnType<typeof convexTest>,
+  designId: Id<"designs">,
+  uploadedByUserId: Id<"users">,
+  overrides: Partial<{
+    filename: string;
+    contentType: string;
+    isMain: boolean;
+    uploadedByAdmin: boolean;
+    createdAt: number;
+  }> = {},
+) {
+  return t.run(async (ctx) => {
+    const storageId = await ctx.storage.store(
+      new Blob(["x"], { type: "image/png" }),
+    );
+    return ctx.db.insert("designAssets", {
+      designId,
+      storageId,
+      filename: overrides.filename ?? "crest.png",
+      contentType: overrides.contentType ?? "image/png",
+      isMain: overrides.isMain ?? false,
+      uploadedByUserId,
+      uploadedByAdmin: overrides.uploadedByAdmin ?? false,
+      createdAt: overrides.createdAt ?? Date.now(),
+    });
+  });
 }
 
 async function seedRun(
@@ -834,7 +865,7 @@ describe("admin.updateDesign", () => {
 });
 
 describe("admin.getDesign", () => {
-  it("returns the design with its owner and signed file urls", async () => {
+  it("returns the design with its owner and its resolved assets", async () => {
     const t = convexTest(schema, modules);
     const { userId: ownerId } = await seedUser(t, "owner", {
       name: "Grace Hopper",
@@ -845,7 +876,33 @@ describe("admin.getDesign", () => {
     const result = await asAdmin.query(api.admin.getDesign, { designId });
     expect(result?.design.title).toBe("Home kit");
     expect(result?.owner?.name).toBe("Grace Hopper");
-    expect(result?.fileUrls).toEqual([]);
+    expect(result?.assets).toEqual([]);
+    expect(result?.mainAsset).toBeNull();
+  });
+
+  it("resolves asset metadata and picks a main image", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const designId = await seedDesign(t, ownerId, "Home kit");
+    await seedDesignAsset(t, designId, ownerId, {
+      filename: "print-template.pdf",
+      contentType: "application/pdf",
+      createdAt: 1_000,
+    });
+    await seedDesignAsset(t, designId, ownerId, {
+      filename: "crest.png",
+      createdAt: 2_000,
+    });
+
+    const result = await asAdmin.query(api.admin.getDesign, { designId });
+    expect(result?.assets.map((a) => a.filename)).toEqual([
+      "print-template.pdf",
+      "crest.png",
+    ]);
+    expect(result?.assets.every((a) => typeof a.url === "string")).toBe(true);
+    // The PDF is older but isn't web-safe, so the image is the main one.
+    expect(result?.mainAsset?.filename).toBe("crest.png");
   });
 
   it("rejects a non-admin caller", async () => {

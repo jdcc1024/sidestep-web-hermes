@@ -10,6 +10,7 @@ import { UploadCloudIcon } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { UploadedFile } from "@/convex/_designAssets";
 import {
   BRIEF_MAX_LENGTH,
   CANVA_LINK_MAX_LENGTH,
@@ -245,15 +246,22 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
 
     // Upload pending files sequentially so the UI progress list reads
     // top-to-bottom. Already-uploaded items (e.g. from a retry) are
-    // reused via their stored storageId.
-    const storageIds: Id<"_storage">[] = [];
+    // reused via their stored storageId. Each upload is sent with the
+    // filename and content type the browser knows — the server records them
+    // as the asset's metadata (D-01), so a design page can tell a PNG from
+    // a print template.
+    const files: UploadedFile[] = [];
     try {
       for (const item of pending) {
-        if (item.status === "done" && item.storageId) {
-          storageIds.push(item.storageId);
-          continue;
-        }
-        storageIds.push(await uploadOne(item));
+        const storageId =
+          item.status === "done" && item.storageId
+            ? item.storageId
+            : await uploadOne(item);
+        files.push({
+          storageId,
+          filename: item.file.name,
+          contentType: item.file.type || "application/octet-stream",
+        });
       }
     } catch {
       const message = "One or more files failed to upload. Try again.";
@@ -281,7 +289,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
           jerseyStyle: payload.jerseyStyle,
           neckline: payload.neckline,
           sleeveStyle: payload.sleeveStyle,
-          addFileIds: storageIds,
+          addFiles: files,
         });
         toast.success("Design updated");
         router.push(`/portal/designs/${mode.designId}`);
@@ -293,7 +301,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
           jerseyStyle: payload.jerseyStyle,
           neckline: payload.neckline,
           sleeveStyle: payload.sleeveStyle,
-          fileIds: storageIds,
+          files,
         });
         toast.success("Design saved", {
           description: "Sidestep will see it next time they review your account.",

@@ -189,8 +189,12 @@ function OrderCard({ order }: { order: Doc<"orders"> }) {
   );
 }
 
-function DesignCard({ design }: { design: Doc<"designs"> }) {
-  const fileCount = design.fileIds.length;
+function DesignCard({
+  design,
+}: {
+  design: Doc<"designs"> & { fileCount: number };
+}) {
+  const fileCount = design.fileCount;
   const briefPreview = truncate(design.brief, BRIEF_PREVIEW_CHARS);
 
   return (

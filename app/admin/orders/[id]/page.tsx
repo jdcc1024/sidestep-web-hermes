@@ -192,23 +192,23 @@ export default function AdminOrderDetailPage({
                       </a>
                     </p>
                   )}
-                  {design.fileUrls.length > 0 && (
+                  {design.assets.length > 0 && (
                     <ul className="mt-3 flex flex-wrap gap-2">
-                      {design.fileUrls.map((file, idx) =>
-                        file.url ? (
-                          <li key={file.storageId}>
+                      {design.assets.map((asset) =>
+                        asset.url ? (
+                          <li key={asset._id}>
                             <Badge
                               variant="secondary"
                               render={
                                 <a
-                                  href={file.url}
+                                  href={asset.url}
                                   target="_blank"
                                   rel="noreferrer"
                                 />
                               }
                             >
                               <FileDown aria-hidden />
-                              File {idx + 1}
+                              {asset.filename}
                             </Badge>
                           </li>
                         ) : null,

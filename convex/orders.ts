@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { getCurrentUserOrNull, requireCurrentUser } from "./_auth";
+import { fileCountsByDesign } from "./_designAssets";
 import { isLocked } from "../lib/jerseyRun/lock";
 
 // Server-side guards. Mirror lib/order.ts so the client and server cap
@@ -113,6 +114,11 @@ export const getMyOrder = query({
       await Promise.all(order.designIds.map((id) => ctx.db.get(id)))
     ).filter((d): d is Doc<"designs"> => d !== null);
 
+    const fileCounts = await fileCountsByDesign(
+      ctx,
+      linkedDesigns.map((d) => d._id),
+    );
+
     const designs = await Promise.all(
       linkedDesigns.map(async (design) => ({
         _id: design._id,
@@ -124,7 +130,7 @@ export const getMyOrder = query({
         jerseyStyle: design.jerseyStyle,
         neckline: design.neckline,
         sleeveStyle: design.sleeveStyle,
-        fileCount: design.fileIds.length,
+        fileCount: fileCounts.get(design._id) ?? 0,
       })),
     );
 

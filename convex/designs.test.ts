@@ -1,16 +1,18 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.*s");
 
-async function seedOwner(
-  t: ReturnType<typeof convexTest>,
-  subject = "user_owner_clerk",
-) {
+// Schema-aware handle so the helpers below can query our own indexes — the
+// bare ReturnType<typeof convexTest> widens the data model away.
+type Test = TestConvex<typeof schema>;
+
+async function seedOwner(t: Test, subject = "user_owner_clerk") {
   const userId = await t.run((ctx) =>
     ctx.db.insert("users", {
       clerkId: subject,
@@ -33,9 +35,34 @@ async function seedOwner(
 // Storage ids in convex-test are opaque strings shaped like real ones via
 // ctx.storage.store. We don't need real bytes — the validators accept any
 // v.id("_storage").
-async function fakeStorageId(t: ReturnType<typeof convexTest>) {
+async function fakeStorageId(t: Test) {
   return t.run((ctx) =>
     ctx.storage.store(new Blob(["x"], { type: "text/plain" })),
+  );
+}
+
+// One uploaded-file payload as the client sends it: the storage id from the
+// two-phase upload plus the metadata only the browser knows.
+async function fakeFile(
+  t: Test,
+  overrides: { filename?: string; contentType?: string } = {},
+) {
+  return {
+    storageId: await fakeStorageId(t),
+    filename: overrides.filename ?? "mood-board.png",
+    contentType: overrides.contentType ?? "image/png",
+  };
+}
+
+async function assetsOf(
+  t: Test,
+  designId: Id<"designs">,
+) {
+  return t.run((ctx) =>
+    ctx.db
+      .query("designAssets")
+      .withIndex("by_design", (q) => q.eq("designId", designId))
+      .collect(),
   );
 }
 
@@ -43,12 +70,12 @@ describe("designs.createDesign", () => {
   it("inserts a design owned by the caller", async () => {
     const t = convexTest(schema, modules);
     const { userId, asUser } = await seedOwner(t);
-    const storageId = await fakeStorageId(t);
+    const file = await fakeFile(t);
 
     const designId = await asUser.mutation(api.designs.createDesign, {
       title: "Away kit concept",
       brief: "Navy with gold accents.",
-      fileIds: [storageId],
+      files: [file],
     });
 
     const row = await t.run((ctx) => ctx.db.get(designId));
@@ -57,7 +84,88 @@ describe("designs.createDesign", () => {
       title: "Away kit concept",
       brief: "Navy with gold accents.",
     });
-    expect(row?.fileIds).toEqual([storageId]);
+  });
+
+  it("creates one asset row per file with its metadata and provenance", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedOwner(t);
+    const png = await fakeFile(t, { filename: "crest.png" });
+    const pdf = await fakeFile(t, {
+      filename: "print-template.pdf",
+      contentType: "application/pdf",
+    });
+
+    const designId = await asUser.mutation(api.designs.createDesign, {
+      title: "Away kit concept",
+      brief: "Navy with gold accents.",
+      files: [png, pdf],
+    });
+
+    const assets = await assetsOf(t, designId);
+    expect(assets).toHaveLength(2);
+    expect(assets.map((a) => a.storageId)).toEqual([
+      png.storageId,
+      pdf.storageId,
+    ]);
+    expect(assets[0]).toMatchObject({
+      designId,
+      filename: "crest.png",
+      contentType: "image/png",
+      isMain: false,
+      uploadedByUserId: userId,
+      uploadedByAdmin: false,
+    });
+    expect(assets[1]).toMatchObject({
+      filename: "print-template.pdf",
+      contentType: "application/pdf",
+    });
+  });
+
+  it("normalizes a blank filename and a parameterized content type", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const storageId = await fakeStorageId(t);
+
+    const designId = await asUser.mutation(api.designs.createDesign, {
+      title: "Odd upload",
+      brief: "Brief.",
+      files: [
+        { storageId, filename: "   ", contentType: "IMAGE/SVG+XML; charset=utf-8" },
+      ],
+    });
+
+    const [asset] = await assetsOf(t, designId);
+    expect(asset).toMatchObject({
+      filename: "Untitled file",
+      contentType: "image/svg+xml",
+    });
+  });
+
+  it("snapshots admin provenance on an admin's upload", async () => {
+    const t = convexTest(schema, modules);
+    await t.run((ctx) =>
+      ctx.db.insert("users", {
+        clerkId: "user_admin_clerk",
+        email: "staff@sidestep.test",
+        name: "Staff",
+        isAdmin: true,
+        createdAt: Date.now(),
+      }),
+    );
+    const asAdmin = t.withIdentity({
+      subject: "user_admin_clerk",
+      email: "staff@sidestep.test",
+      name: "Staff",
+    });
+
+    const designId = await asAdmin.mutation(api.designs.createDesign, {
+      title: "Staff mock-up",
+      brief: "Drafted internally.",
+      files: [await fakeFile(t)],
+    });
+
+    const [asset] = await assetsOf(t, designId);
+    expect(asset?.uploadedByAdmin).toBe(true);
   });
 
   it("rejects createDesign when no files are attached", async () => {
@@ -67,7 +175,7 @@ describe("designs.createDesign", () => {
       asUser.mutation(api.designs.createDesign, {
         title: "Empty",
         brief: "Has a brief but no files.",
-        fileIds: [],
+        files: [],
       }),
     ).rejects.toThrow(/At least one file/);
   });
@@ -75,12 +183,11 @@ describe("designs.createDesign", () => {
   it("persists silhouette specs when supplied", async () => {
     const t = convexTest(schema, modules);
     const { asUser } = await seedOwner(t);
-    const storageId = await fakeStorageId(t);
 
     const designId = await asUser.mutation(api.designs.createDesign, {
       title: "Home kit",
       brief: "Bold stripes.",
-      fileIds: [storageId],
+      files: [await fakeFile(t)],
       jerseyStyle: "  Soccer jersey  ",
       neckline: "Crew Neck",
       sleeveStyle: "Raglan",
@@ -98,12 +205,11 @@ describe("designs.createDesign", () => {
   it("creates a design with no specs (specs are optional)", async () => {
     const t = convexTest(schema, modules);
     const { asUser } = await seedOwner(t);
-    const storageId = await fakeStorageId(t);
 
     const designId = await asUser.mutation(api.designs.createDesign, {
       title: "Idea only",
       brief: "No cut decided yet.",
-      fileIds: [storageId],
+      files: [await fakeFile(t)],
     });
 
     const row = await t.run((ctx) => ctx.db.get(designId));
@@ -115,13 +221,12 @@ describe("designs.createDesign", () => {
   it("rejects an invalid neckline", async () => {
     const t = convexTest(schema, modules);
     const { asUser } = await seedOwner(t);
-    const storageId = await fakeStorageId(t);
 
     await expect(
       asUser.mutation(api.designs.createDesign, {
         title: "Bad cut",
         brief: "Brief.",
-        fileIds: [storageId],
+        files: [await fakeFile(t)],
         neckline: "Turtle",
       }),
     ).rejects.toThrow(/neckline/i);
@@ -130,13 +235,12 @@ describe("designs.createDesign", () => {
   it("rejects an invalid sleeve style", async () => {
     const t = convexTest(schema, modules);
     const { asUser } = await seedOwner(t);
-    const storageId = await fakeStorageId(t);
 
     await expect(
       asUser.mutation(api.designs.createDesign, {
         title: "Bad sleeve",
         brief: "Brief.",
-        fileIds: [storageId],
+        files: [await fakeFile(t)],
         sleeveStyle: "Sleeveless",
       }),
     ).rejects.toThrow(/sleeve/i);
@@ -147,41 +251,90 @@ describe("designs.updateDesign", () => {
   it("updates metadata for a design the caller owns", async () => {
     const t = convexTest(schema, modules);
     const { asUser } = await seedOwner(t);
-    const storageId = await fakeStorageId(t);
 
     const designId = await asUser.mutation(api.designs.createDesign, {
       title: "First pass",
       brief: "Initial brief.",
-      fileIds: [storageId],
+      files: [await fakeFile(t)],
     });
 
     await asUser.mutation(api.designs.updateDesign, {
       designId,
       title: "Revised pass",
       brief: "Updated brief.",
-      addFileIds: [],
+      addFiles: [],
     });
 
     const row = await t.run((ctx) => ctx.db.get(designId));
     expect(row).toMatchObject({ title: "Revised pass", brief: "Updated brief." });
+    expect(await assetsOf(t, designId)).toHaveLength(1);
+  });
+
+  it("appends asset rows for newly uploaded files", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    const designId = await asUser.mutation(api.designs.createDesign, {
+      title: "Growing design",
+      brief: "Brief.",
+      files: [await fakeFile(t, { filename: "first.png" })],
+    });
+
+    await asUser.mutation(api.designs.updateDesign, {
+      designId,
+      title: "Growing design",
+      brief: "Brief.",
+      addFiles: [await fakeFile(t, { filename: "second.jpg", contentType: "image/jpeg" })],
+    });
+
+    const assets = await assetsOf(t, designId);
+    expect(assets.map((a) => a.filename)).toEqual(["first.png", "second.jpg"]);
+  });
+
+  it("rejects an update that would leave the design with no files", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    const designId = await asUser.mutation(api.designs.createDesign, {
+      title: "Only file",
+      brief: "Brief.",
+      files: [await fakeFile(t)],
+    });
+    // Simulate the pre-D-05 state where a design somehow has no assets — the
+    // guard has to hold on the asset rows, not on the submitted array.
+    await t.run(async (ctx) => {
+      for (const asset of await ctx.db
+        .query("designAssets")
+        .withIndex("by_design", (q) => q.eq("designId", designId))
+        .collect())
+        await ctx.db.delete(asset._id);
+    });
+
+    await expect(
+      asUser.mutation(api.designs.updateDesign, {
+        designId,
+        title: "Only file",
+        brief: "Brief.",
+        addFiles: [],
+      }),
+    ).rejects.toThrow(/At least one file/);
   });
 
   it("updates silhouette specs when supplied", async () => {
     const t = convexTest(schema, modules);
     const { asUser } = await seedOwner(t);
-    const storageId = await fakeStorageId(t);
 
     const designId = await asUser.mutation(api.designs.createDesign, {
       title: "Spec edit",
       brief: "Initial.",
-      fileIds: [storageId],
+      files: [await fakeFile(t)],
     });
 
     await asUser.mutation(api.designs.updateDesign, {
       designId,
       title: "Spec edit",
       brief: "Initial.",
-      addFileIds: [],
+      addFiles: [],
       jerseyStyle: "Hockey jersey",
       neckline: "V-Neck",
       sleeveStyle: "Regular",
@@ -198,11 +351,10 @@ describe("designs.updateDesign", () => {
   it("rejects updateDesign when the caller doesn't own the design", async () => {
     const t = convexTest(schema, modules);
     const { asUser: asOwner } = await seedOwner(t, "user_owner_clerk");
-    const storageId = await fakeStorageId(t);
     const designId = await asOwner.mutation(api.designs.createDesign, {
       title: "Owned by Owner",
       brief: "Brief.",
-      fileIds: [storageId],
+      files: [await fakeFile(t)],
     });
 
     // A second user, freshly synced.
@@ -226,9 +378,100 @@ describe("designs.updateDesign", () => {
         designId,
         title: "Hijacked",
         brief: "Hijack.",
-        addFileIds: [],
+        addFiles: [],
       }),
     ).rejects.toThrow(/don't have access/);
+  });
+});
+
+describe("designs.getMyDesign", () => {
+  it("returns assets with resolved URLs and the resolved main image", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    const designId = await asUser.mutation(api.designs.createDesign, {
+      title: "With files",
+      brief: "Brief.",
+      files: [
+        await fakeFile(t, {
+          filename: "spec.pdf",
+          contentType: "application/pdf",
+        }),
+        await fakeFile(t, { filename: "crest.png" }),
+      ],
+    });
+
+    const design = await asUser.query(api.designs.getMyDesign, { designId });
+    expect(design?.assets.map((a) => a.filename)).toEqual([
+      "spec.pdf",
+      "crest.png",
+    ]);
+    for (const asset of design?.assets ?? [])
+      expect(typeof asset.url).toBe("string");
+    // The PDF is older, so the first web-safe image wins.
+    expect(design?.mainAsset?.filename).toBe("crest.png");
+  });
+
+  it("returns a null main asset when no file is an image", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    const designId = await asUser.mutation(api.designs.createDesign, {
+      title: "Docs only",
+      brief: "Brief.",
+      files: [
+        await fakeFile(t, {
+          filename: "spec.pdf",
+          contentType: "application/pdf",
+        }),
+      ],
+    });
+
+    const design = await asUser.query(api.designs.getMyDesign, { designId });
+    expect(design?.mainAsset).toBeNull();
+  });
+
+  it("refuses a design the caller doesn't own", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser: asOwner } = await seedOwner(t, "user_owner_clerk");
+    const designId = await asOwner.mutation(api.designs.createDesign, {
+      title: "Private",
+      brief: "Brief.",
+      files: [await fakeFile(t)],
+    });
+
+    await t.run((ctx) =>
+      ctx.db.insert("users", {
+        clerkId: "user_intruder_clerk",
+        email: "intruder@example.com",
+        name: "Intruder",
+        isAdmin: false,
+        createdAt: Date.now(),
+      }),
+    );
+
+    await expect(
+      t
+        .withIdentity({ subject: "user_intruder_clerk" })
+        .query(api.designs.getMyDesign, { designId }),
+    ).rejects.toThrow(/don't have access/);
+  });
+});
+
+describe("designs.listMyDesigns", () => {
+  it("carries a file count per design", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    await asUser.mutation(api.designs.createDesign, {
+      title: "Two files",
+      brief: "Brief.",
+      files: [await fakeFile(t), await fakeFile(t)],
+    });
+
+    const designs = await asUser.query(api.designs.listMyDesigns, {});
+    expect(designs).toHaveLength(1);
+    expect(designs[0]?.fileCount).toBe(2);
   });
 });
 

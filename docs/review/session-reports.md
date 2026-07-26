@@ -243,3 +243,53 @@ One entry per completed loop task. This is the human's fast path for UX critique
   - Empty-name users exist in the dev data, so both customer surfaces fall back
     to "Unnamed customer" instead of rendering a blank link.
 - Follow-ups filed: none
+
+## 2026-07-25 — D-01: Design Assets Metadata Table
+- What shipped:
+  - New `designAssets` table (one row per uploaded file: `filename`,
+    `contentType`, `isMain`, uploader provenance snapshot, `createdAt`,
+    indexed `by_design`) replacing `designs.fileIds`, which is gone from the
+    schema. `convex/_designAssets.ts` owns every read/write of the table
+    (list, resolve signed URLs, per-design file counts, insert-on-upload).
+  - `lib/designAsset.ts` — the pure rules the rest of the PRD builds on:
+    web-safe image predicate, main-image resolver (explicit `isMain` → first
+    web-safe image by `createdAt` → none), upload/delete permission helpers,
+    filename/content-type normalizers. 26 unit tests cover every branch.
+  - `DesignForm` now sends `filename` + `contentType` with each upload;
+    `getMyDesign` and admin `getDesign` return resolved `assets` (+ the
+    resolved `mainAsset`); list surfaces get `fileCount` from the query
+    instead of counting an array on the design doc. Portal and admin file
+    lists show real filenames instead of "File 1 / File 2".
+- **Blocking one-time human step before the app runs again:** the dev
+  deployment still holds one dummy design (`j572994ahcdr7mzg6h8aycd9sh877eb4`,
+  "TOC 2026 Jersey") carrying the removed `fileIds` field, so `npx convex dev`
+  will refuse the new schema until that row is deleted in the Convex dashboard
+  (this is the "wipe dummy designs once" step from the PRD). Three dev orders
+  reference it; that's fine — order queries already drop missing design ids.
+  I did not delete it myself: it's an irreversible write to a shared
+  deployment, and nothing in the loop's contract covers deploying.
+- UX surfaces to eyeball: **no screenshots this run** — every design surface
+  reads through the Convex backend, which can't be pushed until the wipe
+  above, so a snap would have photographed the old backend, not this change.
+  After the wipe + `npx convex dev`, worth a look:
+  `/portal/designs/[id]` and `/admin/designs/[id]` (file rows now read
+  "crest.png" rather than "File 1" — check long filenames truncate rather
+  than blow out the row), `/admin/orders/[id]` (file badges, same change),
+  and the file counts on `/portal`, `/portal/designs`, `/admin/designs`,
+  `/admin/customers/[id]`.
+- Decisions I made that a human may want to veto:
+  - **Resolver honours an explicit `isMain` even on a non-image asset.** The
+    PRD's chain reads literally that way; render surfaces gate on
+    `isWebSafeImage`, so an odd pick degrades to a download card. The
+    alternative (ignore the flag unless web-safe) silently overrides the
+    owner, which felt worse.
+  - **`_schemaSmokeTest:run` takes an optional `storageId` arg.** A mutation
+    can't create a storage id (`ctx.storage.store` is action-only), so the
+    `designAssets` round-trip only runs when you hand it one from a real
+    upload; the other eight tables are unchanged.
+  - **Asset rows are appended in batch order via `createdAt + index`.**
+    `Date.now()` is identical across a batch, and the resolver's "first by
+    createdAt" needs a stable order.
+  - **Filenames are shown as-is in the read-side lists** (D-02 owns the rich
+    rendering); a blank name normalizes to "Untitled file" server-side.
+- Follow-ups filed: none

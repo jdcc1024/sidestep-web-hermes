@@ -35,7 +35,6 @@ async function seedRun(
         ownerId: userId,
         title: "Home",
         brief: "home kit",
-        fileIds: [],
         createdAt: now,
         updatedAt: now,
       });
@@ -43,7 +42,6 @@ async function seedRun(
         ownerId: userId,
         title: "Away",
         brief: "away kit",
-        fileIds: [],
         createdAt: now,
         updatedAt: now,
       });
@@ -374,7 +372,6 @@ describe("orderEntries.submitOrder", () => {
         ownerId: userId,
         title: "Stray",
         brief: "x",
-        fileIds: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }),

@@ -150,8 +150,8 @@ export default function AdminCustomerDetailPage({
                     {design.title}
                   </Link>
                   <span className="text-sm text-muted-foreground">
-                    {design.fileIds.length}{" "}
-                    {design.fileIds.length === 1 ? "file" : "files"} ·{" "}
+                    {design.fileCount}{" "}
+                    {design.fileCount === 1 ? "file" : "files"} ·{" "}
                     {formatDate(design.createdAt)}
                   </span>
                 </li>

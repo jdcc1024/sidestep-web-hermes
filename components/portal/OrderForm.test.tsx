@@ -93,7 +93,7 @@ describe("OrderForm — progress gate", () => {
   });
 
   it("clears the design milestone once a design is checked", async () => {
-    designsResult = [{ _id: "design_a", title: "Home kit", fileIds: [] }];
+    designsResult = [{ _id: "design_a", title: "Home kit", fileCount: 0 }];
     const user = userEvent.setup();
     render(<OrderForm />);
 
@@ -156,7 +156,7 @@ describe("OrderForm — removing a design with submissions", () => {
   };
 
   it("names the affected submitters when a linked design is unchecked", async () => {
-    designsResult = [{ _id: "design_a", title: "Home kit", fileIds: [] }];
+    designsResult = [{ _id: "design_a", title: "Home kit", fileCount: 0 }];
     runResult = collectingRun;
     affectedResult = affectedHomeKit;
     const user = userEvent.setup();
@@ -172,7 +172,7 @@ describe("OrderForm — removing a design with submissions", () => {
   });
 
   it("still saves the removal — the warning is soft, never a hard stop", async () => {
-    designsResult = [{ _id: "design_a", title: "Home kit", fileIds: [] }];
+    designsResult = [{ _id: "design_a", title: "Home kit", fileCount: 0 }];
     runResult = collectingRun;
     affectedResult = affectedHomeKit;
     const user = userEvent.setup();
@@ -189,7 +189,7 @@ describe("OrderForm — removing a design with submissions", () => {
   });
 
   it("stays quiet when the order has no run — nobody has submitted yet", async () => {
-    designsResult = [{ _id: "design_a", title: "Home kit", fileIds: [] }];
+    designsResult = [{ _id: "design_a", title: "Home kit", fileCount: 0 }];
     runResult = null;
     affectedResult = affectedHomeKit;
     const user = userEvent.setup();
@@ -201,7 +201,7 @@ describe("OrderForm — removing a design with submissions", () => {
   });
 
   it("does not warn on a brand-new order, which can't have removals", async () => {
-    designsResult = [{ _id: "design_a", title: "Home kit", fileIds: [] }];
+    designsResult = [{ _id: "design_a", title: "Home kit", fileCount: 0 }];
     runResult = collectingRun;
     affectedResult = affectedHomeKit;
     const user = userEvent.setup();

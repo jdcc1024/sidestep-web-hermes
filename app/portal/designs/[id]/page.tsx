@@ -59,7 +59,7 @@ export default function DesignDetailPage({ params }: PageProps) {
               initialJerseyStyle: design.jerseyStyle ?? "",
               initialNeckline: design.neckline ?? "",
               initialSleeveStyle: design.sleeveStyle ?? "",
-              existingFileCount: design.files.length,
+              existingFileCount: design.assets.length,
             }}
           />
         </div>
@@ -139,23 +139,23 @@ export default function DesignDetailPage({ params }: PageProps) {
 
       <section className="mt-8">
         <h2 className="text-base font-semibold text-foreground">
-          Files ({design.files.length})
+          Files ({design.assets.length})
         </h2>
-        {design.files.length === 0 ? (
+        {design.assets.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">No files attached.</p>
         ) : (
           <ul className="mt-3 divide-y divide-border rounded-lg border border-border bg-card">
-            {design.files.map((file, idx) => (
+            {design.assets.map((asset) => (
               <li
-                key={file.storageId}
+                key={asset._id}
                 className="flex items-center justify-between gap-3 px-4 py-3"
               >
                 <span className="truncate text-sm text-foreground/90">
-                  File {idx + 1}
+                  {asset.filename}
                 </span>
-                {file.url ? (
+                {asset.url ? (
                   <a
-                    href={file.url}
+                    href={asset.url}
                     target="_blank"
                     rel="noreferrer noopener"
                     className="text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"

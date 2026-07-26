@@ -25,7 +25,6 @@ async function seedRun(t: ReturnType<typeof convexTest>) {
       ownerId: userId,
       title: "Home",
       brief: "home kit",
-      fileIds: [],
       createdAt: now,
       updatedAt: now,
     });
@@ -124,7 +123,6 @@ describe("orderEntries.create", () => {
         ownerId: userId,
         title: "Away",
         brief: "away kit",
-        fileIds: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
@@ -235,7 +233,6 @@ async function addAwayDesign(
       ownerId: userId,
       title: "Away",
       brief: "away kit",
-      fileIds: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

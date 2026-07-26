@@ -32,12 +32,8 @@ export default function AdminDesignsPage() {
 
   const rows = useMemo(() => {
     if (!designs) return [];
-    return designs
-      .map((design) => ({
-        ...design,
-        fileCount: design.fileIds.length,
-      }))
-      .sort((a, b) => compareBy(a, b, sortKey, direction));
+    // fileCount arrives from the query now that files live in designAssets.
+    return [...designs].sort((a, b) => compareBy(a, b, sortKey, direction));
   }, [designs, sortKey, direction]);
 
   const toggleSort = (key: SortKey) => {
