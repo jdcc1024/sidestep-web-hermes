@@ -184,9 +184,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0B1121; colo
     </div>
   </div>
   <div class="sidebar">
-    <h2>Active Agents</h2>
-    <div id="agentsPanel"><div style="color:#6B7280;font-size:13px;">No agents active</div></div>
-    <div class="log-section">
+    <div class="log-section" style="margin-top: 0;">
       <h2>Activity Log</h2>
       <div id="logPanel"></div>
     </div>
@@ -872,19 +870,7 @@ function getPhaseName(data, phaseId) {
 }
 
 function renderAgents(data) {
-  const panel = document.getElementById('agentsPanel');
-  if (!data.agents || !data.agents.length) {
-    panel.innerHTML = '<div style="color:#6B7280;font-size:13px;">No agents active</div>'; return;
-  }
-  panel.innerHTML = data.agents.map(agent => {
-    const task = data.nodes.find(n => n.id === agent.currentTask);
-    return `<div class="agent-card">
-      <div class="agent-name">${agent.name}</div>
-      <div class="agent-status">${agent.status}</div>
-      <div class="agent-task">${task ? 'Working on: ' + task.title : 'Idle'}</div>
-      <div class="agent-stats">${agent.tasksCompleted} tasks completed this session</div>
-    </div>`;
-  }).join('');
+  // Agent registry panel removed
 }
 
 function renderLog(data) {

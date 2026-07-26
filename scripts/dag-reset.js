@@ -5,7 +5,7 @@
  * Usage:
  *   node scripts/dag-reset.js "<Project Name>"
  *
- * This clears all example nodes, edges, agents, and logs,
+ * This clears all nodes, edges, and logs,
  * leaving you with a fresh DAG ready for /create-issues to populate.
  */
 
@@ -25,7 +25,6 @@ const freshDAG = {
   ],
   nodes: [],
   edges: [],
-  agents: [],
   log: []
 };
 

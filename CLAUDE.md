@@ -260,22 +260,15 @@ Always include `--desc`, `--prd`, and `--criteria` when adding nodes — the hum
 ### When a task needs a HUMAN decision (product/UX taste, scope, pricing, copy):
 
 ```bash
-node scripts/dag-update.js needs-human <nodeId> <agentId> "<one-line question>"
+node scripts/dag-update.js needs-human <nodeId> "<one-line question>"
 ```
 
 Also append the full question (context, options, your recommendation) to `backlog/QUESTIONS.md` using the template there. The node turns purple in the viewer and is skipped by agents until the human answers and runs `node scripts/dag-update.js answer <nodeId>`. When you pick up a previously-parked task, read its Answered entry in QUESTIONS.md first.
 
 Only park questions a human must answer. Technical choices (library, refactor shape, test strategy) are yours — decide, note it in the session report, move on.
 
-### When joining as a new agent:
-
-```bash
-node scripts/dag-update.js agent-join <agentId> "<Your Name>"
-```
-
 **Rules:**
 
-- Always call `agent-join` at the start of a new session before picking up work
 - Always call `start` BEFORE beginning implementation of a task
 - Always call `complete` AFTER all tests pass and code is committed. `complete` is gated: it requires a `.verify-receipt.json` from `node scripts/verify.mjs` (typecheck + lint + tests) that matches the current file state. Any file change after verify invalidates the receipt — re-run verify. `SKIP_VERIFY=1` is a human-only escape hatch; its use is logged and flagged in review.
 - If you discover new tasks during implementation, `add-node` them to the DAG
