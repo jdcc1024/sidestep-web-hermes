@@ -1,0 +1,44 @@
+# Issue: Shared Block Editor: Text Sections and Reorder
+
+## Status: pending
+
+## Phase: 2
+
+## Type: feature
+
+## Vertical Slice
+This issue touches:
+- [ ] Database: none (uses `designs.blocks` from D-02)
+- [ ] API: block add/update/remove/reorder mutations (owner or admin)
+- [ ] Frontend: shared block editor shell (add from fixed menu, edit, remove, drag-to-reorder); text block editing wired into the portal detail page
+- [ ] Tests: reorder + add/remove mutation smoke tests; editor interaction tests
+
+## Description
+Build the shared block editor shell that later block-types plug into, and ship the text block type through it. The owner can add fixed text sections (Overview/Concept/Inspiration/Notes), edit their bodies, remove them, and drag to reorder all blocks. This is the editing surface both portal and admin reuse.
+
+## Acceptance Criteria
+- [ ] Shared `DesignBlockEditor` component: renders the ordered blocks, an "add block" menu limited to the fixed types, per-block remove, and drag-to-reorder with persisted order
+- [ ] Text sections limited to Overview/Concept/Inspiration/Notes; a used field can't be added twice; Overview required
+- [ ] Block mutations (add/update/remove/reorder) are owner-or-admin guarded and re-run the D-02 validators
+- [ ] Reorder persists to `designs.blocks` and survives reload
+- [ ] Wired into the portal design detail page, replacing the current full-form edit flow for block content
+- [ ] All tests pass
+- [ ] No regressions in existing tests
+
+## Dependencies
+- Blocked by: D-02
+- Blocks: D-04, D-05, D-06
+
+## PRD Reference
+See: docs/prd/design-page-blocks.md — Section 4 (P0), Section 5 (shared block editor), Appendix slice 4 (shell established here)
+
+## Implementation Notes
+- **Sequencing note:** the PRD appendix lists palette (slice 3) before this; we build the editor *shell* here first because palette (D-04) and gallery (D-05) editing plug into it. This is a technical ordering decision, not a scope change.
+- Reorder: prefer a small, dependency-light drag approach; the exact handle affordance + mobile behavior is an open question in PRD §10 — pick a sensible default and note it in the session report.
+- Reuse the RHF + zod grain from the current `DesignForm` for text body editing; keep the block editor a deep component with a simple prop surface (`designId`, `blocks`).
+- Overview-on-create authoring (create form vs editor) is PRD §10 open — resolve here: keep the create form requiring an Overview body, then hand off to the editor for everything else.
+
+## TDD Approach
+1. Write test: add/remove/reorder mutations persist and reject unauthorized callers + duplicate text fields; editor renders add-menu, reorders on drag, saves.
+2. Implement: mutations + `DesignBlockEditor` shell + text block editing; wire into portal page.
+3. Verify: convex-test + component tests green; manual drag check.

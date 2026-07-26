@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-20T08:09:53.546Z",
+  "lastUpdated": "2026-07-26T01:15:54.386Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1340,6 +1340,150 @@
         "npm test passes (IntakeForm.test.tsx no longer crashes)",
         "no behavior change to the qty prefill feature"
       ]
+    },
+    {
+      "id": "D-01",
+      "title": "Design Assets Metadata Table",
+      "phase": "phase-1",
+      "type": "infrastructure",
+      "description": "Replace designs.fileIds with a designAssets table (filename, contentType, uploader, isMain) plus a shared main-image resolver. Foundation for thumbnails and image/non-image detection.",
+      "status": "pending",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-01-design-assets-metadata-table.md",
+      "prdRef": "docs/prd/design-page-blocks.md#5-scope",
+      "acceptanceCriteria": [
+        "designAssets table with per-file metadata, by_design index",
+        "Upload persists filename+contentType; queries resolve URLs",
+        "Main-image resolver + web-safe predicate + permission helpers, unit-tested"
+      ]
+    },
+    {
+      "id": "D-02",
+      "title": "Design Blocks Model and Read Rendering",
+      "phase": "phase-1",
+      "type": "feature",
+      "description": "Add designs.blocks (ordered text|gallery|palette union), remove brief (Overview replaces it), and render blocks read-only on portal + admin pages.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-02-design-blocks-model-and-read-rendering.md",
+      "prdRef": "docs/prd/design-page-blocks.md#5-scope",
+      "acceptanceCriteria": [
+        "blocks union persisted with validators (field uniqueness, single palette, swatch shape)",
+        "brief removed; Overview is the summary source",
+        "Read-only rendering: inline images by content type, cards otherwise, palette swatches"
+      ]
+    },
+    {
+      "id": "D-03",
+      "title": "Shared Block Editor: Text Sections and Reorder",
+      "phase": "phase-2",
+      "type": "feature",
+      "description": "Build the shared block editor shell (add/remove/reorder blocks) and ship the fixed text sections through it, wired into the portal.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-03-shared-block-editor-text-sections-and-reorder.md",
+      "prdRef": "docs/prd/design-page-blocks.md#4-user-stories",
+      "acceptanceCriteria": [
+        "DesignBlockEditor shell with add-menu, remove, drag-reorder persisted",
+        "Text fields Overview/Concept/Inspiration/Notes, each once, Overview required",
+        "Owner-or-admin guarded block mutations re-run validators"
+      ]
+    },
+    {
+      "id": "D-04",
+      "title": "Palette Block Editor",
+      "phase": "phase-2",
+      "type": "feature",
+      "description": "Add palette editing to the shared editor: one palette per design, unlimited swatches with hex picker, role (primary/secondary/accent), label, and free-text Pantone code.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-04-palette-block-editor.md",
+      "prdRef": "docs/prd/design-page-blocks.md#5-scope",
+      "acceptanceCriteria": [
+        "At most one palette block; second prevented",
+        "Swatch add/remove/reorder with hex, role, label, Pantone text",
+        "Hex via on-screen picker; renders light+dark"
+      ]
+    },
+    {
+      "id": "D-05",
+      "title": "Gallery Blocks and Asset Pool",
+      "phase": "phase-2",
+      "type": "feature",
+      "description": "Manage the uploaded image pool (upload, set-main, delete under permission rules) and build captioned galleries from hand-picked images. Heaviest slice.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-05-gallery-blocks-and-asset-pool.md",
+      "prdRef": "docs/prd/design-page-blocks.md#5-scope",
+      "acceptanceCriteria": [
+        "Asset pool: upload, set-main, delete with permission matrix",
+        "Gallery blocks: caption + hand-picked assetIds, multiple per design",
+        "Deleting a referenced asset leaves galleries valid"
+      ]
+    },
+    {
+      "id": "D-06",
+      "title": "Admin Design Page Uses Shared Editor",
+      "phase": "phase-2",
+      "type": "feature",
+      "description": "Mount the shared block editor on the admin design page, replacing InlineEditField for design content, so admin and owner edit through one code path.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-06-admin-design-page-uses-shared-editor.md",
+      "prdRef": "docs/prd/design-page-blocks.md#3-target-users",
+      "acceptanceCriteria": [
+        "Admin page renders shared DesignBlockEditor",
+        "InlineEditField removed for design content",
+        "Admin upload + admin-delete-only enforced; owner/admin produce same state"
+      ]
+    },
+    {
+      "id": "D-07",
+      "title": "Order Page Design Main Image",
+      "phase": "phase-3",
+      "type": "feature",
+      "description": "Show each linked design's resolved main image next to its file count on the order page. Thin read-side + UI slice over the D-01 resolver.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-07-order-page-design-main-image.md",
+      "prdRef": "docs/prd/design-page-blocks.md#5-scope",
+      "acceptanceCriteria": [
+        "Order query returns per-design main image URL + file count",
+        "Order page renders thumbnail beside count with no-image fallback",
+        "Handles unavailable URLs gracefully"
+      ]
+    },
+    {
+      "id": "D-08",
+      "title": "Design Page Motion and Polish",
+      "phase": "phase-3",
+      "type": "improvement",
+      "description": "Deferred polish pass: tasteful motion, hover, transitions across the design page + editor. Starts with a human design discussion before implementation.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-08-design-page-motion-and-polish.md",
+      "prdRef": "docs/prd/design-page-blocks.md#5-scope",
+      "acceptanceCriteria": [
+        "Human design direction agreed first (needs-human)",
+        "Motion/hover/transition polish applied; respects reduced-motion",
+        "No functional regressions"
+      ]
     }
   ],
   "edges": [
@@ -1658,6 +1802,46 @@
     {
       "from": "R-06",
       "to": "O-06"
+    },
+    {
+      "from": "D-01",
+      "to": "D-02"
+    },
+    {
+      "from": "D-01",
+      "to": "D-05"
+    },
+    {
+      "from": "D-01",
+      "to": "D-07"
+    },
+    {
+      "from": "D-02",
+      "to": "D-03"
+    },
+    {
+      "from": "D-03",
+      "to": "D-04"
+    },
+    {
+      "from": "D-03",
+      "to": "D-05"
+    },
+    {
+      "from": "D-04",
+      "to": "D-06"
+    },
+    {
+      "from": "D-05",
+      "to": "D-06"
+    },
+    {
+      "from": "D-06",
+      "to": "D-08"
+    },
+    {
+      "from": "D-07",
+      "to": "D-08"
     }
   ],
   "agents": [
@@ -1999,62 +2183,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-27T07:25:25.644Z",
-      "event": "task_completed",
-      "nodeId": "3-08",
-      "agent": "claude-3-08",
-      "message": "Completed: Logged-In User Sees Their Jersey Run Responses"
-    },
-    {
-      "timestamp": "2026-05-27T07:37:46.371Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "claude-a01",
-      "message": "Claude (A-01 Auth Helpers) joined the workforce"
-    },
-    {
-      "timestamp": "2026-05-27T07:37:46.449Z",
-      "event": "task_started",
-      "nodeId": "A-01",
-      "agent": "claude-a01",
-      "message": "Claude (A-01 Auth Helpers) picked up: Extract Shared Convex Auth Helpers"
-    },
-    {
-      "timestamp": "2026-05-27T07:44:35.981Z",
-      "event": "task_completed",
-      "nodeId": "A-01",
-      "agent": "claude-a01",
-      "message": "Completed: Extract Shared Convex Auth Helpers"
-    },
-    {
-      "timestamp": "2026-05-27T18:41:15.417Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "opus-A02",
-      "message": "Claude (Opus 4.7) — A-02 smoke tests joined the workforce"
-    },
-    {
-      "timestamp": "2026-05-27T18:41:17.973Z",
-      "event": "task_started",
-      "nodeId": "A-02",
-      "agent": "opus-A02",
-      "message": "Claude (Opus 4.7) — A-02 smoke tests picked up: Add Convex Mutation Smoke Tests"
-    },
-    {
-      "timestamp": "2026-05-27T18:46:27.674Z",
-      "event": "task_completed",
-      "nodeId": "A-02",
-      "agent": "opus-A02",
-      "message": "Completed: Add Convex Mutation Smoke Tests"
-    },
-    {
-      "timestamp": "2026-05-27T19:09:06.569Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "opus-A03",
-      "message": "Opus A-03 joined the workforce"
-    },
     {
       "timestamp": "2026-05-27T19:09:09.228Z",
       "event": "task_started",
@@ -2698,6 +2826,62 @@
       "nodeId": "2-13",
       "agent": "ralph-loop",
       "message": "Completed: Admin Customer Management"
+    },
+    {
+      "timestamp": "2026-07-26T01:15:38.276Z",
+      "event": "nodes_added",
+      "nodeId": "D-01",
+      "agent": null,
+      "message": "New task added: Design Assets Metadata Table"
+    },
+    {
+      "timestamp": "2026-07-26T01:15:38.364Z",
+      "event": "nodes_added",
+      "nodeId": "D-02",
+      "agent": null,
+      "message": "New task added: Design Blocks Model and Read Rendering"
+    },
+    {
+      "timestamp": "2026-07-26T01:15:38.462Z",
+      "event": "nodes_added",
+      "nodeId": "D-03",
+      "agent": null,
+      "message": "New task added: Shared Block Editor: Text Sections and Reorder"
+    },
+    {
+      "timestamp": "2026-07-26T01:15:38.554Z",
+      "event": "nodes_added",
+      "nodeId": "D-04",
+      "agent": null,
+      "message": "New task added: Palette Block Editor"
+    },
+    {
+      "timestamp": "2026-07-26T01:15:48.894Z",
+      "event": "nodes_added",
+      "nodeId": "D-05",
+      "agent": null,
+      "message": "New task added: Gallery Blocks and Asset Pool"
+    },
+    {
+      "timestamp": "2026-07-26T01:15:48.983Z",
+      "event": "nodes_added",
+      "nodeId": "D-06",
+      "agent": null,
+      "message": "New task added: Admin Design Page Uses Shared Editor"
+    },
+    {
+      "timestamp": "2026-07-26T01:15:49.089Z",
+      "event": "nodes_added",
+      "nodeId": "D-07",
+      "agent": null,
+      "message": "New task added: Order Page Design Main Image"
+    },
+    {
+      "timestamp": "2026-07-26T01:15:49.179Z",
+      "event": "nodes_added",
+      "nodeId": "D-08",
+      "agent": null,
+      "message": "New task added: Design Page Motion and Polish"
     }
   ]
 }

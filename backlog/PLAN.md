@@ -211,3 +211,45 @@ Slice three of the order build. Replaces the split `jerseyRuns.fixedRoster` + `j
 ### Open Questions Affecting Track R (carry into implementation)
 - **During R-06**: confirm `closed` vs `locked` precedence when a deadline passes; coordinate with `3-01-jersey-run-deadline-enforcement` so the two "done" signals don't fight (PRD §10 residual).
 - **During R-05**: decide whether "removed" is a derived state (design no longer in `orders.designIds`) or a stored per-entry flag.
+
+---
+
+# Track D — Design Page Structured Brief Blocks (8 issues)
+## Source PRD: docs/prd/design-page-blocks.md
+## Generated: 2026-07-25
+
+Turns the flat design page into a structured internal brief built from **reorderable blocks** (fixed text sections, hand-picked captioned galleries, one color palette with hex+role+Pantone-label swatches), edited through **one shared editor** shared by portal and admin. **Supersedes** `docs/prd/design-assets.md` — it keeps that draft's per-file metadata table + permission model + main-image resolver, but swaps tag-grouping for the block model.
+
+### Foundation (sequential)
+| # | Issue | Type | Depends On |
+|---|-------|------|------------|
+| D-01 | Design Assets Metadata Table | infrastructure | none |
+| D-02 | Design Blocks Model and Read Rendering | feature | D-01 |
+
+### Core — the shared editor and block types (fan-out after D-02)
+| # | Issue | Type | Depends On |
+|---|-------|------|------------|
+| D-03 | Shared Block Editor: Text Sections and Reorder | feature | D-02 |
+| D-04 | Palette Block Editor | feature | D-03 |
+| D-05 | Gallery Blocks and Asset Pool | feature | D-01, D-03 |
+| D-06 | Admin Design Page Uses Shared Editor | feature | D-04, D-05 |
+
+### Enhancements
+| # | Issue | Type | Depends On |
+|---|-------|------|------------|
+| D-07 | Order Page Design Main Image | feature | D-01 |
+| D-08 | Design Page Motion and Polish | improvement | D-06, D-07 |
+
+### Parallelization Notes for Track D
+- **Sequencing refinement vs the PRD appendix:** the appendix lists palette (slice 3) before the text/reorder editor (slice 4); we build the **editor shell first** (D-03) because palette (D-04) and gallery (D-05) editing plug into it. Conceptual scope is unchanged.
+- D-04 and D-05 both fan out from D-03 and can run in parallel (D-05 also needs D-01 for assets).
+- D-07 (order-page main image) depends only on D-01's resolver, so it can run any time after D-01 — in parallel with the whole editor chain.
+- D-08 is last and is a **human-in-the-loop** taste task: agree motion direction before building.
+
+### Critical Path
+`D-01 → D-02 → D-03 → (D-04 ‖ D-05) → D-06 → D-08`
+
+### Open Questions Affecting Track D
+- **Before D-03**: exact drag-reorder affordance (whole-block handle vs edge grip) + mobile behavior — pick a default, note it in the session report (PRD §10).
+- **During D-03**: where the required **Overview** is authored on create (create form vs editor) — lean: create form requires an Overview body, editor handles the rest (PRD §10).
+- **Before D-08**: agree the motion/polish direction with a human (park `needs-human` / short `/grill-me`) before implementing.

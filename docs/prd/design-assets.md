@@ -2,8 +2,10 @@
 
 **Author:** Sidestep / Claude
 **Created:** 2026-06-02
-**Status:** Draft
-**Last Updated:** 2026-06-02
+**Status:** Superseded (2026-07-25) — see [`docs/prd/design-page-blocks.md`](./design-page-blocks.md)
+**Last Updated:** 2026-07-25
+
+> **⚠️ Superseded — do not build from this document.** [`docs/prd/design-page-blocks.md`](./design-page-blocks.md) replaces it. That PRD **keeps** this document's per-file **metadata table** (`designAssets` with `filename`/`contentType`/uploader provenance), its **content-type-drives-inline-render** rule, its **main-image resolver**, and its **admin upload/delete permission model** — but **replaces tag-based auto-grouping** with hand-picked, reorderable **gallery blocks**, and adds **structured text sections** and a **color palette**. Retained here for the decision history behind the asset layer.
 
 > Derived from the `/grill-me` session on design assets (2026-06-02). **Sequenced after the roster work** — see [`docs/prd/roster-manager-and-lock.md`](./roster-manager-and-lock.md), which reshapes `order → design → rosterEntry → orderEntry`. This PRD owns how a design's *files* are modeled, categorized, and displayed on the design and order pages. It assumes the post-roster world where an order fans out to one-to-many designs.
 
