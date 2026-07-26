@@ -1,6 +1,6 @@
 # Issue: Shared Block Editor: Text Sections and Reorder
 
-## Status: pending
+## Status: done
 
 ## Phase: 2
 
@@ -8,22 +8,41 @@
 
 ## Vertical Slice
 This issue touches:
-- [ ] Database: none (uses `designs.blocks` from D-02)
-- [ ] API: block add/update/remove/reorder mutations (owner or admin)
-- [ ] Frontend: shared block editor shell (add from fixed menu, edit, remove, drag-to-reorder); text block editing wired into the portal detail page
-- [ ] Tests: reorder + add/remove mutation smoke tests; editor interaction tests
+- [x] Database: none (uses `designs.blocks` from D-02)
+- [x] API: block add/update/remove/reorder mutations (owner or admin)
+- [x] Frontend: shared block editor shell (add from fixed menu, edit, remove, drag-to-reorder); text block editing wired into the portal detail page
+- [x] Tests: reorder + add/remove mutation smoke tests; editor interaction tests
 
 ## Description
 Build the shared block editor shell that later block-types plug into, and ship the text block type through it. The owner can add fixed text sections (Overview/Concept/Inspiration/Notes), edit their bodies, remove them, and drag to reorder all blocks. This is the editing surface both portal and admin reuse.
 
 ## Acceptance Criteria
-- [ ] Shared `DesignBlockEditor` component: renders the ordered blocks, an "add block" menu limited to the fixed types, per-block remove, and drag-to-reorder with persisted order
-- [ ] Text sections limited to Overview/Concept/Inspiration/Notes; a used field can't be added twice; Overview required
-- [ ] Block mutations (add/update/remove/reorder) are owner-or-admin guarded and re-run the D-02 validators
-- [ ] Reorder persists to `designs.blocks` and survives reload
-- [ ] Wired into the portal design detail page, replacing the current full-form edit flow for block content
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] Shared `DesignBlockEditor` component: renders the ordered blocks, an "add block" menu limited to the fixed types, per-block remove, and drag-to-reorder with persisted order
+- [x] Text sections limited to Overview/Concept/Inspiration/Notes; a used field can't be added twice; Overview required
+- [x] Block mutations (add/update/remove/reorder) are owner-or-admin guarded and re-run the D-02 validators
+- [x] Reorder persists to `designs.blocks` and survives reload
+- [x] Wired into the portal design detail page, replacing the current full-form edit flow for block content
+- [x] All tests pass
+- [x] No regressions in existing tests
+
+## Delivered
+- `lib/designBlock.ts`: `availableTextFields`, `newTextBlock`, `isRequiredBlock`,
+  `indexOfBlock`, `moveBlockTo` — the pure half, shared by editor and server.
+- `convex/_designBlocks.ts`: `requireBlockEditAccess` (owner **or** admin, one
+  gate), `patchBlocks` (the only writer of `designs.blocks`), `requireBlockIndex`.
+- `convex/designs.ts`: `addBlock` / `updateBlock` / `removeBlock` / `moveBlock`.
+  `updateDesign.blocks` became optional so a metadata save can't clobber the brief.
+- `components/design/DesignBlockEditor.tsx`, reusing `DesignBlockBody` (split out
+  of `DesignBlocks.tsx`) so the editor and the read page render blocks identically.
+- Portal design page edits the brief in place; `DesignForm` keeps the Overview on
+  create only.
+
+**Open:** the add menu offers text sections only. Gallery and palette blocks are
+reorderable and removable here but not yet editable — their menu entries land with
+D-04 and D-05, which own those editors.
+
+**Screenshots not captured** — the dev deployment still holds one pre-D-01 design
+(`TOC 2026 Jersey`), so the schema can't push. See D-09 / QUESTIONS.md.
 
 ## Dependencies
 - Blocked by: D-02

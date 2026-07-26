@@ -22,7 +22,28 @@ Agents: when you restart a previously-parked task, read its Answered entry FIRST
 **Answer:** _(human fills in)_
 -->
 
-_(none open)_
+### [D-09] Wipe the pre-D-01 dev design so the schema can push — 2026-07-25, ralph-loop
+**Question:** May we delete the one remaining old-shape design document on the **dev** deployment (`benevolent-starling-766`), or would you rather delete it yourself?
+
+**Context:** D-01 replaced `designs.fileIds` with the `designAssets` table and D-02 replaced `designs.brief` with the `blocks` array. The PRD chose **no migration** — "dummy designs wiped once (pre-launch, no real data)" (`docs/prd/design-page-blocks.md` §6). One document was never wiped, so `npx convex dev` refuses to push:
+
+```
+✖ Schema validation failed.
+Document with ID "j572994ahcdr7mzg6h8aycd9sh877eb4" in table "designs"
+does not match the schema: Object is missing the required field `blocks`.
+```
+
+It is the only row in `designs`: `{ title: "TOC 2026 Jersey", brief: "for toc", fileIds: [2 files] }`. That reads like a record **you** created by hand to test the portal, not loop-generated dummy data — which is why three iterations in a row have now left it alone rather than deleting your data on your deployment.
+
+**What it blocks:** no schema push means no working dev backend, which means `scripts/snap.mjs` can't reach the app. **D-01, D-02 and D-03 all shipped without screenshots**, so the UX review surface for the whole design-page track is missing, and D-08 (motion & polish) can't be done at all without it. The code is fine — 789 tests green — this is purely the review surface.
+
+**Options considered:**
+1. **Delete the one document** (dashboard → `designs` → delete row), then re-run `npx convex dev --once`. Loses one hand-made test record; its two uploaded files stay orphaned in storage and can be deleted too. Matches the PRD's stated plan.
+2. **Back-fill it in place** — add `blocks: [{kind:"text",field:"overview",body:"for toc"}]` and create `designAssets` rows for its two `fileIds`. Preserves the record, but means writing migration code the PRD explicitly declined, for one row.
+3. **Make `blocks` optional in the schema** so the stale row validates. Rejected: it would let a design exist with no description forever and undo D-02's central guarantee.
+
+**Recommendation:** Option 1, and honestly it's a 10-second dashboard click you may prefer to just do — say the word and the next iteration will do it instead. Once it's pushed, D-09 also re-captures the missing screenshots for D-01/D-02/D-03 in one pass.
+**Answer:** _(human fills in)_
 
 ## Answered
 

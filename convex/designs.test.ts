@@ -654,4 +654,447 @@ describe("design blocks", () => {
     expect(overviewOf(design!.blocks)).toBe("Navy and gold.");
     expect(design!.assets).toHaveLength(1);
   });
+
+  it("leaves blocks untouched when updateDesign omits them", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    const designId = await asUser.mutation(api.designs.createDesign, {
+      title: "Away kit",
+      blocks: [overview, { id: "g1", kind: "gallery", assetIds: [] }],
+      files: [await fakeFile(t)],
+    });
+
+    // The edit form owns title/specs/files; the block editor owns blocks. A
+    // form submit must not clobber a brief the editor just changed.
+    await asUser.mutation(api.designs.updateDesign, {
+      designId,
+      title: "Away kit v2",
+      addFiles: [],
+    });
+
+    const row = await t.run((ctx) => ctx.db.get(designId));
+    expect(row!.title).toBe("Away kit v2");
+    expect(row!.blocks.map((b) => b.id)).toEqual(["b-overview", "g1"]);
+  });
+});
+
+// The block editor's write path (D-03). Each operation is its own mutation so
+// the client sends the change, not a whole array it might be holding stale —
+// and every one of them re-runs the D-02 validators server-side.
+describe("design block mutations", () => {
+  const overview = {
+    id: "b-overview",
+    kind: "text" as const,
+    field: "overview" as const,
+    body: "Navy and gold.",
+  };
+  const gallery = { id: "g1", kind: "gallery" as const, assetIds: [] };
+
+  type AsUser = Awaited<ReturnType<typeof seedOwner>>["asUser"];
+
+  async function seedDesign(t: Test, asUser: AsUser) {
+    return asUser.mutation(api.designs.createDesign, {
+      title: "Away kit",
+      blocks: [overview, gallery],
+      files: [await fakeFile(t)],
+    });
+  }
+
+  async function seedAdmin(t: Test) {
+    await t.run((ctx) =>
+      ctx.db.insert("users", {
+        clerkId: "user_staff_clerk",
+        email: "staff@sidestep.test",
+        name: "Staff",
+        isAdmin: true,
+        createdAt: Date.now(),
+      }),
+    );
+    return t.withIdentity({
+      subject: "user_staff_clerk",
+      email: "staff@sidestep.test",
+      name: "Staff",
+    });
+  }
+
+  async function blockIds(t: Test, designId: Id<"designs">) {
+    const row = await t.run((ctx) => ctx.db.get(designId));
+    return row!.blocks.map((b) => b.id);
+  }
+
+  describe("addBlock", () => {
+    it("appends a new text section to the end of the brief", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await asUser.mutation(api.designs.addBlock, {
+        designId,
+        block: {
+          id: "c1",
+          kind: "text",
+          field: "concept",
+          body: "  Retro stripes.  ",
+        },
+      });
+
+      const row = await t.run((ctx) => ctx.db.get(designId));
+      expect(row!.blocks.map((b) => b.id)).toEqual(["b-overview", "g1", "c1"]);
+      const concept = row!.blocks.find(
+        (b) => b.kind === "text" && b.field === "concept",
+      )!;
+      expect(concept.kind === "text" && concept.body).toBe("Retro stripes.");
+    });
+
+    it("rejects a section the design already uses", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.addBlock, {
+          designId,
+          block: { id: "o2", kind: "text", field: "overview", body: "Again." },
+        }),
+      ).rejects.toThrow(/overview can only appear once/i);
+    });
+
+    it("rejects an empty text body", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.addBlock, {
+          designId,
+          block: { id: "c1", kind: "text", field: "concept", body: "   " },
+        }),
+      ).rejects.toThrow(/can't be empty/i);
+    });
+
+    it("rejects a second palette", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await asUser.mutation(api.designs.createDesign, {
+        title: "Away kit",
+        blocks: [overview, { id: "p1", kind: "palette", swatches: [] }],
+        files: [await fakeFile(t)],
+      });
+
+      await expect(
+        asUser.mutation(api.designs.addBlock, {
+          designId,
+          block: { id: "p2", kind: "palette", swatches: [] },
+        }),
+      ).rejects.toThrow(/one palette/i);
+    });
+
+    it("rejects a block id already on the design", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.addBlock, {
+          designId,
+          block: { id: "g1", kind: "gallery", assetIds: [] },
+        }),
+      ).rejects.toThrow(/same id/i);
+    });
+
+    it("refuses a caller who neither owns the design nor is an admin", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const { asUser: asStranger } = await seedOwner(t, "user_stranger_clerk");
+
+      await expect(
+        asStranger.mutation(api.designs.addBlock, {
+          designId,
+          block: { id: "c1", kind: "text", field: "concept", body: "Mine now." },
+        }),
+      ).rejects.toThrow(/access/i);
+      expect(await blockIds(t, designId)).toEqual(["b-overview", "g1"]);
+    });
+
+    it("lets an admin edit someone else's design — same editor, same rules", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const asAdmin = await seedAdmin(t);
+
+      await asAdmin.mutation(api.designs.addBlock, {
+        designId,
+        block: { id: "n1", kind: "text", field: "notes", body: "Staff note." },
+      });
+
+      expect(await blockIds(t, designId)).toEqual(["b-overview", "g1", "n1"]);
+    });
+
+    it("rejects an unauthenticated caller", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        t.mutation(api.designs.addBlock, {
+          designId,
+          block: { id: "c1", kind: "text", field: "concept", body: "Hi." },
+        }),
+      ).rejects.toThrow(/Not authenticated/);
+    });
+  });
+
+  describe("updateBlock", () => {
+    it("rewrites a block in place, keeping its position", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await asUser.mutation(api.designs.updateBlock, {
+        designId,
+        block: { ...overview, body: "Charcoal with a gold sash." },
+      });
+
+      const row = await t.run((ctx) => ctx.db.get(designId));
+      expect(row!.blocks.map((b) => b.id)).toEqual(["b-overview", "g1"]);
+      expect(overviewOf(row!.blocks)).toBe("Charcoal with a gold sash.");
+    });
+
+    it("bumps updatedAt so list surfaces resort", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const before = (await t.run((ctx) => ctx.db.get(designId)))!.updatedAt;
+
+      await asUser.mutation(api.designs.updateBlock, {
+        designId,
+        block: { ...overview, body: "Revised." },
+      });
+
+      const after = (await t.run((ctx) => ctx.db.get(designId)))!.updatedAt;
+      expect(after).toBeGreaterThanOrEqual(before);
+    });
+
+    it("rejects a block that isn't on the design", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.updateBlock, {
+          designId,
+          block: { id: "ghost", kind: "text", field: "notes", body: "Hi." },
+        }),
+      ).rejects.toThrow(/no longer/i);
+    });
+
+    it("refuses to change a block's kind", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.updateBlock, {
+          designId,
+          block: { id: "g1", kind: "palette", swatches: [] },
+        }),
+      ).rejects.toThrow(/kind/i);
+    });
+
+    it("rejects emptying the Overview body", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.updateBlock, {
+          designId,
+          block: { ...overview, body: "" },
+        }),
+      ).rejects.toThrow(/can't be empty/i);
+    });
+
+    it("refuses a caller who neither owns the design nor is an admin", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const { asUser: asStranger } = await seedOwner(t, "user_stranger_clerk");
+
+      await expect(
+        asStranger.mutation(api.designs.updateBlock, {
+          designId,
+          block: { ...overview, body: "Vandalized." },
+        }),
+      ).rejects.toThrow(/access/i);
+    });
+  });
+
+  describe("removeBlock", () => {
+    it("drops the block and keeps the rest in order", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await asUser.mutation(api.designs.createDesign, {
+        title: "Away kit",
+        blocks: [
+          overview,
+          gallery,
+          { id: "n1", kind: "text", field: "notes", body: "Note." },
+        ],
+        files: [await fakeFile(t)],
+      });
+
+      await asUser.mutation(api.designs.removeBlock, {
+        designId,
+        blockId: "g1",
+      });
+
+      expect(await blockIds(t, designId)).toEqual(["b-overview", "n1"]);
+    });
+
+    it("refuses to remove the Overview — every list reads it", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.removeBlock, {
+          designId,
+          blockId: "b-overview",
+        }),
+      ).rejects.toThrow(/overview/i);
+      expect(await blockIds(t, designId)).toEqual(["b-overview", "g1"]);
+    });
+
+    it("rejects a block that isn't on the design", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.removeBlock, {
+          designId,
+          blockId: "ghost",
+        }),
+      ).rejects.toThrow(/no longer/i);
+    });
+
+    it("refuses a caller who neither owns the design nor is an admin", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const { asUser: asStranger } = await seedOwner(t, "user_stranger_clerk");
+
+      await expect(
+        asStranger.mutation(api.designs.removeBlock, {
+          designId,
+          blockId: "g1",
+        }),
+      ).rejects.toThrow(/access/i);
+      expect(await blockIds(t, designId)).toEqual(["b-overview", "g1"]);
+    });
+  });
+
+  describe("moveBlock", () => {
+    it("persists a new order that survives a re-read", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await asUser.mutation(api.designs.moveBlock, {
+        designId,
+        blockId: "b-overview",
+        toIndex: 1,
+      });
+
+      expect(await blockIds(t, designId)).toEqual(["g1", "b-overview"]);
+      const design = await asUser.query(api.designs.getMyDesign, { designId });
+      expect(design!.blocks.map((b) => b.id)).toEqual(["g1", "b-overview"]);
+    });
+
+    it("clamps a destination past the end instead of failing", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await asUser.mutation(api.designs.moveBlock, {
+        designId,
+        blockId: "b-overview",
+        toIndex: 99,
+      });
+
+      expect(await blockIds(t, designId)).toEqual(["g1", "b-overview"]);
+    });
+
+    it("moves the Overview freely — required does not mean pinned", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await asUser.mutation(api.designs.moveBlock, {
+        designId,
+        blockId: "g1",
+        toIndex: 0,
+      });
+
+      expect(await blockIds(t, designId)).toEqual(["g1", "b-overview"]);
+    });
+
+    it("rejects a block that isn't on the design", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.moveBlock, {
+          designId,
+          blockId: "ghost",
+          toIndex: 0,
+        }),
+      ).rejects.toThrow(/no longer/i);
+    });
+
+    it("refuses a caller who neither owns the design nor is an admin", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const { asUser: asStranger } = await seedOwner(t, "user_stranger_clerk");
+
+      await expect(
+        asStranger.mutation(api.designs.moveBlock, {
+          designId,
+          blockId: "g1",
+          toIndex: 0,
+        }),
+      ).rejects.toThrow(/access/i);
+      expect(await blockIds(t, designId)).toEqual(["b-overview", "g1"]);
+    });
+
+    it("lets an admin reorder someone else's design", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const asAdmin = await seedAdmin(t);
+
+      await asAdmin.mutation(api.designs.moveBlock, {
+        designId,
+        blockId: "g1",
+        toIndex: 0,
+      });
+
+      expect(await blockIds(t, designId)).toEqual(["g1", "b-overview"]);
+    });
+  });
+
+  it("rejects every block mutation against a design that's gone", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const designId = await seedDesign(t, asUser);
+    await t.run((ctx) => ctx.db.delete(designId));
+
+    await expect(
+      asUser.mutation(api.designs.removeBlock, { designId, blockId: "g1" }),
+    ).rejects.toThrow(/not found/i);
+  });
 });

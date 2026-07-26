@@ -349,3 +349,68 @@ One entry per completed loop task. This is the human's fast path for UX critique
     refuses a second dev server for the same directory. A fresh one is running.
 
 - Follow-ups filed: none
+
+## 2026-07-25 — D-03: Shared Block Editor: Text Sections and Reorder
+
+- What shipped:
+  - **Four narrow block mutations** in `convex/designs.ts` — `addBlock`,
+    `updateBlock`, `removeBlock`, `moveBlock` — all behind one
+    `requireBlockEditAccess` gate (owner **or** admin, because portal and admin
+    mount the same editor) and all writing through `patchBlocks`, the only
+    function that ever touches `designs.blocks`. So every operation re-runs the
+    D-02 validators; there is no path that half-applies a change.
+  - **`components/design/DesignBlockEditor.tsx`** — the shared editing surface:
+    add a text section from the fixed menu, edit a body in place, remove,
+    reorder by drag or by move up/down. Prop surface is `designId` / `blocks` /
+    `assets`; it holds no draft of the brief, only what isn't committed yet.
+  - **Portal design page edits the brief in place.** `DesignForm` keeps the
+    Overview on **create** only (PRD §10: authored where the design is born),
+    and `updateDesign.blocks` is now optional — the edit form sends no blocks at
+    all, so saving a title can't overwrite a section the editor just changed.
+  - `DesignBlocks.tsx` split: `DesignBlockBody` renders one block with no
+    chrome, so the editor and the read-only page share one renderer.
+
+- UX surfaces to eyeball: **no screenshots — see "Blocked" below.** When the dev
+  deployment can push, look at `/portal/designs/[id]` (the brief is now a stack
+  of cards with a grip, move arrows, edit and remove; check the header row
+  doesn't crowd at 375px with four buttons and a long heading), the "Add
+  Concept / Inspiration / Notes" button row, the dashed draft card, and
+  `/portal/designs/[id]` in edit mode (the Overview textarea is gone from step
+  01 — confirm that section doesn't read oddly with only Title + Canva left).
+
+- Decisions I made that a human may want to veto:
+  - **The add menu is a row of visible buttons, not a dropdown.** There are at
+    most four sections; showing which are still open beats hiding them behind a
+    click. Taste call — a `DropdownMenu` is a small change if you disagree.
+  - **Reorder affordance (resolves PRD §10):** a grip handle is the drag source
+    on desktop, and **move up / move down buttons are the real path** for
+    keyboard and touch. HTML5 drag-and-drop doesn't fire on touch at all, so
+    shipping only a handle would have left mobile with no way to reorder. The
+    grip is `aria-hidden` — it's a pointer-only affordance and shouldn't
+    announce itself as a control that can't be operated.
+  - **A new section isn't stored until it has a body.** `validateBlocks` refuses
+    an empty text block (D-02), so picking "Concept" opens a draft card and the
+    mutation fires on save. The alternative was relaxing that rule to allow
+    blank headings — worse.
+  - **Gallery and palette are reorderable and removable here, but not
+    editable.** The add menu offers text sections only; palette and gallery
+    entries arrive with D-04/D-05, which own those editors. Adding an
+    unfillable empty palette now would be a half-feature.
+  - **`updateBlock` refuses to change a block's kind**, which would silently
+    discard a text body. Position is `moveBlock`'s job, not an edit's.
+  - **The editor validates with `validateBlocks` itself** rather than a
+    parallel zod schema, so the message the user reads is the message the
+    server would have sent.
+  - **I did not delete the stale dev document** (below). It looks like your
+    hand-made test record, on your deployment.
+
+- Blocked: **screenshots, for the third slice running.** `npx convex dev`
+  refuses to push because one design (`TOC 2026 Jersey`) predates D-01/D-02 and
+  has no `blocks` field, so `snap.mjs` has no live backend to point at. Filed as
+  **D-09** (needs-human) with the exact error and three options in
+  `backlog/QUESTIONS.md`. The whole design-page track — D-01, D-02, D-03 — now
+  has no visual review surface, and D-08 can't start without one; D-09 re-snaps
+  all three once it's unblocked. Code is unaffected: 789 tests green.
+
+- Follow-ups filed: D-09 (wipe the pre-D-01 dev design, then capture the
+  missing D-01/D-02/D-03 screenshots) — flagged needs-human, blocks D-08.

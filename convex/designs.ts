@@ -14,7 +14,15 @@ import {
   resolveDesignAssets,
   uploadedFileValidator,
 } from "./_designAssets";
-import { designBlocksValidator, prepareBlocks } from "./_designBlocks";
+import {
+  designBlockValidator,
+  designBlocksValidator,
+  patchBlocks,
+  prepareBlocks,
+  requireBlockEditAccess,
+  requireBlockIndex,
+} from "./_designBlocks";
+import { isRequiredBlock, moveBlockTo } from "../lib/designBlock";
 
 // Server-side guards. Mirror lib/design so the client and server cap
 // values the same way — defense in depth against a hand-rolled client that
@@ -196,9 +204,11 @@ export const updateDesign = mutation({
   args: {
     designId: v.id("designs"),
     title: v.string(),
-    // The full block array, in its new order — a reorder, an edit and a
-    // removal are all "write the array you want" (PRD §6).
-    blocks: designBlocksValidator,
+    // Optional, and normally omitted: the brief is edited block-by-block
+    // through the mutations below (D-03), so a form submit that only changed
+    // the title must not carry a stale array over the editor's work. Create
+    // still sends blocks — that's where the required Overview is authored.
+    blocks: v.optional(designBlocksValidator),
     canvaLink: v.optional(v.string()),
     addFiles: v.array(uploadedFileValidator),
     jerseyStyle: v.optional(v.string()),
@@ -213,7 +223,7 @@ export const updateDesign = mutation({
       throw new ConvexError("You don't have access to this design.");
 
     const title = normalizeTitle(args.title);
-    const blocks = prepareBlocks(args.blocks);
+    const blocks = args.blocks ? prepareBlocks(args.blocks) : undefined;
     const canvaLink = normalizeCanvaLink(args.canvaLink);
     const specs = normalizeSpecs(args);
 
@@ -227,7 +237,7 @@ export const updateDesign = mutation({
 
     await ctx.db.patch(args.designId, {
       title,
-      blocks,
+      ...(blocks ? { blocks } : {}),
       // Convex `patch` doesn't accept undefined for optional fields — pass
       // an explicit string (possibly empty) and let the schema/optional do
       // the rest. We use the normalized value or fall back to clearing.
@@ -238,5 +248,78 @@ export const updateDesign = mutation({
     });
 
     return args.designId;
+  },
+});
+
+// ---------------------------------------------------------------------------
+// The block editor's write path (D-03).
+//
+// Four narrow mutations rather than one "save the whole brief": the editor
+// sends the change it made, not an array it may have been holding while
+// someone else edited. Each one reads the stored blocks, applies one
+// operation, and hands the result to `patchBlocks`, which is the only place
+// `designs.blocks` is ever written — so add, edit, remove and reorder all
+// re-run the D-02 validators and all answer the same owner-or-admin question.
+// ---------------------------------------------------------------------------
+
+export const addBlock = mutation({
+  args: { designId: v.id("designs"), block: designBlockValidator },
+  handler: async (ctx, { designId, block }) => {
+    const { design } = await requireBlockEditAccess(ctx, designId);
+    // Appended, not inserted: a new section lands at the bottom and the owner
+    // drags it where it belongs. Duplicate fields, a second palette and a
+    // colliding id are all the validator's calls, not ours.
+    await patchBlocks(ctx, designId, [...design.blocks, block]);
+  },
+});
+
+export const updateBlock = mutation({
+  args: { designId: v.id("designs"), block: designBlockValidator },
+  handler: async (ctx, { designId, block }) => {
+    const { design } = await requireBlockEditAccess(ctx, designId);
+    const index = requireBlockIndex(design.blocks, block.id);
+
+    // Position is the array's business (moveBlock's), so an edit rewrites in
+    // place. Kind is fixed at add time — a text section can't become a
+    // gallery, which would silently discard its body.
+    if (design.blocks[index]!.kind !== block.kind)
+      throw new ConvexError("A block can't change kind.");
+
+    const blocks = [...design.blocks];
+    blocks[index] = block;
+    await patchBlocks(ctx, designId, blocks);
+  },
+});
+
+export const removeBlock = mutation({
+  args: { designId: v.id("designs"), blockId: v.string() },
+  handler: async (ctx, { designId, blockId }) => {
+    const { design } = await requireBlockEditAccess(ctx, designId);
+    const index = requireBlockIndex(design.blocks, blockId);
+
+    // `prepareBlocks` would refuse an Overview-less brief anyway; catching it
+    // here means the error names the section instead of describing the array.
+    if (isRequiredBlock(design.blocks[index]!))
+      throw new ConvexError(
+        "The Overview is your design's description — it can't be removed.",
+      );
+
+    await patchBlocks(ctx, designId, design.blocks.toSpliced(index, 1));
+  },
+});
+
+// Reorder. The array order IS the page order (PRD §6), so this is a splice —
+// `toIndex` is where the block should end up, clamped, because a drop past the
+// last block means "put it last".
+export const moveBlock = mutation({
+  args: {
+    designId: v.id("designs"),
+    blockId: v.string(),
+    toIndex: v.number(),
+  },
+  handler: async (ctx, { designId, blockId, toIndex }) => {
+    const { design } = await requireBlockEditAccess(ctx, designId);
+    const from = requireBlockIndex(design.blocks, blockId);
+    await patchBlocks(ctx, designId, moveBlockTo(design.blocks, from, toIndex));
   },
 });

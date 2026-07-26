@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T01:43:09.006Z",
+  "lastUpdated": "2026-07-26T02:45:28.786Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1365,10 +1365,10 @@
       "phase": "phase-1",
       "type": "feature",
       "description": "Add designs.blocks (ordered text|gallery|palette union), remove brief (Overview replaces it), and render blocks read-only on portal + admin pages.",
-      "status": "in-progress",
+      "status": "completed",
       "agent": "ralph-loop",
       "startedAt": "2026-07-26T01:43:09.005Z",
-      "completedAt": null,
+      "completedAt": "2026-07-26T02:29:00.828Z",
       "issueFile": "backlog/D-02-design-blocks-model-and-read-rendering.md",
       "prdRef": "docs/prd/design-page-blocks.md#5-scope",
       "acceptanceCriteria": [
@@ -1383,9 +1383,9 @@
       "phase": "phase-2",
       "type": "feature",
       "description": "Build the shared block editor shell (add/remove/reorder blocks) and ship the fixed text sections through it, wired into the portal.",
-      "status": "blocked",
-      "agent": null,
-      "startedAt": null,
+      "status": "in-progress",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-26T02:29:14.238Z",
       "completedAt": null,
       "issueFile": "backlog/D-03-shared-block-editor-text-sections-and-reorder.md",
       "prdRef": "docs/prd/design-page-blocks.md#4-user-stories",
@@ -1484,6 +1484,27 @@
         "Motion/hover/transition polish applied; respects reduced-motion",
         "No functional regressions"
       ]
+    },
+    {
+      "id": "D-09",
+      "title": "Wipe Stale Dev Design and Capture Track D Screenshots",
+      "phase": "phase-1",
+      "type": "infrastructure",
+      "description": "One pre-D-01 design blocks the schema push, so snap.mjs has no backend: D-01/D-02/D-03 all shipped without screenshots. Wipe it, push, re-snap all three.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/D-09-wipe-stale-dev-design-and-capture-track-d-screenshots.md",
+      "prdRef": "docs/prd/design-page-blocks.md#6-implementation-decisions",
+      "acceptanceCriteria": [
+        "Stale designs row removed (human-approved) and npx convex dev --once pushes clean",
+        "snap.mjs captures /portal/designs/[id] and /admin/designs/[id] for D-01, D-02 and D-03",
+        "Obvious visual breakage found in those screenshots fixed or filed",
+        "docs/review/<nodeId>/ populated at 375/768/1280 light+dark"
+      ],
+      "needsHuman": true,
+      "humanQuestion": "May we delete the one pre-D-01 design on the dev deployment so the schema can push (screenshots are blocked for all of Track D)?"
     }
   ],
   "edges": [
@@ -1842,6 +1863,10 @@
     {
       "from": "D-07",
       "to": "D-08"
+    },
+    {
+      "from": "D-09",
+      "to": "D-08"
     }
   ],
   "agents": [
@@ -2170,9 +2195,9 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "working",
-      "currentTask": "D-02",
-      "tasksCompleted": 10
+      "status": "idle",
+      "currentTask": null,
+      "tasksCompleted": 11
     },
     {
       "id": "review-batch",
@@ -2183,41 +2208,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-30T15:52:46.245Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "opus-4-8",
-      "message": "Opus 4.8 joined the workforce"
-    },
-    {
-      "timestamp": "2026-05-30T15:52:46.316Z",
-      "event": "task_started",
-      "nodeId": "2-12",
-      "agent": "opus-4-8",
-      "message": "Opus 4.8 picked up: Admin Stage Management"
-    },
-    {
-      "timestamp": "2026-05-30T16:19:53.531Z",
-      "event": "task_completed",
-      "nodeId": "2-12",
-      "agent": "opus-4-8",
-      "message": "Completed: Admin Stage Management"
-    },
-    {
-      "timestamp": "2026-05-31T00:04:57.493Z",
-      "event": "nodes_added",
-      "nodeId": "O-01",
-      "agent": null,
-      "message": "New task added: Design Owns Silhouette Specs"
-    },
-    {
-      "timestamp": "2026-05-31T00:04:59.932Z",
-      "event": "nodes_added",
-      "nodeId": "O-02",
-      "agent": null,
-      "message": "New task added: Design Form Captures Specs"
-    },
     {
       "timestamp": "2026-05-31T00:05:02.642Z",
       "event": "nodes_added",
@@ -2882,6 +2872,41 @@
       "nodeId": "D-02",
       "agent": "ralph-loop",
       "message": "Ralph Loop picked up: Design Blocks Model and Read Rendering"
+    },
+    {
+      "timestamp": "2026-07-26T02:27:23.465Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-26T02:29:00.833Z",
+      "event": "task_completed",
+      "nodeId": "D-02",
+      "agent": "ralph-loop",
+      "message": "Completed: Design Blocks Model and Read Rendering"
+    },
+    {
+      "timestamp": "2026-07-26T02:29:14.239Z",
+      "event": "task_started",
+      "nodeId": "D-03",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Shared Block Editor: Text Sections and Reorder"
+    },
+    {
+      "timestamp": "2026-07-26T02:45:28.644Z",
+      "event": "nodes_added",
+      "nodeId": "D-09",
+      "agent": null,
+      "message": "New task added: Wipe Stale Dev Design and Capture Track D Screenshots"
+    },
+    {
+      "timestamp": "2026-07-26T02:45:28.785Z",
+      "event": "needs_human",
+      "nodeId": "D-09",
+      "agent": "ralph-loop",
+      "message": "Needs human: Wipe Stale Dev Design and Capture Track D Screenshots — May we delete the one pre-D-01 design on the dev deployment so the schema can push (screenshots are blocked for all of Track D)?"
     }
   ]
 }

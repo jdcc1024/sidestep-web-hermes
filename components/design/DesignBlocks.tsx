@@ -14,6 +14,10 @@ import {
 // portal and admin design pages so both read the same brief the same way.
 // Editing is the shared block editor's job (D-03 onward) — this component
 // takes blocks and assets and renders; it owns no state.
+//
+// `DesignBlockBody` is the per-block half, exported so the block editor can
+// wrap each block in its own card chrome (handle, move, remove) and still show
+// exactly what the read-only page shows. One renderer, two surfaces.
 
 // The slice of a resolved design asset a block needs. Structural rather than
 // the Convex doc type so a test fixture (or a future server component) can
@@ -34,24 +38,35 @@ export function DesignBlocks({
 }) {
   if (blocks.length === 0) return <EmptyBrief />;
 
-  const byId = new Map(assets.map((asset) => [asset._id, asset]));
-
   return (
     <div className="space-y-8">
-      {blocks.map((block) => {
-        switch (block.kind) {
-          case "text":
-            return <TextSection key={block.id} block={block} />;
-          case "gallery":
-            return (
-              <GallerySection key={block.id} block={block} assets={byId} />
-            );
-          case "palette":
-            return <PaletteSection key={block.id} block={block} />;
-        }
-      })}
+      {blocks.map((block) => (
+        <BlockSection key={block.id} heading={blockHeading(block)}>
+          <DesignBlockBody block={block} assets={assets} />
+        </BlockSection>
+      ))}
     </div>
   );
+}
+
+// One block's contents, with no heading and no chrome — the caller supplies
+// those. Split out for the editor (D-03), which needs the same rendering
+// inside an editable card.
+export function DesignBlockBody({
+  block,
+  assets,
+}: {
+  block: DesignBlock;
+  assets: readonly BlockAsset[];
+}) {
+  switch (block.kind) {
+    case "text":
+      return <TextBody block={block} />;
+    case "gallery":
+      return <GalleryBody block={block} assets={assets} />;
+    case "palette":
+      return <PaletteBody block={block} />;
+  }
 }
 
 function BlockSection({
@@ -69,43 +84,39 @@ function BlockSection({
   );
 }
 
-function TextSection({ block }: { block: TextBlock }) {
+function TextBody({ block }: { block: TextBlock }) {
   return (
-    <BlockSection heading={blockHeading(block)}>
-      <p className="whitespace-pre-wrap text-sm text-foreground/90">
-        {block.body}
-      </p>
-    </BlockSection>
+    <p className="whitespace-pre-wrap text-sm text-foreground/90">
+      {block.body}
+    </p>
   );
 }
 
-function GallerySection({
+function GalleryBody({
   block,
   assets,
 }: {
   block: GalleryBlock;
-  assets: Map<string, BlockAsset>;
+  assets: readonly BlockAsset[];
 }) {
   // An id can dangle after a file is deleted — drop it rather than render a
   // hole. The gallery still reads correctly with the files that remain.
+  const byId = new Map(assets.map((asset) => [asset._id, asset]));
   const picked = block.assetIds
-    .map((id) => assets.get(id))
+    .map((id) => byId.get(id))
     .filter((asset): asset is BlockAsset => asset !== undefined);
 
+  if (picked.length === 0)
+    return <EmptyNote>No files in this gallery yet.</EmptyNote>;
+
   return (
-    <BlockSection heading={blockHeading(block)}>
-      {picked.length === 0 ? (
-        <EmptyNote>No files in this gallery yet.</EmptyNote>
-      ) : (
-        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {picked.map((asset) => (
-            <li key={asset._id}>
-              <GalleryItem asset={asset} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </BlockSection>
+    <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      {picked.map((asset) => (
+        <li key={asset._id}>
+          <GalleryItem asset={asset} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -159,53 +170,52 @@ function GalleryItem({ asset }: { asset: BlockAsset }) {
   );
 }
 
-function PaletteSection({ block }: { block: PaletteBlock }) {
+function PaletteBody({ block }: { block: PaletteBlock }) {
+  if (block.swatches.length === 0)
+    return <EmptyNote>No colors picked yet.</EmptyNote>;
+
   return (
-    <BlockSection heading={blockHeading(block)}>
-      {block.swatches.length === 0 ? (
-        <EmptyNote>No colors picked yet.</EmptyNote>
-      ) : (
-        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {block.swatches.map((swatch) => (
-            <li
-              key={swatch.id}
-              data-testid={`swatch-${swatch.id}`}
-              className="overflow-hidden rounded-lg border border-border bg-card"
-            >
-              <div
-                data-testid={`swatch-chip-${swatch.id}`}
-                className="h-16 w-full"
-                style={{ backgroundColor: swatch.hex }}
-              />
-              <div className="space-y-0.5 px-3 py-2">
-                <p className="font-mono text-sm text-foreground">{swatch.hex}</p>
-                {swatch.role && (
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {SWATCH_ROLE_LABELS[swatch.role]}
-                  </p>
-                )}
-                {swatch.label && (
-                  <p className="truncate text-sm text-foreground/90">
-                    {swatch.label}
-                  </p>
-                )}
-                {/* Pantone is a free-text label production treats as the real
-                    spec — the hex above it is only a screen approximation. */}
-                {swatch.pantoneCode && (
-                  <p className="text-xs text-muted-foreground">
-                    Pantone {swatch.pantoneCode}
-                  </p>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </BlockSection>
+    <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      {block.swatches.map((swatch) => (
+        <li
+          key={swatch.id}
+          data-testid={`swatch-${swatch.id}`}
+          className="overflow-hidden rounded-lg border border-border bg-card"
+        >
+          <div
+            data-testid={`swatch-chip-${swatch.id}`}
+            className="h-16 w-full"
+            style={{ backgroundColor: swatch.hex }}
+          />
+          <div className="space-y-0.5 px-3 py-2">
+            <p className="font-mono text-sm text-foreground">{swatch.hex}</p>
+            {swatch.role && (
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {SWATCH_ROLE_LABELS[swatch.role]}
+              </p>
+            )}
+            {swatch.label && (
+              <p className="truncate text-sm text-foreground/90">
+                {swatch.label}
+              </p>
+            )}
+            {/* Pantone is a free-text label production treats as the real
+                spec — the hex above it is only a screen approximation. */}
+            {swatch.pantoneCode && (
+              <p className="text-xs text-muted-foreground">
+                Pantone {swatch.pantoneCode}
+              </p>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function EmptyBrief() {
+// The "this brief is blank" prompt, shared with the editor so both surfaces
+// invite the same next step.
+export function EmptyBrief() {
   return (
     <p className="rounded-lg border border-dashed border-border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
       Nothing written yet — add an overview, a gallery or a palette to start

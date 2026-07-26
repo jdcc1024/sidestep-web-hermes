@@ -6,10 +6,15 @@ import {
   TEXT_BODY_MAX_LENGTH,
   TEXT_FIELDS,
   TEXT_FIELD_LABELS,
+  availableTextFields,
   blockHeading,
+  indexOfBlock,
+  isRequiredBlock,
   isSwatchRole,
   isTextField,
+  moveBlockTo,
   newBlockId,
+  newTextBlock,
   normalizeBlocks,
   normalizeHex,
   overviewOf,
@@ -49,6 +54,114 @@ function palette(overrides: Partial<PaletteBlock> = {}): PaletteBlock {
 function blocks(...rest: DesignBlock[]): DesignBlock[] {
   return [text(), ...rest];
 }
+
+describe("availableTextFields", () => {
+  it("offers every section on an empty design", () => {
+    expect(availableTextFields([])).toEqual([...TEXT_FIELDS]);
+  });
+
+  it("drops sections the design already uses", () => {
+    const used = [text(), text({ id: "b2", field: "notes", body: "Later." })];
+    expect(availableTextFields(used)).toEqual(["concept", "inspiration"]);
+  });
+
+  it("returns nothing once all four sections are used", () => {
+    const all = TEXT_FIELDS.map((field) =>
+      text({ id: `b-${field}`, field, body: "x" }),
+    );
+    expect(availableTextFields(all)).toEqual([]);
+  });
+
+  it("keeps the fixed menu order regardless of block order", () => {
+    const reversed = [
+      text({ id: "b1", field: "notes", body: "n" }),
+      text({ id: "b2", field: "overview", body: "o" }),
+    ];
+    expect(availableTextFields(reversed)).toEqual(["concept", "inspiration"]);
+  });
+
+  it("ignores gallery and palette blocks", () => {
+    expect(availableTextFields([gallery(), palette()])).toEqual([
+      ...TEXT_FIELDS,
+    ]);
+  });
+});
+
+describe("newTextBlock", () => {
+  it("mints a text block for the requested section", () => {
+    const block = newTextBlock("concept", "Retro stripes.", () => "fixed-id");
+    expect(block).toEqual({
+      id: "fixed-id",
+      kind: "text",
+      field: "concept",
+      body: "Retro stripes.",
+    });
+  });
+
+  it("starts with an empty body when none is given", () => {
+    expect(newTextBlock("notes").body).toBe("");
+  });
+});
+
+describe("isRequiredBlock", () => {
+  it("marks the Overview section required — every list reads it", () => {
+    expect(isRequiredBlock(text({ field: "overview" }))).toBe(true);
+  });
+
+  it("leaves the other sections removable", () => {
+    expect(isRequiredBlock(text({ field: "concept" }))).toBe(false);
+    expect(isRequiredBlock(gallery())).toBe(false);
+    expect(isRequiredBlock(palette())).toBe(false);
+  });
+});
+
+describe("indexOfBlock", () => {
+  it("finds a block by id", () => {
+    expect(indexOfBlock(blocks(gallery({ id: "g1" })), "g1")).toBe(1);
+  });
+
+  it("returns -1 for an id that isn't on the design", () => {
+    expect(indexOfBlock(blocks(), "nope")).toBe(-1);
+  });
+});
+
+describe("moveBlockTo", () => {
+  const three = [
+    text({ id: "a" }),
+    gallery({ id: "b" }),
+    palette({ id: "c" }),
+  ];
+  const ids = (list: readonly DesignBlock[]) => list.map((b) => b.id);
+
+  it("moves a block down to the requested index", () => {
+    expect(ids(moveBlockTo(three, 0, 2))).toEqual(["b", "c", "a"]);
+  });
+
+  it("moves a block up to the requested index", () => {
+    expect(ids(moveBlockTo(three, 2, 0))).toEqual(["c", "a", "b"]);
+  });
+
+  it("clamps a destination past the end", () => {
+    expect(ids(moveBlockTo(three, 0, 99))).toEqual(["b", "c", "a"]);
+  });
+
+  it("clamps a negative destination to the top", () => {
+    expect(ids(moveBlockTo(three, 2, -5))).toEqual(["c", "a", "b"]);
+  });
+
+  it("is a no-op when the block is already there", () => {
+    expect(ids(moveBlockTo(three, 1, 1))).toEqual(["a", "b", "c"]);
+  });
+
+  it("does not mutate the input array", () => {
+    moveBlockTo(three, 0, 2);
+    expect(ids(three)).toEqual(["a", "b", "c"]);
+  });
+
+  it("returns the array unchanged for an out-of-range source", () => {
+    expect(ids(moveBlockTo(three, 7, 0))).toEqual(["a", "b", "c"]);
+  });
+});
 
 describe("normalizeHex", () => {
   it("uppercases and prefixes a bare six-digit hex", () => {

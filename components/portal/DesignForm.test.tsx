@@ -69,50 +69,83 @@ describe("DesignForm", () => {
     ).toBeNull();
   });
 
-  // The Overview textarea is one block inside a larger array (D-02). Editing
-  // it must not drop the galleries and palette the block editor owns.
-  it("saves the overview as a text block and preserves the design's other blocks", async () => {
+  it("stores the overview as the new design's Overview block", async () => {
     const user = userEvent.setup();
-    const gallery = {
-      id: "g1",
-      kind: "gallery" as const,
-      caption: "Mood board",
-      assetIds: [],
-    };
-
-    render(
-      <DesignForm
-        mode={{
-          kind: "edit",
-          designId: "design_1" as Id<"designs">,
-          initialTitle: "Home kit",
-          initialOverview: "Old overview",
-          initialBlocks: [
-            { id: "b1", kind: "text", field: "overview", body: "Old overview" },
-            gallery,
-          ],
-          initialCanvaLink: "",
-          initialJerseyStyle: "",
-          initialNeckline: "",
-          initialSleeveStyle: "",
-          existingFileCount: 1,
-        }}
-      />,
+    // A create needs at least one file, and uploads go straight to the signed
+    // URL rather than through Convex — so the two-phase upload is the one part
+    // of the submit path that needs a stubbed transport.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ storageId: "storage_1" }),
+      })),
     );
+    render(<DesignForm />);
 
-    const overview = screen.getByLabelText(/overview/i);
-    await user.clear(overview);
-    await user.type(overview, "New overview");
-    await user.click(screen.getByRole("button", { name: /save changes/i }));
+    await user.type(screen.getByLabelText(/^title$/i), "Home kit");
+    await user.type(screen.getByLabelText(/overview/i), "Navy and gold.");
+    await user.upload(
+      screen.getByLabelText(/click to choose files/i),
+      new File(["x"], "logo.png", { type: "image/png" }),
+    );
+    await user.click(screen.getByRole("button", { name: /save design/i }));
 
     await vi.waitFor(() => expect(mutationStub).toHaveBeenCalled());
     const [args] = mutationStub.mock.calls.at(-1) as unknown as [
-      { blocks: unknown[] },
+      { blocks: { kind: string; field: string; body: string }[] },
     ];
-    expect(args.blocks).toEqual([
-      { id: "b1", kind: "text", field: "overview", body: "New overview" },
-      gallery,
+    expect(args.blocks).toMatchObject([
+      { kind: "text", field: "overview", body: "Navy and gold." },
     ]);
+    vi.unstubAllGlobals();
+  });
+
+  // The brief moved to the block editor on the design page (D-03). The edit
+  // form keeps title/cut/Canva/files, and — critically — sends no `blocks`, so
+  // saving it can't overwrite a section the editor just changed.
+  describe("edit mode", () => {
+    function renderEdit() {
+      return render(
+        <DesignForm
+          mode={{
+            kind: "edit",
+            designId: "design_1" as Id<"designs">,
+            initialTitle: "Home kit",
+            initialCanvaLink: "",
+            initialJerseyStyle: "",
+            initialNeckline: "",
+            initialSleeveStyle: "",
+            existingFileCount: 1,
+          }}
+        />,
+      );
+    }
+
+    it("does not offer an Overview field — the block editor owns the brief", () => {
+      renderEdit();
+      expect(screen.queryByLabelText(/overview/i)).toBeNull();
+      expect(screen.getByLabelText(/^title$/i)).toBeInTheDocument();
+    });
+
+    it("saves without sending blocks, and without complaining about the missing overview", async () => {
+      const user = userEvent.setup();
+      renderEdit();
+
+      await user.clear(screen.getByLabelText(/^title$/i));
+      await user.type(screen.getByLabelText(/^title$/i), "Home kit v2");
+      await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+      await vi.waitFor(() => expect(mutationStub).toHaveBeenCalled());
+      const [args] = mutationStub.mock.calls.at(-1) as unknown as [
+        Record<string, unknown>,
+      ];
+      expect(args.title).toBe("Home kit v2");
+      expect(args).not.toHaveProperty("blocks");
+      expect(
+        screen.queryByText(/add an overview so sidestep knows/i),
+      ).toBeNull();
+    });
   });
 
   it("flags an invalid canva link", async () => {

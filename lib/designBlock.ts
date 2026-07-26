@@ -116,6 +116,60 @@ export function newBlockId(): string {
   return `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// The sections the "add block" menu may still offer, in the fixed menu order
+// rather than the order the design happens to use them — the menu should read
+// the same every time it opens. Each field is usable at most once (PRD §6), so
+// this is exactly TEXT_FIELDS minus what's already on the design.
+export function availableTextFields(
+  blocks: readonly DesignBlock[],
+): TextField[] {
+  const used = new Set(
+    blocks.filter((block) => block.kind === "text").map((block) => block.field),
+  );
+  return TEXT_FIELDS.filter((field) => !used.has(field));
+}
+
+export function newTextBlock(
+  field: TextField,
+  body = "",
+  makeId: () => string = newBlockId,
+): TextBlock {
+  return { id: makeId(), kind: "text", field, body };
+}
+
+// Overview is the design's description — every list, card and admin summary
+// reads it, and validateBlocks refuses an array without one. The editor asks
+// this so it can simply not offer a remove button rather than letting someone
+// click one that always fails.
+export function isRequiredBlock(block: DesignBlock): boolean {
+  return block.kind === "text" && block.field === "overview";
+}
+
+export function indexOfBlock(
+  blocks: readonly DesignBlock[],
+  id: string,
+): number {
+  return blocks.findIndex((block) => block.id === id);
+}
+
+// Reorder is the whole point of the block model, and the array order IS the
+// page order — so a move is a pure splice, returning a new array. `to` is the
+// index the block should end up at, clamped: a drag past the last block means
+// "put it last", not "throw". An out-of-range `from` returns the array as-is,
+// which is what a drop on a block that just got removed should do.
+export function moveBlockTo<T extends DesignBlock>(
+  blocks: readonly T[],
+  from: number,
+  to: number,
+): T[] {
+  if (from < 0 || from >= blocks.length) return [...blocks];
+  const next = [...blocks];
+  const [moved] = next.splice(from, 1);
+  const target = Math.min(Math.max(to, 0), next.length);
+  next.splice(target, 0, moved!);
+  return next;
+}
+
 export function blockHeading(block: DesignBlock): string {
   switch (block.kind) {
     case "text":

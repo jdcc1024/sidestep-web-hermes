@@ -8,8 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DesignForm } from "@/components/portal/DesignForm";
-import { DesignBlocks } from "@/components/design/DesignBlocks";
-import { overviewOf } from "@/lib/designBlock";
+import { DesignBlockEditor } from "@/components/design/DesignBlockEditor";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -56,8 +55,6 @@ export default function DesignDetailPage({ params }: PageProps) {
               kind: "edit",
               designId: design._id,
               initialTitle: design.title,
-              initialOverview: overviewOf(design.blocks),
-              initialBlocks: design.blocks,
               initialCanvaLink: design.canvaLink ?? "",
               initialJerseyStyle: design.jerseyStyle ?? "",
               initialNeckline: design.neckline ?? "",
@@ -103,8 +100,15 @@ export default function DesignDetailPage({ params }: PageProps) {
         </button>
       </header>
 
+      {/* The brief is edited in place (D-03) — this is the owner's own design
+          page, so there's no reason to make them open a form to write in it.
+          "Edit design" still covers the title, the cut, Canva and files. */}
       <div className="mt-10">
-        <DesignBlocks blocks={design.blocks} assets={design.assets} />
+        <DesignBlockEditor
+          designId={design._id}
+          blocks={design.blocks}
+          assets={design.assets}
+        />
       </div>
 
       <section className="mt-8">

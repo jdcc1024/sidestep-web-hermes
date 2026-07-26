@@ -11,11 +11,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { UploadedFile } from "@/convex/_designAssets";
-import type { StoredDesignBlock } from "@/convex/_designBlocks";
-import {
-  TEXT_BODY_MAX_LENGTH,
-  withOverview,
-} from "@/lib/designBlock";
+import { TEXT_BODY_MAX_LENGTH, overviewBlocks } from "@/lib/designBlock";
 import {
   CANVA_LINK_MAX_LENGTH,
   JERSEY_STYLE_MAX_LENGTH,
@@ -48,17 +44,17 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
+// Create authors the Overview here because a design can't exist without one
+// (PRD §10); edit doesn't, because the brief belongs to the block editor on the
+// design page from D-03 on. So the edit form is title, cut, Canva and files —
+// and it never sends `blocks`, which means saving it can't overwrite a section
+// the editor just changed.
 type Mode =
   | { kind: "create" }
   | {
       kind: "edit";
       designId: Id<"designs">;
       initialTitle: string;
-      initialOverview: string;
-      // The design's existing blocks, so a submit rewrites only the Overview
-      // and leaves galleries, palette and the block order intact. The full
-      // block editor lands in D-03.
-      initialBlocks: StoredDesignBlock[];
       initialCanvaLink: string;
       initialJerseyStyle: string;
       initialNeckline: string;
@@ -148,6 +144,11 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// Edit mode doesn't render an Overview field, so relaxing the check keeps the
+// unrendered value from failing a save. Both schemas infer the same
+// FormValues, so the form stays one shape.
+const editSchema = formSchema.extend({ overview: z.string() });
+
 export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
   const router = useRouter();
   const generateUploadUrl = useMutation(api.designs.generateUploadUrl);
@@ -158,12 +159,12 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
     mode.kind === "edit" ? mode.existingFileCount : 0;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(mode.kind === "edit" ? editSchema : formSchema),
     defaultValues:
       mode.kind === "edit"
         ? {
             title: mode.initialTitle,
-            overview: mode.initialOverview,
+            overview: "",
             canvaLink: mode.initialCanvaLink,
             jerseyStyle: mode.initialJerseyStyle,
             neckline: mode.initialNeckline,
@@ -288,18 +289,13 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
         sleeveStyle: values.sleeveStyle,
         fileCount: values.fileCount,
       });
-      // One textarea in, a whole block array out: the Overview is a text
-      // block now (D-02), and an edit must preserve every other block.
-      const blocks = withOverview(
-        mode.kind === "edit" ? mode.initialBlocks : [],
-        payload.overview,
-      );
 
       if (mode.kind === "edit") {
+        // No `blocks`: the design page's block editor owns the brief, and a
+        // metadata save must leave it exactly as the editor left it.
         await updateDesign({
           designId: mode.designId,
           title: payload.title,
-          blocks,
           canvaLink: payload.canvaLink,
           jerseyStyle: payload.jerseyStyle,
           neckline: payload.neckline,
@@ -311,7 +307,9 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
       } else {
         const designId = await createDesign({
           title: payload.title,
-          blocks,
+          // A brand-new design's brief is just its Overview; every other
+          // section is added on the design page afterwards.
+          blocks: overviewBlocks(payload.overview),
           canvaLink: payload.canvaLink,
           jerseyStyle: payload.jerseyStyle,
           neckline: payload.neckline,
@@ -353,7 +351,11 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
         <FieldSection
           eyebrow="01"
           title="About this design"
-          description="A clear title and overview make it easier for Sidestep to nail your vibe on the first pass."
+          description={
+            mode.kind === "edit"
+              ? "The brief itself — overview, concept, galleries, palette — is edited on the design page."
+              : "A clear title and overview make it easier for Sidestep to nail your vibe on the first pass."
+          }
         >
           <FormField
             control={form.control}
@@ -373,36 +375,41 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="overview"
-            render={({ field }) => {
-              const remaining = TEXT_BODY_MAX_LENGTH - field.value.length;
-              return (
-                <FormItem>
-                  <FormLabel>Overview</FormLabel>
-                  <FormDescription>
-                    The design&apos;s description — it heads the brief and is
-                    what your other surfaces summarize.
-                  </FormDescription>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Theme, colors, references, anything we should know."
-                      maxLength={TEXT_BODY_MAX_LENGTH}
-                      rows={6}
-                      {...field}
-                    />
-                  </FormControl>
-                  <div className="flex items-center justify-between">
-                    <FormMessage />
-                    <p className="ml-auto text-[0.75rem] text-muted-foreground">
-                      {remaining} characters left
-                    </p>
-                  </div>
-                </FormItem>
-              );
-            }}
-          />
+          {/* Create only: the Overview is the one block authored here, because
+              a design can't be stored without one. Editing it — and every
+              other section — happens in the block editor on the design page. */}
+          {mode.kind === "create" && (
+            <FormField
+              control={form.control}
+              name="overview"
+              render={({ field }) => {
+                const remaining = TEXT_BODY_MAX_LENGTH - field.value.length;
+                return (
+                  <FormItem>
+                    <FormLabel>Overview</FormLabel>
+                    <FormDescription>
+                      The design&apos;s description — it heads the brief and is
+                      what your other surfaces summarize.
+                    </FormDescription>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Theme, colors, references, anything we should know."
+                        maxLength={TEXT_BODY_MAX_LENGTH}
+                        rows={6}
+                        {...field}
+                      />
+                    </FormControl>
+                    <div className="flex items-center justify-between">
+                      <FormMessage />
+                      <p className="ml-auto text-[0.75rem] text-muted-foreground">
+                        {remaining} characters left
+                      </p>
+                    </div>
+                  </FormItem>
+                );
+              }}
+            />
+          )}
 
           <FormField
             control={form.control}

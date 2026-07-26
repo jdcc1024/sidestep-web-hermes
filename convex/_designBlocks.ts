@@ -1,5 +1,9 @@
 import { ConvexError, v, type Infer } from "convex/values";
+import { requireCurrentUser } from "./_auth";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import {
+  indexOfBlock,
   normalizeBlocks,
   validateBlocks,
   type DesignBlock,
@@ -80,6 +84,51 @@ export function prepareBlocks(
   const error = validateBlocks(normalized);
   if (error) throw new ConvexError(error);
   return normalized;
+}
+
+// The gate every block-editor mutation opens with (D-03). Owner **or** admin,
+// because portal and admin mount the same editor (PRD §5) — so the permission
+// question is answered in one place rather than once per mutation. Returns the
+// design so the caller doesn't need a second db.get.
+export async function requireBlockEditAccess(
+  ctx: MutationCtx,
+  designId: Id<"designs">,
+): Promise<{ user: Doc<"users">; design: Doc<"designs"> }> {
+  const user = await requireCurrentUser(ctx);
+  const design = await ctx.db.get(designId);
+  if (!design) throw new ConvexError("Design not found.");
+  if (design.ownerId !== user._id && !user.isAdmin)
+    throw new ConvexError("You don't have access to this design.");
+  return { user, design };
+}
+
+// Every block write lands here: normalize + validate the whole array, then
+// patch. Nothing else may touch `designs.blocks`, which is what makes "the
+// editor and the server can't drift" true for add, edit, remove and reorder
+// alike — an operation that produces an unstorable brief is refused rather
+// than half-applied.
+export async function patchBlocks(
+  ctx: MutationCtx,
+  designId: Id<"designs">,
+  blocks: readonly StoredDesignBlock[],
+): Promise<void> {
+  await ctx.db.patch(designId, {
+    blocks: prepareBlocks(blocks),
+    updatedAt: Date.now(),
+  });
+}
+
+// Locates a block the caller named by id. A missing block almost always means
+// someone else removed it while this editor was open, so the message says so
+// rather than blaming the request.
+export function requireBlockIndex(
+  blocks: readonly StoredDesignBlock[],
+  blockId: string,
+): number {
+  const index = indexOfBlock(blocks, blockId);
+  if (index < 0)
+    throw new ConvexError("That block is no longer on this design.");
+  return index;
 }
 
 // Re-exported so Convex modules import block helpers from one place.
