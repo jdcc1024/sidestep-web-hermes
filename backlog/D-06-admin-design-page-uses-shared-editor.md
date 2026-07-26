@@ -1,6 +1,6 @@
 # Issue: Admin Design Page Uses Shared Editor
 
-## Status: pending
+## Status: done
 
 ## Phase: 2
 

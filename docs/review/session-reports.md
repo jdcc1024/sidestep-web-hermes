@@ -530,3 +530,53 @@ One entry per completed loop task. This is the human's fast path for UX critique
   say so.
 
 - Follow-ups filed: none. D-09 still needs the human `--login`.
+
+## 2026-07-26 — D-06: Admin Design Page Uses Shared Editor
+
+- What shipped:
+  - **`/admin/designs/<id>` mounts `DesignBlockEditor`.** Staff now write the
+    brief — text sections, palette, galleries, reorder — through the exact
+    component the captain uses on `/portal/designs/<id>`, calling the same four
+    owner-or-admin block mutations. The read-only "Brief" card (and the note
+    saying staff would get this in D-06) is gone.
+  - **The admin page's read-only "Files" list is replaced by the shared asset
+    pool**, which rides along inside the editor: staff upload, pick the main
+    image, and delete — including a captain's upload, which is the admin-only
+    case. Staff uploads stay admin-delete-only, because the provenance snapshot
+    is taken server-side at upload.
+  - **`admin.getDesign` now returns `viewer: { userId, isAdmin }`**, the same
+    shape `designs.getMyDesign` returns — the pool has to know who's looking to
+    decide which delete buttons exist.
+  - **Parity is a test, not a claim.** `convex/designs.test.ts` runs one edit
+    script (add section, rewrite one, hand-pick a gallery, reorder, upload, set
+    main, delete a picked file) twice — once as the captain, once as staff — and
+    asserts both designs land in identical block and file state.
+
+- UX surfaces to eyeball: `/admin/designs/<id>` — the brief and files are now
+  the portal's editing surface dropped between the "Design" card and the
+  "Silhouette specs" card. Worth judging: the editor sits *on* the page rather
+  than inside a Card (the block cards would otherwise be cards inside a card),
+  so the admin page now mixes card chrome and plain sections; and whether staff
+  want the file pool that far down the page. **No screenshots** — see below.
+
+- Decisions I made that a human may want to veto:
+  - **Title, the cut and the Canva link keep their `InlineEditField` chrome.**
+    Only design *content* moved to the shared editor, per the issue's
+    acceptance criteria — swapping the rest would have meant giving the portal
+    a title editor it doesn't have.
+  - **No admin-only affordances were added.** The editor is mounted unchanged;
+    everything admin-specific (delete anything, uploads flagged as staff) falls
+    out of the viewer it's given plus the server rules. That's the "no divergent
+    code paths" criterion taken literally.
+  - **`components/design/DesignBlocks.tsx`'s top-level `DesignBlocks` export is
+    now unused in app code** (the editor uses its `DesignBlockBody`/`EmptyBrief`
+    internals). Left in place because D-07/D-08 are the read-only design
+    surfaces; if they don't take it, it should be deleted then.
+
+- Blocked: **screenshots, sixth slice running.** `.auth/state.json` is still the
+  session saved 2026-07-19, and `/admin/designs/<id>` is behind both Clerk and
+  the admin role, so a capture would photograph the sign-in wall again. Didn't
+  re-capture. `node scripts/snap.mjs --login` then unparking D-09 now covers
+  D-01 → D-06 in one pass.
+
+- Follow-ups filed: none. D-09 still needs the human `--login`.

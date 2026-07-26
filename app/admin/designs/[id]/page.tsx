@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { use } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, FileDown } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { InlineEditField } from "@/components/admin/InlineEditField";
-import { DesignBlocks } from "@/components/design/DesignBlocks";
+import { DesignBlockEditor } from "@/components/design/DesignBlockEditor";
 import {
   validateOptionalText,
   validateRequiredText,
@@ -35,7 +35,7 @@ export default function AdminDesignDetailPage({
   if (result === undefined) return <DetailSkeleton />;
   if (result === null) return <NotFound />;
 
-  const { design, owner, assets, orders } = result;
+  const { design, owner, assets, orders, viewer } = result;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -88,20 +88,21 @@ export default function AdminDesignDetailPage({
         </CardContent>
       </Card>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Brief</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="-mt-1 mb-4 text-xs text-muted-foreground">
-            The captain&apos;s structured brief, read-only for now — staff edit
-            it through the shared block editor in D-06.
-          </p>
-          <DesignBlocks blocks={design.blocks} assets={assets} />
-        </CardContent>
-      </Card>
+      {/* The captain's own editing surface, mounted unchanged (D-06): staff
+          write the brief and manage the files through the very mutations the
+          portal calls, so an edit made here and an edit made there can't
+          diverge. It sits on the page rather than inside a Card because the
+          editor cards each block itself. */}
+      <div className="mt-8">
+        <DesignBlockEditor
+          designId={design._id}
+          blocks={design.blocks}
+          assets={assets}
+          viewer={viewer}
+        />
+      </div>
 
-      <Card className="mt-6">
+      <Card className="mt-8">
         <CardHeader>
           <CardTitle>Silhouette specs</CardTitle>
         </CardHeader>
@@ -130,37 +131,6 @@ export default function AdminDesignDetailPage({
               onSave={(sleeveStyle) => updateDesign({ designId, sleeveStyle })}
             />
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Files</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {assets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No files uploaded for this design.
-            </p>
-          ) : (
-            <ul className="flex flex-wrap gap-2">
-              {assets.map((asset) =>
-                asset.url ? (
-                  <li key={asset._id}>
-                    <Badge
-                      variant="secondary"
-                      render={
-                        <a href={asset.url} target="_blank" rel="noreferrer" />
-                      }
-                    >
-                      <FileDown aria-hidden />
-                      {asset.filename}
-                    </Badge>
-                  </li>
-                ) : null,
-              )}
-            </ul>
-          )}
         </CardContent>
       </Card>
 

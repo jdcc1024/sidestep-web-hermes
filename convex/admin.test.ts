@@ -922,6 +922,21 @@ describe("admin.getDesign", () => {
     expect(result?.mainAsset?.filename).toBe("crest.png");
   });
 
+  // The admin page mounts the same block editor and file pool the captain
+  // uses (D-06), and both gate their buttons on who is looking — so the admin
+  // query has to ship the viewer the portal query ships.
+  it("carries the admin as the viewer so the shared editor can gate its buttons", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner");
+    const { userId: adminId, asUser: asAdmin } = await seedUser(t, "admin", {
+      isAdmin: true,
+    });
+    const designId = await seedDesign(t, ownerId, "Home kit");
+
+    const result = await asAdmin.query(api.admin.getDesign, { designId });
+    expect(result?.viewer).toEqual({ userId: adminId, isAdmin: true });
+  });
+
   it("rejects a non-admin caller", async () => {
     const t = convexTest(schema, modules);
     const { userId: ownerId, asUser: asOwner } = await seedUser(t, "owner");

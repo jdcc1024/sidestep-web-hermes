@@ -33,6 +33,25 @@ async function seedOwner(t: Test, subject = "user_owner_clerk") {
   };
 }
 
+// Sidestep staff. Every design mutation answers "owner or admin", so most
+// permission tests need someone who is neither the owner nor a stranger.
+async function seedAdmin(t: Test) {
+  await t.run((ctx) =>
+    ctx.db.insert("users", {
+      clerkId: "user_staff_clerk",
+      email: "staff@sidestep.test",
+      name: "Staff",
+      isAdmin: true,
+      createdAt: Date.now(),
+    }),
+  );
+  return t.withIdentity({
+    subject: "user_staff_clerk",
+    email: "staff@sidestep.test",
+    name: "Staff",
+  });
+}
+
 // Storage ids in convex-test are opaque strings shaped like real ones via
 // ctx.storage.store. We don't need real bytes — the validators accept any
 // v.id("_storage").
@@ -701,23 +720,6 @@ describe("design block mutations", () => {
     });
   }
 
-  async function seedAdmin(t: Test) {
-    await t.run((ctx) =>
-      ctx.db.insert("users", {
-        clerkId: "user_staff_clerk",
-        email: "staff@sidestep.test",
-        name: "Staff",
-        isAdmin: true,
-        createdAt: Date.now(),
-      }),
-    );
-    return t.withIdentity({
-      subject: "user_staff_clerk",
-      email: "staff@sidestep.test",
-      name: "Staff",
-    });
-  }
-
   async function blockIds(t: Test, designId: Id<"designs">) {
     const row = await t.run((ctx) => ctx.db.get(designId));
     return row!.blocks.map((b) => b.id);
@@ -1217,23 +1219,6 @@ describe("design asset pool", () => {
 
   type AsUser = Awaited<ReturnType<typeof seedOwner>>["asUser"];
 
-  async function seedAdmin(t: Test) {
-    await t.run((ctx) =>
-      ctx.db.insert("users", {
-        clerkId: "user_staff_clerk",
-        email: "staff@sidestep.test",
-        name: "Staff",
-        isAdmin: true,
-        createdAt: Date.now(),
-      }),
-    );
-    return t.withIdentity({
-      subject: "user_staff_clerk",
-      email: "staff@sidestep.test",
-      name: "Staff",
-    });
-  }
-
   // Two files, so a delete test isn't fighting the "a design keeps at least
   // one file" rule while it's checking something else.
   async function seedDesign(t: Test, asUser: AsUser) {
@@ -1539,5 +1524,143 @@ describe("design asset pool", () => {
 
     const design = await asUser.query(api.designs.getMyDesign, { designId });
     expect(design?.viewer).toEqual({ userId, isAdmin: false });
+  });
+});
+
+// ─── D-06 Owner/admin parity ────────────────────────────────────────────
+// The admin design page mounts the same editor the captain uses, writing
+// through these same mutations. That's only worth anything if staff editing a
+// design lands the design in exactly the state the captain would have — so
+// this runs one edit script twice, once from each side, and compares.
+describe("owner and admin edits are one code path", () => {
+  const overview = {
+    id: "b-overview",
+    kind: "text" as const,
+    field: "overview" as const,
+    body: "Navy and gold.",
+  };
+
+  type AsUser = Awaited<ReturnType<typeof seedOwner>>["asUser"];
+
+  async function seedDesign(t: Test, asUser: AsUser) {
+    return asUser.mutation(api.designs.createDesign, {
+      title: "Away kit",
+      blocks: [overview],
+      files: [
+        await fakeFile(t, { filename: "crest.png" }),
+        await fakeFile(t, { filename: "sketch.png" }),
+      ],
+    });
+  }
+
+  // Everything the editor can do to a design, in one pass: write a section,
+  // rewrite one, hand-pick a gallery, reorder, upload, name the main image,
+  // and delete a file a gallery was pointing at.
+  async function runEditScript(
+    t: Test,
+    actor: AsUser,
+    designId: Id<"designs">,
+  ) {
+    const [crest, sketch] = await assetsOf(t, designId);
+
+    await actor.mutation(api.designs.addBlock, {
+      designId,
+      block: { id: "n1", kind: "text", field: "notes", body: "Ship by March." },
+    });
+    await actor.mutation(api.designs.updateBlock, {
+      designId,
+      block: { ...overview, body: "Charcoal with a gold sash." },
+    });
+    await actor.mutation(api.designs.addBlock, {
+      designId,
+      block: {
+        id: "g1",
+        kind: "gallery",
+        caption: "Mood board",
+        assetIds: [crest!._id, sketch!._id],
+      },
+    });
+    await actor.mutation(api.designs.moveBlock, {
+      designId,
+      blockId: "n1",
+      toIndex: 0,
+    });
+    await actor.mutation(api.designs.addAssets, {
+      designId,
+      files: [
+        await fakeFile(t, { filename: "logo.svg", contentType: "image/svg+xml" }),
+      ],
+    });
+    const logo = (await assetsOf(t, designId))[2]!;
+    await actor.mutation(api.designs.setMainAsset, { assetId: logo._id });
+    await actor.mutation(api.designs.removeAsset, { assetId: sketch!._id });
+  }
+
+  // The design as a reader would see it, with asset ids swapped for filenames
+  // so two separately-seeded designs are comparable at all.
+  async function stateOf(t: Test, designId: Id<"designs">) {
+    const design = await t.run((ctx) => ctx.db.get(designId));
+    const assets = await assetsOf(t, designId);
+    const nameOf = new Map(assets.map((a) => [a._id, a.filename]));
+
+    return {
+      blocks: design!.blocks.map((block) =>
+        block.kind === "gallery"
+          ? { ...block, assetIds: block.assetIds.map((id) => nameOf.get(id)) }
+          : block,
+      ),
+      assets: assets.map((a) => ({
+        filename: a.filename,
+        contentType: a.contentType,
+        isMain: a.isMain,
+      })),
+    };
+  }
+
+  it("lands the same blocks and files whether the captain or staff edits", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const asAdmin = await seedAdmin(t);
+    const captainEdited = await seedDesign(t, asUser);
+    const staffEdited = await seedDesign(t, asUser);
+
+    await runEditScript(t, asUser, captainEdited);
+    await runEditScript(t, asAdmin, staffEdited);
+
+    const captainState = await stateOf(t, captainEdited);
+    expect(await stateOf(t, staffEdited)).toEqual(captainState);
+    // Not a tautology on an empty result: the script really did rewrite the
+    // brief, reorder it, and leave the gallery pointing only at the file that
+    // survived the delete.
+    expect(captainState.blocks.map((b) => b.id)).toEqual([
+      "n1",
+      "b-overview",
+      "g1",
+    ]);
+    expect(captainState.blocks[2]).toMatchObject({ assetIds: ["crest.png"] });
+    expect(captainState.assets).toEqual([
+      { filename: "crest.png", contentType: "image/png", isMain: false },
+      { filename: "logo.svg", contentType: "image/svg+xml", isMain: true },
+    ]);
+  });
+
+  // The one thing that legitimately differs: who uploaded the file. It's a
+  // provenance snapshot, not design state — it's what makes a staff upload
+  // admin-delete-only afterwards.
+  it("still records a staff upload as staff, so the captain can't delete it", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const asAdmin = await seedAdmin(t);
+    const designId = await seedDesign(t, asUser);
+
+    await runEditScript(t, asAdmin, designId);
+    const logo = (await assetsOf(t, designId)).find(
+      (a) => a.filename === "logo.svg",
+    )!;
+
+    expect(logo.uploadedByAdmin).toBe(true);
+    await expect(
+      asUser.mutation(api.designs.removeAsset, { assetId: logo._id }),
+    ).rejects.toThrow(/Sidestep/i);
   });
 });

@@ -434,9 +434,11 @@ export const updateOrder = mutation({
 // on it since O-01. The optional specs are clearable — an empty string
 // removes the field rather than storing "".
 //
-// The brief is no longer here: it became the `blocks` array in D-02, which
-// the shared block editor writes. Admin block editing arrives with that
-// editor in D-06; until then the admin page renders blocks read-only.
+// The brief is no longer here: it became the `blocks` array in D-02, and the
+// shared block editor writes it through the owner-or-admin mutations in
+// convex/designs.ts. Since D-06 the admin page mounts that editor, so staff
+// and captain edit a brief through one code path — this mutation stays for
+// the fields the editor doesn't own.
 export const updateDesign = mutation({
   args: {
     designId: v.id("designs"),
@@ -473,10 +475,15 @@ export const updateDesign = mutation({
 // One design for the admin design detail page, with its owner and the
 // short-lived signed URLs for its uploaded files (same treatment as
 // `getOrder`). null when the design is gone.
+//
+// Since D-06 the page mounts the same block editor and file pool the captain
+// uses, and both gate their buttons on who is looking — so this carries the
+// `viewer` shape `designs.getMyDesign` carries, with `isAdmin` necessarily
+// true here.
 export const getDesign = query({
   args: { designId: v.id("designs") },
   handler: async (ctx, { designId }) => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
 
     const design = await ctx.db.get(designId);
     if (!design) return null;
@@ -496,6 +503,7 @@ export const getDesign = query({
       assets,
       mainAsset: mainAssetOf(assets),
       orders: orders.map((o) => ({ _id: o._id, teamName: o.teamName })),
+      viewer: { userId: admin._id, isAdmin: admin.isAdmin },
     };
   },
 });
