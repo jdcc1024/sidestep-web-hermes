@@ -1,23 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
   CAPTION_MAX_LENGTH,
+  DEFAULT_SWATCH_HEX,
   PANTONE_CODE_MAX_LENGTH,
   SWATCH_LABEL_MAX_LENGTH,
   TEXT_BODY_MAX_LENGTH,
   TEXT_FIELDS,
   TEXT_FIELD_LABELS,
+  addSwatch,
   availableTextFields,
   blockHeading,
+  hasPalette,
   indexOfBlock,
   isRequiredBlock,
   isSwatchRole,
   isTextField,
   moveBlockTo,
+  moveSwatch,
   newBlockId,
+  newPaletteBlock,
+  newSwatch,
   newTextBlock,
   normalizeBlocks,
   normalizeHex,
   overviewOf,
+  patchSwatch,
+  removeSwatchAt,
   validateBlocks,
   withOverview,
   type DesignBlock,
@@ -470,5 +478,167 @@ describe("validateBlocks", () => {
     });
     expect(validateBlocks(blocks(longLabel))).toMatch(/too long/i);
     expect(validateBlocks(blocks(longCode))).toMatch(/too long/i);
+  });
+});
+
+// --- Palette editing (D-04) -------------------------------------------------
+// The swatch list is edited entirely through these four pure functions, so the
+// palette editor's behaviour is specified here rather than through the DOM.
+
+describe("hasPalette", () => {
+  it("is true once the design carries its one palette", () => {
+    expect(hasPalette(blocks(palette()))).toBe(true);
+  });
+
+  it("is false for a design of text and galleries", () => {
+    expect(hasPalette(blocks(gallery()))).toBe(false);
+  });
+});
+
+describe("newSwatch", () => {
+  it("starts from a neutral default the picker can open on", () => {
+    const swatch = newSwatch(undefined, () => "s-new");
+    expect(swatch).toEqual({ id: "s-new", hex: DEFAULT_SWATCH_HEX });
+  });
+
+  it("carries no role, label or Pantone code until one is typed", () => {
+    const swatch = newSwatch("#102A44");
+    expect(swatch.hex).toBe("#102A44");
+    expect(swatch).not.toHaveProperty("role");
+    expect(swatch).not.toHaveProperty("label");
+    expect(swatch).not.toHaveProperty("pantoneCode");
+  });
+
+  it("mints a distinct id per swatch", () => {
+    expect(newSwatch().id).not.toBe(newSwatch().id);
+  });
+});
+
+describe("newPaletteBlock", () => {
+  it("is storable straight away — an empty palette is a valid block", () => {
+    const block = newPaletteBlock([], () => "b-new");
+    expect(block).toEqual({ id: "b-new", kind: "palette", swatches: [] });
+    expect(validateBlocks([text(), block])).toBeNull();
+  });
+});
+
+describe("addSwatch", () => {
+  it("appends a new swatch, leaving the existing ones in order", () => {
+    const next = addSwatch(palette(), undefined, () => "s2");
+    expect(next.swatches.map((s) => s.id)).toEqual(["s1", "s2"]);
+    expect(next.swatches[1]!.hex).toBe(DEFAULT_SWATCH_HEX);
+  });
+
+  it("keeps the block's caption and id", () => {
+    const next = addSwatch(palette({ caption: "Kit colors" }));
+    expect(next.id).toBe("b-palette");
+    expect(next.caption).toBe("Kit colors");
+  });
+
+  it("does not mutate the block it was given", () => {
+    const block = palette();
+    addSwatch(block);
+    expect(block.swatches).toHaveLength(1);
+  });
+});
+
+describe("removeSwatchAt", () => {
+  it("drops the swatch at that position", () => {
+    const block = palette({
+      swatches: [
+        { id: "s1", hex: "#102A44" },
+        { id: "s2", hex: "#FFFFFF" },
+      ],
+    });
+    expect(removeSwatchAt(block, 0).swatches.map((s) => s.id)).toEqual(["s2"]);
+  });
+
+  it("leaves the palette alone for an index that isn't there", () => {
+    expect(removeSwatchAt(palette(), 4).swatches).toHaveLength(1);
+  });
+});
+
+describe("moveSwatch", () => {
+  const three = palette({
+    swatches: [
+      { id: "s1", hex: "#111111" },
+      { id: "s2", hex: "#222222" },
+      { id: "s3", hex: "#333333" },
+    ],
+  });
+
+  it("reorders the swatches — the array order is the palette's order", () => {
+    expect(moveSwatch(three, 2, 0).swatches.map((s) => s.id)).toEqual([
+      "s3",
+      "s1",
+      "s2",
+    ]);
+  });
+
+  it("clamps a destination past the end", () => {
+    expect(moveSwatch(three, 0, 9).swatches.map((s) => s.id)).toEqual([
+      "s2",
+      "s3",
+      "s1",
+    ]);
+  });
+});
+
+describe("patchSwatch", () => {
+  it("writes a field on one swatch and leaves its neighbours alone", () => {
+    const block = palette({
+      swatches: [
+        { id: "s1", hex: "#102A44" },
+        { id: "s2", hex: "#FFFFFF" },
+      ],
+    });
+    const next = patchSwatch(block, 1, { hex: "#C8102E" });
+    expect(next.swatches[1]!.hex).toBe("#C8102E");
+    expect(next.swatches[0]!.hex).toBe("#102A44");
+  });
+
+  it("keeps a swatch's other fields when one changes", () => {
+    const block = palette({
+      swatches: [{ id: "s1", hex: "#102A44", role: "primary" }],
+    });
+    const next = patchSwatch(block, 0, { pantoneCode: "289 C" });
+    expect(next.swatches[0]).toEqual({
+      id: "s1",
+      hex: "#102A44",
+      role: "primary",
+      pantoneCode: "289 C",
+    });
+  });
+
+  // Clearing an optional field has to remove the key, not leave `undefined`
+  // sitting in the object a Convex validator will read.
+  it("drops a role, label or Pantone code that was cleared", () => {
+    const block = palette({
+      swatches: [
+        {
+          id: "s1",
+          hex: "#102A44",
+          role: "accent",
+          label: "Sash",
+          pantoneCode: "289 C",
+        },
+      ],
+    });
+    const next = patchSwatch(block, 0, {
+      role: undefined,
+      label: "",
+      pantoneCode: "   ",
+    });
+    expect(next.swatches[0]).toEqual({ id: "s1", hex: "#102A44" });
+  });
+
+  it("ignores an index that isn't in the palette", () => {
+    expect(patchSwatch(palette(), 9, { hex: "#000000" })).toEqual(palette());
+  });
+
+  it("does not mutate the block it was given", () => {
+    const block = palette();
+    patchSwatch(block, 0, { hex: "#FFFFFF" });
+    expect(block.swatches[0]!.hex).toBe("#102A44");
   });
 });

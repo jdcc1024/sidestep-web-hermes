@@ -414,3 +414,66 @@ One entry per completed loop task. This is the human's fast path for UX critique
 
 - Follow-ups filed: D-09 (wipe the pre-D-01 dev design, then capture the
   missing D-01/D-02/D-03 screenshots) — flagged needs-human, blocks D-08.
+
+## 2026-07-26 — D-04: Palette Block Editor
+
+- What shipped:
+  - **The palette is editable in the shared block editor.** "Add palette"
+    appears in the add menu only while the design hasn't got one; the card opens
+    a swatch list where each row is a native color picker + hex field + role +
+    optional label + optional Pantone code, with move up/down and remove per
+    swatch, plus a caption for the block itself.
+  - **`lib/designBlock` grew the pure half** — `hasPalette`, `newSwatch`,
+    `newPaletteBlock`, `addSwatch`, `removeSwatchAt`, `moveSwatch`,
+    `patchSwatch` — so `PaletteEditor.tsx` is layout and labels only, and the
+    swatch rules are unit-tested without a DOM. `moveBlockTo` now delegates to a
+    generic `moveItemTo`, which swatches reuse: blocks on the page and colors in
+    the palette reorder by the same function.
+  - **No new mutations.** A palette is one block, so add/remove/reorder/retype
+    of swatches is local until you press save, then rides the existing
+    `addBlock` / `updateBlock` from D-03 — and `prepareBlocks` re-runs the D-02
+    validators on it server-side either way.
+
+- UX surfaces to eyeball: `/portal/designs/<id>` — open the brief, click **Add
+  palette**, then **Add color**. Look for: the swatch row at 375px (picker +
+  four fields + three icon buttons is the densest thing in the editor), the
+  native `<select>` for role against the shadcn inputs beside it, and the color
+  picker's popover in dark mode. **No screenshots this slice** — see Blocked.
+
+- Decisions I made that a human may want to veto:
+  - **The palette saves as a whole block, not swatch-by-swatch.** D-03's four
+    narrow mutations exist so two people editing one design can't clobber each
+    other; a palette's swatches are one ordered list inside one block, and a
+    mutation per keystroke of a Pantone code would be absurd. So the editor
+    holds a draft and one save carries it. Trade-off: two people editing the
+    *same palette* at once, last save wins.
+  - **A new palette doesn't exist until you save it.** Clicking "Add palette"
+    opens a dashed draft card (same as a new text section) rather than writing
+    an empty palette immediately — so abandoning it leaves nothing behind.
+  - **Role is a native `<select>`, not the shadcn `Select`.** Three short
+    options in an already-dense row, it stays operable by keyboard and touch,
+    and it's testable without driving a portal-rendered listbox. Styled to match
+    `Input`; the open dropdown is OS-drawn. Swap it if it reads cheap next to
+    the other fields.
+  - **Field labels are `aria-label` + placeholder, not visible `<label>`s.**
+    Four visible labels per swatch across N swatches drowned the row. Screen
+    readers get "Swatch 2 Pantone code"; sighted users get the placeholder.
+  - **A new swatch starts black** (`DEFAULT_SWATCH_HEX`). The picker has to open
+    somewhere and a color nobody would ship reads as "pick me" rather than as a
+    decision the design already made.
+  - **An empty palette is savable** — the block lands, colors arrive later, same
+    as an empty gallery. `validateBlocks` already allowed this.
+
+- Blocked: **screenshots, for the fourth slice running — but the reason
+  changed.** Your `_migrations.ts` backfill fixed the schema: `npx convex dev
+  --once` pushes cleanly now and `snap.mjs` reached the running app. What it
+  photographed was the **Clerk sign-in wall** — the session saved in
+  `.auth/state.json` on 2026-07-19 has expired. All 12 shots were sign-in pages,
+  so I deleted them rather than file them as review artifacts. One human command
+  fixes it and unblocks D-01/D-02/D-03/D-04 together:
+  `node scripts/snap.mjs --login`. Noted under D-09 in `backlog/QUESTIONS.md`,
+  whose original question (delete the stale dev row?) is now moot — nothing has
+  to be deleted.
+
+- Follow-ups filed: none. D-09 still needs a human, now for `--login` rather
+  than for the dev data.

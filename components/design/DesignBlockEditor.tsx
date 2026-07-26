@@ -19,8 +19,10 @@ import {
   TEXT_FIELD_LABELS,
   availableTextFields,
   blockHeading,
+  hasPalette,
   indexOfBlock,
   isRequiredBlock,
+  newPaletteBlock,
   newTextBlock,
   validateBlocks,
   type TextField,
@@ -32,6 +34,7 @@ import {
   EmptyBrief,
   type BlockAsset,
 } from "./DesignBlocks";
+import { PaletteEditor } from "./PaletteEditor";
 
 // The shared block editor (D-03) — the one editing surface for a design's
 // brief, mounted by the portal design page now and the admin page in D-06.
@@ -44,9 +47,13 @@ import {
 // The only local state is what isn't committed yet — the section being typed,
 // the body being edited, and which block the pointer is dragging.
 //
-// This slice ships the text sections and reorder. Gallery and palette blocks
-// render read-only here through the same `DesignBlockBody` the read page uses;
-// their editors (and their entries in the add menu) arrive with D-04 and D-05.
+// This slice ships the text sections and reorder; D-04 added the palette.
+// Gallery blocks still render read-only here through the same
+// `DesignBlockBody` the read page uses; their editor arrives with D-05.
+
+// The one block kind with structure inside it, so the editor holds a whole
+// draft block for it rather than a single string.
+type StoredPaletteBlock = Extract<StoredDesignBlock, { kind: "palette" }>;
 
 export function DesignBlockEditor({
   designId,
@@ -71,11 +78,28 @@ export function DesignBlockEditor({
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(
     null,
   );
+  // The palette is edited as a whole block — its swatches are a list, and
+  // saving each keystroke of a Pantone code would be a mutation per character.
+  // `isNew` is what decides between addBlock and updateBlock on save; until
+  // then nothing about a new palette exists on the server.
+  const [paletteDraft, setPaletteDraft] = useState<{
+    block: StoredPaletteBlock;
+    isNew: boolean;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const available = availableTextFields(blocks);
+
+  // Only one thing is ever mid-edit: opening any editor closes the others, so
+  // there's never a second unsaved change quietly waiting off screen.
+  function closeEditors() {
+    setError(null);
+    setDraft(null);
+    setEditing(null);
+    setPaletteDraft(null);
+  }
 
   // Every write goes through here: one busy flag, one place errors become a
   // toast. `onDone` runs only on success, so a rejected save leaves the
@@ -140,6 +164,37 @@ export function DesignBlockEditor({
     );
   }
 
+  // One save for both palette paths: the draft is the block either way, and
+  // only its presence on the design decides which mutation carries it.
+  function onSavePalette() {
+    if (!paletteDraft) return;
+    const { block, isNew } = paletteDraft;
+
+    const next = [...blocks];
+    if (isNew) {
+      next.push(block);
+    } else {
+      const index = indexOfBlock(blocks, block.id);
+      if (index < 0) return;
+      next[index] = block;
+    }
+
+    const problem = firstProblem(next);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setError(null);
+    void run(
+      isNew ? "Could not add the palette" : "Could not save the palette",
+      () =>
+        isNew
+          ? addBlock({ designId, block })
+          : updateBlock({ designId, block }),
+      () => setPaletteDraft(null),
+    );
+  }
+
   function onRemove(block: StoredDesignBlock) {
     void run("Could not remove that block", () =>
       removeBlock({ designId, blockId: block.id }),
@@ -172,18 +227,22 @@ export function DesignBlockEditor({
         >
           Brief
         </h2>
-        <AddSectionMenu
+        <AddBlockMenu
           available={available}
-          disabled={busy || draft !== null}
-          onPick={(field) => {
-            setError(null);
-            setEditing(null);
+          canAddPalette={!hasPalette(blocks)}
+          disabled={busy || draft !== null || paletteDraft !== null}
+          onPickField={(field) => {
+            closeEditors();
             setDraft({ field, body: "" });
+          }}
+          onAddPalette={() => {
+            closeEditors();
+            setPaletteDraft({ block: newPaletteBlock(), isNew: true });
           }}
         />
       </div>
 
-      {blocks.length === 0 && !draft ? (
+      {blocks.length === 0 && !draft && !paletteDraft ? (
         <div className="mt-4">
           <EmptyBrief />
         </div>
@@ -264,14 +323,29 @@ export function DesignBlockEditor({
                       disabled={busy}
                       aria-label={`Edit ${blockHeading(block)}`}
                       onClick={() => {
-                        setError(null);
-                        setDraft(null);
+                        closeEditors();
                         setEditing({ id: block.id, body: block.body });
                       }}
                     >
                       <PencilIcon />
                     </Button>
                   )}
+                  {block.kind === "palette" &&
+                    paletteDraft?.block.id !== block.id && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={busy}
+                        aria-label={`Edit ${blockHeading(block)}`}
+                        onClick={() => {
+                          closeEditors();
+                          setPaletteDraft({ block, isNew: false });
+                        }}
+                      >
+                        <PencilIcon />
+                      </Button>
+                    )}
                   {/* The Overview is the design's description — the server
                       refuses to drop it, so we don't offer a button that
                       always fails. */}
@@ -302,6 +376,21 @@ export function DesignBlockEditor({
                     onSave={onSaveEdit}
                     onCancel={() => {
                       setEditing(null);
+                      setError(null);
+                    }}
+                  />
+                ) : paletteDraft?.block.id === block.id ? (
+                  <PaletteEditor
+                    block={paletteDraft.block}
+                    error={error}
+                    busy={busy}
+                    saveLabel="Save palette"
+                    onChange={(next) =>
+                      setPaletteDraft({ block: next, isNew: false })
+                    }
+                    onSave={onSavePalette}
+                    onCancel={() => {
+                      setPaletteDraft(null);
                       setError(null);
                     }}
                   />
@@ -336,26 +425,54 @@ export function DesignBlockEditor({
           </div>
         </div>
       )}
+
+      {/* A palette that isn't on the design yet: same dashed card as a new text
+          section, so "unsaved" looks the same whatever you're adding. */}
+      {paletteDraft?.isNew && (
+        <div className="mt-4 rounded-lg border border-dashed border-border bg-card px-4 py-4">
+          <h3 className="text-sm font-semibold text-foreground">Palette</h3>
+          <div className="mt-3">
+            <PaletteEditor
+              block={paletteDraft.block}
+              error={error}
+              busy={busy}
+              saveLabel="Save palette"
+              onChange={(next) => setPaletteDraft({ block: next, isNew: true })}
+              onSave={onSavePalette}
+              onCancel={() => {
+                setPaletteDraft(null);
+                setError(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
 // The add menu is a row of buttons rather than a dropdown: there are at most
-// four sections, and showing which ones are still open is more useful than
-// hiding them behind a click.
-function AddSectionMenu({
+// four sections plus the palette, and showing which ones are still open is
+// more useful than hiding them behind a click. The palette sits last and only
+// appears while the design hasn't got one — a design has at most one (PRD §6),
+// so offering a second would be offering a button that always fails.
+function AddBlockMenu({
   available,
+  canAddPalette,
   disabled,
-  onPick,
+  onPickField,
+  onAddPalette,
 }: {
   available: readonly TextField[];
+  canAddPalette: boolean;
   disabled: boolean;
-  onPick: (field: TextField) => void;
+  onPickField: (field: TextField) => void;
+  onAddPalette: () => void;
 }) {
-  if (available.length === 0)
+  if (available.length === 0 && !canAddPalette)
     return (
       <p className="text-xs text-muted-foreground">
-        All four sections are in use.
+        Every section and the palette are in use.
       </p>
     );
 
@@ -368,12 +485,24 @@ function AddSectionMenu({
           variant="outline"
           size="sm"
           disabled={disabled}
-          onClick={() => onPick(field)}
+          onClick={() => onPickField(field)}
         >
           <PlusIcon />
           Add {TEXT_FIELD_LABELS[field]}
         </Button>
       ))}
+      {canAddPalette && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          onClick={onAddPalette}
+        >
+          <PlusIcon />
+          Add palette
+        </Button>
+      )}
     </div>
   );
 }

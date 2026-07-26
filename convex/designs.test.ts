@@ -931,6 +931,110 @@ describe("design block mutations", () => {
     });
   });
 
+  // The palette editor (D-04) sends the whole palette block: its swatches are
+  // an ordered list inside one block, so add/remove/reorder are all one
+  // updateBlock carrying the list the owner ended up with.
+  describe("palette editing", () => {
+    const palette = {
+      id: "p1",
+      kind: "palette" as const,
+      swatches: [
+        { id: "s1", hex: "#102A44", role: "primary" as const },
+        { id: "s2", hex: "#FFFFFF" },
+      ],
+    };
+
+    async function seedPalette(t: Test, asUser: AsUser) {
+      const designId = await seedDesign(t, asUser);
+      await asUser.mutation(api.designs.addBlock, { designId, block: palette });
+      return designId;
+    }
+
+    it("stores the palette's swatches in the order they were sent", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedPalette(t, asUser);
+
+      const row = await t.run((ctx) => ctx.db.get(designId));
+      const stored = row!.blocks.find((b) => b.kind === "palette")!;
+      expect(stored.kind === "palette" && stored.swatches).toEqual(
+        palette.swatches,
+      );
+    });
+
+    it("persists a reordered, relabelled swatch list", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedPalette(t, asUser);
+
+      await asUser.mutation(api.designs.updateBlock, {
+        designId,
+        block: {
+          ...palette,
+          caption: "Kit colors",
+          swatches: [
+            { id: "s2", hex: "#FFFFFF", role: "secondary", label: "Numbers" },
+            { id: "s1", hex: "#102A44", role: "primary", pantoneCode: "289 C" },
+          ],
+        },
+      });
+
+      const row = await t.run((ctx) => ctx.db.get(designId));
+      const stored = row!.blocks.find((b) => b.kind === "palette")!;
+      expect(stored.kind === "palette" && stored.caption).toBe("Kit colors");
+      expect(stored.kind === "palette" && stored.swatches).toEqual([
+        { id: "s2", hex: "#FFFFFF", role: "secondary", label: "Numbers" },
+        { id: "s1", hex: "#102A44", role: "primary", pantoneCode: "289 C" },
+      ]);
+    });
+
+    it("canonicalizes a typed hex and drops a blank Pantone code", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedPalette(t, asUser);
+
+      await asUser.mutation(api.designs.updateBlock, {
+        designId,
+        block: {
+          ...palette,
+          swatches: [{ id: "s1", hex: "c8102e", pantoneCode: "   " }],
+        },
+      });
+
+      const row = await t.run((ctx) => ctx.db.get(designId));
+      const stored = row!.blocks.find((b) => b.kind === "palette");
+      const swatch = stored?.kind === "palette" ? stored.swatches[0] : null;
+      expect(swatch?.hex).toBe("#C8102E");
+      expect(swatch).not.toHaveProperty("pantoneCode");
+    });
+
+    it("rejects a swatch whose hex isn't a color", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedPalette(t, asUser);
+
+      await expect(
+        asUser.mutation(api.designs.updateBlock, {
+          designId,
+          block: { ...palette, swatches: [{ id: "s1", hex: "navy" }] },
+        }),
+      ).rejects.toThrow(/color/i);
+    });
+
+    it("drops the palette without touching the rest of the brief", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedPalette(t, asUser);
+
+      await asUser.mutation(api.designs.removeBlock, {
+        designId,
+        blockId: "p1",
+      });
+
+      expect(await blockIds(t, designId)).toEqual(["b-overview", "g1"]);
+    });
+  });
+
   describe("removeBlock", () => {
     it("drops the block and keeps the rest in order", async () => {
       const t = convexTest(schema, modules);

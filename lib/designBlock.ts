@@ -37,6 +37,11 @@ export const SWATCH_ROLE_LABELS: Record<SwatchRole, string> = {
   accent: "Accent",
 };
 
+// What a brand-new swatch opens on. Black rather than a brand color: the
+// picker has to start somewhere, and a color nobody would ship reads as "pick
+// me" instead of looking like a decision the design already made.
+export const DEFAULT_SWATCH_HEX = "#000000";
+
 export const TEXT_BODY_MAX_LENGTH = 2000;
 export const CAPTION_MAX_LENGTH = 120;
 export const SWATCH_LABEL_MAX_LENGTH = 60;
@@ -145,6 +150,77 @@ export function isRequiredBlock(block: DesignBlock): boolean {
   return block.kind === "text" && block.field === "overview";
 }
 
+// --- Palette editing (D-04) -------------------------------------------------
+// A design has at most one palette (PRD §6) holding an ordered list of
+// swatches, and the four functions below are every edit its rows can make.
+// They're pure and return new blocks, so the palette editor is a rendering of
+// one draft block plus these transitions — no swatch bookkeeping in the
+// component, and the rules stay unit-tested here.
+
+export function hasPalette(blocks: readonly DesignBlock[]): boolean {
+  return blocks.some((block) => block.kind === "palette");
+}
+
+export function newSwatch(
+  hex: string = DEFAULT_SWATCH_HEX,
+  makeId: () => string = newBlockId,
+): Swatch {
+  return { id: makeId(), hex };
+}
+
+// An empty palette is storable on purpose: the block lands first and the colors
+// arrive as they're picked, the same way an empty gallery waits for its images.
+export function newPaletteBlock(
+  swatches: Swatch[] = [],
+  makeId: () => string = newBlockId,
+): PaletteBlock {
+  return { id: makeId(), kind: "palette", swatches };
+}
+
+export function addSwatch<T extends PaletteBlock>(
+  block: T,
+  hex?: string,
+  makeId: () => string = newBlockId,
+): T {
+  return { ...block, swatches: [...block.swatches, newSwatch(hex, makeId)] };
+}
+
+export function removeSwatchAt<T extends PaletteBlock>(
+  block: T,
+  index: number,
+): T {
+  return { ...block, swatches: block.swatches.filter((_, i) => i !== index) };
+}
+
+export function moveSwatch<T extends PaletteBlock>(
+  block: T,
+  from: number,
+  to: number,
+): T {
+  return { ...block, swatches: moveItemTo(block.swatches, from, to) };
+}
+
+const OPTIONAL_SWATCH_FIELDS = ["role", "label", "pantoneCode"] as const;
+
+// Edits one swatch in place. A cleared optional field is removed rather than
+// left as `undefined` on the object: the swatch that gets sent to Convex should
+// simply not carry a role it doesn't have.
+export function patchSwatch<T extends PaletteBlock>(
+  block: T,
+  index: number,
+  patch: Partial<Swatch>,
+): T {
+  const swatches = block.swatches.map((swatch, i) => {
+    if (i !== index) return swatch;
+    const next: Swatch = { ...swatch, ...patch };
+    for (const field of OPTIONAL_SWATCH_FIELDS) {
+      if (!next[field]?.trim()) delete next[field];
+    }
+    return next;
+  });
+  return { ...block, swatches };
+}
+
 export function indexOfBlock(
   blocks: readonly DesignBlock[],
   id: string,
@@ -152,22 +228,28 @@ export function indexOfBlock(
   return blocks.findIndex((block) => block.id === id);
 }
 
+// Reorder is a pure splice, returning a new array. `to` is the index the item
+// should end up at, clamped: a drag past the last one means "put it last", not
+// "throw". An out-of-range `from` returns the array as-is, which is what a drop
+// on an item that just got removed should do. Blocks on the page and swatches
+// inside the palette reorder the same way, so they share this.
+export function moveItemTo<T>(items: readonly T[], from: number, to: number): T[] {
+  if (from < 0 || from >= items.length) return [...items];
+  const next = [...items];
+  const [moved] = next.splice(from, 1);
+  const target = Math.min(Math.max(to, 0), next.length);
+  next.splice(target, 0, moved!);
+  return next;
+}
+
 // Reorder is the whole point of the block model, and the array order IS the
-// page order — so a move is a pure splice, returning a new array. `to` is the
-// index the block should end up at, clamped: a drag past the last block means
-// "put it last", not "throw". An out-of-range `from` returns the array as-is,
-// which is what a drop on a block that just got removed should do.
+// page order.
 export function moveBlockTo<T extends DesignBlock>(
   blocks: readonly T[],
   from: number,
   to: number,
 ): T[] {
-  if (from < 0 || from >= blocks.length) return [...blocks];
-  const next = [...blocks];
-  const [moved] = next.splice(from, 1);
-  const target = Math.min(Math.max(to, 0), next.length);
-  next.splice(target, 0, moved!);
-  return next;
+  return moveItemTo(blocks, from, to);
 }
 
 export function blockHeading(block: DesignBlock): string {

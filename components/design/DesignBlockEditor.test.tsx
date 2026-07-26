@@ -81,6 +81,15 @@ const assets = [
   },
 ];
 
+function allFourSections(): StoredDesignBlock[] {
+  return [
+    overview,
+    notes,
+    { id: "b-c", kind: "text", field: "concept", body: "c" },
+    { id: "b-i", kind: "text", field: "inspiration", body: "i" },
+  ];
+}
+
 function renderEditor(blocks: StoredDesignBlock[] = [overview]) {
   return render(
     <DesignBlockEditor designId={designId} blocks={blocks} assets={assets} />,
@@ -140,16 +149,22 @@ describe("DesignBlockEditor", () => {
       expect(screen.queryByRole("button", { name: /add notes/i })).toBeNull();
     });
 
-    it("says so when all four sections are in use", () => {
-      renderEditor([
-        overview,
-        notes,
-        { id: "b-c", kind: "text", field: "concept", body: "c" },
-        { id: "b-i", kind: "text", field: "inspiration", body: "i" },
-      ]);
+    it("still offers the palette once all four sections are in use", () => {
+      renderEditor(allFourSections());
+
+      expect(screen.queryByRole("button", { name: /add notes/i })).toBeNull();
+      expect(
+        screen.getByRole("button", { name: /add palette/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("says so when every section and the palette are in use", () => {
+      renderEditor([...allFourSections(), paletteBlock]);
 
       expect(screen.queryByRole("button", { name: /^add /i })).toBeNull();
-      expect(screen.getByText(/all four sections are in use/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/every section and the palette are in use/i),
+      ).toBeInTheDocument();
     });
 
     it("writes the new section through addBlock once the body is filled in", async () => {
@@ -262,10 +277,9 @@ describe("DesignBlockEditor", () => {
       expect(screen.getByLabelText(/overview/i)).toBeInTheDocument();
     });
 
-    it("has no inline editor for gallery and palette blocks yet", () => {
+    it("has no inline editor for gallery blocks yet", () => {
       renderEditor([overview, galleryBlock, paletteBlock]);
       expect(screen.queryByRole("button", { name: /edit mood board/i })).toBeNull();
-      expect(screen.queryByRole("button", { name: /edit palette/i })).toBeNull();
     });
 
     it("still renders gallery and palette contents read-only", () => {
@@ -362,6 +376,230 @@ describe("DesignBlockEditor", () => {
       fireEvent.drop(items[1]!);
 
       expect(mutationCalls(NAMES.move)).toHaveLength(0);
+    });
+  });
+
+  // --- Palette (D-04) -------------------------------------------------------
+  // The palette is the one block with structure inside it, so it's edited as a
+  // whole draft: swatches are added, reordered and typed into locally, and one
+  // save carries the block.
+  describe("the palette", () => {
+    function paletteWith(...swatches: { id: string; hex: string }[]) {
+      return {
+        id: "b-palette",
+        kind: "palette",
+        swatches,
+      } satisfies StoredDesignBlock;
+    }
+
+    function savedPalette() {
+      const [args] = mutationCalls(NAMES.update)[0] as [
+        { block: StoredDesignBlock },
+      ];
+      return args.block.kind === "palette" ? args.block : null;
+    }
+
+    function addedPalette() {
+      const [args] = mutationCalls(NAMES.add)[0] as [
+        { block: StoredDesignBlock },
+      ];
+      return args.block.kind === "palette" ? args.block : null;
+    }
+
+    it("offers to add a palette while the design hasn't got one", () => {
+      renderEditor([overview]);
+      expect(
+        screen.getByRole("button", { name: /add palette/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("does not offer a second palette — a design has at most one", () => {
+      renderEditor([overview, paletteBlock]);
+      expect(screen.queryByRole("button", { name: /add palette/i })).toBeNull();
+    });
+
+    it("writes a new palette through addBlock with the colors picked so far", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview]);
+
+      await user.click(screen.getByRole("button", { name: /add palette/i }));
+      await user.click(screen.getByRole("button", { name: /add color/i }));
+      const hex = screen.getByLabelText(/swatch 1 hex/i);
+      await user.clear(hex);
+      await user.type(hex, "#C8102E");
+      await user.selectOptions(
+        screen.getByLabelText(/swatch 1 role/i),
+        "accent",
+      );
+      await user.type(screen.getByLabelText(/swatch 1 pantone code/i), "186 C");
+      await user.click(screen.getByRole("button", { name: /save palette/i }));
+
+      expect(mutationCalls(NAMES.update)).toHaveLength(0);
+      expect(addedPalette()?.swatches).toEqual([
+        {
+          id: expect.any(String),
+          hex: "#C8102E",
+          role: "accent",
+          pantoneCode: "186 C",
+        },
+      ]);
+    });
+
+    it("carries the palette's caption", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview]);
+
+      await user.click(screen.getByRole("button", { name: /add palette/i }));
+      await user.type(screen.getByLabelText(/palette caption/i), "Kit colors");
+      await user.click(screen.getByRole("button", { name: /save palette/i }));
+
+      expect(addedPalette()).toMatchObject({
+        caption: "Kit colors",
+        swatches: [],
+      });
+    });
+
+    it("discards a new palette on cancel without calling the server", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview]);
+
+      await user.click(screen.getByRole("button", { name: /add palette/i }));
+      await user.click(screen.getByRole("button", { name: /add color/i }));
+      await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+      expect(mutationCalls(NAMES.add)).toHaveLength(0);
+      expect(
+        screen.getByRole("button", { name: /add palette/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the picker and the hex field showing one color", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview]);
+
+      await user.click(screen.getByRole("button", { name: /add palette/i }));
+      await user.click(screen.getByRole("button", { name: /add color/i }));
+      fireEvent.change(screen.getByLabelText(/swatch 1 color/i), {
+        target: { value: "#c8102e" },
+      });
+
+      expect(screen.getByLabelText(/swatch 1 hex/i)).toHaveValue("#C8102E");
+    });
+
+    it("edits an existing palette through updateBlock", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview, paletteBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit palette/i }));
+      expect(screen.getByLabelText(/swatch 1 hex/i)).toHaveValue("#102A44");
+      expect(screen.getByLabelText(/swatch 1 role/i)).toHaveValue("primary");
+
+      await user.type(screen.getByLabelText(/swatch 1 label/i), "Sash");
+      await user.click(screen.getByRole("button", { name: /save palette/i }));
+
+      expect(mutationCalls(NAMES.add)).toHaveLength(0);
+      expect(savedPalette()).toEqual({
+        ...paletteBlock,
+        swatches: [{ id: "s1", hex: "#102A44", role: "primary", label: "Sash" }],
+      });
+    });
+
+    it("adds and removes swatches before anything is saved", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview, paletteBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit palette/i }));
+      await user.click(screen.getByRole("button", { name: /add color/i }));
+      expect(screen.getAllByTestId("swatch-row")).toHaveLength(2);
+
+      await user.click(screen.getByRole("button", { name: /remove swatch 1/i }));
+      expect(screen.getAllByTestId("swatch-row")).toHaveLength(1);
+      expect(mutationCalls(NAMES.update)).toHaveLength(0);
+
+      await user.click(screen.getByRole("button", { name: /save palette/i }));
+      expect(savedPalette()?.swatches).toEqual([
+        { id: expect.any(String), hex: "#000000" },
+      ]);
+    });
+
+    it("reorders swatches — the list order is the palette's order", async () => {
+      const user = userEvent.setup();
+      renderEditor([
+        overview,
+        paletteWith({ id: "s1", hex: "#102A44" }, { id: "s2", hex: "#FFFFFF" }),
+      ]);
+
+      await user.click(screen.getByRole("button", { name: /edit palette/i }));
+      await user.click(
+        screen.getByRole("button", { name: /move swatch 2 up/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /save palette/i }));
+
+      expect(savedPalette()?.swatches).toEqual([
+        { id: "s2", hex: "#FFFFFF" },
+        { id: "s1", hex: "#102A44" },
+      ]);
+    });
+
+    it("clears a role back to none", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview, paletteBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit palette/i }));
+      await user.selectOptions(screen.getByLabelText(/swatch 1 role/i), "");
+      await user.click(screen.getByRole("button", { name: /save palette/i }));
+
+      expect(savedPalette()?.swatches).toEqual([{ id: "s1", hex: "#102A44" }]);
+    });
+
+    it("refuses a hex that isn't a color without calling the server", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview, paletteBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit palette/i }));
+      const hex = screen.getByLabelText(/swatch 1 hex/i);
+      await user.clear(hex);
+      await user.type(hex, "navy");
+      await user.click(screen.getByRole("button", { name: /save palette/i }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(/color/i);
+      expect(mutationCalls(NAMES.update)).toHaveLength(0);
+    });
+
+    it("leaves the stored palette alone on cancel", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview, paletteBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit palette/i }));
+      await user.click(screen.getByRole("button", { name: /remove swatch 1/i }));
+      await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+      expect(mutationCalls(NAMES.update)).toHaveLength(0);
+      // Back to the read-only rendering of what's actually stored.
+      expect(screen.getByText("#102A44")).toBeInTheDocument();
+    });
+
+    it("closes an open text editor when the palette opens", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview, paletteBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit overview/i }));
+      await user.click(screen.getByRole("button", { name: /edit palette/i }));
+
+      expect(screen.queryByLabelText(/^overview$/i)).toBeNull();
+      expect(screen.getByLabelText(/swatch 1 hex/i)).toBeInTheDocument();
+    });
+
+    it("surfaces a server rejection as a toast and stays open", async () => {
+      const user = userEvent.setup();
+      resetMutations().set(NAMES.update, "Nope.");
+      renderEditor([overview, paletteBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit palette/i }));
+      await user.click(screen.getByRole("button", { name: /save palette/i }));
+
+      expect(toastError).toHaveBeenCalled();
+      expect(screen.getByLabelText(/swatch 1 hex/i)).toBeInTheDocument();
     });
   });
 });

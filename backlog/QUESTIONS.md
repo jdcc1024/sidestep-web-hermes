@@ -43,7 +43,18 @@ It is the only row in `designs`: `{ title: "TOC 2026 Jersey", brief: "for toc", 
 3. **Make `blocks` optional in the schema** so the stale row validates. Rejected: it would let a design exist with no description forever and undo D-02's central guarantee.
 
 **Recommendation:** Option 1, and honestly it's a 10-second dashboard click you may prefer to just do — say the word and the next iteration will do it instead. Once it's pushed, D-09 also re-captures the missing screenshots for D-01/D-02/D-03 in one pass.
-**Answer:** _(human fills in)_
+
+**Update (2026-07-26, ralph-loop) — the schema half is solved; a different thing now blocks screenshots.** Your `_migrations.ts` backfill (f76fade) did it: `npx convex dev --once` pushes cleanly, and `TOC 2026 Jersey` now carries a real four-section brief. So this question no longer needs an answer as asked.
+
+What still blocks Track D screenshots is the **Clerk session in `.auth/state.json`, which has expired** (saved 2026-07-19). `snap.mjs` reached the app fine during D-04 and photographed the **sign-in wall** at all 12 viewport/scheme combinations; those shots were deleted rather than filed as review artifacts. The one-time human step from CLAUDE.md fixes it:
+
+```
+node scripts/snap.mjs --login
+```
+
+Once that's re-run, D-09 can capture D-01/D-02/D-03/D-04 in one pass — and no dev data has to be deleted for any of it.
+
+**Answer:** _(human fills in — or just re-run `--login` and unpark D-09 with `node scripts/dag-update.js answer D-09`)_
 
 ## Answered
 

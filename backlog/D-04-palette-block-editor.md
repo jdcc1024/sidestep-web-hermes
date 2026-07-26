@@ -1,6 +1,6 @@
 # Issue: Palette Block Editor
 
-## Status: pending
+## Status: done
 
 ## Phase: 2
 
@@ -8,23 +8,25 @@
 
 ## Vertical Slice
 This issue touches:
-- [ ] Database: none (palette lives in `designs.blocks` from D-02)
-- [ ] API: swatch add/update/remove/reorder within the single palette block (via block mutations)
-- [ ] Frontend: palette block editing in the shared editor — hex picker, role select, label + Pantone code fields, swatch reorder
-- [ ] Tests: swatch validation; palette editor interaction tests
+- [x] Database: none (palette lives in `designs.blocks` from D-02)
+- [x] API: swatch add/update/remove/reorder within the single palette block (via block mutations)
+- [x] Frontend: palette block editing in the shared editor — hex picker, role select, label + Pantone code fields, swatch reorder
+- [x] Tests: swatch validation; palette editor interaction tests
 
 ## Description
 Add palette editing to the shared block editor. The owner/admin can add the one palette block and manage an unlimited, ordered set of swatches — each a hex color picked on-screen, a role (primary/secondary/accent), an optional free label, and an optional free-text Pantone code. Pantone is a label only; no API or dataset.
 
 ## Acceptance Criteria
-- [ ] A design can hold at most one palette block; adding a second is prevented
-- [ ] Swatches: add, remove, reorder; each has a hex (required), role (primary/secondary/accent defaults), optional label, optional Pantone code text
-- [ ] Hex chosen via an on-screen color picker; hex is the stored source of truth
-- [ ] Optional caption on the palette block
-- [ ] Swatch edits validate against the D-02 validators and persist to `designs.blocks`
-- [ ] Renders correctly light + dark
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] A design can hold at most one palette block; adding a second is prevented
+- [x] Swatches: add, remove, reorder; each has a hex (required), role (primary/secondary/accent defaults), optional label, optional Pantone code text
+- [x] Hex chosen via an on-screen color picker; hex is the stored source of truth
+- [x] Optional caption on the palette block
+- [x] Swatch edits validate against the D-02 validators and persist to `designs.blocks`
+- [ ] Renders correctly light + dark — **unverified**: the saved Clerk session in
+      `.auth/state.json` has expired, so `snap.mjs` photographed the sign-in wall
+      instead of the portal. Needs `node scripts/snap.mjs --login` (human, once).
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: D-03
