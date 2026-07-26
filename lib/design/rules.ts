@@ -10,7 +10,6 @@
 // new-edit-order-page PRD §6); neckline and sleeve style are allowlists.
 
 export const TITLE_MAX_LENGTH = 120;
-export const BRIEF_MAX_LENGTH = 2000;
 export const CANVA_LINK_MAX_LENGTH = 500;
 export const JERSEY_STYLE_MAX_LENGTH = 120;
 

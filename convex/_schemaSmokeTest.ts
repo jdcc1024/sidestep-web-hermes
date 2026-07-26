@@ -26,10 +26,28 @@ export const run = internalMutation({
       createdAt: now,
     });
 
+    // One of every block kind, so the union in the schema is round-tripped
+    // rather than just its first member.
     const designId = await ctx.db.insert("designs", {
       ownerId: userId,
       title: "Smoke Design",
-      brief: "smoke",
+      blocks: [
+        { id: "smoke-overview", kind: "text", field: "overview", body: "smoke" },
+        { id: "smoke-gallery", kind: "gallery", caption: "Smoke", assetIds: [] },
+        {
+          id: "smoke-palette",
+          kind: "palette",
+          swatches: [
+            {
+              id: "smoke-swatch",
+              hex: "#102A44",
+              role: "primary",
+              label: "Navy",
+              pantoneCode: "289 C",
+            },
+          ],
+        },
+      ],
       createdAt: now,
       updatedAt: now,
     });

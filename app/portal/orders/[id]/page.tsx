@@ -26,7 +26,7 @@ type PageProps = {
 type OrderDesign = {
   _id: Id<"designs">;
   title: string;
-  brief: string;
+  overview: string;
   canvaLink?: string;
   jerseyStyle?: string;
   neckline?: string;

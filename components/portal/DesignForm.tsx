@@ -11,8 +11,12 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { UploadedFile } from "@/convex/_designAssets";
+import type { StoredDesignBlock } from "@/convex/_designBlocks";
 import {
-  BRIEF_MAX_LENGTH,
+  TEXT_BODY_MAX_LENGTH,
+  withOverview,
+} from "@/lib/designBlock";
+import {
   CANVA_LINK_MAX_LENGTH,
   JERSEY_STYLE_MAX_LENGTH,
   NECKLINES,
@@ -50,7 +54,11 @@ type Mode =
       kind: "edit";
       designId: Id<"designs">;
       initialTitle: string;
-      initialBrief: string;
+      initialOverview: string;
+      // The design's existing blocks, so a submit rewrites only the Overview
+      // and leaves galleries, palette and the block order intact. The full
+      // block editor lands in D-03.
+      initialBlocks: StoredDesignBlock[];
       initialCanvaLink: string;
       initialJerseyStyle: string;
       initialNeckline: string;
@@ -82,13 +90,13 @@ const formSchema = z.object({
       TITLE_MAX_LENGTH,
       `Please keep the title under ${TITLE_MAX_LENGTH} characters.`,
     ),
-  brief: z
+  overview: z
     .string()
     .trim()
-    .min(1, "Add a brief so Sidestep knows what you want.")
+    .min(1, "Add an overview so Sidestep knows what you want.")
     .max(
-      BRIEF_MAX_LENGTH,
-      `Please keep the brief under ${BRIEF_MAX_LENGTH} characters.`,
+      TEXT_BODY_MAX_LENGTH,
+      `Please keep the overview under ${TEXT_BODY_MAX_LENGTH} characters.`,
     ),
   canvaLink: z.string().superRefine((value, ctx) => {
     const link = value.trim();
@@ -155,7 +163,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
       mode.kind === "edit"
         ? {
             title: mode.initialTitle,
-            brief: mode.initialBrief,
+            overview: mode.initialOverview,
             canvaLink: mode.initialCanvaLink,
             jerseyStyle: mode.initialJerseyStyle,
             neckline: mode.initialNeckline,
@@ -164,7 +172,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
           }
         : {
             title: "",
-            brief: "",
+            overview: "",
             canvaLink: "",
             jerseyStyle: "",
             neckline: "",
@@ -273,18 +281,25 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
     try {
       const payload = toDesignPayload({
         title: values.title,
-        brief: values.brief,
+        overview: values.overview,
         canvaLink: values.canvaLink,
         jerseyStyle: values.jerseyStyle,
         neckline: values.neckline,
         sleeveStyle: values.sleeveStyle,
         fileCount: values.fileCount,
       });
+      // One textarea in, a whole block array out: the Overview is a text
+      // block now (D-02), and an edit must preserve every other block.
+      const blocks = withOverview(
+        mode.kind === "edit" ? mode.initialBlocks : [],
+        payload.overview,
+      );
+
       if (mode.kind === "edit") {
         await updateDesign({
           designId: mode.designId,
           title: payload.title,
-          brief: payload.brief,
+          blocks,
           canvaLink: payload.canvaLink,
           jerseyStyle: payload.jerseyStyle,
           neckline: payload.neckline,
@@ -296,7 +311,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
       } else {
         const designId = await createDesign({
           title: payload.title,
-          brief: payload.brief,
+          blocks,
           canvaLink: payload.canvaLink,
           jerseyStyle: payload.jerseyStyle,
           neckline: payload.neckline,
@@ -338,7 +353,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
         <FieldSection
           eyebrow="01"
           title="About this design"
-          description="A clear title and brief make it easier for Sidestep to nail your vibe on the first pass."
+          description="A clear title and overview make it easier for Sidestep to nail your vibe on the first pass."
         >
           <FormField
             control={form.control}
@@ -360,16 +375,20 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
 
           <FormField
             control={form.control}
-            name="brief"
+            name="overview"
             render={({ field }) => {
-              const remaining = BRIEF_MAX_LENGTH - field.value.length;
+              const remaining = TEXT_BODY_MAX_LENGTH - field.value.length;
               return (
                 <FormItem>
-                  <FormLabel>Brief</FormLabel>
+                  <FormLabel>Overview</FormLabel>
+                  <FormDescription>
+                    The design&apos;s description — it heads the brief and is
+                    what your other surfaces summarize.
+                  </FormDescription>
                   <FormControl>
                     <Textarea
                       placeholder="Theme, colors, references, anything we should know."
-                      maxLength={BRIEF_MAX_LENGTH}
+                      maxLength={TEXT_BODY_MAX_LENGTH}
                       rows={6}
                       {...field}
                     />

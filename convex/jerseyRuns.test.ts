@@ -5,6 +5,7 @@ import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
 
@@ -257,7 +258,7 @@ describe("jerseyRuns.lock / unlock (R-06)", () => {
       ctx.db.insert("designs", {
         ownerId: userId,
         title: "Home",
-        brief: "b",
+        blocks: overviewBlocks("b"),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }),
@@ -447,14 +448,14 @@ describe("jerseyRuns.getPublic", () => {
       const homeId = await ctx.db.insert("designs", {
         ownerId: userId,
         title: "Home",
-        brief: "h",
+        blocks: overviewBlocks("h"),
         createdAt: now,
         updatedAt: now,
       });
       const awayId = await ctx.db.insert("designs", {
         ownerId: userId,
         title: "Away",
-        brief: "a",
+        blocks: overviewBlocks("a"),
         createdAt: now,
         updatedAt: now,
       });

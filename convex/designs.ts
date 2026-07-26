@@ -14,13 +14,13 @@ import {
   resolveDesignAssets,
   uploadedFileValidator,
 } from "./_designAssets";
+import { designBlocksValidator, prepareBlocks } from "./_designBlocks";
 
 // Server-side guards. Mirror lib/design so the client and server cap
 // values the same way — defense in depth against a hand-rolled client that
 // posts past the form's maxLength. Spec allowlists/caps come from
 // lib/design/rules so the two sides can't drift.
 const TITLE_MAX_LENGTH = 120;
-const BRIEF_MAX_LENGTH = 2000;
 const CANVA_LINK_MAX_LENGTH = 500;
 
 function normalizeTitle(value: string): string {
@@ -28,14 +28,6 @@ function normalizeTitle(value: string): string {
   if (!trimmed) throw new ConvexError("Title is required.");
   if (trimmed.length > TITLE_MAX_LENGTH)
     throw new ConvexError("Title is too long.");
-  return trimmed;
-}
-
-function normalizeBrief(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) throw new ConvexError("Brief is required.");
-  if (trimmed.length > BRIEF_MAX_LENGTH)
-    throw new ConvexError("Brief is too long.");
   return trimmed;
 }
 
@@ -158,7 +150,9 @@ export const generateUploadUrl = mutation({
 export const createDesign = mutation({
   args: {
     title: v.string(),
-    brief: v.string(),
+    // The structured brief (D-02). Must contain an Overview text block —
+    // prepareBlocks enforces that, so every design has a summary from birth.
+    blocks: designBlocksValidator,
     canvaLink: v.optional(v.string()),
     // Uploaded files carry their own metadata now (D-01) — the client sends
     // filename + content type alongside each storage id, and the server
@@ -172,7 +166,7 @@ export const createDesign = mutation({
     const user = await requireCurrentUser(ctx);
 
     const title = normalizeTitle(args.title);
-    const brief = normalizeBrief(args.brief);
+    const blocks = prepareBlocks(args.blocks);
     const canvaLink = normalizeCanvaLink(args.canvaLink);
     const specs = normalizeSpecs(args);
 
@@ -183,7 +177,7 @@ export const createDesign = mutation({
     const designId = await ctx.db.insert("designs", {
       ownerId: user._id,
       title,
-      brief,
+      blocks,
       ...(canvaLink ? { canvaLink } : {}),
       ...specs,
       createdAt: now,
@@ -202,7 +196,9 @@ export const updateDesign = mutation({
   args: {
     designId: v.id("designs"),
     title: v.string(),
-    brief: v.string(),
+    // The full block array, in its new order — a reorder, an edit and a
+    // removal are all "write the array you want" (PRD §6).
+    blocks: designBlocksValidator,
     canvaLink: v.optional(v.string()),
     addFiles: v.array(uploadedFileValidator),
     jerseyStyle: v.optional(v.string()),
@@ -217,7 +213,7 @@ export const updateDesign = mutation({
       throw new ConvexError("You don't have access to this design.");
 
     const title = normalizeTitle(args.title);
-    const brief = normalizeBrief(args.brief);
+    const blocks = prepareBlocks(args.blocks);
     const canvaLink = normalizeCanvaLink(args.canvaLink);
     const specs = normalizeSpecs(args);
 
@@ -231,7 +227,7 @@ export const updateDesign = mutation({
 
     await ctx.db.patch(args.designId, {
       title,
-      brief,
+      blocks,
       // Convex `patch` doesn't accept undefined for optional fields — pass
       // an explicit string (possibly empty) and let the schema/optional do
       // the rest. We use the normalized value or fall back to clearing.

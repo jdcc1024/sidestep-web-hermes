@@ -9,7 +9,6 @@ export const NEW_CUSTOMER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Matches the caps in lib/intake.ts — short text fields are short everywhere.
 export const MAX_SHORT_FIELD = 200;
-export const MAX_BRIEF = 1000;
 export const MIN_ORDER_QUANTITY = 5;
 export const MAX_ORDER_QUANTITY = 10000;
 

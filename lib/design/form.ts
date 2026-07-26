@@ -6,11 +6,14 @@
 //
 // Silhouette specs (style/neckline/sleeve) live in ./rules and on the
 // designs table. The design form captures them as of O-02 — all three are
-// optional so an idea-only design (brief + files, cut undecided) still
+// optional so an idea-only design (overview + files, cut undecided) still
 // saves. jerseyStyle is free text; neckline / sleeve are allowlists.
+//
+// `overview` is the design's description. It's stored as the Overview text
+// block rather than a column since D-02, so the cap comes from
+// lib/designBlock — the form and the block validator have to agree.
 
 import {
-  BRIEF_MAX_LENGTH,
   CANVA_LINK_MAX_LENGTH,
   JERSEY_STYLE_MAX_LENGTH,
   TITLE_MAX_LENGTH,
@@ -18,10 +21,11 @@ import {
   isNeckline,
   isSleeveStyle,
 } from "./rules";
+import { TEXT_BODY_MAX_LENGTH } from "../designBlock";
 
 export type DesignInput = {
   title: string;
-  brief: string;
+  overview: string;
   canvaLink: string;
   // Silhouette specs — optional. Blank means "not decided yet".
   jerseyStyle: string;
@@ -38,7 +42,7 @@ export type DesignErrors = Partial<Record<keyof DesignInput, string>>;
 
 export type DesignPayload = {
   title: string;
-  brief: string;
+  overview: string;
   canvaLink?: string;
   jerseyStyle?: string;
   neckline?: string;
@@ -47,7 +51,7 @@ export type DesignPayload = {
 
 export const EMPTY_DESIGN: DesignInput = {
   title: "",
-  brief: "",
+  overview: "",
   canvaLink: "",
   jerseyStyle: "",
   neckline: "",
@@ -63,10 +67,11 @@ export function validateDesign(input: DesignInput): DesignErrors {
   else if (title.length > TITLE_MAX_LENGTH)
     errors.title = `Please keep the title under ${TITLE_MAX_LENGTH} characters.`;
 
-  const brief = input.brief.trim();
-  if (!brief) errors.brief = "Add a brief so Sidestep knows what you want.";
-  else if (brief.length > BRIEF_MAX_LENGTH)
-    errors.brief = `Please keep the brief under ${BRIEF_MAX_LENGTH} characters.`;
+  const overview = input.overview.trim();
+  if (!overview)
+    errors.overview = "Add an overview so Sidestep knows what you want.";
+  else if (overview.length > TEXT_BODY_MAX_LENGTH)
+    errors.overview = `Please keep the overview under ${TEXT_BODY_MAX_LENGTH} characters.`;
 
   const canvaLink = input.canvaLink.trim();
   if (canvaLink) {
@@ -96,14 +101,14 @@ export function validateDesign(input: DesignInput): DesignErrors {
 
 export function toDesignPayload(input: DesignInput): DesignPayload {
   const title = input.title.trim();
-  const brief = input.brief.trim();
+  const overview = input.overview.trim();
   const canvaLink = input.canvaLink.trim();
   const jerseyStyle = input.jerseyStyle.trim();
   const neckline = input.neckline.trim();
   const sleeveStyle = input.sleeveStyle.trim();
   return {
     title,
-    brief,
+    overview,
     ...(canvaLink ? { canvaLink } : {}),
     ...(jerseyStyle ? { jerseyStyle } : {}),
     ...(neckline ? { neckline } : {}),

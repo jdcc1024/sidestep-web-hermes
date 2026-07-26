@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  BRIEF_MAX_LENGTH,
   CANVA_LINK_MAX_LENGTH,
   EMPTY_DESIGN,
   JERSEY_STYLE_MAX_LENGTH,
@@ -14,11 +13,12 @@ import {
   validateDesign,
   type DesignInput,
 } from "./design";
+import { TEXT_BODY_MAX_LENGTH } from "./designBlock";
 
 function validInput(overrides: Partial<DesignInput> = {}): DesignInput {
   return {
     title: "Spring season kits",
-    brief: "Retro 90s look, cobalt blue with cream accents.",
+    overview: "Retro 90s look, cobalt blue with cream accents.",
     canvaLink: "",
     jerseyStyle: "",
     neckline: "",
@@ -50,7 +50,7 @@ describe("validateDesign — required fields", () => {
   it("flags every required field when the form is empty", () => {
     const errors = validateDesign(EMPTY_DESIGN);
     expect(errors.title).toBeTruthy();
-    expect(errors.brief).toBeTruthy();
+    expect(errors.overview).toBeTruthy();
     expect(errors.fileCount).toBeTruthy();
   });
 
@@ -58,8 +58,8 @@ describe("validateDesign — required fields", () => {
     expect(validateDesign(validInput({ title: "   " })).title).toBeTruthy();
   });
 
-  it("rejects a whitespace-only brief", () => {
-    expect(validateDesign(validInput({ brief: "   " })).brief).toBeTruthy();
+  it("rejects a whitespace-only overview", () => {
+    expect(validateDesign(validInput({ overview: "   " })).overview).toBeTruthy();
   });
 
   it("requires at least one file", () => {
@@ -90,17 +90,17 @@ describe("validateDesign — length caps", () => {
     ).toBeUndefined();
   });
 
-  it("rejects a brief over the max length", () => {
+  it("rejects an overview over the max length", () => {
     expect(
-      validateDesign(validInput({ brief: "x".repeat(BRIEF_MAX_LENGTH + 1) }))
-        .brief,
+      validateDesign(validInput({ overview: "x".repeat(TEXT_BODY_MAX_LENGTH + 1) }))
+        .overview,
     ).toBeTruthy();
   });
 
-  it("accepts a brief at exactly the max length", () => {
+  it("accepts an overview at exactly the max length", () => {
     expect(
-      validateDesign(validInput({ brief: "x".repeat(BRIEF_MAX_LENGTH) }))
-        .brief,
+      validateDesign(validInput({ overview: "x".repeat(TEXT_BODY_MAX_LENGTH) }))
+        .overview,
     ).toBeUndefined();
   });
 
@@ -266,10 +266,10 @@ describe("toDesignPayload — silhouette specs", () => {
 describe("toDesignPayload", () => {
   it("trims whitespace from all string fields", () => {
     const payload = toDesignPayload(
-      validInput({ title: "  Kits  ", brief: "  brief here  " }),
+      validInput({ title: "  Kits  ", overview: "  overview here  " }),
     );
     expect(payload.title).toBe("Kits");
-    expect(payload.brief).toBe("brief here");
+    expect(payload.overview).toBe("overview here");
   });
 
   it("omits canvaLink when blank", () => {

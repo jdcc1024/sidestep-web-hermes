@@ -6,8 +6,9 @@ import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { overviewOf } from "@/lib/designBlock";
 
-const BRIEF_PREVIEW_CHARS = 160;
+const OVERVIEW_PREVIEW_CHARS = 160;
 
 export default function MyDesignsPage() {
   const designs = useQuery(api.designs.listMyDesigns);
@@ -64,7 +65,7 @@ function DesignCard({
   design: Doc<"designs"> & { fileCount: number };
 }) {
   const fileCount = design.fileCount;
-  const briefPreview = truncate(design.brief, BRIEF_PREVIEW_CHARS);
+  const summary = truncate(overviewOf(design.blocks), OVERVIEW_PREVIEW_CHARS);
 
   return (
     <Link
@@ -72,8 +73,8 @@ function DesignCard({
       className="flex h-full flex-col rounded-lg border border-border bg-card p-5 shadow-sm transition hover:border-teal-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2"
     >
       <h3 className="text-lg font-semibold text-foreground">{design.title}</h3>
-      {briefPreview && (
-        <p className="mt-2 text-sm text-muted-foreground">{briefPreview}</p>
+      {summary && (
+        <p className="mt-2 text-sm text-muted-foreground">{summary}</p>
       )}
       <p className="mt-auto pt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {fileCount === 0

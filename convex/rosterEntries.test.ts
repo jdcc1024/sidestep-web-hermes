@@ -5,6 +5,7 @@ import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
 const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -29,7 +30,7 @@ async function seedRun(
     const designId = await ctx.db.insert("designs", {
       ownerId: userId,
       title: "Home",
-      brief: "home kit",
+      blocks: overviewBlocks("home kit"),
       createdAt: now,
       updatedAt: now,
     });
@@ -123,7 +124,7 @@ describe("rosterEntries.create", () => {
       ctx.db.insert("designs", {
         ownerId: userId,
         title: "Stray",
-        brief: "x",
+        blocks: overviewBlocks("x"),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }),

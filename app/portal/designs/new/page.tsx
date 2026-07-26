@@ -22,8 +22,8 @@ export default function NewDesignPage() {
           Tell us what you&apos;re thinking.
         </h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Upload logos, mood boards, or reference photos — and write a brief so
-          Sidestep can start with your vibe in mind.
+          Upload logos, mood boards, or reference photos — and write an
+          overview so Sidestep can start with your vibe in mind.
         </p>
       </header>
 

@@ -8,6 +8,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DesignForm } from "@/components/portal/DesignForm";
+import { DesignBlocks } from "@/components/design/DesignBlocks";
+import { overviewOf } from "@/lib/designBlock";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -54,7 +56,8 @@ export default function DesignDetailPage({ params }: PageProps) {
               kind: "edit",
               designId: design._id,
               initialTitle: design.title,
-              initialBrief: design.brief,
+              initialOverview: overviewOf(design.blocks),
+              initialBlocks: design.blocks,
               initialCanvaLink: design.canvaLink ?? "",
               initialJerseyStyle: design.jerseyStyle ?? "",
               initialNeckline: design.neckline ?? "",
@@ -100,12 +103,9 @@ export default function DesignDetailPage({ params }: PageProps) {
         </button>
       </header>
 
-      <section className="mt-10">
-        <h2 className="text-base font-semibold text-foreground">Brief</h2>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/90">
-          {design.brief}
-        </p>
-      </section>
+      <div className="mt-10">
+        <DesignBlocks blocks={design.blocks} assets={design.assets} />
+      </div>
 
       <section className="mt-8">
         <h2 className="text-base font-semibold text-foreground">The cut</h2>

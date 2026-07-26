@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { designBlocksValidator } from "./_designBlocks";
 
 export default defineSchema({
   users: defineTable({
@@ -13,7 +14,11 @@ export default defineSchema({
   designs: defineTable({
     ownerId: v.id("users"),
     title: v.string(),
-    brief: v.string(),
+    // The structured brief (D-02): an ordered list of text / gallery / palette
+    // blocks. The array order IS the page order, so a reorder is one patch.
+    // Replaces the old single `brief` string — the Overview text block is now
+    // the design's primary description, read by every list and card.
+    blocks: designBlocksValidator,
     canvaLink: v.optional(v.string()),
     // Silhouette specs live on the design now (moved off the order in O-01)
     // so a reusable design carries its own cut. Optional: a design can be

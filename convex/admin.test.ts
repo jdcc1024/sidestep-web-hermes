@@ -6,6 +6,7 @@ import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { INTERNAL_STAGES } from "../lib/orderStages";
+import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
 
@@ -190,7 +191,7 @@ async function seedDesign(
     ctx.db.insert("designs", {
       ownerId,
       title,
-      brief: "",
+      blocks: overviewBlocks("A design brief."),
       jerseyStyle: specs.jerseyStyle,
       neckline: specs.neckline,
       sleeveStyle: specs.sleeveStyle,
@@ -807,7 +808,7 @@ describe("admin.updateOrder", () => {
 });
 
 describe("admin.updateDesign", () => {
-  it("updates the title, brief and silhouette specs", async () => {
+  it("updates the title and silhouette specs", async () => {
     const t = convexTest(schema, modules);
     const { userId: ownerId } = await seedUser(t, "owner");
     const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
@@ -816,16 +817,32 @@ describe("admin.updateDesign", () => {
     await asAdmin.mutation(api.admin.updateDesign, {
       designId,
       title: "Home kit v2",
-      brief: "Navy with gold trim",
       neckline: "V-neck",
     });
 
     const design = await t.run((ctx) => ctx.db.get(designId));
     expect(design).toMatchObject({
       title: "Home kit v2",
-      brief: "Navy with gold trim",
       neckline: "V-neck",
     });
+  });
+
+  // The brief moved into `blocks` in D-02 and is written by the shared block
+  // editor, not by this mutation — admin block editing arrives in D-06.
+  it("leaves the design's blocks untouched", async () => {
+    const t = convexTest(schema, modules);
+    const { userId: ownerId } = await seedUser(t, "owner");
+    const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
+    const designId = await seedDesign(t, ownerId, "Home kit");
+    const before = await t.run((ctx) => ctx.db.get(designId));
+
+    await asAdmin.mutation(api.admin.updateDesign, {
+      designId,
+      title: "Home kit v2",
+    });
+
+    const after = await t.run((ctx) => ctx.db.get(designId));
+    expect(after!.blocks).toEqual(before!.blocks);
   });
 
   it("clears an optional spec when sent an empty string", async () => {

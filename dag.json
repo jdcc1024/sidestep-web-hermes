@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T01:28:24.298Z",
+  "lastUpdated": "2026-07-26T01:43:09.006Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1347,10 +1347,10 @@
       "phase": "phase-1",
       "type": "infrastructure",
       "description": "Replace designs.fileIds with a designAssets table (filename, contentType, uploader, isMain) plus a shared main-image resolver. Foundation for thumbnails and image/non-image detection.",
-      "status": "in-progress",
+      "status": "completed",
       "agent": "ralph-loop",
       "startedAt": "2026-07-26T01:28:24.297Z",
-      "completedAt": null,
+      "completedAt": "2026-07-26T01:42:59.781Z",
       "issueFile": "backlog/D-01-design-assets-metadata-table.md",
       "prdRef": "docs/prd/design-page-blocks.md#5-scope",
       "acceptanceCriteria": [
@@ -1365,9 +1365,9 @@
       "phase": "phase-1",
       "type": "feature",
       "description": "Add designs.blocks (ordered text|gallery|palette union), remove brief (Overview replaces it), and render blocks read-only on portal + admin pages.",
-      "status": "blocked",
-      "agent": null,
-      "startedAt": null,
+      "status": "in-progress",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-26T01:43:09.005Z",
       "completedAt": null,
       "issueFile": "backlog/D-02-design-blocks-model-and-read-rendering.md",
       "prdRef": "docs/prd/design-page-blocks.md#5-scope",
@@ -1455,7 +1455,7 @@
       "phase": "phase-3",
       "type": "feature",
       "description": "Show each linked design's resolved main image next to its file count on the order page. Thin read-side + UI slice over the D-01 resolver.",
-      "status": "blocked",
+      "status": "pending",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -2171,8 +2171,8 @@
       "id": "ralph-loop",
       "name": "Ralph Loop",
       "status": "working",
-      "currentTask": "D-01",
-      "tasksCompleted": 9
+      "currentTask": "D-02",
+      "tasksCompleted": 10
     },
     {
       "id": "review-batch",
@@ -2183,27 +2183,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-27T20:39:40.399Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "opus-A04",
-      "message": "Opus A-04 joined the workforce"
-    },
-    {
-      "timestamp": "2026-05-27T20:39:40.458Z",
-      "event": "task_started",
-      "nodeId": "A-04",
-      "agent": "opus-A04",
-      "message": "Opus A-04 picked up: Consolidate Jersey Run Response Validation Rules"
-    },
-    {
-      "timestamp": "2026-05-28T15:54:05.324Z",
-      "event": "task_completed",
-      "nodeId": "A-04",
-      "agent": "opus-A04",
-      "message": "Completed: Consolidate Jersey Run Response Validation Rules"
-    },
     {
       "timestamp": "2026-05-30T15:52:46.245Z",
       "event": "agent_joined",
@@ -2882,6 +2861,27 @@
       "nodeId": "D-01",
       "agent": "ralph-loop",
       "message": "Ralph Loop picked up: Design Assets Metadata Table"
+    },
+    {
+      "timestamp": "2026-07-26T01:41:54.806Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-26T01:42:59.782Z",
+      "event": "task_completed",
+      "nodeId": "D-01",
+      "agent": "ralph-loop",
+      "message": "Completed: Design Assets Metadata Table"
+    },
+    {
+      "timestamp": "2026-07-26T01:43:09.005Z",
+      "event": "task_started",
+      "nodeId": "D-02",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Design Blocks Model and Read Rendering"
     }
   ]
 }

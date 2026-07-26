@@ -5,6 +5,7 @@ import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
 
@@ -54,7 +55,7 @@ async function seedDesign(
     ctx.db.insert("designs", {
       ownerId,
       title,
-      brief: "A brief",
+      blocks: overviewBlocks("A brief"),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }),
@@ -127,7 +128,7 @@ describe("orders.createOrder", () => {
       ctx.db.insert("designs", {
         ownerId: otherUserId,
         title: "Not mine",
-        brief: "Not my brief",
+        blocks: overviewBlocks("Not my brief"),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }),
@@ -321,7 +322,7 @@ describe("orders.getMyOrder", () => {
       ctx.db.insert("designs", {
         ownerId: userId,
         title: "Home kit",
-        brief: "Classic look",
+        blocks: overviewBlocks("Classic look"),
         jerseyStyle: "Pro Fit",
         neckline: "V-Neck",
         sleeveStyle: "Raglan",

@@ -293,3 +293,59 @@ One entry per completed loop task. This is the human's fast path for UX critique
   - **Filenames are shown as-is in the read-side lists** (D-02 owns the rich
     rendering); a blank name normalizes to "Untitled file" server-side.
 - Follow-ups filed: none
+
+## 2026-07-25 — D-02: Design Blocks Model and Read Rendering
+
+- What shipped:
+  - `designs.blocks` — an ordered discriminated union (`text` / `gallery` /
+    `palette`) on the design doc, replacing the single `brief` string. Rules
+    live in `lib/designBlock.ts` (fixed text sections used at most once,
+    Overview required, one palette per design, hex/role/caption validation,
+    `withOverview` merge); `convex/_designBlocks.ts` owns the stored shape and
+    the one `prepareBlocks` gate every mutation runs a payload through.
+  - `components/design/DesignBlocks.tsx` renders a brief read-only on both the
+    portal and admin design pages: text sections headed by their field name,
+    gallery grids that inline web-safe images by content type and fall back to
+    typed download cards (or "Unavailable" on a null URL), and palette swatches
+    with hex chip, role and Pantone label.
+  - `brief` is gone everywhere: the design form's textarea now writes the
+    Overview block, and every list/card/admin summary reads `overviewOf(blocks)`.
+
+- **Screenshots: none — blocked, needs a human action.** The dev Convex
+  deployment still holds one pre-D-01 dummy design (`TOC 2026 Jersey`, id
+  `j572994ahcdr7mzg6h8aycd9sh877eb4`) carrying the *old* `brief` + `fileIds`
+  shape, so `npx convex dev` refuses to push: *"Object is missing the required
+  field `blocks`"*. With no backend matching the code, `snap.mjs` can't reach
+  network-idle on any authenticated route and times out (0/18). D-01's report
+  raised the same wipe and it hasn't happened yet, so **D-01's UI is also
+  unscreenshotted**. Delete that one document in the Convex dashboard (PRD §6:
+  "Migration: none — schema swap, wipe dummy data once") and both slices become
+  reviewable.
+
+- UX surfaces to eyeball once the wipe unblocks the deployment:
+  `/portal/designs/[id]` (the brief is now blocks — check gallery grid density
+  at 375px and that a long filename truncates in the download card),
+  `/admin/designs/[id]` (new read-only "Brief" card above Silhouette specs),
+  `/portal/designs/new` + edit (the "Brief" textarea is now "Overview"),
+  and the summary lines on `/portal`, `/portal/designs`, `/admin/orders/[id]`.
+
+- Decisions I made that a human may want to veto:
+  - **Overview is required by the validator, not just on create.** Every list
+    surface reads it, so a design without one has no summary anywhere. The
+    editor simply won't offer to remove it (D-03).
+  - **Admin lost inline brief editing.** `admin.updateDesign` no longer takes
+    `brief` — the block editor writes blocks, and that lands for admin in D-06.
+    Staff can still edit title, specs and files in the meantime.
+  - **Hex is stored canonicalized as uppercase `#RRGGBB`** (shorthand expanded,
+    bare digits accepted) so a swatch reads like a spec token next to its
+    Pantone code.
+  - **Text bodies keep the old 2000-char cap** (`TEXT_BODY_MAX_LENGTH`), now
+    owned by `lib/designBlock` rather than `lib/design/rules`.
+  - **Galleries allow the same asset in two galleries but not twice in one**,
+    and an empty gallery/palette is storable — those are normal mid-edit states
+    that D-05 needs.
+  - **I killed a stale `next dev` process** (PID 145928, started 2026-07-20)
+    that was squatting on :8080 with an outdated route manifest — Next 16
+    refuses a second dev server for the same directory. A fresh one is running.
+
+- Follow-ups filed: none

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
+import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
 const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -34,14 +35,14 @@ async function seedRun(
       const homeId = await ctx.db.insert("designs", {
         ownerId: userId,
         title: "Home",
-        brief: "home kit",
+        blocks: overviewBlocks("home kit"),
         createdAt: now,
         updatedAt: now,
       });
       const awayId = await ctx.db.insert("designs", {
         ownerId: userId,
         title: "Away",
-        brief: "away kit",
+        blocks: overviewBlocks("away kit"),
         createdAt: now,
         updatedAt: now,
       });
@@ -371,7 +372,7 @@ describe("orderEntries.submitOrder", () => {
       ctx.db.insert("designs", {
         ownerId: userId,
         title: "Stray",
-        brief: "x",
+        blocks: overviewBlocks("x"),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }),

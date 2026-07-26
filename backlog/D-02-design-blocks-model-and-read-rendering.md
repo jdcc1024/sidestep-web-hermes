@@ -1,6 +1,6 @@
 # Issue: Design Blocks Model and Read Rendering
 
-## Status: pending
+## Status: done
 
 ## Phase: 1
 
@@ -8,23 +8,23 @@
 
 ## Vertical Slice
 This issue touches:
-- [ ] Database: `designs.blocks` — ordered array of a discriminated union (`text` | `gallery` | `palette`); remove `designs.brief` (replaced by Overview)
-- [ ] API: mutations accept/validate `blocks`; queries return them; block validators (fixed-field uniqueness, single-palette rule, swatch shape)
-- [ ] Frontend: read-only rendering of blocks on portal + admin detail pages (text sections, gallery grids, palette swatches)
-- [ ] Tests: block validators; render tests for each block kind incl. inline-image vs download-card
+- [x] Database: `designs.blocks` — ordered array of a discriminated union (`text` | `gallery` | `palette`); remove `designs.brief` (replaced by Overview)
+- [x] API: mutations accept/validate `blocks`; queries return them; block validators (fixed-field uniqueness, single-palette rule, swatch shape)
+- [x] Frontend: read-only rendering of blocks on portal + admin detail pages (text sections, gallery grids, palette swatches)
+- [x] Tests: block validators; render tests for each block kind incl. inline-image vs download-card
 
 ## Description
 Introduce the block content model on the design doc and render it read-only on both detail pages. Text sections render as headed prose, galleries as thumbnail grids (web-safe images inline, other files as download cards), palette as labelled swatches. `brief` is removed — the Overview text block becomes the design's primary description read by list/card/admin summaries.
 
 ## Acceptance Criteria
-- [ ] `designs.blocks` array persists a discriminated union: `text {field: overview|concept|inspiration|notes, body}`, `gallery {caption?, assetIds[]}`, `palette {caption?, swatches[]}`; each block has a stable `id`
-- [ ] Validators enforce: each text `field` used at most once; at most one `palette` block; swatch `{hex, role?, label?, pantoneCode?}` with valid hex + role in `primary|secondary|accent`
-- [ ] `designs.brief` removed; Overview text block is the summary source for list/card/admin views (with a graceful empty state)
-- [ ] Portal + admin detail pages render blocks read-only in stored order
-- [ ] Gallery renders web-safe images inline (by `contentType`) and non-web assets as typed download cards; unavailable URLs degrade gracefully
-- [ ] Palette renders swatches with hex chip, role, and Pantone code label when present
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] `designs.blocks` array persists a discriminated union: `text {field: overview|concept|inspiration|notes, body}`, `gallery {caption?, assetIds[]}`, `palette {caption?, swatches[]}`; each block has a stable `id`
+- [x] Validators enforce: each text `field` used at most once; at most one `palette` block; swatch `{hex, role?, label?, pantoneCode?}` with valid hex + role in `primary|secondary|accent`
+- [x] `designs.brief` removed; Overview text block is the summary source for list/card/admin views (with a graceful empty state)
+- [x] Portal + admin detail pages render blocks read-only in stored order
+- [x] Gallery renders web-safe images inline (by `contentType`) and non-web assets as typed download cards; unavailable URLs degrade gracefully
+- [x] Palette renders swatches with hex chip, role, and Pantone code label when present
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: D-01

@@ -11,6 +11,7 @@ import { ExportOrderButton } from "@/components/admin/ExportOrderButton";
 import { InlineEditField } from "@/components/admin/InlineEditField";
 import { OrderStageChecklist } from "@/components/admin/OrderStageChecklist";
 import { validateQuantity, validateRequiredText } from "@/lib/adminRecords";
+import { overviewOf } from "@/lib/designBlock";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -175,9 +176,9 @@ export default function AdminOrderDetailPage({
                       {design.title}
                     </Link>
                   </h3>
-                  {design.brief && (
+                  {overviewOf(design.blocks) && (
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {design.brief}
+                      {overviewOf(design.blocks)}
                     </p>
                   )}
                   {design.canvaLink && (

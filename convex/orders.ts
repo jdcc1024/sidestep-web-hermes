@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { getCurrentUserOrNull, requireCurrentUser } from "./_auth";
 import { fileCountsByDesign } from "./_designAssets";
+import { overviewOf } from "../lib/designBlock";
 import { isLocked } from "../lib/jerseyRun/lock";
 
 // Server-side guards. Mirror lib/order.ts so the client and server cap
@@ -123,7 +124,9 @@ export const getMyOrder = query({
       linkedDesigns.map(async (design) => ({
         _id: design._id,
         title: design.title,
-        brief: design.brief,
+        // The order page shows a one-line summary, not the whole brief — the
+        // Overview block is that summary since D-02.
+        overview: overviewOf(design.blocks),
         canvaLink: design.canvaLink,
         // Silhouette specs live on the design now (O-01); surface them so the
         // order detail can render each design as its own section with its cut.

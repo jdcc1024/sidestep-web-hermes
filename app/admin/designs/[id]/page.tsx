@@ -8,8 +8,8 @@ import { ArrowLeft, FileDown } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { InlineEditField } from "@/components/admin/InlineEditField";
+import { DesignBlocks } from "@/components/design/DesignBlocks";
 import {
-  MAX_BRIEF,
   validateOptionalText,
   validateRequiredText,
 } from "@/lib/adminRecords";
@@ -73,13 +73,6 @@ export default function AdminDesignDetailPage({
             validate={(v) => validateRequiredText(v, "Title")}
             onSave={(title) => updateDesign({ designId, title })}
           />
-          <InlineEditField
-            label="Brief"
-            value={design.brief}
-            multiline
-            validate={(v) => validateOptionalText(v, "Brief", MAX_BRIEF)}
-            onSave={(brief) => updateDesign({ designId, brief })}
-          />
           {design.canvaLink && (
             <p className="text-xs">
               <a
@@ -92,6 +85,19 @@ export default function AdminDesignDetailPage({
               </a>
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Brief</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="-mt-1 mb-4 text-xs text-muted-foreground">
+            The captain&apos;s structured brief, read-only for now — staff edit
+            it through the shared block editor in D-06.
+          </p>
+          <DesignBlocks blocks={design.blocks} assets={assets} />
         </CardContent>
       </Card>
 

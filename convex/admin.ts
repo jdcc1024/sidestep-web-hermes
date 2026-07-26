@@ -10,7 +10,6 @@ import {
   resolveDesignAssets,
 } from "./_designAssets";
 import {
-  MAX_BRIEF,
   validateEmail,
   validateOptionalText,
   validateQuantity,
@@ -431,14 +430,17 @@ export const updateOrder = mutation({
   },
 });
 
-// Admin correction of a design: its title, brief, and the silhouette specs
-// that live on it since O-01. The optional specs are clearable — an empty
-// string removes the field rather than storing "".
+// Admin correction of a design: its title and the silhouette specs that live
+// on it since O-01. The optional specs are clearable — an empty string
+// removes the field rather than storing "".
+//
+// The brief is no longer here: it became the `blocks` array in D-02, which
+// the shared block editor writes. Admin block editing arrives with that
+// editor in D-06; until then the admin page renders blocks read-only.
 export const updateDesign = mutation({
   args: {
     designId: v.id("designs"),
     title: v.optional(v.string()),
-    brief: v.optional(v.string()),
     jerseyStyle: v.optional(v.string()),
     neckline: v.optional(v.string()),
     sleeveStyle: v.optional(v.string()),
@@ -453,10 +455,6 @@ export const updateDesign = mutation({
     if (fields.title !== undefined) {
       reject(validateRequiredText(fields.title, "Title"));
       patch.title = fields.title.trim();
-    }
-    if (fields.brief !== undefined) {
-      reject(validateOptionalText(fields.brief, "Brief", MAX_BRIEF));
-      patch.brief = fields.brief.trim();
     }
     for (const key of ["jerseyStyle", "neckline", "sleeveStyle"] as const) {
       const value = fields[key];
