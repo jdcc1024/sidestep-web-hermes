@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T16:40:53.287Z",
+  "lastUpdated": "2026-07-26T16:43:00.611Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1128,10 +1128,10 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Once the roster is locked, freeze the order: details go read-only and edit mutations are rejected so the production basis cannot drift. Reacts to the external locked run state; standalone designs stay editable. BLOCKED on the external Confirm/Lock slice (jerseyRuns.locked status).",
-      "status": "in-progress",
+      "status": "completed",
       "agent": "ralph-loop",
       "startedAt": "2026-07-26T16:34:03.211Z",
-      "completedAt": null,
+      "completedAt": "2026-07-26T16:43:00.610Z",
       "issueFile": "backlog/O-06-freeze-order-when-roster-locked.md",
       "prdRef": "docs/prd/new-edit-order-page.md#5-scope",
       "acceptanceCriteria": [
@@ -1512,7 +1512,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "R-06 shipped lock/unlock mutations with no UI. The captain run surfaces (run setup, run responses) still offer Manage-run affordances on a locked run and expose no lock/unlock control, so a captain can neither lock deliberately nor see why a run stopped accepting edits.",
-      "status": "blocked",
+      "status": "pending",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -2221,9 +2221,9 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "working",
-      "currentTask": "O-06",
-      "tasksCompleted": 16
+      "status": "idle",
+      "currentTask": null,
+      "tasksCompleted": 17
     },
     {
       "id": "review-batch",
@@ -2234,13 +2234,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-06-01T07:56:36.278Z",
-      "event": "task_started",
-      "nodeId": "O-04",
-      "agent": "opus-o04",
-      "message": "Opus (O-04) picked up: New / Edit Order Single Page"
-    },
     {
       "timestamp": "2026-06-01T08:08:01.277Z",
       "event": "task_completed",
@@ -2933,6 +2926,13 @@
       "nodeId": "R-08",
       "agent": null,
       "message": "New task added: Run Surface Lock Controls"
+    },
+    {
+      "timestamp": "2026-07-26T16:43:00.611Z",
+      "event": "task_completed",
+      "nodeId": "O-06",
+      "agent": "ralph-loop",
+      "message": "Completed: Freeze Order When Roster Locked"
     }
   ]
 }
