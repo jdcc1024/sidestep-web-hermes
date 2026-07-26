@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T16:27:25.596Z",
+  "lastUpdated": "2026-07-26T16:33:01.895Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1455,10 +1455,10 @@
       "phase": "phase-3",
       "type": "feature",
       "description": "Show each linked design's resolved main image next to its file count on the order page. Thin read-side + UI slice over the D-01 resolver.",
-      "status": "in-progress",
+      "status": "completed",
       "agent": "ralph-loop",
       "startedAt": "2026-07-26T16:27:25.595Z",
-      "completedAt": null,
+      "completedAt": "2026-07-26T16:33:01.891Z",
       "issueFile": "backlog/D-07-order-page-design-main-image.md",
       "prdRef": "docs/prd/design-page-blocks.md#5-scope",
       "acceptanceCriteria": [
@@ -2195,9 +2195,9 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "working",
-      "currentTask": "D-07",
-      "tasksCompleted": 15
+      "status": "idle",
+      "currentTask": null,
+      "tasksCompleted": 16
     },
     {
       "id": "review-batch",
@@ -2208,13 +2208,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-06-01T07:40:06.963Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "opus-o03",
-      "message": "Opus O-03 joined the workforce"
-    },
     {
       "timestamp": "2026-06-01T07:40:07.018Z",
       "event": "task_started",
@@ -2907,6 +2900,13 @@
       "nodeId": "D-07",
       "agent": "ralph-loop",
       "message": "Ralph Loop picked up: Order Page Design Main Image"
+    },
+    {
+      "timestamp": "2026-07-26T16:33:01.895Z",
+      "event": "task_completed",
+      "nodeId": "D-07",
+      "agent": "ralph-loop",
+      "message": "Completed: Order Page Design Main Image"
     }
   ]
 }
