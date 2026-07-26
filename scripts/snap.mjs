@@ -78,32 +78,130 @@ async function ensureServer() {
   process.exit(1);
 }
 
+function loadEnv() {
+  for (const envFile of ['.env.local', '.env']) {
+    const envPath = path.join(ROOT, envFile);
+    if (fs.existsSync(envPath)) {
+      try {
+        process.loadEnvFile(envPath);
+      } catch {
+        /* ignore error if file missing or invalid */
+      }
+    }
+  }
+}
+
+function waitForEnter() {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question('', () => {
+      rl.close();
+      resolve();
+    });
+  });
+}
+
 async function login() {
   fs.mkdirSync(path.dirname(AUTH_STATE), { recursive: true });
-  try { process.loadEnvFile(path.join(ROOT, '.env.local')); } catch { /* no .env.local — clerkSetup will error below */ }
+  loadEnv();
 
-  const { clerkSetup, setupClerkTestingToken } = await import('@clerk/testing/playwright');
+  const snapUid = process.env.SNAP_UID;
+  const snapPwd = process.env.SNAP_PWD;
+
+  const { clerkSetup, setupClerkTestingToken, clerk } = await import('@clerk/testing/playwright');
   await clerkSetup(); // fetches a testing token from the Clerk Backend API using CLERK_SECRET_KEY
 
   const server = await ensureServer();
   const userDataDir = path.join(ROOT, '.auth', 'chrome-profile');
-  const context = await chromium.launchPersistentContext(userDataDir, {
-    headless: false,
-    channel: 'chrome', // real installed Chrome, not the Playwright test build — fewer automation tells
+  
+  const launchOptions = {
+    headless: Boolean(snapUid),
     viewport: { width: 1280, height: 800 },
     args: ['--disable-blink-features=AutomationControlled'],
     ignoreDefaultArgs: ['--enable-automation'],
-  });
+  };
+
+  let context;
+  try {
+    context = await chromium.launchPersistentContext(userDataDir, {
+      ...launchOptions,
+      channel: 'chrome',
+    });
+  } catch {
+    context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+  }
+
   await setupClerkTestingToken({ context }); // bypasses Clerk's Cloudflare bot check for this session
   const page = await context.newPage();
-  await page.goto(BASE);
-  console.log('\n[snap] Sign in with a Clerk EMAIL/PASSWORD (or email-code) test user.');
-  console.log('[snap] Do NOT use "Continue with Google" — Google blocks automated browsers at the OAuth step no matter what.');
-  console.log('[snap] Then press Enter here to save the session...');
-  await new Promise(resolve => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    rl.question('', () => { rl.close(); resolve(); });
-  });
+
+  if (snapUid) {
+    console.log(`[snap] Programmatically signing in as ${snapUid}...`);
+    let loggedIn = false;
+
+    // Primary strategy: @clerk/testing helper
+    try {
+      await page.goto(BASE);
+      if (snapPwd) {
+        await clerk.signIn({
+          page,
+          signInParams: {
+            strategy: 'password',
+            identifier: snapUid,
+            password: snapPwd,
+          },
+        });
+      } else {
+        await clerk.signIn({
+          page,
+          emailAddress: snapUid,
+        });
+      }
+      loggedIn = true;
+      console.log('[snap] Programmatic login via @clerk/testing succeeded.');
+    } catch (err) {
+      console.warn(`[snap] @clerk/testing sign-in error: ${err.message}. Trying UI automation fallback...`);
+    }
+
+    // Secondary strategy: Playwright UI automation fallback
+    if (!loggedIn) {
+      try {
+        await page.goto(BASE + '/sign-in');
+        const identifierInput = page.locator('input[name="identifier"], input[type="email"], input[name="username"]').first();
+        await identifierInput.waitFor({ state: 'visible', timeout: 10000 });
+        await identifierInput.fill(snapUid);
+
+        const submitBtn = page.locator('button[type="submit"], button.cl-formButtonPrimary').first();
+        await submitBtn.click();
+
+        if (snapPwd) {
+          const passwordInput = page.locator('input[name="password"], input[type="password"]').first();
+          await passwordInput.waitFor({ state: 'visible', timeout: 10000 });
+          await passwordInput.fill(snapPwd);
+
+          const submitPwdBtn = page.locator('button[type="submit"], button.cl-formButtonPrimary').first();
+          await submitPwdBtn.click();
+        }
+
+        await page.waitForFunction(() => window.Clerk?.user !== null || !window.location.pathname.startsWith('/sign-in'), { timeout: 15000 });
+        loggedIn = true;
+        console.log('[snap] Programmatic login via UI automation succeeded.');
+      } catch (err) {
+        console.error(`[snap] Programmatic UI automation failed: ${err.message}`);
+      }
+    }
+
+    if (!loggedIn) {
+      console.error('[snap] Automatic login failed. Falling back to manual intervention...');
+      await waitForEnter();
+    }
+  } else {
+    await page.goto(BASE);
+    console.log('\n[snap] Sign in with a Clerk EMAIL/PASSWORD (or email-code) test user.');
+    console.log('[snap] Do NOT use "Continue with Google" — Google blocks automated browsers at the OAuth step no matter what.');
+    console.log('[snap] Then press Enter here to save the session...');
+    await waitForEnter();
+  }
+
   await context.storageState({ path: AUTH_STATE });
   await context.close();
   server?.kill();
@@ -111,14 +209,21 @@ async function login() {
 }
 
 async function snap(issueId, routes) {
+  loadEnv();
   const outDir = path.join(ROOT, 'docs', 'review', issueId);
   fs.mkdirSync(outDir, { recursive: true });
-  const server = await ensureServer();
-  const hasAuth = fs.existsSync(AUTH_STATE);
+  let hasAuth = fs.existsSync(AUTH_STATE);
   if (!hasAuth && routes.some(r => r.startsWith('/portal') || r.startsWith('/admin'))) {
-    console.warn('[snap] WARNING: no .auth/state.json — authed routes will show the sign-in page. Run `node scripts/snap.mjs --login` once (human task).');
+    if (process.env.SNAP_UID) {
+      console.log('[snap] No .auth/state.json found, but SNAP_UID is set in env. Performing automatic login...');
+      await login();
+      hasAuth = fs.existsSync(AUTH_STATE);
+    } else {
+      console.warn('[snap] WARNING: no .auth/state.json — authed routes will show the sign-in page. Run `node scripts/snap.mjs --login` once (human task).');
+    }
   }
 
+  const server = await ensureServer();
   const browser = await chromium.launch();
   const shots = [];
   try {
@@ -134,8 +239,8 @@ async function snap(issueId, routes) {
           const slug = route.replace(/^\//, '').replace(/[^a-zA-Z0-9]+/g, '-') || 'home';
           const file = path.join(outDir, `${slug}-w${vp.width}-${scheme}.png`);
           try {
-            await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 30_000 });
-            await page.waitForTimeout(500); // settle animations/fonts
+            await page.goto(BASE + route, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+            await page.waitForTimeout(1000); // settle animations/fonts
             await page.screenshot({ path: file, fullPage: true });
             shots.push(path.relative(ROOT, file));
             console.log(`[snap] ${route} @ ${vp.width}px ${scheme} → ${path.relative(ROOT, file)}`);
@@ -165,3 +270,4 @@ if (args[0] === '--login') {
   console.log('Usage:\n  node scripts/snap.mjs <issueId> <route> [route...]\n  node scripts/snap.mjs --login');
   process.exit(1);
 }
+
