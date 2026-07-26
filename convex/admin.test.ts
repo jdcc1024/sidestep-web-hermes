@@ -535,7 +535,7 @@ describe("admin list-view user joins", () => {
     expect(designs[0]).toMatchObject({ ownerName: "Unknown", ownerEmail: "" });
   });
 
-  it("joins team name, captain, and response count onto each jersey run", async () => {
+  it("joins team name, captain, and jersey count (Σ qty) onto each jersey run", async () => {
     const t = convexTest(schema, modules);
     const { userId: captainId } = await seedUser(t, "captain", {
       name: "Ada Lovelace",
@@ -543,15 +543,21 @@ describe("admin list-view user joins", () => {
     });
     const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
     const orderId = await seedOrder(t, captainId);
+    const designId = await seedDesign(t, captainId, "Home");
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
     const runId = await seedRun(t, orderId, captainId);
+    // responseCount is now Σ qty over the run's order entries (R-07): one
+    // line of qty 1 must tally as 1.
     await t.run((ctx) =>
-      ctx.db.insert("jerseyRunResponses", {
-        jerseyRunId: runId,
-        respondentName: "Fan",
-        respondentEmail: "fan@example.com",
+      ctx.db.insert("orderEntries", {
+        runId,
+        designId,
         size: "M",
-        customAnswers: {},
-        submittedAt: Date.now(),
+        qty: 1,
+        source: "fan",
+        submitterName: "Fan",
+        submitterEmail: "fan@example.com",
+        createdAt: Date.now(),
       }),
     );
 

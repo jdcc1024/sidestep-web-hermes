@@ -43,11 +43,7 @@ export type NamesMode = (typeof NAMES_MODES)[number];
 
 export const MAX_CUSTOM_QUESTIONS = 5;
 export const QUESTION_LABEL_MAX_LENGTH = 200;
-export const ROSTER_NAME_MAX_LENGTH = 80;
-export const ROSTER_NUMBER_MAX_LENGTH = 8;
-export const MAX_ROSTER_ENTRIES = 200;
 
-export type RosterEntry = { name: string; number: string };
 export type CustomQuestion = { id: string; label: string };
 
 export function isSizeOption(value: string): value is SizeOption {
@@ -71,9 +67,9 @@ export function parseDeadline(value: string): number | null {
   return ms;
 }
 
-// Generate a unique id for a new custom question or roster entry. Uses
-// crypto.randomUUID where available (modern browsers and Node 19+); falls
-// back to a timestamp+random combo in older environments and JSDOM.
+// Generate a unique id for a new custom question. Uses crypto.randomUUID
+// where available (modern browsers and Node 19+); falls back to a
+// timestamp+random combo in older environments and JSDOM.
 export function newQuestionId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();

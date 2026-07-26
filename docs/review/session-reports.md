@@ -4,6 +4,68 @@ One entry per completed loop task. This is the human's fast path for UX critique
 
 ---
 
+## 2026-07-26 — R-07: Migrate Remaining Surfaces + Retire Old Tables
+
+- What shipped — the interim dual-model state is gone. `jerseyRunResponses`
+  (the flat one-row-per-fan table) and `jerseyRuns.fixedRoster` (the run-level
+  roster array) are **deleted from the schema**. Every reader now sits on the
+  unified `orderEntries` / `rosterEntries` model (R-01), and every writer was
+  already there (R-02…R-06), so this was the cleanup slice, not new behaviour.
+  - **Convex reads repointed.** `jerseyRuns.listResponses` → **`listOrderEntries`**
+    (returns the run + order + each order entry enriched with its design title
+    and, when it fills a slot, the roster name/number). `listMyResponses`
+    rewritten to read a fan's own jerseys by normalized submitter email — via a
+    **new `orderEntries.by_submitterEmail` index** so it stays indexed, not a
+    scan. `admin.getOrder` / `admin.listJerseyRuns` counts and `_closeRun`'s
+    email count all now compute **Σ qty over order entries** (total jerseys).
+  - **Legacy writers/readers deleted:** `jerseyRuns.submitResponse` (replaced by
+    `orderEntries.submitOrder` back in R-02) and the unused
+    `listMyResponsesForRun`. `create` no longer accepts or writes `fixedRoster`.
+  - **UI migrated.** Admin run detail and the captain responses page render an
+    **order-entry table** (Submitter · Email · Design · Jersey · Size · Qty ·
+    custom answers · Submitted); a slot-less line reads "Blank". The portal
+    dashboard "your jersey run responses" cards read order entries (design title
+    + `N×` when qty > 1). The run setup form **drops the inline fixed roster** —
+    fixed-mode named slots are seeded through the RosterManager (R-03) after
+    creation, which is now the single source of truth.
+  - **Lib cleanup.** `lib/jerseyRun` lost the `fixedRoster` field and roster
+    caps (they live in `lib/rosterEntry` now). `lib/jerseyRunResponse/form.ts`
+    (the dead response form adapter) deleted; `rules.ts` slimmed to the grain
+    still shared by the public form + submit mutation (`isJerseyRunClosed`,
+    `checkCustomAnswer`).
+
+- Verified: `node scripts/verify.mjs` PASS — typecheck clean, 0 lint errors,
+  **884 tests** green (added `listOrderEntries` + `listMyResponses` coverage;
+  retired the `submitResponse` and legacy-table tests). A repo-wide grep for
+  `jerseyRunResponses` / `fixedRoster` shows only historical comments and one
+  intentional `not.toHaveProperty("fixedRoster")` assertion.
+
+- UX surfaces to eyeball: `/portal/orders/<id>/run/responses` (captain) and
+  `/admin/jersey-runs/<id>` (admin) for a run with a mix of named, blank/bulk,
+  and multi-qty order entries — check the new columns read cleanly and "Blank"
+  isn't mistaken for missing data; `/portal` dashboard cards for a fan who
+  ordered across designs; `/portal/orders/<id>/run/setup` in **fixed** mode —
+  confirm the roster is seeded via RosterManager and the old inline roster form
+  is gone. **No screenshots** — routes are behind Clerk and `.auth/state.json`
+  is stale (same blocker as recent slices).
+
+- Decisions I made that a human may want to veto:
+  1. **Counts are Σ qty (total jerseys) everywhere**, not a row/submitter tally.
+     The old table was one row = one jersey, so Σ qty is the faithful analog and
+     it reconciles with the order page's derived total (O-07) and the responses
+     estimate. Side effect: the closure email's "N people submitted" now counts
+     jerseys, not people — I left that render fn (deadline lib) untouched.
+  2. **Kept the field/module names `responseCount`, `jerseyRunResponseCount`,
+     and the `lib/jerseyRunResponse` module** rather than renaming. They no
+     longer reference a real table but renaming fans out into more surfaces;
+     flagged here if you'd rather I rename for clarity.
+  3. **`listOrderEntries` returns fully-joined rows** (design title + slot
+     name/number resolved server-side) so both consuming pages stay dumb. The
+     alternative — return raw entries and let each page join — duplicated the
+     lookup twice.
+
+---
+
 ## 2026-07-26 — O-07: Order Total Derived From Roster
 
 - What shipped:

@@ -28,7 +28,7 @@ export default function AdminJerseyRunDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const jerseyRunId = id as Id<"jerseyRuns">;
 
-  const data = useQuery(api.jerseyRuns.listResponses, { jerseyRunId });
+  const data = useQuery(api.jerseyRuns.listOrderEntries, { jerseyRunId });
   const closeRun = useMutation(api.jerseyRuns.closeRunByAdmin);
 
   const [closing, setClosing] = useState(false);
@@ -37,9 +37,10 @@ export default function AdminJerseyRunDetailPage({ params }: PageProps) {
   if (data === undefined) return <Loading />;
   if (data === null) return <NotFound />;
 
-  const { run, order, responses } = data;
+  const { run, order, entries } = data;
   const deadlineStatus = describeDeadline(run.deadline);
   const isClosed = run.status === "closed";
+  const totalJerseys = entries.reduce((sum, e) => sum + e.qty, 0);
 
   const handleClose = async () => {
     if (closing || isClosed) return;
@@ -119,12 +120,12 @@ export default function AdminJerseyRunDetailPage({ params }: PageProps) {
 
       <section aria-label="Summary" className="mt-8 grid gap-3 sm:grid-cols-4">
         <SummaryCard
-          label="Responses"
-          value={String(responses.length)}
+          label="Jerseys"
+          value={String(totalJerseys)}
           caption={
-            responses.length === 1
-              ? "1 submission"
-              : `${responses.length} submissions`
+            entries.length === 1
+              ? "1 order line"
+              : `${entries.length} order lines`
           }
         />
         <SummaryCard
@@ -138,7 +139,7 @@ export default function AdminJerseyRunDetailPage({ params }: PageProps) {
           value={run.namesMode === "fixed" ? "Fixed roster" : "Open"}
           caption={
             run.namesMode === "fixed"
-              ? `${run.fixedRoster?.length ?? 0} roster names`
+              ? "Pick from seeded slots"
               : "Anyone can submit"
           }
         />
@@ -151,14 +152,14 @@ export default function AdminJerseyRunDetailPage({ params }: PageProps) {
 
       <Card className="mt-8 gap-0 p-0">
         <CardHeader className="border-b px-4 py-3">
-          <CardTitle>Responses</CardTitle>
+          <CardTitle>Order entries</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {responses.length === 0 ? (
+          {entries.length === 0 ? (
             <EmptyResponses />
           ) : (
-            <ResponseTable
-              responses={responses}
+            <EntryTable
+              entries={entries}
               customQuestions={run.customQuestions}
             />
           )}
@@ -168,22 +169,24 @@ export default function AdminJerseyRunDetailPage({ params }: PageProps) {
   );
 }
 
-type ResponseRow = {
-  _id: Id<"jerseyRunResponses">;
-  respondentName: string;
-  respondentEmail: string;
+type EntryRow = {
+  _id: Id<"orderEntries">;
+  submitterName: string;
+  submitterEmail: string;
+  designTitle: string;
+  name?: string;
+  number?: string;
   size: string;
-  jerseyName?: string;
-  jerseyNumber?: string;
+  qty: number;
   customAnswers: Record<string, string>;
-  submittedAt: number;
+  createdAt: number;
 };
 
-function ResponseTable({
-  responses,
+function EntryTable({
+  entries,
   customQuestions,
 }: {
-  responses: ResponseRow[];
+  entries: EntryRow[];
   customQuestions: { id: string; label: string }[];
 }) {
   return (
@@ -191,11 +194,12 @@ function ResponseTable({
       <table className="min-w-full divide-y divide-border text-sm">
         <thead className="bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th scope="col" className="px-4 py-3">Name</th>
+            <th scope="col" className="px-4 py-3">Submitter</th>
             <th scope="col" className="px-4 py-3">Email</th>
+            <th scope="col" className="px-4 py-3">Design</th>
+            <th scope="col" className="px-4 py-3">Jersey</th>
             <th scope="col" className="px-4 py-3">Size</th>
-            <th scope="col" className="px-4 py-3">Jersey name</th>
-            <th scope="col" className="px-4 py-3">Number</th>
+            <th scope="col" className="px-4 py-3">Qty</th>
             {customQuestions.map((q) => (
               <th key={q.id} scope="col" className="px-4 py-3">
                 {q.label}
@@ -205,41 +209,36 @@ function ResponseTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {responses.map((r) => (
-            <tr key={r._id} className="hover:bg-muted/40">
+          {entries.map((e) => (
+            <tr key={e._id} className="hover:bg-muted/40">
               <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">
-                {r.respondentName}
+                {e.submitterName}
               </td>
               <td className="px-4 py-3">
                 <a
-                  href={`mailto:${r.respondentEmail}`}
+                  href={`mailto:${e.submitterEmail}`}
                   className="text-teal-700 hover:underline dark:text-teal-300"
                 >
-                  {r.respondentEmail}
+                  {e.submitterEmail}
                 </a>
               </td>
-              <td className="px-4 py-3 text-foreground">{r.size}</td>
+              <td className="px-4 py-3 text-foreground">{e.designTitle}</td>
               <td className="px-4 py-3 text-foreground">
-                {r.jerseyName ?? (
-                  <span className="text-muted-foreground/60">—</span>
-                )}
+                <JerseyCell name={e.name} number={e.number} />
               </td>
-              <td className="px-4 py-3 text-foreground">
-                {r.jerseyNumber ?? (
-                  <span className="text-muted-foreground/60">—</span>
-                )}
-              </td>
+              <td className="px-4 py-3 text-foreground">{e.size}</td>
+              <td className="px-4 py-3 text-foreground">{e.qty}</td>
               {customQuestions.map((q) => (
                 <td key={q.id} className="px-4 py-3 text-foreground">
-                  {r.customAnswers[q.id]?.trim() ? (
-                    r.customAnswers[q.id]
+                  {e.customAnswers[q.id]?.trim() ? (
+                    e.customAnswers[q.id]
                   ) : (
                     <span className="text-muted-foreground/60">—</span>
                   )}
                 </td>
               ))}
               <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                {formatTimestamp(r.submittedAt)}
+                {formatTimestamp(e.createdAt)}
               </td>
             </tr>
           ))}
@@ -247,6 +246,15 @@ function ResponseTable({
       </table>
     </div>
   );
+}
+
+// A named slot renders "Name #number"; a blank/bulk line (no roster slot)
+// reads as "Blank" so a spare jersey isn't mistaken for missing data.
+function JerseyCell({ name, number }: { name?: string; number?: string }) {
+  const label = [name, number ? `#${number}` : null].filter(Boolean).join(" ");
+  if (!label)
+    return <span className="text-muted-foreground/60">Blank</span>;
+  return <>{label}</>;
 }
 
 function RunStatusBadge({

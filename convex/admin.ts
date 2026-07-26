@@ -92,15 +92,15 @@ export const getOrder = query({
       .withIndex("by_order", (q) => q.eq("orderId", order._id))
       .unique();
 
+    // Σ qty of the run's order entries (R-01 model) — total jerseys
+    // ordered, the count that replaced the old one-row-per-response tally.
     const jerseyRunResponseCount = jerseyRun
       ? (
           await ctx.db
-            .query("jerseyRunResponses")
-            .withIndex("by_jerseyRun", (q) =>
-              q.eq("jerseyRunId", jerseyRun._id),
-            )
+            .query("orderEntries")
+            .withIndex("by_run", (q) => q.eq("runId", jerseyRun._id))
             .collect()
-        ).length
+        ).reduce((sum, e) => sum + e.qty, 0)
       : 0;
 
     return {
@@ -531,9 +531,9 @@ export const listJerseyRuns = query({
         const order = orders.get(run.orderId);
         const captain = captains.get(run.captainId);
 
-        const responses = await ctx.db
-          .query("jerseyRunResponses")
-          .withIndex("by_jerseyRun", (q) => q.eq("jerseyRunId", run._id))
+        const entries = await ctx.db
+          .query("orderEntries")
+          .withIndex("by_run", (q) => q.eq("runId", run._id))
           .collect();
 
         return {
@@ -546,7 +546,8 @@ export const listJerseyRuns = query({
           teamName: order?.teamName ?? "Unknown team",
           captainName: captain?.name ?? "Unknown",
           captainEmail: captain?.email ?? "",
-          responseCount: responses.length,
+          // Σ qty — total jerseys ordered on the run (R-07).
+          responseCount: entries.reduce((sum, e) => sum + e.qty, 0),
         };
       }),
     );

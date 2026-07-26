@@ -1,6 +1,6 @@
 # Issue: Migrate Remaining Surfaces + Retire Old Tables
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -17,13 +17,13 @@ This issue touches:
 Finish the migration. With the public form (R-02), captain seeding (R-03), counts (R-04), relabel/remove (R-05) and lock (R-06) all on the new model, migrate the remaining **read** surfaces and then delete the legacy `jerseyRunResponses` table and `jerseyRuns.fixedRoster` field. This is the cleanup slice that removes the interim dual-model state.
 
 ## Acceptance Criteria
-- [ ] Admin jersey-run oversight reads order/roster entries
-- [ ] The captain run responses page reads order entries
-- [ ] Customer participation history (3-04) and logged-in response views (3-08) read order entries
-- [ ] `jerseyRunResponses` table and `jerseyRuns.fixedRoster` are removed from the schema
-- [ ] No code references the removed table/field
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] Admin jersey-run oversight reads order/roster entries
+- [x] The captain run responses page reads order entries
+- [x] Customer participation history (3-04) and logged-in response views (3-08) read order entries
+- [x] `jerseyRunResponses` table and `jerseyRuns.fixedRoster` are removed from the schema
+- [x] No code references the removed table/field
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: R-05, R-06 (and transitively all R-track issues)

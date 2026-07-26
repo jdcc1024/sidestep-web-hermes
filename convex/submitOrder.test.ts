@@ -322,23 +322,6 @@ describe("orderEntries.submitOrder", () => {
     expect(entry?.customAnswers).toEqual({ q1: "None" });
   });
 
-  it("writes nothing to the legacy jerseyRunResponses table", async () => {
-    const t = convexTest(schema, modules);
-    const { runId, homeId } = await seedRun(t);
-
-    await t.mutation(api.orderEntries.submitOrder, {
-      jerseyRunId: runId,
-      ...fan,
-      customAnswers: {},
-      lines: [{ designId: homeId, name: "Gretzky", number: "99", size: "L", qty: 1 }],
-    });
-
-    const legacy = await t.run((ctx) =>
-      ctx.db.query("jerseyRunResponses").collect(),
-    );
-    expect(legacy).toHaveLength(0);
-  });
-
   it("rejects a submission to a closed run", async () => {
     const t = convexTest(schema, modules);
     const { runId, homeId } = await seedRun(t, { status: "closed" });

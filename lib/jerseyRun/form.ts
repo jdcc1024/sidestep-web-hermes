@@ -6,13 +6,9 @@
 
 import {
   MAX_CUSTOM_QUESTIONS,
-  MAX_ROSTER_ENTRIES,
   QUESTION_LABEL_MAX_LENGTH,
-  ROSTER_NAME_MAX_LENGTH,
-  ROSTER_NUMBER_MAX_LENGTH,
   type CustomQuestion,
   type NamesMode,
-  type RosterEntry,
   type SizeOption,
   isNamesMode,
   isSizeOption,
@@ -22,7 +18,6 @@ import {
 export type JerseyRunInput = {
   sizeOptions: string[];
   namesMode: NamesMode | "";
-  fixedRoster: RosterEntry[];
   customQuestions: CustomQuestion[];
   // Kept as a string in form state so the empty state is valid; coerced
   // to a timestamp at payload time.
@@ -32,7 +27,6 @@ export type JerseyRunInput = {
 export type JerseyRunErrors = {
   sizeOptions?: string;
   namesMode?: string;
-  fixedRoster?: string;
   customQuestions?: string;
   deadline?: string;
 };
@@ -40,7 +34,6 @@ export type JerseyRunErrors = {
 export type JerseyRunPayload = {
   sizeOptions: SizeOption[];
   namesMode: NamesMode;
-  fixedRoster: Array<{ name: string; number: string | undefined }>;
   customQuestions: CustomQuestion[];
   deadline: number;
 };
@@ -48,7 +41,6 @@ export type JerseyRunPayload = {
 export const EMPTY_JERSEY_RUN: JerseyRunInput = {
   sizeOptions: [],
   namesMode: "",
-  fixedRoster: [],
   customQuestions: [],
   deadline: "",
 };
@@ -65,29 +57,6 @@ export function validateJerseyRun(
 
   if (!isNamesMode(input.namesMode))
     errors.namesMode = "Choose how names will be collected.";
-
-  if (input.namesMode === "fixed") {
-    const namedEntries = input.fixedRoster
-      .map((entry) => ({
-        name: entry.name.trim(),
-        number: entry.number.trim(),
-      }))
-      .filter((entry) => entry.name.length > 0);
-    if (namedEntries.length === 0)
-      errors.fixedRoster = "Add at least one name to the roster.";
-    else if (input.fixedRoster.length > MAX_ROSTER_ENTRIES)
-      errors.fixedRoster = `Rosters are capped at ${MAX_ROSTER_ENTRIES} names.`;
-    else if (
-      namedEntries.some((entry) => entry.name.length > ROSTER_NAME_MAX_LENGTH)
-    )
-      errors.fixedRoster = `Keep each name under ${ROSTER_NAME_MAX_LENGTH} characters.`;
-    else if (
-      namedEntries.some(
-        (entry) => entry.number.length > ROSTER_NUMBER_MAX_LENGTH,
-      )
-    )
-      errors.fixedRoster = `Keep each number under ${ROSTER_NUMBER_MAX_LENGTH} characters.`;
-  }
 
   if (input.customQuestions.length > MAX_CUSTOM_QUESTIONS)
     errors.customQuestions = `Up to ${MAX_CUSTOM_QUESTIONS} custom questions.`;
@@ -122,20 +91,6 @@ export function toJerseyRunPayload(input: JerseyRunInput): JerseyRunPayload {
   const deadline = parseDeadline(input.deadline);
   if (deadline === null) throw new Error("Invalid deadline");
 
-  const fixedRoster =
-    input.namesMode === "fixed"
-      ? input.fixedRoster
-          .map((entry) => ({
-            name: entry.name.trim(),
-            number: entry.number.trim(),
-          }))
-          .filter((entry) => entry.name.length > 0)
-          .map((entry) => ({
-            name: entry.name,
-            number: entry.number.length > 0 ? entry.number : undefined,
-          }))
-      : [];
-
   const customQuestions = input.customQuestions
     .map((q) => ({ id: q.id, label: q.label.trim() }))
     .filter((q) => q.label.length > 0);
@@ -143,7 +98,6 @@ export function toJerseyRunPayload(input: JerseyRunInput): JerseyRunPayload {
   return {
     sizeOptions,
     namesMode: input.namesMode,
-    fixedRoster,
     customQuestions,
     deadline,
   };

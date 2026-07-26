@@ -88,17 +88,6 @@ export const run = internalMutation({
       createdAt: now,
     });
 
-    const responseId = await ctx.db.insert("jerseyRunResponses", {
-      jerseyRunId: runId,
-      respondentName: "Fan One",
-      respondentEmail: "fan@example.com",
-      jerseyName: "FAN",
-      jerseyNumber: "7",
-      size: "M",
-      customAnswers: { "Delivery method?": "pickup" },
-      submittedAt: now,
-    });
-
     const rosterEntryId = await ctx.db.insert("rosterEntries", {
       runId,
       orderId,
@@ -118,6 +107,7 @@ export const run = internalMutation({
       source: "fan",
       submitterName: "Fan One",
       submitterEmail: "fan@example.com",
+      customAnswers: { q1: "pickup" },
       createdAt: now,
     });
 
@@ -138,7 +128,6 @@ export const run = internalMutation({
         : {}),
       order: await ctx.db.get(orderId),
       run: await ctx.db.get(runId),
-      response: await ctx.db.get(responseId),
       rosterEntry: await ctx.db.get(rosterEntryId),
       orderEntry: await ctx.db.get(orderEntryId),
       intake: await ctx.db.get(intakeId),
@@ -150,13 +139,12 @@ export const run = internalMutation({
     if (inserted.order!.internalStages[0].name !== "Inquiry") {
       throw new Error("smoke test: nested stage field lost in round-trip");
     }
-    if (inserted.response!.customAnswers["Delivery method?"] !== "pickup") {
+    if (inserted.orderEntry!.customAnswers?.q1 !== "pickup") {
       throw new Error("smoke test: customAnswers record lost in round-trip");
     }
 
     await ctx.db.delete(orderEntryId);
     await ctx.db.delete(rosterEntryId);
-    await ctx.db.delete(responseId);
     await ctx.db.delete(runId);
     await ctx.db.delete(orderId);
     if (designAssetId) await ctx.db.delete(designAssetId);

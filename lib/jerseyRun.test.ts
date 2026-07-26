@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_JERSEY_RUN,
   MAX_CUSTOM_QUESTIONS,
-  MAX_ROSTER_ENTRIES,
   QUESTION_LABEL_MAX_LENGTH,
-  ROSTER_NAME_MAX_LENGTH,
-  ROSTER_NUMBER_MAX_LENGTH,
   SIZE_OPTIONS,
   canLock,
   canUnlock,
@@ -31,7 +28,6 @@ function validInput(overrides: Partial<JerseyRunInput> = {}): JerseyRunInput {
   return {
     sizeOptions: ["S", "M", "L"],
     namesMode: "open",
-    fixedRoster: [],
     customQuestions: [],
     deadline: FUTURE_DATE,
     ...overrides,
@@ -43,19 +39,10 @@ describe("validateJerseyRun — happy path", () => {
     expect(validateJerseyRun(validInput(), NOW)).toEqual({});
   });
 
-  it("accepts a fixed-mode run with a populated roster", () => {
-    const errors = validateJerseyRun(
-      validInput({
-        namesMode: "fixed",
-        fixedRoster: [
-          { name: "Alex", number: "7" },
-          { name: "Bo", number: "" },
-          { name: "Casey", number: "23" },
-        ],
-      }),
-      NOW,
-    );
-    expect(errors).toEqual({});
+  it("accepts a fixed-mode run (named slots are seeded via the roster manager)", () => {
+    expect(
+      validateJerseyRun(validInput({ namesMode: "fixed" }), NOW),
+    ).toEqual({});
   });
 
   it("accepts up to MAX_CUSTOM_QUESTIONS questions", () => {
@@ -88,79 +75,6 @@ describe("validateJerseyRun — required fields", () => {
     expect(
       validateJerseyRun(validInput({ sizeOptions: ["XXXL"] }), NOW).sizeOptions,
     ).toBeTruthy();
-  });
-});
-
-describe("validateJerseyRun — fixed roster", () => {
-  it("rejects fixed mode with no named entries", () => {
-    expect(
-      validateJerseyRun(
-        validInput({ namesMode: "fixed", fixedRoster: [] }),
-        NOW,
-      ).fixedRoster,
-    ).toBeTruthy();
-  });
-
-  it("treats whitespace-only rows as empty", () => {
-    expect(
-      validateJerseyRun(
-        validInput({
-          namesMode: "fixed",
-          fixedRoster: [{ name: "   ", number: "" }],
-        }),
-        NOW,
-      ).fixedRoster,
-    ).toBeTruthy();
-  });
-
-  it("rejects a name over the cap", () => {
-    expect(
-      validateJerseyRun(
-        validInput({
-          namesMode: "fixed",
-          fixedRoster: [
-            { name: "x".repeat(ROSTER_NAME_MAX_LENGTH + 1), number: "" },
-          ],
-        }),
-        NOW,
-      ).fixedRoster,
-    ).toBeTruthy();
-  });
-
-  it("rejects a number over the cap", () => {
-    expect(
-      validateJerseyRun(
-        validInput({
-          namesMode: "fixed",
-          fixedRoster: [
-            { name: "Alex", number: "x".repeat(ROSTER_NUMBER_MAX_LENGTH + 1) },
-          ],
-        }),
-        NOW,
-      ).fixedRoster,
-    ).toBeTruthy();
-  });
-
-  it("rejects a roster larger than the cap", () => {
-    const fixedRoster = Array.from(
-      { length: MAX_ROSTER_ENTRIES + 1 },
-      (_, i) => ({ name: `Player ${i}`, number: "" }),
-    );
-    expect(
-      validateJerseyRun(
-        validInput({ namesMode: "fixed", fixedRoster }),
-        NOW,
-      ).fixedRoster,
-    ).toBeTruthy();
-  });
-
-  it("ignores the roster when names mode is open", () => {
-    expect(
-      validateJerseyRun(
-        validInput({ namesMode: "open", fixedRoster: [] }),
-        NOW,
-      ).fixedRoster,
-    ).toBeUndefined();
   });
 });
 
@@ -278,7 +192,6 @@ describe("toJerseyRunPayload — open mode", () => {
     );
     expect(payload.namesMode).toBe("open");
     expect(payload.sizeOptions).toEqual(["S", "M", "L", "XL"]);
-    expect(payload.fixedRoster).toEqual([]);
     expect(payload.customQuestions).toEqual([
       { id: "q1", label: "Delivery method?" },
       { id: "q2", label: "Allergies?" },
@@ -309,48 +222,10 @@ describe("toJerseyRunPayload — open mode", () => {
 });
 
 describe("toJerseyRunPayload — fixed mode", () => {
-  it("populates fixedRoster with cleaned names and numbers", () => {
-    const payload = toJerseyRunPayload(
-      validInput({
-        namesMode: "fixed",
-        fixedRoster: [
-          { name: "  Alex  ", number: "  7  " },
-          { name: "Bo", number: "" },
-          { name: "Casey", number: "23" },
-        ],
-      }),
-    );
+  it("carries namesMode through without a roster (slots are seeded separately)", () => {
+    const payload = toJerseyRunPayload(validInput({ namesMode: "fixed" }));
     expect(payload.namesMode).toBe("fixed");
-    expect(payload.fixedRoster).toEqual([
-      { name: "Alex", number: "7" },
-      { name: "Bo", number: undefined },
-      { name: "Casey", number: "23" },
-    ]);
-  });
-
-  it("drops empty-name rows from the roster", () => {
-    const payload = toJerseyRunPayload(
-      validInput({
-        namesMode: "fixed",
-        fixedRoster: [
-          { name: "Alex", number: "" },
-          { name: "  ", number: "99" },
-        ],
-      }),
-    );
-    expect(payload.fixedRoster).toEqual([
-      { name: "Alex", number: undefined },
-    ]);
-  });
-
-  it("ignores the roster entirely when names mode is open", () => {
-    const payload = toJerseyRunPayload(
-      validInput({
-        namesMode: "open",
-        fixedRoster: [{ name: "Alex", number: "7" }],
-      }),
-    );
-    expect(payload.fixedRoster).toEqual([]);
+    expect(payload).not.toHaveProperty("fixedRoster");
   });
 
   it("throws for an invalid namesMode (caller should have validated)", () => {

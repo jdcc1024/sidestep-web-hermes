@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
-import type { Doc } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { overviewOf } from "@/lib/designBlock";
@@ -14,12 +14,20 @@ import {
   type ChipTone,
 } from "@/lib/orderStages";
 
-// Shape returned by api.jerseyRuns.listMyResponses — the response row joined
-// with its run and the linked order's team name. Keep this in sync with the
-// query handler in convex/jerseyRuns.ts; if either grows fields, add them
-// here too.
+// Shape returned by api.jerseyRuns.listMyResponses — one order entry (a
+// jersey the signed-in user ordered) joined with its run and the linked
+// order's team name. Keep this in sync with the query handler in
+// convex/jerseyRuns.ts; if either grows fields, add them here too.
 type MyJerseyRunResponse = {
-  response: Doc<"jerseyRunResponses">;
+  entry: {
+    _id: Id<"orderEntries">;
+    designTitle: string;
+    name?: string;
+    number?: string;
+    size: string;
+    qty: number;
+    createdAt: number;
+  };
   run: Doc<"jerseyRuns">;
   teamName: string;
 };
@@ -152,9 +160,9 @@ export default function PortalDashboardPage() {
             <EmptyJerseyRunResponses />
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
-              {jerseyRunResponses.map((entry) => (
-                <li key={entry.response._id}>
-                  <JerseyResponseCard entry={entry} />
+              {jerseyRunResponses.map((item) => (
+                <li key={item.entry._id}>
+                  <JerseyResponseCard entry={item} />
                 </li>
               ))}
             </ul>
@@ -217,9 +225,9 @@ function DesignCard({
 }
 
 function JerseyResponseCard({ entry }: { entry: MyJerseyRunResponse }) {
-  const { response, run, teamName } = entry;
+  const { entry: line, run, teamName } = entry;
   const jerseyLabel =
-    [response.jerseyName, response.jerseyNumber ? `#${response.jerseyNumber}` : null]
+    [line.name, line.number ? `#${line.number}` : null]
       .filter(Boolean)
       .join(" ") || "No name or number";
 
@@ -239,12 +247,16 @@ function JerseyResponseCard({ entry }: { entry: MyJerseyRunResponse }) {
         )}
       </div>
       <p className="mt-1 text-sm font-medium text-foreground">{jerseyLabel}</p>
+      <p className="text-xs text-muted-foreground">{line.designTitle}</p>
       <dl className="mt-3 grid grid-cols-2 gap-y-2 text-sm">
         <dt className="text-muted-foreground">Size</dt>
-        <dd className="text-foreground">{response.size}</dd>
-        <dt className="text-muted-foreground">Submitted</dt>
         <dd className="text-foreground">
-          {formatResponseDate(response.submittedAt)}
+          {line.size}
+          {line.qty > 1 ? ` · ${line.qty}×` : ""}
+        </dd>
+        <dt className="text-muted-foreground">Ordered</dt>
+        <dd className="text-foreground">
+          {formatResponseDate(line.createdAt)}
         </dd>
       </dl>
     </Link>

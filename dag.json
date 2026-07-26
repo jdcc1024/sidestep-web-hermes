@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T22:20:09.417Z",
+  "lastUpdated": "2026-07-26T22:51:12.996Z",
   "phases": [
     {
       "id": "phase-1",
@@ -142,10 +142,10 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Cleanup slice: migrate admin oversight, run responses page, participation history and response views onto the new model, then delete jerseyRunResponses + jerseyRuns.fixedRoster. Done last so every writer is migrated before the legacy table is dropped.",
-      "status": "blocked",
+      "status": "completed",
       "agent": null,
-      "startedAt": null,
-      "completedAt": null,
+      "startedAt": "2026-07-26T22:30:06.301Z",
+      "completedAt": "2026-07-26T22:51:12.995Z",
       "issueFile": "backlog/R-07-migrate-remaining-surfaces-retire-old-tables.md",
       "prdRef": "docs/prd/roster-manager-and-lock.md#5-scope",
       "acceptanceCriteria": [
@@ -217,7 +217,7 @@
       "phase": "3",
       "type": "improvement",
       "description": "Collapse the Σ-qty-grouped-by-design rollup duplicated across countsByRun, jerseyRuns.lock, and admin.exportOrder into one shared helper so the live count and the frozen lock snapshot are provably the same computation.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/A-08-extract-qty-by-design-rollup-helper.md",
@@ -458,6 +458,18 @@
       "event": "task_completed",
       "nodeId": "O-07",
       "message": "Completed: Order Total Derived From Roster"
+    },
+    {
+      "timestamp": "2026-07-26T22:30:06.302Z",
+      "event": "task_started",
+      "nodeId": "R-07",
+      "message": "Picked up: Migrate Remaining Surfaces + Retire Old Tables"
+    },
+    {
+      "timestamp": "2026-07-26T22:51:12.996Z",
+      "event": "task_completed",
+      "nodeId": "R-07",
+      "message": "Completed: Migrate Remaining Surfaces + Retire Old Tables"
     }
   ]
 }

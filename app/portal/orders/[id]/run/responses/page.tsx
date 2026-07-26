@@ -30,7 +30,7 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
     order ? { orderId } : "skip",
   );
   const data = useQuery(
-    api.jerseyRuns.listResponses,
+    api.jerseyRuns.listOrderEntries,
     runStub ? { jerseyRunId: runStub._id } : "skip",
   );
 
@@ -40,9 +40,12 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
   if (runStub === null) return <NoRunYet orderId={orderId} />;
   if (data === null) return <NotFound orderId={orderId} />;
 
-  const { run, responses } = data;
+  const { run, entries } = data;
   const deadlineStatus = describeDeadline(run.deadline);
-  const estimate = estimateForResponses(responses.length, order.order);
+  // Production total is Σ order-entry qty (R-04) — the estimate and the
+  // participation count both read the real jersey count, not a row tally.
+  const totalJerseys = entries.reduce((sum, e) => sum + e.qty, 0);
+  const estimate = estimateForResponses(totalJerseys, order.order);
   const teamName = order.order.teamName;
 
   return (
@@ -72,8 +75,8 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
       >
         <SummaryCard
           label="Participation"
-          value={String(responses.length)}
-          caption={participationLabel(responses.length)}
+          value={String(totalJerseys)}
+          caption={participationLabel(totalJerseys)}
         />
         <SummaryCard
           label="Deadline"
@@ -100,11 +103,11 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
         aria-label="Response table"
         className="mt-8 overflow-hidden rounded-lg border border-border bg-card shadow-sm"
       >
-        {responses.length === 0 ? (
+        {entries.length === 0 ? (
           <EmptyState jerseyRunId={run._id} />
         ) : (
-          <ResponseTable
-            responses={responses}
+          <EntryTable
+            entries={entries}
             customQuestions={run.customQuestions}
           />
         )}
@@ -113,22 +116,24 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
   );
 }
 
-type ResponseRow = {
-  _id: Id<"jerseyRunResponses">;
-  respondentName: string;
-  respondentEmail: string;
+type EntryRow = {
+  _id: Id<"orderEntries">;
+  submitterName: string;
+  submitterEmail: string;
+  designTitle: string;
+  name?: string;
+  number?: string;
   size: string;
-  jerseyName?: string;
-  jerseyNumber?: string;
+  qty: number;
   customAnswers: Record<string, string>;
-  submittedAt: number;
+  createdAt: number;
 };
 
-function ResponseTable({
-  responses,
+function EntryTable({
+  entries,
   customQuestions,
 }: {
-  responses: ResponseRow[];
+  entries: EntryRow[];
   customQuestions: { id: string; label: string }[];
 }) {
   return (
@@ -136,11 +141,12 @@ function ResponseTable({
       <table className="min-w-full divide-y divide-border text-sm">
         <thead className="bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th scope="col" className="px-4 py-3">Name</th>
+            <th scope="col" className="px-4 py-3">Submitter</th>
             <th scope="col" className="px-4 py-3">Email</th>
+            <th scope="col" className="px-4 py-3">Design</th>
+            <th scope="col" className="px-4 py-3">Jersey</th>
             <th scope="col" className="px-4 py-3">Size</th>
-            <th scope="col" className="px-4 py-3">Jersey name</th>
-            <th scope="col" className="px-4 py-3">Number</th>
+            <th scope="col" className="px-4 py-3">Qty</th>
             {customQuestions.map((q) => (
               <th key={q.id} scope="col" className="px-4 py-3">
                 {q.label}
@@ -150,33 +156,39 @@ function ResponseTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {responses.map((r) => (
-            <tr key={r._id}>
-              <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">
-                {r.respondentName}
-              </td>
-              <td className="px-4 py-3 text-foreground/90">{r.respondentEmail}</td>
-              <td className="px-4 py-3 text-foreground/90">{r.size}</td>
-              <td className="px-4 py-3 text-foreground/90">
-                {r.jerseyName ?? <span className="text-muted-foreground">—</span>}
-              </td>
-              <td className="px-4 py-3 text-foreground/90">
-                {r.jerseyNumber ?? <span className="text-muted-foreground">—</span>}
-              </td>
-              {customQuestions.map((q) => (
-                <td key={q.id} className="px-4 py-3 text-foreground/90">
-                  {r.customAnswers[q.id]?.trim() ? (
-                    r.customAnswers[q.id]
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
+          {entries.map((e) => {
+            const jersey = [e.name, e.number ? `#${e.number}` : null]
+              .filter(Boolean)
+              .join(" ");
+            return (
+              <tr key={e._id}>
+                <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">
+                  {e.submitterName}
                 </td>
-              ))}
-              <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                {formatTimestamp(r.submittedAt)}
-              </td>
-            </tr>
-          ))}
+                <td className="px-4 py-3 text-foreground/90">
+                  {e.submitterEmail}
+                </td>
+                <td className="px-4 py-3 text-foreground/90">{e.designTitle}</td>
+                <td className="px-4 py-3 text-foreground/90">
+                  {jersey || <span className="text-muted-foreground">Blank</span>}
+                </td>
+                <td className="px-4 py-3 text-foreground/90">{e.size}</td>
+                <td className="px-4 py-3 text-foreground/90">{e.qty}</td>
+                {customQuestions.map((q) => (
+                  <td key={q.id} className="px-4 py-3 text-foreground/90">
+                    {e.customAnswers[q.id]?.trim() ? (
+                      e.customAnswers[q.id]
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                ))}
+                <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                  {formatTimestamp(e.createdAt)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

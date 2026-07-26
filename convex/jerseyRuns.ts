@@ -5,7 +5,7 @@ import {
   mutation,
   query,
 } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import {
   getCurrentUserOrNull,
@@ -15,21 +15,9 @@ import {
 } from "./_auth";
 import {
   MAX_CUSTOM_QUESTIONS,
-  MAX_ROSTER_ENTRIES,
   QUESTION_LABEL_MAX_LENGTH,
-  ROSTER_NAME_MAX_LENGTH,
-  ROSTER_NUMBER_MAX_LENGTH,
   isSizeOption,
 } from "../lib/jerseyRun/rules";
-import {
-  checkCustomAnswer,
-  checkJerseyName,
-  checkJerseyNumber,
-  checkRespondentEmail,
-  checkRespondentName,
-  checkSize,
-  isJerseyRunClosed,
-} from "../lib/jerseyRunResponse/rules";
 import {
   canLock,
   canUnlock,
@@ -121,12 +109,6 @@ export const create = mutation({
     orderId: v.id("orders"),
     sizeOptions: v.array(v.string()),
     namesMode: v.union(v.literal("open"), v.literal("fixed")),
-    fixedRoster: v.array(
-      v.object({
-        name: v.string(),
-        number: v.optional(v.string()),
-      }),
-    ),
     customQuestions: v.array(
       v.object({ id: v.string(), label: v.string() }),
     ),
@@ -168,45 +150,20 @@ export const create = mutation({
       seenQuestionIds.add(q.id);
     }
 
-    let fixedRoster: Array<{ name: string; number?: string }> = [];
-    if (args.namesMode === "fixed") {
-      const cleaned = args.fixedRoster
-        .map((entry) => ({
-          name: entry.name.trim(),
-          number: entry.number?.trim() ?? "",
-        }))
-        .filter((entry) => entry.name.length > 0);
-      if (cleaned.length === 0)
-        throw new ConvexError("Add at least one name to the roster.");
-      if (cleaned.length > MAX_ROSTER_ENTRIES)
-        throw new ConvexError(
-          `Rosters are capped at ${MAX_ROSTER_ENTRIES} names.`,
-        );
-      for (const entry of cleaned) {
-        if (entry.name.length > ROSTER_NAME_MAX_LENGTH)
-          throw new ConvexError("A roster name is too long.");
-        if (entry.number.length > ROSTER_NUMBER_MAX_LENGTH)
-          throw new ConvexError("A roster number is too long.");
-      }
-      fixedRoster = cleaned.map((entry) => ({
-        name: entry.name,
-        number: entry.number.length > 0 ? entry.number : undefined,
-      }));
-    }
-
     const customQuestions = args.customQuestions.map((q) => ({
       id: q.id,
       label: q.label.trim(),
     }));
 
+    // A fixed-mode run seeds its named slots through the roster manager
+    // (rosterEntries, R-03) after creation — the run row itself no longer
+    // carries a roster array. `namesMode` is preserved so the public form
+    // still shows a slot picker instead of free-text name entry.
     return ctx.db.insert("jerseyRuns", {
       orderId: args.orderId,
       captainId: user._id,
       sizeOptions,
       namesMode: args.namesMode,
-      // Only persist a roster when the run uses fixed names; omitting the
-      // field for open-mode runs keeps the document clean.
-      fixedRoster: args.namesMode === "fixed" ? fixedRoster : undefined,
       customQuestions,
       deadline: args.deadline,
       status: "open",
@@ -215,45 +172,25 @@ export const create = mutation({
   },
 });
 
-// Normalize an email the same way submitResponse persists it. Keeping the
+// Normalize an email the same way the order-entry submit path
+// (orderEntries.submitOrder → checkSubmitterEmail) persists it. Keeping the
 // two in lockstep is the whole point — a user signed in with "Pat@x.com"
-// must still match a response they submitted as "pat@x.com". Defined as
-// a top-level helper rather than inlined so any future caller (an admin
+// must still match a jersey they ordered as "pat@x.com". Defined as a
+// top-level helper rather than inlined so any future caller (an admin
 // lookup, an account-linking migration) uses the same rule.
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// Issue 3-08. Returns the responses the signed-in user has submitted to a
-// single run, matched by their Clerk email (normalized the same way the
-// submit path stores it). Returns [] for unauthenticated callers so the
-// public /run/[id] page can call this unconditionally without branching
-// on the auth state at the call site.
-export const listMyResponsesForRun = query({
-  args: { jerseyRunId: v.id("jerseyRuns") },
-  handler: async (ctx, { jerseyRunId }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity?.email) return [];
-    const email = normalizeEmail(identity.email);
-    if (email.length === 0) return [];
-
-    const responses = await ctx.db
-      .query("jerseyRunResponses")
-      .withIndex("by_respondentEmail", (q) => q.eq("respondentEmail", email))
-      .collect();
-
-    return responses
-      .filter((r) => r.jerseyRunId === jerseyRunId)
-      .sort((a, b) => b.submittedAt - a.submittedAt);
-  },
-});
-
-// Issue 3-08. Returns the signed-in user's responses across every run,
-// joined with the linked run and order so the portal dashboard can show
-// team name and run context per entry without a follow-up roundtrip.
-// Skips orphaned rows whose run or order has been deleted — better to
-// silently omit than to leak a half-populated card. Cached lookups
-// (runCache/orderCache) keep this O(unique runs) instead of O(responses).
+// Issue 3-08 / R-07. Returns the jerseys the signed-in user has ordered
+// across every run — their own order entries, matched by normalized
+// submitter email (the same lowercasing the submit path stores). Each
+// entry is joined with its run, the linked order's team name, its design
+// title, and (when it fills a slot) the roster name/number, so the portal
+// dashboard renders each jersey card without a follow-up roundtrip. Skips
+// orphaned entries whose run/order/design has been deleted — better to
+// omit than leak a half-populated card. Cached lookups keep this
+// O(unique runs+designs) rather than O(entries). Newest first.
 export const listMyResponses = query({
   args: {},
   handler: async (ctx) => {
@@ -262,24 +199,35 @@ export const listMyResponses = query({
     const email = normalizeEmail(identity.email);
     if (email.length === 0) return [];
 
-    const responses = await ctx.db
-      .query("jerseyRunResponses")
-      .withIndex("by_respondentEmail", (q) => q.eq("respondentEmail", email))
+    const entries = await ctx.db
+      .query("orderEntries")
+      .withIndex("by_submitterEmail", (q) => q.eq("submitterEmail", email))
       .collect();
 
     const runCache = new Map<string, Doc<"jerseyRuns"> | null>();
     const orderCache = new Map<string, Doc<"orders"> | null>();
+    const designTitleCache = new Map<string, string>();
+    const rosterCache = new Map<string, Doc<"rosterEntries"> | null>();
 
     const joined: Array<{
-      response: Doc<"jerseyRunResponses">;
+      entry: {
+        _id: Id<"orderEntries">;
+        designTitle: string;
+        name: string | undefined;
+        number: string | undefined;
+        size: string;
+        qty: number;
+        createdAt: number;
+      };
       run: Doc<"jerseyRuns">;
       teamName: string;
     }> = [];
-    for (const response of responses) {
-      let run = runCache.get(response.jerseyRunId) ?? null;
-      if (!runCache.has(response.jerseyRunId)) {
-        run = await ctx.db.get(response.jerseyRunId);
-        runCache.set(response.jerseyRunId, run);
+
+    for (const entry of entries) {
+      let run = runCache.get(entry.runId) ?? null;
+      if (!runCache.has(entry.runId)) {
+        run = await ctx.db.get(entry.runId);
+        runCache.set(entry.runId, run);
       }
       if (!run) continue;
 
@@ -290,21 +238,54 @@ export const listMyResponses = query({
       }
       if (!order) continue;
 
-      joined.push({ response, run, teamName: order.teamName });
+      if (!designTitleCache.has(entry.designId)) {
+        const design = await ctx.db.get(entry.designId);
+        designTitleCache.set(entry.designId, design?.title ?? "Untitled design");
+      }
+
+      let name: string | undefined;
+      let number: string | undefined;
+      if (entry.rosterEntryId) {
+        if (!rosterCache.has(entry.rosterEntryId)) {
+          rosterCache.set(
+            entry.rosterEntryId,
+            await ctx.db.get(entry.rosterEntryId),
+          );
+        }
+        const slot = rosterCache.get(entry.rosterEntryId);
+        name = slot?.name;
+        number = slot?.number;
+      }
+
+      joined.push({
+        entry: {
+          _id: entry._id,
+          designTitle: designTitleCache.get(entry.designId)!,
+          name,
+          number,
+          size: entry.size,
+          qty: entry.qty,
+          createdAt: entry.createdAt,
+        },
+        run,
+        teamName: order.teamName,
+      });
     }
 
-    return joined.sort(
-      (a, b) => b.response.submittedAt - a.response.submittedAt,
-    );
+    return joined.sort((a, b) => b.entry.createdAt - a.entry.createdAt);
   },
 });
 
-// Captain or admin view of every response submitted to a run. Used by the
-// captain dashboard (issue 2-10). Returns the run plus the linked order so
-// the dashboard can show team name + deadline without a follow-up query.
-// Throws on access violation so the UI can show a 403; returns null if
-// the run or order has been deleted.
-export const listResponses = query({
+// Captain or admin view of every jersey ordered on a run — the order
+// entries (R-01 model) that replaced the flat jerseyRunResponses table.
+// Used by the captain dashboard (2-10) and admin oversight (3-02). Each
+// entry is enriched with its design title and, when it fills a slot, the
+// roster name/number (blank/bulk lines carry neither). Returns the run +
+// linked order so the dashboard shows team name + deadline without a
+// follow-up query. Newest first — fresh submissions at the top. Throws on
+// access violation so the UI can show a 403; null if the run or order has
+// been deleted.
+export const listOrderEntries = query({
   args: { jerseyRunId: v.id("jerseyRuns") },
   handler: async (ctx, { jerseyRunId }) => {
     const user = await requireCurrentUser(ctx);
@@ -317,16 +298,54 @@ export const listResponses = query({
     if (run.captainId !== user._id && !user.isAdmin)
       throw new ConvexError("You don't have access to this jersey run.");
 
-    const responses = await ctx.db
-      .query("jerseyRunResponses")
-      .withIndex("by_jerseyRun", (q) => q.eq("jerseyRunId", jerseyRunId))
+    const rawEntries = await ctx.db
+      .query("orderEntries")
+      .withIndex("by_run", (q) => q.eq("runId", jerseyRunId))
       .collect();
 
-    // Newest first — captain wants to see fresh submissions at the top
-    // without having to sort the column manually.
-    responses.sort((a, b) => b.submittedAt - a.submittedAt);
+    // Resolve each referenced design title and roster slot once.
+    const designTitles = new Map(
+      await Promise.all(
+        [...new Set(rawEntries.map((e) => e.designId))].map(
+          async (id) =>
+            [id, (await ctx.db.get(id))?.title ?? "Untitled design"] as const,
+        ),
+      ),
+    );
+    const rosterIds = [
+      ...new Set(
+        rawEntries
+          .map((e) => e.rosterEntryId)
+          .filter((id): id is Id<"rosterEntries"> => id !== undefined),
+      ),
+    ];
+    const rosters = new Map(
+      await Promise.all(
+        rosterIds.map(async (id) => [id, await ctx.db.get(id)] as const),
+      ),
+    );
 
-    return { run, order, responses };
+    const entries = rawEntries
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((e) => {
+        const slot = e.rosterEntryId ? rosters.get(e.rosterEntryId) : null;
+        return {
+          _id: e._id,
+          submitterName: e.submitterName,
+          submitterEmail: e.submitterEmail,
+          designId: e.designId,
+          designTitle: designTitles.get(e.designId) ?? "Untitled design",
+          name: slot?.name,
+          number: slot?.number,
+          size: e.size,
+          qty: e.qty,
+          source: e.source,
+          customAnswers: e.customAnswers ?? {},
+          createdAt: e.createdAt,
+        };
+      });
+
+    return { run, order, entries };
   },
 });
 
@@ -360,10 +379,11 @@ export const _closeRun = internalMutation({
     const captain = await ctx.db.get(run.captainId);
     if (!order || !captain) return null;
 
-    const responses = await ctx.db
-      .query("jerseyRunResponses")
-      .withIndex("by_jerseyRun", (q) => q.eq("jerseyRunId", jerseyRunId))
+    const entries = await ctx.db
+      .query("orderEntries")
+      .withIndex("by_run", (q) => q.eq("runId", jerseyRunId))
       .collect();
+    const jerseyCount = entries.reduce((sum, e) => sum + e.qty, 0);
 
     return {
       jerseyRunId,
@@ -372,7 +392,7 @@ export const _closeRun = internalMutation({
       captainEmail: captain.email,
       captainName: captain.name,
       deadline: run.deadline,
-      responseCount: responses.length,
+      responseCount: jerseyCount,
     };
   },
 });
@@ -476,62 +496,5 @@ export const unlock = mutation({
       lockSnapshot: undefined,
     });
     return jerseyRunId;
-  },
-});
-
-// Public — no auth. Called by the fan submission form at /run/[id].
-// Re-validates everything the client checked; the public form is the
-// one surface anyone on the internet can hit, so trust nothing.
-export const submitResponse = mutation({
-  args: {
-    jerseyRunId: v.id("jerseyRuns"),
-    respondentName: v.string(),
-    respondentEmail: v.string(),
-    size: v.string(),
-    jerseyName: v.optional(v.string()),
-    jerseyNumber: v.optional(v.string()),
-    customAnswers: v.record(v.string(), v.string()),
-  },
-  handler: async (ctx, args) => {
-    const run = await ctx.db.get(args.jerseyRunId);
-    if (!run) throw new ConvexError("Jersey run not found.");
-
-    if (isJerseyRunClosed(run))
-      throw new ConvexError("This jersey run is closed.");
-
-    const nameCheck = checkRespondentName(args.respondentName);
-    if (!nameCheck.ok) throw new ConvexError(nameCheck.error);
-
-    const emailCheck = checkRespondentEmail(args.respondentEmail);
-    if (!emailCheck.ok) throw new ConvexError(emailCheck.error);
-
-    const sizeCheck = checkSize(args.size, run.sizeOptions);
-    if (!sizeCheck.ok) throw new ConvexError(sizeCheck.error);
-
-    const jerseyNameCheck = checkJerseyName(args.jerseyName);
-    if (!jerseyNameCheck.ok) throw new ConvexError(jerseyNameCheck.error);
-
-    const jerseyNumberCheck = checkJerseyNumber(args.jerseyNumber);
-    if (!jerseyNumberCheck.ok) throw new ConvexError(jerseyNumberCheck.error);
-
-    const knownQuestionIds = new Set(run.customQuestions.map((q) => q.id));
-    const customAnswers: Record<string, string> = {};
-    for (const [id, value] of Object.entries(args.customAnswers)) {
-      if (!knownQuestionIds.has(id)) continue;
-      const result = checkCustomAnswer(value);
-      if (!result.ok) throw new ConvexError(result.error);
-      customAnswers[id] = result.value;
-    }
-
-    return ctx.db.insert("jerseyRunResponses", {
-      jerseyRunId: args.jerseyRunId,
-      respondentName: nameCheck.value,
-      respondentEmail: emailCheck.value,
-      size: sizeCheck.value,
-      jerseyName: jerseyNameCheck.value,
-      jerseyNumber: jerseyNumberCheck.value,
-      customAnswers,
-      submittedAt: Date.now(),
-    });
   },
 });

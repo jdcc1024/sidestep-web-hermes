@@ -11,11 +11,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   MAX_CUSTOM_QUESTIONS,
-  MAX_ROSTER_ENTRIES,
   NAMES_MODES,
   QUESTION_LABEL_MAX_LENGTH,
-  ROSTER_NAME_MAX_LENGTH,
-  ROSTER_NUMBER_MAX_LENGTH,
   SIZE_OPTIONS,
   newQuestionId,
   parseDeadline,
@@ -43,9 +40,10 @@ import { RosterManager } from "@/components/portal/RosterManager";
 
 // Colocated zod schema. Constants reused from lib/jerseyRun.ts so the
 // client and server cap values the same way (the Convex mutation enforces
-// matching limits server-side). superRefine handles conditional roster
-// rules (only validated when namesMode === "fixed") and per-question
-// label rules that depend on the whole array.
+// matching limits server-side). Fixed-mode named slots are seeded through
+// the roster manager (RosterManager, R-03) after the run is created, so
+// the setup form no longer collects a roster. superRefine only handles the
+// per-question label rules that depend on the whole array.
 const formSchema = z
   .object({
     sizeOptions: z
@@ -54,9 +52,6 @@ const formSchema = z
     namesMode: z.enum(NAMES_MODES, {
       message: "Choose how names will be collected.",
     }),
-    fixedRoster: z.array(
-      z.object({ name: z.string(), number: z.string() }),
-    ),
     customQuestions: z.array(
       z.object({ id: z.string(), label: z.string() }),
     ),
@@ -70,43 +65,6 @@ const formSchema = z
       }, "Deadline must be in the future."),
   })
   .superRefine((data, ctx) => {
-    if (data.namesMode === "fixed") {
-      const named = data.fixedRoster.filter(
-        (entry) => entry.name.trim().length > 0,
-      );
-      if (named.length === 0) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["fixedRoster"],
-          message: "Add at least one name to the roster.",
-        });
-      } else if (data.fixedRoster.length > MAX_ROSTER_ENTRIES) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["fixedRoster"],
-          message: `Rosters are capped at ${MAX_ROSTER_ENTRIES} names.`,
-        });
-      } else if (
-        named.some((entry) => entry.name.trim().length > ROSTER_NAME_MAX_LENGTH)
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["fixedRoster"],
-          message: `Keep each name under ${ROSTER_NAME_MAX_LENGTH} characters.`,
-        });
-      } else if (
-        named.some(
-          (entry) => entry.number.trim().length > ROSTER_NUMBER_MAX_LENGTH,
-        )
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["fixedRoster"],
-          message: `Keep each number under ${ROSTER_NUMBER_MAX_LENGTH} characters.`,
-        });
-      }
-    }
-
     if (data.customQuestions.length > MAX_CUSTOM_QUESTIONS) {
       ctx.addIssue({
         code: "custom",
@@ -156,22 +114,16 @@ function JerseyRunForm({ orderId }: { orderId: Id<"orders"> }) {
       // "Choose how names will be collected." message above, so the cast
       // just satisfies the typed RadioGroup binding.
       namesMode: undefined as unknown as NamesMode,
-      fixedRoster: [],
       customQuestions: [],
       deadline: "",
     },
   });
 
-  const namesMode = useWatch({ control: form.control, name: "namesMode" });
   const customQuestions = useWatch({
     control: form.control,
     name: "customQuestions",
   });
 
-  const rosterArray = useFieldArray({
-    control: form.control,
-    name: "fixedRoster",
-  });
   const questionsArray = useFieldArray({
     control: form.control,
     name: "customQuestions",
@@ -185,7 +137,6 @@ function JerseyRunForm({ orderId }: { orderId: Id<"orders"> }) {
         orderId,
         sizeOptions: payload.sizeOptions,
         namesMode: payload.namesMode,
-        fixedRoster: payload.fixedRoster,
         customQuestions: payload.customQuestions,
         deadline: payload.deadline,
       });
@@ -285,85 +236,6 @@ function JerseyRunForm({ orderId }: { orderId: Id<"orders"> }) {
             </FormItem>
           )}
         />
-
-        {namesMode === "fixed" && (
-          <FormField
-            control={form.control}
-            name="fixedRoster"
-            render={() => (
-              <FormItem>
-                <FormLabel>Roster</FormLabel>
-                <FormDescription>
-                  Number is optional — leave blank to let the fan fill it in.
-                </FormDescription>
-                <div className="space-y-2">
-                  {rosterArray.fields.length === 0 ? (
-                    <p className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-4 text-center text-sm text-muted-foreground">
-                      No roster entries yet.
-                    </p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {rosterArray.fields.map((row, index) => (
-                        <li
-                          key={row.id}
-                          className="grid grid-cols-[1fr_120px_auto] gap-2"
-                        >
-                          <FormField
-                            control={form.control}
-                            name={`fixedRoster.${index}.name`}
-                            render={({ field }) => (
-                              <FormControl>
-                                <Input
-                                  placeholder="Name"
-                                  maxLength={ROSTER_NAME_MAX_LENGTH}
-                                  aria-label={`Roster name ${index + 1}`}
-                                  {...field}
-                                />
-                              </FormControl>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name={`fixedRoster.${index}.number`}
-                            render={({ field }) => (
-                              <FormControl>
-                                <Input
-                                  placeholder="Number"
-                                  maxLength={ROSTER_NUMBER_MAX_LENGTH}
-                                  aria-label={`Roster number ${index + 1}`}
-                                  {...field}
-                                />
-                              </FormControl>
-                            )}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => rosterArray.remove(index)}
-                            aria-label={`Remove roster row ${index + 1}`}
-                          >
-                            <XIcon />
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => rosterArray.append({ name: "", number: "" })}
-                  >
-                    <PlusIcon />
-                    Add roster entry
-                  </Button>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
 
         <FormField
           control={form.control}
@@ -517,7 +389,6 @@ function JerseyRunSummary({
     namesMode: "open" | "fixed";
     customQuestions: { id: string; label: string }[];
     deadline: number;
-    fixedRoster?: { name: string; number?: string }[];
   };
   orderId: Id<"orders">;
 }) {
@@ -561,28 +432,9 @@ function JerseyRunSummary({
 
       <Separator />
 
-      {/* Per-design roster seeding (R-03), the new model's source of truth.
-          The legacy run-level fixedRoster below is shown read-only until the
-          public form migrates onto roster entries in R-02. */}
+      {/* Per-design roster seeding (R-03) — the unified model's single
+          source of truth for named slots, in both open and fixed mode. */}
       <RosterManager runId={run._id} />
-
-      {run.namesMode === "fixed" &&
-        run.fixedRoster &&
-        run.fixedRoster.length > 0 && (
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Fixed roster (legacy)
-            </p>
-            <ul className="mt-2 space-y-1 text-sm text-foreground">
-              {run.fixedRoster.map((entry, i) => (
-                <li key={i}>
-                  {entry.name}
-                  {entry.number ? ` · #${entry.number}` : ""}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
 
       {run.customQuestions.length > 0 && (
         <div>

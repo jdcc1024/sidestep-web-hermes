@@ -54,7 +54,6 @@ function validRunArgs(orderId: Id<"orders">) {
     orderId,
     sizeOptions: ["S", "M", "L"],
     namesMode: "open" as const,
-    fixedRoster: [] as { name: string; number?: string }[],
     customQuestions: [],
     deadline: Date.now() + 7 * ONE_DAY,
   };
@@ -130,54 +129,6 @@ describe("jerseyRuns.create", () => {
     await expect(
       asOther.mutation(api.jerseyRuns.create, validRunArgs(orderId)),
     ).rejects.toThrow(/don't have access/);
-  });
-});
-
-describe("jerseyRuns.submitResponse", () => {
-  it("records a fan's response on an open run", async () => {
-    const t = convexTest(schema, modules);
-    const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
-      validRunArgs(orderId),
-    );
-
-    // submitResponse is public — no identity required.
-    const responseId = await t.mutation(api.jerseyRuns.submitResponse, {
-      jerseyRunId: runId,
-      respondentName: "Sam",
-      respondentEmail: "SAM@Example.com",
-      size: "M",
-      customAnswers: {},
-    });
-
-    const row = await t.run((ctx) => ctx.db.get(responseId));
-    expect(row).toMatchObject({
-      jerseyRunId: runId,
-      respondentName: "Sam",
-      // Email is normalized to lowercase before persistence.
-      respondentEmail: "sam@example.com",
-      size: "M",
-    });
-  });
-
-  it("rejects a response with a size that's not in the run's sizeOptions", async () => {
-    const t = convexTest(schema, modules);
-    const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
-      validRunArgs(orderId),
-    );
-
-    await expect(
-      t.mutation(api.jerseyRuns.submitResponse, {
-        jerseyRunId: runId,
-        respondentName: "Sam",
-        respondentEmail: "sam@example.com",
-        size: "4XL",
-        customAnswers: {},
-      }),
-    ).rejects.toThrow(/Pick a size/);
   });
 });
 
@@ -502,5 +453,163 @@ describe("jerseyRuns.getPublic", () => {
     ]);
     const away = data!.designs.find((d) => d._id === awayId);
     expect(away!.roster).toHaveLength(0);
+  });
+});
+
+describe("jerseyRuns.listOrderEntries (R-07)", () => {
+  it("returns the run's order entries joined with design title and slot name/number, newest first", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+
+    const designId = await t.run((ctx) =>
+      ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Home",
+        blocks: overviewBlocks("h"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
+
+    const now = Date.now();
+    const rosterId = await t.run((ctx) =>
+      ctx.db.insert("rosterEntries", {
+        runId,
+        orderId,
+        designId,
+        name: "Gretzky",
+        number: "99",
+        source: "captain",
+        createdAt: now,
+      }),
+    );
+    // A named fan line attached to the slot…
+    await t.run((ctx) =>
+      ctx.db.insert("orderEntries", {
+        runId,
+        designId,
+        rosterEntryId: rosterId,
+        size: "L",
+        qty: 2,
+        source: "fan",
+        submitterName: "Sam",
+        submitterEmail: "sam@example.com",
+        createdAt: now,
+      }),
+    );
+    // …and a later blank/bulk line with no slot.
+    await t.run((ctx) =>
+      ctx.db.insert("orderEntries", {
+        runId,
+        designId,
+        size: "M",
+        qty: 3,
+        source: "captain",
+        submitterName: "Cap",
+        submitterEmail: "captain@example.com",
+        createdAt: now + 1,
+      }),
+    );
+
+    const data = await asUser.query(api.jerseyRuns.listOrderEntries, {
+      jerseyRunId: runId,
+    });
+    expect(data).not.toBeNull();
+    expect(data!.entries).toHaveLength(2);
+    // Newest first: the blank captain line leads and carries no name/number.
+    expect(data!.entries[0]).toMatchObject({
+      designTitle: "Home",
+      size: "M",
+      qty: 3,
+    });
+    expect(data!.entries[0].name).toBeUndefined();
+    expect(data!.entries[0].number).toBeUndefined();
+    const gretzky = data!.entries.find((e) => e.name === "Gretzky");
+    expect(gretzky).toMatchObject({
+      number: "99",
+      designTitle: "Home",
+      size: "L",
+      qty: 2,
+    });
+  });
+
+  it("rejects a caller who is neither the captain nor an admin", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const { asUser: asStranger } = await seedCaptainWithOrder(
+      t,
+      "user_stranger_clerk",
+    );
+
+    await expect(
+      asStranger.query(api.jerseyRuns.listOrderEntries, { jerseyRunId: runId }),
+    ).rejects.toThrow(/access/i);
+  });
+});
+
+describe("jerseyRuns.listMyResponses (R-07)", () => {
+  it("returns only the signed-in user's own order entries, joined with run + team", async () => {
+    const t = convexTest(schema, modules);
+    // seedCaptainWithOrder signs in as captain@example.com.
+    const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const designId = await t.run((ctx) =>
+      ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Home",
+        blocks: overviewBlocks("h"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
+
+    await t.run((ctx) =>
+      ctx.db.insert("orderEntries", {
+        runId,
+        designId,
+        size: "M",
+        qty: 1,
+        source: "fan",
+        submitterName: "Cap",
+        submitterEmail: "captain@example.com",
+        createdAt: Date.now(),
+      }),
+    );
+    // A different fan's entry on the same run — must not leak into my list.
+    await t.run((ctx) =>
+      ctx.db.insert("orderEntries", {
+        runId,
+        designId,
+        size: "L",
+        qty: 1,
+        source: "fan",
+        submitterName: "Other",
+        submitterEmail: "other@example.com",
+        createdAt: Date.now(),
+      }),
+    );
+
+    const mine = await asUser.query(api.jerseyRuns.listMyResponses, {});
+    expect(mine).toHaveLength(1);
+    expect(mine[0].teamName).toBe("Falcons");
+    expect(mine[0].entry).toMatchObject({ size: "M", designTitle: "Home" });
+  });
+
+  it("returns [] for an unauthenticated caller", async () => {
+    const t = convexTest(schema, modules);
+    expect(await t.query(api.jerseyRuns.listMyResponses, {})).toEqual([]);
   });
 });

@@ -73,14 +73,6 @@ export default defineSchema({
     // options to what they expect their team to need.
     sizeOptions: v.array(v.string()),
     namesMode: v.union(v.literal("open"), v.literal("fixed")),
-    fixedRoster: v.optional(
-      v.array(
-        v.object({
-          name: v.string(),
-          number: v.optional(v.string()),
-        }),
-      ),
-    ),
     customQuestions: v.array(
       v.object({
         id: v.string(),
@@ -160,20 +152,12 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_run", ["runId"])
-    .index("by_rosterEntry", ["rosterEntryId"]),
-
-  jerseyRunResponses: defineTable({
-    jerseyRunId: v.id("jerseyRuns"),
-    respondentName: v.string(),
-    respondentEmail: v.string(),
-    jerseyName: v.optional(v.string()),
-    jerseyNumber: v.optional(v.string()),
-    size: v.string(),
-    customAnswers: v.record(v.string(), v.string()),
-    submittedAt: v.number(),
-  })
-    .index("by_jerseyRun", ["jerseyRunId"])
-    .index("by_respondentEmail", ["respondentEmail"]),
+    .index("by_rosterEntry", ["rosterEntryId"])
+    // A captain/fan's own submissions across every run are read back by
+    // normalized submitter email (the portal "your responses" view, R-07),
+    // so the same email lookup the legacy jerseyRunResponses table had lives
+    // on the unified model now.
+    .index("by_submitterEmail", ["submitterEmail"]),
 
   intakes: defineTable({
     name: v.string(),
