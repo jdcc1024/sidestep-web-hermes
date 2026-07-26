@@ -1,6 +1,6 @@
 # Issue: Order Total Derived From Roster
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -17,12 +17,12 @@ This issue touches:
 Replace the static estimate with a live total derived from the unified roster: the order total and each linked design's count are computed from roster rows, not entered. This closes the "quantity is a frozen guess" gap.
 
 ## Acceptance Criteria
-- [ ] Order detail shows an order total equal to the sum of roster row quantities
-- [ ] Each linked design section shows its own count derived from rows tagged with that `designId`
-- [ ] With zero roster rows the total reads as 0 (or "X of N" where a target exists), never a stale estimate
-- [ ] `estimatedQuantity` is shown only as an informational/intake seed, clearly distinct from the derived total
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] Order detail shows an order total equal to the sum of roster row quantities
+- [x] Each linked design section shows its own count derived from rows tagged with that `designId`
+- [x] With zero roster rows the total reads as 0 (or "X of N" where a target exists), never a stale estimate
+- [x] `estimatedQuantity` is shown only as an informational/intake seed, clearly distinct from the derived total
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: O-05

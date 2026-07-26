@@ -52,6 +52,14 @@ export default function OrderDetailPage({ params }: PageProps) {
   // gone through Run Setup ("first collect") — saving an order never creates
   // one, so null here is the common starting state, not an error.
   const run = useQuery(api.jerseyRuns.getByOrder, { orderId });
+  // The live production total, derived from the roster rows (O-07, reading
+  // R-04's `countsByRun`). Skipped until a run exists — before that there are
+  // no rows, so the total is simply 0. This replaces `estimatedQuantity` as
+  // the order's real quantity; the estimate stays only as an intake seed.
+  const counts = useQuery(
+    api.orderEntries.countsByRun,
+    run ? { runId: run._id } : "skip",
+  );
 
   if (result === undefined) return <Loading />;
   if (result === null) return <NotFound />;
@@ -61,6 +69,13 @@ export default function OrderDetailPage({ params }: PageProps) {
   const { order, designs, locked } = result;
   const stage = deriveCustomerStage(order.internalStages);
   const tone = chipToneForStage(stage);
+
+  // 0 is the resting total: an empty roster, a run still loading, or no run
+  // yet all read as "nothing collected", never as the stale estimate.
+  const total = counts?.total ?? 0;
+  const countByDesign = new Map(
+    (counts?.byDesign ?? []).map((d) => [d.designId, d.total] as const),
+  );
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -81,7 +96,9 @@ export default function OrderDetailPage({ params }: PageProps) {
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{order.sport}</Badge>
-            <Badge variant="secondary">{order.estimatedQuantity} jerseys</Badge>
+            <Badge variant="secondary" className="tabular-nums">
+              {total} collected
+            </Badge>
             <Badge variant="outline">Created {formatDate(order.createdAt)}</Badge>
           </div>
         </div>
@@ -130,8 +147,14 @@ export default function OrderDetailPage({ params }: PageProps) {
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <Field label="Team name" value={order.teamName} />
             <Field label="Sport" value={order.sport} />
+            {/* The live total is the real quantity (O-07); the intake estimate
+                sits beside it, plainly labelled as the seed it was. */}
             <Field
-              label="Quantity"
+              label="Collected"
+              value={`${total} jersey${total === 1 ? "" : "s"}`}
+            />
+            <Field
+              label="Estimated at intake"
               value={`${order.estimatedQuantity} jerseys`}
             />
             <Field
@@ -186,7 +209,11 @@ export default function OrderDetailPage({ params }: PageProps) {
         ) : (
           <div className="mt-4 space-y-4">
             {designs.map((design) => (
-              <DesignSection key={design._id} design={design} />
+              <DesignSection
+                key={design._id}
+                design={design}
+                count={countByDesign.get(design._id) ?? 0}
+              />
             ))}
           </div>
         )}
@@ -206,9 +233,15 @@ export default function OrderDetailPage({ params }: PageProps) {
 }
 
 // Each linked design renders as its own section under the one order timeline
-// (O-05). It carries the design's silhouette specs and a per-design rollup
-// placeholder — real collected counts arrive once O-07 wires the roster.
-function DesignSection({ design }: { design: OrderDesign }) {
+// (O-05). It carries the design's silhouette specs and its own collected count
+// — Σ qty over the roster rows tagged with this design (O-07).
+function DesignSection({
+  design,
+  count,
+}: {
+  design: OrderDesign;
+  count: number;
+}) {
   const hasSpecs = design.jerseyStyle || design.neckline || design.sleeveStyle;
   return (
     <Card aria-label={`Design: ${design.title}`} className="py-6">
@@ -256,14 +289,33 @@ function DesignSection({ design }: { design: OrderDesign }) {
           </p>
         )}
 
-        {/* Per-design rollup — placeholder until O-07 derives counts from the
-            unified roster. The run spans all designs, so "which design" becomes
-            a per-row attribute the Roster Manager fills in later. */}
-        <div className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          Collected counts will appear here once your team starts submitting.
-        </div>
+        {/* Per-design rollup — Σ qty over this design's roster rows (O-07).
+            The run spans every design, so "which design" is a per-row tag the
+            derived-counts query groups on. */}
+        <DesignRollup count={count} />
       </CardContent>
     </Card>
+  );
+}
+
+// The collected count for one design. Zero keeps the dashed, muted look of an
+// empty slot — nothing's come in yet — while any real count reads as a solid
+// figure so the derived total feels like the source of truth it is.
+function DesignRollup({ count }: { count: number }) {
+  if (count === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        No jerseys collected yet — counts appear here as your team submits.
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
+      <span className="font-semibold tabular-nums text-foreground">{count}</span>{" "}
+      <span className="text-muted-foreground">
+        jersey{count === 1 ? "" : "s"} collected
+      </span>
+    </div>
   );
 }
 

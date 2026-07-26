@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T18:14:28.941Z",
+  "lastUpdated": "2026-07-26T22:20:09.417Z",
   "phases": [
     {
       "id": "phase-1",
@@ -46,7 +46,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Final pre-launch pass: Next.js metadata on all pages, OG image, Next.js Image optimization, jersey photos added, Lighthouse score >= 85 mobile, axe accessibility audit, zero TypeScript/ESLint errors.",
-      "status": "pending",
+      "status": "blocked",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -66,7 +66,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Revisit the client-side query+mutation pattern for syncing Clerk users into Convex. Current approach runs a Convex query on every page load for authenticated users. Evaluate: Clerk webhook handled entirely as a Convex HTTP action, or a Convex auth trigger, to guarantee sync fires exactly once on sign-up with no client-side overhead.",
-      "status": "pending",
+      "status": "blocked",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -85,7 +85,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Apply the A-03 split to lib/order.ts, lib/design.ts, and lib/intake.ts. Convex orders.ts, designs.ts, and intakes.ts import constants and checks from the new rules modules. Single source for team-name, sport, quantity, design title, and brief caps.",
-      "status": "pending",
+      "status": "blocked",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -124,10 +124,10 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Replace the static estimate with a live total derived from the unified roster: order total and per-design counts are summed from roster rows. BLOCKED on the external Roster Manager slice (unified rosterEntries table).",
-      "status": "pending",
+      "status": "completed",
       "agent": null,
-      "startedAt": null,
-      "completedAt": null,
+      "startedAt": "2026-07-26T22:16:27.415Z",
+      "completedAt": "2026-07-26T22:20:09.415Z",
       "issueFile": "backlog/O-07-order-total-derived-from-roster.md",
       "prdRef": "docs/prd/new-edit-order-page.md#6-implementation-decisions",
       "acceptanceCriteria": [
@@ -142,7 +142,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Cleanup slice: migrate admin oversight, run responses page, participation history and response views onto the new model, then delete jerseyRunResponses + jerseyRuns.fixedRoster. Done last so every writer is migrated before the legacy table is dropped.",
-      "status": "pending",
+      "status": "blocked",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -199,7 +199,7 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "R-06 shipped lock/unlock mutations with no UI. The captain run surfaces (run setup, run responses) still offer Manage-run affordances on a locked run and expose no lock/unlock control, so a captain can neither lock deliberately nor see why a run stopped accepting edits.",
-      "status": "pending",
+      "status": "blocked",
       "agent": null,
       "startedAt": null,
       "completedAt": null,
@@ -209,6 +209,24 @@
         "captain/admin can lock a run from the run surface",
         "a locked run shows a locked badge and read-only run settings",
         "admin unlock (and pre-deadline captain unlock) is reachable from the UI"
+      ]
+    },
+    {
+      "id": "A-08",
+      "title": "Extract Qty-By-Design Rollup Helper",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Collapse the Σ-qty-grouped-by-design rollup duplicated across countsByRun, jerseyRuns.lock, and admin.exportOrder into one shared helper so the live count and the frozen lock snapshot are provably the same computation.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/A-08-extract-qty-by-design-rollup-helper.md",
+      "prdRef": "docs/architecture/improvement-report-2026-07-26.md",
+      "acceptanceCriteria": [
+        "Single qtyByDesign helper owns the rollup",
+        "countsByRun and jerseyRuns.lock both derive from it",
+        "Lock snapshot equals the live count (one source)",
+        "No behavior change; all tests pass"
       ]
     }
   ],
@@ -276,6 +294,10 @@
     {
       "from": "O-06",
       "to": "R-08"
+    },
+    {
+      "from": "R-07",
+      "to": "A-08"
     }
   ],
   "log": [
@@ -418,6 +440,24 @@
       "nodeId": "O-06",
       "agent": "ralph-loop",
       "message": "Completed: Freeze Order When Roster Locked"
+    },
+    {
+      "timestamp": "2026-07-26T22:09:28.615Z",
+      "event": "nodes_added",
+      "nodeId": "A-08",
+      "message": "New task added: Extract Qty-By-Design Rollup Helper"
+    },
+    {
+      "timestamp": "2026-07-26T22:16:27.416Z",
+      "event": "task_started",
+      "nodeId": "O-07",
+      "message": "Picked up: Order Total Derived From Roster"
+    },
+    {
+      "timestamp": "2026-07-26T22:20:09.417Z",
+      "event": "task_completed",
+      "nodeId": "O-07",
+      "message": "Completed: Order Total Derived From Roster"
     }
   ]
 }

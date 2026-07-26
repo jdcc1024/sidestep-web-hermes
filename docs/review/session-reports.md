@@ -4,6 +4,35 @@ One entry per completed loop task. This is the human's fast path for UX critique
 
 ---
 
+## 2026-07-26 — O-07: Order Total Derived From Roster
+
+- What shipped:
+  - **The order's quantity is now derived, not entered.** `/portal/orders/[id]`
+    reads R-04's `orderEntries.countsByRun` (skipped until a run exists) and
+    uses `total` — Σ qty over the roster rows — as the order's real headline
+    number. The header badge reads "N collected" and the "The basics" card
+    splits the old single "Quantity" line into **Collected** (the live derived
+    total) and **Estimated at intake** (the old `estimatedQuantity`, kept only
+    as the informational seed it always was, now plainly labelled as such).
+  - **Each design section shows its own count.** The per-design rollup
+    placeholder ("Collected counts will appear here…") is replaced by a real
+    figure from `countsByRun.byDesign`, grouped by `designId`. A design with
+    nothing collected keeps the dashed, muted empty look ("No jerseys collected
+    yet — counts appear here as your team submits"); any real count reads as a
+    solid figure.
+  - **0 is the resting total.** An empty roster, a still-loading run, or no run
+    at all all read as 0 — never a fall-back to the stale estimate. No schema
+    or query change: this slice is purely the order page consuming the existing
+    derived-counts query.
+
+- UX surfaces to eyeball: `/portal/orders/<id>` — check the header badge, the
+  Collected vs Estimated at intake pair in "The basics", and each design
+  section's rollup, across three states: no run yet (0), a run with mixed
+  per-design counts, and a run with an empty roster (0, distinct from the
+  estimate).
+
+---
+
 ## 2026-07-19 — 1-05: Fix Mobile Responsive Shell
 - What shipped: No code change. Verified the bug was already fixed as a side effect of the shadcn migration (S-05/S-12): `SidebarShell.tsx` (the file with the broken `md:` classes) is gone, replaced by `PortalShell.tsx`/`AdminShell.tsx`, which already use a Sheet-based hamburger at `lg:hidden` and fixed sidebar at `lg:flex` — exactly matching this issue's acceptance criteria (hamburger at both 375px and 768px, fixed sidebar at 1024px+).
 - UX surfaces to eyeball: `/portal` and `/` at 375/768/1280, light+dark (screenshots in `docs/review/1-05/`). `/admin/orders` screenshot shows a 403 because the test session isn't an admin user — AdminShell code was reviewed directly instead (structurally identical Sheet/`lg:` pattern to PortalShell).
