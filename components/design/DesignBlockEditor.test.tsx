@@ -45,6 +45,7 @@ vi.mock("sonner", () => ({ toast: { error: toastError, success: vi.fn() } }));
 import type { Id } from "@/convex/_generated/dataModel";
 import type { StoredDesignBlock } from "@/convex/_designBlocks";
 import { DesignBlockEditor } from "./DesignBlockEditor";
+import type { PoolAsset } from "./DesignAssetPool";
 
 const designId = "design_1" as Id<"designs">;
 
@@ -72,14 +73,32 @@ const paletteBlock = {
   swatches: [{ id: "s1", hex: "#102A44", role: "primary" }],
 } satisfies StoredDesignBlock;
 
-const assets = [
+// The editor mounts the asset pool (D-05), so its assets carry the pool's
+// fields too — provenance and the main flag decide which buttons show.
+const assets: PoolAsset[] = [
   {
-    _id: "a1",
+    _id: "a1" as Id<"designAssets">,
     filename: "mood.png",
     contentType: "image/png",
     url: "https://example.test/mood.png",
+    isMain: false,
+    uploadedByUserId: "user_owner",
+    uploadedByAdmin: false,
+    createdAt: 1,
+  },
+  {
+    _id: "a2" as Id<"designAssets">,
+    filename: "logo.png",
+    contentType: "image/png",
+    url: "https://example.test/logo.png",
+    isMain: false,
+    uploadedByUserId: "user_owner",
+    uploadedByAdmin: false,
+    createdAt: 2,
   },
 ];
+
+const viewer = { userId: "user_owner", isAdmin: false };
 
 function allFourSections(): StoredDesignBlock[] {
   return [
@@ -90,9 +109,17 @@ function allFourSections(): StoredDesignBlock[] {
   ];
 }
 
-function renderEditor(blocks: StoredDesignBlock[] = [overview]) {
+function renderEditor(
+  blocks: StoredDesignBlock[] = [overview],
+  pool: PoolAsset[] = assets,
+) {
   return render(
-    <DesignBlockEditor designId={designId} blocks={blocks} assets={assets} />,
+    <DesignBlockEditor
+      designId={designId}
+      blocks={blocks}
+      assets={pool}
+      viewer={viewer}
+    />,
   );
 }
 
@@ -158,12 +185,15 @@ describe("DesignBlockEditor", () => {
       ).toBeInTheDocument();
     });
 
-    it("says so when every section and the palette are in use", () => {
+    it("offers only a gallery once every section and the palette are in use", () => {
       renderEditor([...allFourSections(), paletteBlock]);
 
-      expect(screen.queryByRole("button", { name: /^add /i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /add palette/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /add notes/i })).toBeNull();
+      // Galleries stay on offer — "Mood board" and "Logo refs" are two
+      // different sections of the same brief.
       expect(
-        screen.getByText(/every section and the palette are in use/i),
+        screen.getByRole("button", { name: /add gallery/i }),
       ).toBeInTheDocument();
     });
 
@@ -277,14 +307,10 @@ describe("DesignBlockEditor", () => {
       expect(screen.getByLabelText(/overview/i)).toBeInTheDocument();
     });
 
-    it("has no inline editor for gallery blocks yet", () => {
+    it("renders gallery and palette contents read-only until opened", () => {
       renderEditor([overview, galleryBlock, paletteBlock]);
-      expect(screen.queryByRole("button", { name: /edit mood board/i })).toBeNull();
-    });
-
-    it("still renders gallery and palette contents read-only", () => {
-      renderEditor([overview, galleryBlock, paletteBlock]);
-      expect(screen.getByAltText("mood.png")).toBeInTheDocument();
+      // Once in the gallery block, once in the file pool below it.
+      expect(screen.getAllByAltText("mood.png")).toHaveLength(2);
       expect(screen.getByText("#102A44")).toBeInTheDocument();
     });
   });
@@ -601,5 +627,132 @@ describe("DesignBlockEditor", () => {
       expect(toastError).toHaveBeenCalled();
       expect(screen.getByLabelText(/swatch 1 hex/i)).toBeInTheDocument();
     });
+  });
+
+  // --- Galleries (D-05) -----------------------------------------------------
+  // A gallery is a caption plus a hand-picked, ordered set of the design's
+  // files, so — like the palette — it's edited as one draft block and saved
+  // in a single write.
+  describe("galleries", () => {
+    function savedGallery() {
+      const [args] = mutationCalls(NAMES.update)[0] as [
+        { block: StoredDesignBlock },
+      ];
+      return args.block.kind === "gallery" ? args.block : null;
+    }
+
+    function addedGallery() {
+      const [args] = mutationCalls(NAMES.add)[0] as [
+        { block: StoredDesignBlock },
+      ];
+      return args.block.kind === "gallery" ? args.block : null;
+    }
+
+    it("offers another gallery even when the design already has one", () => {
+      renderEditor([overview, galleryBlock]);
+      expect(
+        screen.getByRole("button", { name: /add gallery/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("writes a new gallery through addBlock with the images picked", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview]);
+
+      await user.click(screen.getByRole("button", { name: /add gallery/i }));
+      await user.type(
+        screen.getByLabelText(/gallery caption/i),
+        "Logo refs",
+      );
+      await user.click(screen.getByRole("checkbox", { name: /logo\.png/i }));
+      await user.click(screen.getByRole("button", { name: /save gallery/i }));
+
+      expect(mutationCalls(NAMES.update)).toHaveLength(0);
+      expect(addedGallery()).toMatchObject({
+        kind: "gallery",
+        caption: "Logo refs",
+        assetIds: ["a2"],
+      });
+    });
+
+    it("picks images in the order they were checked", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview]);
+
+      await user.click(screen.getByRole("button", { name: /add gallery/i }));
+      await user.click(screen.getByRole("checkbox", { name: /logo\.png/i }));
+      await user.click(screen.getByRole("checkbox", { name: /mood\.png/i }));
+      await user.click(screen.getByRole("button", { name: /save gallery/i }));
+
+      expect(addedGallery()?.assetIds).toEqual(["a2", "a1"]);
+    });
+
+    it("unpicks an image from an existing gallery through updateBlock", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview, galleryBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit mood board/i }));
+      expect(screen.getByRole("checkbox", { name: /mood\.png/i })).toBeChecked();
+
+      await user.click(screen.getByRole("checkbox", { name: /mood\.png/i }));
+      await user.click(screen.getByRole("button", { name: /save gallery/i }));
+
+      expect(mutationCalls(NAMES.add)).toHaveLength(0);
+      expect(savedGallery()).toEqual({ ...galleryBlock, assetIds: [] });
+    });
+
+    it("discards a new gallery on cancel without calling the server", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview]);
+
+      await user.click(screen.getByRole("button", { name: /add gallery/i }));
+      await user.click(screen.getByRole("checkbox", { name: /mood\.png/i }));
+      await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+      expect(mutationCalls(NAMES.add)).toHaveLength(0);
+      expect(screen.queryByLabelText(/gallery caption/i)).toBeNull();
+    });
+
+    it("says so when the design has no files to pick from", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview], []);
+
+      await user.click(screen.getByRole("button", { name: /add gallery/i }));
+
+      expect(screen.getByText(/no files to pick from/i)).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).toBeNull();
+    });
+
+    it("closes an open text editor when a gallery opens", async () => {
+      const user = userEvent.setup();
+      renderEditor([overview, galleryBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit overview/i }));
+      await user.click(screen.getByRole("button", { name: /edit mood board/i }));
+
+      expect(screen.queryByLabelText(/^overview$/i)).toBeNull();
+      expect(screen.getByLabelText(/gallery caption/i)).toBeInTheDocument();
+    });
+
+    it("surfaces a server rejection as a toast and stays open", async () => {
+      const user = userEvent.setup();
+      resetMutations().set(NAMES.update, "Nope.");
+      renderEditor([overview, galleryBlock]);
+
+      await user.click(screen.getByRole("button", { name: /edit mood board/i }));
+      await user.click(screen.getByRole("button", { name: /save gallery/i }));
+
+      expect(toastError).toHaveBeenCalled();
+      expect(screen.getByLabelText(/gallery caption/i)).toBeInTheDocument();
+    });
+  });
+
+  // The pool is part of the shared editor, so the admin page picks it up for
+  // free when it mounts the editor in D-06.
+  it("mounts the design's file pool underneath the brief", () => {
+    renderEditor([overview]);
+    expect(
+      screen.getByRole("heading", { name: /files \(2\)/i }),
+    ).toBeInTheDocument();
   });
 });

@@ -100,14 +100,16 @@ export default function DesignDetailPage({ params }: PageProps) {
         </button>
       </header>
 
-      {/* The brief is edited in place (D-03) — this is the owner's own design
-          page, so there's no reason to make them open a form to write in it.
-          "Edit design" still covers the title, the cut, Canva and files. */}
+      {/* The brief and the files are both edited in place (D-03, D-05) — this
+          is the owner's own design page, so there's no reason to make them
+          open a form to write in it. "Edit design" still covers the title,
+          the cut and the Canva link. */}
       <div className="mt-10">
         <DesignBlockEditor
           designId={design._id}
           blocks={design.blocks}
           assets={design.assets}
+          viewer={design.viewer}
         />
       </div>
 
@@ -141,39 +143,6 @@ export default function DesignDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      <section className="mt-8">
-        <h2 className="text-base font-semibold text-foreground">
-          Files ({design.assets.length})
-        </h2>
-        {design.assets.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">No files attached.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-border rounded-lg border border-border bg-card">
-            {design.assets.map((asset) => (
-              <li
-                key={asset._id}
-                className="flex items-center justify-between gap-3 px-4 py-3"
-              >
-                <span className="truncate text-sm text-foreground/90">
-                  {asset.filename}
-                </span>
-                {asset.url ? (
-                  <a
-                    href={asset.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"
-                  >
-                    Download
-                  </a>
-                ) : (
-                  <span className="text-sm text-muted-foreground">Unavailable</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }

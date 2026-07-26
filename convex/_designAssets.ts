@@ -1,7 +1,10 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { requireCurrentUser } from "./_auth";
 import {
+  canDeleteDesignAsset,
+  canUploadDesignAsset,
   normalizeContentType,
   normalizeFilename,
   resolveMainAsset,
@@ -111,4 +114,73 @@ export async function insertDesignAssets(
       createdAt: now + index,
     });
   }
+}
+
+// --- Pool management (D-05) -------------------------------------------------
+// Upload, set-main and delete are run from the design page rather than the
+// edit form, so each needs its own gate. The rules themselves are the pure
+// predicates in lib/designAsset; these three functions are where they meet
+// the database.
+
+// Upload/edit access: owner or admin (PRD §5). Returns the design so callers
+// don't re-fetch it.
+export async function requireAssetEditAccess(
+  ctx: MutationCtx,
+  designId: Id<"designs">,
+): Promise<{ user: Doc<"users">; design: Doc<"designs"> }> {
+  const user = await requireCurrentUser(ctx);
+  const design = await ctx.db.get(designId);
+  if (!design) throw new ConvexError("Design not found.");
+  if (!canUploadDesignAsset(design, { userId: user._id, isAdmin: user.isAdmin }))
+    throw new ConvexError("You don't have access to this design.");
+  return { user, design };
+}
+
+// Loads an asset the caller is allowed to touch, given the design it hangs
+// off. A missing row almost always means someone else deleted the file while
+// this page was open, so the message says that rather than blaming the caller.
+export async function requireEditableAsset(
+  ctx: MutationCtx,
+  assetId: Id<"designAssets">,
+): Promise<{ user: Doc<"users">; asset: Doc<"designAssets"> }> {
+  const asset = await ctx.db.get(assetId);
+  if (!asset) throw new ConvexError("That file is no longer on this design.");
+  const { user } = await requireAssetEditAccess(ctx, asset.designId);
+  return { user, asset };
+}
+
+// The design's representative image is a single flag across the row set, so
+// setting one clears the rest — otherwise the resolver's "explicit isMain"
+// branch would have to break a tie it shouldn't have to.
+export async function setMainDesignAsset(
+  ctx: MutationCtx,
+  asset: Doc<"designAssets">,
+): Promise<void> {
+  for (const other of await listDesignAssets(ctx, asset.designId)) {
+    const isMain = other._id === asset._id;
+    if (other.isMain !== isMain) await ctx.db.patch(other._id, { isMain });
+  }
+}
+
+// Deletes both the row and the bytes. The caller is responsible for the
+// permission check and for stripping the id out of the design's galleries —
+// see convex/designs.ts removeAsset, which does both in one mutation.
+export async function deleteDesignAsset(
+  ctx: MutationCtx,
+  asset: Doc<"designAssets">,
+): Promise<void> {
+  await ctx.storage.delete(asset.storageId);
+  await ctx.db.delete(asset._id);
+}
+
+// Whether this viewer may delete this file — re-exported through the Convex
+// layer so a mutation doesn't have to build the viewer shape itself.
+export function mayDeleteAsset(
+  asset: Doc<"designAssets">,
+  user: Doc<"users">,
+): boolean {
+  return canDeleteDesignAsset(asset, {
+    userId: user._id,
+    isAdmin: user.isAdmin,
+  });
 }

@@ -8,10 +8,15 @@ import {
 } from "../lib/design/rules";
 import {
   countDesignAssets,
+  deleteDesignAsset,
   fileCountsByDesign,
   insertDesignAssets,
   mainAssetOf,
+  mayDeleteAsset,
+  requireAssetEditAccess,
+  requireEditableAsset,
   resolveDesignAssets,
+  setMainDesignAsset,
   uploadedFileValidator,
 } from "./_designAssets";
 import {
@@ -22,7 +27,11 @@ import {
   requireBlockEditAccess,
   requireBlockIndex,
 } from "./_designBlocks";
-import { isRequiredBlock, moveBlockTo } from "../lib/designBlock";
+import {
+  isRequiredBlock,
+  moveBlockTo,
+  removeAssetFromBlocks,
+} from "../lib/designBlock";
 
 // Server-side guards. Mirror lib/design so the client and server cap
 // values the same way — defense in depth against a hand-rolled client that
@@ -139,7 +148,16 @@ export const getMyDesign = query({
 
     const assets = await resolveDesignAssets(ctx, designId);
 
-    return { ...design, assets, mainAsset: mainAssetOf(assets) };
+    return {
+      ...design,
+      assets,
+      mainAsset: mainAssetOf(assets),
+      // The asset pool (D-05) decides per file whether to offer a delete
+      // button, and that answer depends on who's asking — an admin-uploaded
+      // file is admin-delete-only. Shipping the viewer with the design keeps
+      // the client running the very predicate the mutation will re-run.
+      viewer: { userId: user._id, isAdmin: user.isAdmin },
+    };
   },
 });
 
@@ -248,6 +266,71 @@ export const updateDesign = mutation({
     });
 
     return args.designId;
+  },
+});
+
+// ---------------------------------------------------------------------------
+// The asset pool's write path (D-05).
+//
+// The design page manages its own files now — upload more, pick the main
+// image, delete one — so these three sit alongside the block mutations rather
+// than inside the edit form's `updateDesign`. All three are owner-or-admin,
+// because the portal and the admin page mount the same editor (PRD §5);
+// delete asks the narrower question on top of that.
+// ---------------------------------------------------------------------------
+
+export const addAssets = mutation({
+  args: { designId: v.id("designs"), files: v.array(uploadedFileValidator) },
+  handler: async (ctx, { designId, files }) => {
+    const { user } = await requireAssetEditAccess(ctx, designId);
+    await insertDesignAssets(ctx, designId, files, user);
+  },
+});
+
+// Explicit main image. One flag across the design's rows, so this clears the
+// previous pick — the D-01 resolver then reports it everywhere, order page
+// included.
+export const setMainAsset = mutation({
+  args: { assetId: v.id("designAssets") },
+  handler: async (ctx, { assetId }) => {
+    const { asset } = await requireEditableAsset(ctx, assetId);
+    await setMainDesignAsset(ctx, asset);
+  },
+});
+
+// Delete is the narrow one: an admin may remove anything, a captain only
+// files they uploaded themselves, and never one staff uploaded (PRD §5).
+// Removing the file also strips its id out of every gallery that hand-picked
+// it, in this same mutation — a gallery is never left pointing at a file
+// that's gone.
+export const removeAsset = mutation({
+  args: { assetId: v.id("designAssets") },
+  handler: async (ctx, { assetId }) => {
+    const { user, asset } = await requireEditableAsset(ctx, assetId);
+
+    if (!mayDeleteAsset(asset, user))
+      throw new ConvexError(
+        "Sidestep uploaded this file, so only Sidestep can remove it.",
+      );
+
+    // Every design keeps at least one file — createDesign and updateDesign
+    // both insist on it, and a design that deleted its way to zero could no
+    // longer be saved from the edit form at all.
+    if ((await countDesignAssets(ctx, asset.designId)) <= 1)
+      throw new ConvexError(
+        "A design keeps at least one file — upload another before removing this one.",
+      );
+
+    await deleteDesignAsset(ctx, asset);
+
+    const design = await ctx.db.get(asset.designId);
+    if (design) {
+      const blocks = removeAssetFromBlocks(design.blocks, assetId);
+      // Only write when a gallery actually referenced it, so deleting a file
+      // nobody picked doesn't bump the design's updatedAt.
+      if (blocks.some((block, i) => block !== design.blocks[i]))
+        await patchBlocks(ctx, asset.designId, blocks);
+    }
   },
 });
 

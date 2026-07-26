@@ -1,6 +1,6 @@
 # Issue: Gallery Blocks and Asset Pool
 
-## Status: pending
+## Status: done
 
 ## Phase: 2
 
@@ -17,13 +17,13 @@ This issue touches:
 The heaviest slice: manage the design's uploaded image pool and build captioned galleries from hand-picked images. Owner/admin upload to the pool, set a main image, delete under permission rules, then create gallery blocks that reference a chosen subset of assets with a caption. One image may appear in more than one gallery.
 
 ## Acceptance Criteria
-- [ ] Asset pool UI lists uploaded assets with thumbnails (web-safe) / typed cards (other), supports upload, set-main, and delete
-- [ ] Delete respects permissions: owner deletes own uploads, admin deletes any, admin-uploaded assets are admin-delete-only
-- [ ] Gallery block: create with a caption and a hand-picked set of `assetIds`; edit selection + caption; multiple galleries per design
-- [ ] The same asset can be referenced by more than one gallery; removing an asset from the pool removes its references gracefully
-- [ ] Set-main reflects through the D-01 resolver
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] Asset pool UI lists uploaded assets with thumbnails (web-safe) / typed cards (other), supports upload, set-main, and delete
+- [x] Delete respects permissions: owner deletes own uploads, admin deletes any, admin-uploaded assets are admin-delete-only
+- [x] Gallery block: create with a caption and a hand-picked set of `assetIds`; edit selection + caption; multiple galleries per design
+- [x] The same asset can be referenced by more than one gallery; removing an asset from the pool removes its references gracefully
+- [x] Set-main reflects through the D-01 resolver
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: D-01, D-03

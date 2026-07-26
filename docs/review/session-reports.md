@@ -477,3 +477,56 @@ One entry per completed loop task. This is the human's fast path for UX critique
 
 - Follow-ups filed: none. D-09 still needs a human, now for `--login` rather
   than for the dev data.
+
+## 2026-07-26 — D-05: Gallery Blocks and Asset Pool
+
+- What shipped:
+  - **The design's file pool is now managed on the design page.** Three
+    mutations (`addAssets`, `setMainAsset`, `removeAsset`) plus a
+    `DesignAssetPool` component mounted inside the shared block editor: upload
+    more files, pick the main image, delete one — thumbnails for web-safe
+    types, typed tiles for everything else. Permissions run the pure
+    `lib/designAsset` predicates on both sides, so the buttons a captain can't
+    use aren't rendered and the mutation refuses them anyway.
+  - **Gallery blocks are editable.** `GalleryEditor` is a checkbox grid over
+    the whole pool plus a caption; check order is gallery order (shown as a
+    number on each picked tile). Multiple galleries per design, and one image
+    may appear in several.
+  - **Deleting a file cleans up after itself.** `removeAsset` strips the id out
+    of every gallery that hand-picked it in the same mutation, so no gallery is
+    ever left pointing at a file that's gone. The blocks themselves survive —
+    an emptied gallery keeps its place and invites new picks.
+
+- UX surfaces to eyeball: `/portal/designs/<id>` — the brief now ends with a
+  "Files (n)" pool where the old read-only file list used to be; "Add gallery"
+  joined the add-block row. Worth judging: whether the pool belongs under the
+  brief or above it, the gallery picker's tile density on mobile, and the
+  star/x icon pair on each file card. **No screenshots** — see below.
+
+- Decisions I made that a human may want to veto:
+  - **A design can't delete its way to zero files.** `createDesign` and
+    `updateDesign` both require at least one file, so a fileless design could
+    no longer be saved from the edit form at all. `removeAsset` refuses the
+    last one ("upload another before removing this one") and the pool hides the
+    delete button entirely at one file. The alternative — allow zero and relax
+    the form — is a bigger product change than this slice.
+  - **The "Main" badge follows the resolver, not just the explicit flag.** A
+    design with no explicit pick still badges the image the page actually uses
+    (oldest web-safe), so the badge never lies. There's no "unset main" —
+    picking a different image is the only move.
+  - **The pool lives inside `DesignBlockEditor`, not on the page.** That's what
+    makes D-06 a one-line mount: the admin page gets file management for free.
+  - **`getMyDesign` now returns `viewer: { userId, isAdmin }`.** The pool has to
+    know who's looking to decide whether a staff-uploaded file shows a delete
+    button.
+  - **The old read-only "Files" list on the portal design page is gone** — the
+    pool replaces it, download links included.
+
+- Blocked: **screenshots, fifth slice running.** `.auth/state.json` is still the
+  session saved 2026-07-19, untouched since D-04 photographed the Clerk sign-in
+  wall with it. Nothing has changed that would make this attempt land anywhere
+  else, so I didn't re-capture 12 sign-in pages. `node scripts/snap.mjs --login`
+  then unparking D-09 captures D-01 → D-05 in one pass; QUESTIONS.md updated to
+  say so.
+
+- Follow-ups filed: none. D-09 still needs the human `--login`.

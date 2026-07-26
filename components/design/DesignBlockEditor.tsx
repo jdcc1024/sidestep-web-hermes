@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { StoredDesignBlock } from "@/convex/_designBlocks";
+import type { AssetViewer } from "@/lib/designAsset";
 import {
   TEXT_BODY_MAX_LENGTH,
   TEXT_FIELD_LABELS,
@@ -22,6 +23,7 @@ import {
   hasPalette,
   indexOfBlock,
   isRequiredBlock,
+  newGalleryBlock,
   newPaletteBlock,
   newTextBlock,
   validateBlocks,
@@ -29,11 +31,9 @@ import {
 } from "@/lib/designBlock";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  DesignBlockBody,
-  EmptyBrief,
-  type BlockAsset,
-} from "./DesignBlocks";
+import { DesignBlockBody, EmptyBrief } from "./DesignBlocks";
+import { DesignAssetPool, type PoolAsset } from "./DesignAssetPool";
+import { GalleryEditor } from "./GalleryEditor";
 import { PaletteEditor } from "./PaletteEditor";
 
 // The shared block editor (D-03) — the one editing surface for a design's
@@ -47,22 +47,28 @@ import { PaletteEditor } from "./PaletteEditor";
 // The only local state is what isn't committed yet — the section being typed,
 // the body being edited, and which block the pointer is dragging.
 //
-// This slice ships the text sections and reorder; D-04 added the palette.
-// Gallery blocks still render read-only here through the same
-// `DesignBlockBody` the read page uses; their editor arrives with D-05.
+// D-03 shipped the text sections and reorder, D-04 the palette, D-05 the
+// galleries and the file pool underneath — which is why the whole design page
+// is editable from one component the admin page can mount unchanged.
 
-// The one block kind with structure inside it, so the editor holds a whole
-// draft block for it rather than a single string.
-type StoredPaletteBlock = Extract<StoredDesignBlock, { kind: "palette" }>;
+// The block kinds with structure inside them: a list of swatches, a list of
+// picked images. Both are edited as a whole draft block and saved in one
+// write, rather than a mutation per keystroke or per checkbox.
+type StoredDraftBlock = Extract<
+  StoredDesignBlock,
+  { kind: "palette" | "gallery" }
+>;
 
 export function DesignBlockEditor({
   designId,
   blocks,
   assets,
+  viewer,
 }: {
   designId: Id<"designs">;
   blocks: readonly StoredDesignBlock[];
-  assets: readonly BlockAsset[];
+  assets: readonly PoolAsset[];
+  viewer: AssetViewer;
 }) {
   const addBlock = useMutation(api.designs.addBlock);
   const updateBlock = useMutation(api.designs.updateBlock);
@@ -78,12 +84,13 @@ export function DesignBlockEditor({
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(
     null,
   );
-  // The palette is edited as a whole block — its swatches are a list, and
-  // saving each keystroke of a Pantone code would be a mutation per character.
-  // `isNew` is what decides between addBlock and updateBlock on save; until
-  // then nothing about a new palette exists on the server.
-  const [paletteDraft, setPaletteDraft] = useState<{
-    block: StoredPaletteBlock;
+  // The palette and gallery drafts: a whole block held locally, because
+  // saving each keystroke of a Pantone code (or each checkbox in a gallery)
+  // would be a mutation per character. `isNew` is what decides between
+  // addBlock and updateBlock on save; until then nothing about it exists on
+  // the server.
+  const [blockDraft, setBlockDraft] = useState<{
+    block: StoredDraftBlock;
     isNew: boolean;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +105,7 @@ export function DesignBlockEditor({
     setError(null);
     setDraft(null);
     setEditing(null);
-    setPaletteDraft(null);
+    setBlockDraft(null);
   }
 
   // Every write goes through here: one busy flag, one place errors become a
@@ -164,11 +171,13 @@ export function DesignBlockEditor({
     );
   }
 
-  // One save for both palette paths: the draft is the block either way, and
-  // only its presence on the design decides which mutation carries it.
-  function onSavePalette() {
-    if (!paletteDraft) return;
-    const { block, isNew } = paletteDraft;
+  // One save for both draft paths, new or existing: the draft is the block
+  // either way, and only its presence on the design decides which mutation
+  // carries it.
+  function onSaveDraftBlock() {
+    if (!blockDraft) return;
+    const { block, isNew } = blockDraft;
+    const noun = block.kind === "palette" ? "palette" : "gallery";
 
     const next = [...blocks];
     if (isNew) {
@@ -186,12 +195,12 @@ export function DesignBlockEditor({
     }
     setError(null);
     void run(
-      isNew ? "Could not add the palette" : "Could not save the palette",
+      isNew ? `Could not add the ${noun}` : `Could not save the ${noun}`,
       () =>
         isNew
           ? addBlock({ designId, block })
           : updateBlock({ designId, block }),
-      () => setPaletteDraft(null),
+      () => setBlockDraft(null),
     );
   }
 
@@ -230,19 +239,23 @@ export function DesignBlockEditor({
         <AddBlockMenu
           available={available}
           canAddPalette={!hasPalette(blocks)}
-          disabled={busy || draft !== null || paletteDraft !== null}
+          disabled={busy || draft !== null || blockDraft !== null}
           onPickField={(field) => {
             closeEditors();
             setDraft({ field, body: "" });
           }}
           onAddPalette={() => {
             closeEditors();
-            setPaletteDraft({ block: newPaletteBlock(), isNew: true });
+            setBlockDraft({ block: newPaletteBlock(), isNew: true });
+          }}
+          onAddGallery={() => {
+            closeEditors();
+            setBlockDraft({ block: newGalleryBlock(), isNew: true });
           }}
         />
       </div>
 
-      {blocks.length === 0 && !draft && !paletteDraft ? (
+      {blocks.length === 0 && !draft && !blockDraft ? (
         <div className="mt-4">
           <EmptyBrief />
         </div>
@@ -330,22 +343,21 @@ export function DesignBlockEditor({
                       <PencilIcon />
                     </Button>
                   )}
-                  {block.kind === "palette" &&
-                    paletteDraft?.block.id !== block.id && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        disabled={busy}
-                        aria-label={`Edit ${blockHeading(block)}`}
-                        onClick={() => {
-                          closeEditors();
-                          setPaletteDraft({ block, isNew: false });
-                        }}
-                      >
-                        <PencilIcon />
-                      </Button>
-                    )}
+                  {block.kind !== "text" && blockDraft?.block.id !== block.id && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={busy}
+                      aria-label={`Edit ${blockHeading(block)}`}
+                      onClick={() => {
+                        closeEditors();
+                        setBlockDraft({ block, isNew: false });
+                      }}
+                    >
+                      <PencilIcon />
+                    </Button>
+                  )}
                   {/* The Overview is the design's description — the server
                       refuses to drop it, so we don't offer a button that
                       always fails. */}
@@ -379,18 +391,18 @@ export function DesignBlockEditor({
                       setError(null);
                     }}
                   />
-                ) : paletteDraft?.block.id === block.id ? (
-                  <PaletteEditor
-                    block={paletteDraft.block}
+                ) : blockDraft?.block.id === block.id ? (
+                  <DraftBlockEditor
+                    block={blockDraft.block}
+                    assets={assets}
                     error={error}
                     busy={busy}
-                    saveLabel="Save palette"
                     onChange={(next) =>
-                      setPaletteDraft({ block: next, isNew: false })
+                      setBlockDraft({ block: next, isNew: false })
                     }
-                    onSave={onSavePalette}
+                    onSave={onSaveDraftBlock}
                     onCancel={() => {
-                      setPaletteDraft(null);
+                      setBlockDraft(null);
                       setError(null);
                     }}
                   />
@@ -426,56 +438,107 @@ export function DesignBlockEditor({
         </div>
       )}
 
-      {/* A palette that isn't on the design yet: same dashed card as a new text
-          section, so "unsaved" looks the same whatever you're adding. */}
-      {paletteDraft?.isNew && (
+      {/* A palette or gallery that isn't on the design yet: same dashed card as
+          a new text section, so "unsaved" looks the same whatever you add. */}
+      {blockDraft?.isNew && (
         <div className="mt-4 rounded-lg border border-dashed border-border bg-card px-4 py-4">
-          <h3 className="text-sm font-semibold text-foreground">Palette</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            {blockDraft.block.kind === "palette" ? "Palette" : "Gallery"}
+          </h3>
           <div className="mt-3">
-            <PaletteEditor
-              block={paletteDraft.block}
+            <DraftBlockEditor
+              block={blockDraft.block}
+              assets={assets}
               error={error}
               busy={busy}
-              saveLabel="Save palette"
-              onChange={(next) => setPaletteDraft({ block: next, isNew: true })}
-              onSave={onSavePalette}
+              onChange={(next) => setBlockDraft({ block: next, isNew: true })}
+              onSave={onSaveDraftBlock}
               onCancel={() => {
-                setPaletteDraft(null);
+                setBlockDraft(null);
                 setError(null);
               }}
             />
           </div>
         </div>
       )}
+
+      {/* The pool the galleries pick from. Part of the shared editor rather
+          than the page, so the admin design page gets file management for
+          free when it mounts the editor (D-06). */}
+      <div className="mt-10">
+        <DesignAssetPool designId={designId} assets={assets} viewer={viewer} />
+      </div>
     </section>
   );
 }
 
+// Routes a structured draft block to its editor. Both are controlled the same
+// way — draft in, edits out — so the card doesn't care which one it's showing.
+function DraftBlockEditor({
+  block,
+  assets,
+  error,
+  busy,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  block: StoredDraftBlock;
+  assets: readonly PoolAsset[];
+  error: string | null;
+  busy: boolean;
+  onChange: (block: StoredDraftBlock) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  if (block.kind === "palette")
+    return (
+      <PaletteEditor
+        block={block}
+        error={error}
+        busy={busy}
+        saveLabel="Save palette"
+        onChange={onChange}
+        onSave={onSave}
+        onCancel={onCancel}
+      />
+    );
+
+  return (
+    <GalleryEditor
+      block={block}
+      assets={assets}
+      error={error}
+      busy={busy}
+      saveLabel="Save gallery"
+      onChange={onChange}
+      onSave={onSave}
+      onCancel={onCancel}
+    />
+  );
+}
+
 // The add menu is a row of buttons rather than a dropdown: there are at most
-// four sections plus the palette, and showing which ones are still open is
-// more useful than hiding them behind a click. The palette sits last and only
+// four sections plus the palette and galleries, and showing which ones are
+// still open is more useful than hiding them behind a click. The palette only
 // appears while the design hasn't got one — a design has at most one (PRD §6),
-// so offering a second would be offering a button that always fails.
+// so offering a second would be offering a button that always fails. Galleries
+// are always on offer: "Mood board" and "Logo refs" are two different sections.
 function AddBlockMenu({
   available,
   canAddPalette,
   disabled,
   onPickField,
   onAddPalette,
+  onAddGallery,
 }: {
   available: readonly TextField[];
   canAddPalette: boolean;
   disabled: boolean;
   onPickField: (field: TextField) => void;
   onAddPalette: () => void;
+  onAddGallery: () => void;
 }) {
-  if (available.length === 0 && !canAddPalette)
-    return (
-      <p className="text-xs text-muted-foreground">
-        Every section and the palette are in use.
-      </p>
-    );
-
   return (
     <div className="flex flex-wrap items-center gap-2">
       {available.map((field) => (
@@ -491,6 +554,16 @@ function AddBlockMenu({
           Add {TEXT_FIELD_LABELS[field]}
         </Button>
       ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={disabled}
+        onClick={onAddGallery}
+      >
+        <PlusIcon />
+        Add gallery
+      </Button>
       {canAddPalette && (
         <Button
           type="button"

@@ -18,6 +18,7 @@ import {
   moveBlockTo,
   moveSwatch,
   newBlockId,
+  newGalleryBlock,
   newPaletteBlock,
   newSwatch,
   newTextBlock,
@@ -25,7 +26,9 @@ import {
   normalizeHex,
   overviewOf,
   patchSwatch,
+  removeAssetFromBlocks,
   removeSwatchAt,
+  toggleGalleryAsset,
   validateBlocks,
   withOverview,
   type DesignBlock,
@@ -640,5 +643,77 @@ describe("patchSwatch", () => {
     const block = palette();
     patchSwatch(block, 0, { hex: "#FFFFFF" });
     expect(block.swatches[0]!.hex).toBe("#102A44");
+  });
+});
+
+// --- Gallery editing (D-05) -------------------------------------------------
+
+describe("newGalleryBlock", () => {
+  it("starts empty so the block lands before its images are picked", () => {
+    const block = newGalleryBlock([], () => "g-new");
+    expect(block).toEqual({ id: "g-new", kind: "gallery", assetIds: [] });
+  });
+
+  it("keeps the ids it was handed, in order", () => {
+    expect(newGalleryBlock(["a2", "a1"], () => "g-new").assetIds).toEqual([
+      "a2",
+      "a1",
+    ]);
+  });
+});
+
+describe("toggleGalleryAsset", () => {
+  it("appends an id the gallery doesn't show yet", () => {
+    expect(toggleGalleryAsset(gallery(), "a2").assetIds).toEqual(["a1", "a2"]);
+  });
+
+  it("removes an id the gallery already shows", () => {
+    expect(
+      toggleGalleryAsset(gallery({ assetIds: ["a1", "a2"] }), "a1").assetIds,
+    ).toEqual(["a2"]);
+  });
+
+  // Pick order is gallery order, so re-picking an image puts it at the end
+  // rather than back where it used to be.
+  it("re-adds at the end after a removal", () => {
+    const block = gallery({ assetIds: ["a1", "a2"] });
+    const next = toggleGalleryAsset(toggleGalleryAsset(block, "a1"), "a1");
+    expect(next.assetIds).toEqual(["a2", "a1"]);
+  });
+
+  it("does not mutate the block it was given", () => {
+    const block = gallery();
+    toggleGalleryAsset(block, "a2");
+    expect(block.assetIds).toEqual(["a1"]);
+  });
+});
+
+// A deleted file must not leave a hole behind: the id is stripped from every
+// gallery that hand-picked it, which is what keeps `validateBlocks` happy and
+// the page rendering the files that remain.
+describe("removeAssetFromBlocks", () => {
+  it("strips the id from every gallery that referenced it", () => {
+    const blocks: DesignBlock[] = [
+      text(),
+      gallery({ id: "g1", assetIds: ["a1", "a2"] }),
+      gallery({ id: "g2", assetIds: ["a2"] }),
+    ];
+    expect(removeAssetFromBlocks(blocks, "a2")).toEqual([
+      text(),
+      gallery({ id: "g1", assetIds: ["a1"] }),
+      gallery({ id: "g2", assetIds: [] }),
+    ]);
+  });
+
+  it("leaves an unrelated brief exactly as it was", () => {
+    const blocks: DesignBlock[] = [text(), palette(), gallery()];
+    expect(removeAssetFromBlocks(blocks, "a9")).toEqual(blocks);
+  });
+
+  it("keeps a gallery that ends up empty rather than dropping the block", () => {
+    const blocks: DesignBlock[] = [text(), gallery({ assetIds: ["a1"] })];
+    const next = removeAssetFromBlocks(blocks, "a1");
+    expect(next).toHaveLength(2);
+    expect((next[1] as GalleryBlock).assetIds).toEqual([]);
   });
 });

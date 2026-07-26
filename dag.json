@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T08:09:45.974Z",
+  "lastUpdated": "2026-07-26T08:10:28.901Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1419,9 +1419,9 @@
       "phase": "phase-2",
       "type": "feature",
       "description": "Manage the uploaded image pool (upload, set-main, delete under permission rules) and build captioned galleries from hand-picked images. Heaviest slice.",
-      "status": "pending",
-      "agent": null,
-      "startedAt": null,
+      "status": "in-progress",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-26T08:10:28.900Z",
       "completedAt": null,
       "issueFile": "backlog/D-05-gallery-blocks-and-asset-pool.md",
       "prdRef": "docs/prd/design-page-blocks.md#5-scope",
@@ -2195,8 +2195,8 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "idle",
-      "currentTask": null,
+      "status": "working",
+      "currentTask": "D-05",
       "tasksCompleted": 13
     },
     {
@@ -2208,20 +2208,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-05-31T00:05:17.836Z",
-      "event": "nodes_added",
-      "nodeId": "O-07",
-      "agent": null,
-      "message": "New task added: Order Total Derived From Roster"
-    },
-    {
-      "timestamp": "2026-05-31T00:05:20.636Z",
-      "event": "nodes_added",
-      "nodeId": "O-08",
-      "agent": null,
-      "message": "New task added: Relabel Remove Design Warning"
-    },
     {
       "timestamp": "2026-05-31T01:17:06.808Z",
       "event": "nodes_added",
@@ -2907,6 +2893,20 @@
       "nodeId": "D-04",
       "agent": "ralph-loop",
       "message": "Completed: Palette Block Editor"
+    },
+    {
+      "timestamp": "2026-07-26T08:10:08.472Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-26T08:10:28.900Z",
+      "event": "task_started",
+      "nodeId": "D-05",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Gallery Blocks and Asset Pool"
     }
   ]
 }

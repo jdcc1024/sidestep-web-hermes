@@ -221,6 +221,52 @@ export function patchSwatch<T extends PaletteBlock>(
   return { ...block, swatches };
 }
 
+// --- Gallery editing (D-05) -------------------------------------------------
+// A gallery is a hand-picked, ordered list of ids pointing at the design's
+// uploaded files. The three functions below are every edit it can take: mint
+// one, pick or unpick an image, and forget a file that no longer exists.
+
+// Empty on purpose, like a new palette: the block lands first and the images
+// are checked off in the editor underneath it. Generic over the id type so a
+// caller holding branded Convex ids gets a block it can send straight to a
+// mutation.
+export function newGalleryBlock<A extends string = string>(
+  assetIds: A[] = [],
+  makeId: () => string = newBlockId,
+): GalleryBlock & { assetIds: A[] } {
+  return { id: makeId(), kind: "gallery", assetIds };
+}
+
+// Pick order is gallery order, so an image that's picked again lands at the
+// end rather than reclaiming the slot it used to hold.
+export function toggleGalleryAsset<T extends GalleryBlock>(
+  block: T,
+  assetId: T["assetIds"][number],
+): T {
+  const assetIds = block.assetIds.includes(assetId)
+    ? block.assetIds.filter((id) => id !== assetId)
+    : [...block.assetIds, assetId];
+  return { ...block, assetIds } as T;
+}
+
+// Deleting a file has to leave the brief valid: its id is stripped from every
+// gallery that hand-picked it, in the same write that removes the row (see
+// convex/designs.ts removeAsset). A gallery left with nothing in it stays —
+// the block was a deliberate section, and its editor invites new picks.
+export function removeAssetFromBlocks<T extends DesignBlock>(
+  blocks: readonly T[],
+  assetId: string,
+): T[] {
+  return blocks.map((block) => {
+    if (block.kind !== "gallery" || !block.assetIds.includes(assetId))
+      return block;
+    return {
+      ...block,
+      assetIds: block.assetIds.filter((id) => id !== assetId),
+    } as T;
+  });
+}
+
 export function indexOfBlock(
   blocks: readonly DesignBlock[],
   id: string,

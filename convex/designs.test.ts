@@ -1202,3 +1202,342 @@ describe("design block mutations", () => {
     ).rejects.toThrow(/not found/i);
   });
 });
+
+// ─── D-05 Asset pool ───────────────────────────────────────────────────
+// The pool is managed from the design page itself (upload, set main, delete)
+// rather than through the edit form, so each operation is its own mutation
+// answering the permission questions lib/designAsset defines.
+describe("design asset pool", () => {
+  const overview = {
+    id: "b-overview",
+    kind: "text" as const,
+    field: "overview" as const,
+    body: "Navy and gold.",
+  };
+
+  type AsUser = Awaited<ReturnType<typeof seedOwner>>["asUser"];
+
+  async function seedAdmin(t: Test) {
+    await t.run((ctx) =>
+      ctx.db.insert("users", {
+        clerkId: "user_staff_clerk",
+        email: "staff@sidestep.test",
+        name: "Staff",
+        isAdmin: true,
+        createdAt: Date.now(),
+      }),
+    );
+    return t.withIdentity({
+      subject: "user_staff_clerk",
+      email: "staff@sidestep.test",
+      name: "Staff",
+    });
+  }
+
+  // Two files, so a delete test isn't fighting the "a design keeps at least
+  // one file" rule while it's checking something else.
+  async function seedDesign(t: Test, asUser: AsUser) {
+    return asUser.mutation(api.designs.createDesign, {
+      title: "Away kit",
+      blocks: [overview],
+      files: [
+        await fakeFile(t, { filename: "crest.png" }),
+        await fakeFile(t, { filename: "sketch.png" }),
+      ],
+    });
+  }
+
+  describe("addAssets", () => {
+    it("appends rows for files uploaded from the design page", async () => {
+      const t = convexTest(schema, modules);
+      const { userId, asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await asUser.mutation(api.designs.addAssets, {
+        designId,
+        files: [
+          await fakeFile(t, {
+            filename: "logo.svg",
+            contentType: "image/svg+xml",
+          }),
+        ],
+      });
+
+      const assets = await assetsOf(t, designId);
+      expect(assets.map((a) => a.filename)).toEqual([
+        "crest.png",
+        "sketch.png",
+        "logo.svg",
+      ]);
+      expect(assets[2]).toMatchObject({
+        contentType: "image/svg+xml",
+        isMain: false,
+        uploadedByUserId: userId,
+        uploadedByAdmin: false,
+      });
+    });
+
+    it("lets an admin add staff files to a design they don't own", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const asAdmin = await seedAdmin(t);
+
+      await asAdmin.mutation(api.designs.addAssets, {
+        designId,
+        files: [
+          await fakeFile(t, {
+            filename: "print-template.pdf",
+            contentType: "application/pdf",
+          }),
+        ],
+      });
+
+      expect((await assetsOf(t, designId))[2]).toMatchObject({
+        filename: "print-template.pdf",
+        uploadedByAdmin: true,
+      });
+    });
+
+    it("refuses a caller who neither owns the design nor is an admin", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const { asUser: asStranger } = await seedOwner(t, "user_stranger_clerk");
+
+      await expect(
+        asStranger.mutation(api.designs.addAssets, {
+          designId,
+          files: [await fakeFile(t)],
+        }),
+      ).rejects.toThrow(/access/i);
+      expect(await assetsOf(t, designId)).toHaveLength(2);
+    });
+
+    it("rejects an unauthenticated caller", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+
+      await expect(
+        t.mutation(api.designs.addAssets, {
+          designId,
+          files: [await fakeFile(t)],
+        }),
+      ).rejects.toThrow(/Not authenticated/);
+    });
+  });
+
+  describe("setMainAsset", () => {
+    it("flags the chosen asset and clears any previous pick", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const [first, second] = await assetsOf(t, designId);
+
+      await asUser.mutation(api.designs.setMainAsset, { assetId: first!._id });
+      await asUser.mutation(api.designs.setMainAsset, { assetId: second!._id });
+
+      expect((await assetsOf(t, designId)).map((a) => a.isMain)).toEqual([
+        false,
+        true,
+      ]);
+    });
+
+    it("reflects through the resolver getMyDesign reads", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const assets = await assetsOf(t, designId);
+
+      // Without a pick the oldest web-safe image wins; the explicit flag
+      // overrides that.
+      expect(
+        (await asUser.query(api.designs.getMyDesign, { designId }))?.mainAsset
+          ?.filename,
+      ).toBe("crest.png");
+
+      await asUser.mutation(api.designs.setMainAsset, {
+        assetId: assets[1]!._id,
+      });
+
+      expect(
+        (await asUser.query(api.designs.getMyDesign, { designId }))?.mainAsset
+          ?.filename,
+      ).toBe("sketch.png");
+    });
+
+    it("lets an admin pick the main image on a design they don't own", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const asAdmin = await seedAdmin(t);
+      const assets = await assetsOf(t, designId);
+
+      await asAdmin.mutation(api.designs.setMainAsset, {
+        assetId: assets[1]!._id,
+      });
+
+      expect((await assetsOf(t, designId))[1]?.isMain).toBe(true);
+    });
+
+    it("refuses a caller who neither owns the design nor is an admin", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const { asUser: asStranger } = await seedOwner(t, "user_stranger_clerk");
+      const assets = await assetsOf(t, designId);
+
+      await expect(
+        asStranger.mutation(api.designs.setMainAsset, {
+          assetId: assets[0]!._id,
+        }),
+      ).rejects.toThrow(/access/i);
+    });
+
+    it("rejects an asset that is already gone", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const assets = await assetsOf(t, designId);
+      await t.run((ctx) => ctx.db.delete(assets[0]!._id));
+
+      await expect(
+        asUser.mutation(api.designs.setMainAsset, { assetId: assets[0]!._id }),
+      ).rejects.toThrow(/no longer/i);
+    });
+  });
+
+  describe("removeAsset", () => {
+    it("deletes the row and its stored file", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const [first] = await assetsOf(t, designId);
+
+      await asUser.mutation(api.designs.removeAsset, { assetId: first!._id });
+
+      expect((await assetsOf(t, designId)).map((a) => a.filename)).toEqual([
+        "sketch.png",
+      ]);
+      expect(
+        await t.run((ctx) => ctx.storage.getUrl(first!.storageId)),
+      ).toBeNull();
+    });
+
+    it("strips the deleted id out of every gallery that showed it", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const [first, second] = await assetsOf(t, designId);
+
+      await asUser.mutation(api.designs.addBlock, {
+        designId,
+        block: {
+          id: "g1",
+          kind: "gallery",
+          caption: "Mood board",
+          assetIds: [first!._id, second!._id],
+        },
+      });
+      await asUser.mutation(api.designs.addBlock, {
+        designId,
+        block: { id: "g2", kind: "gallery", assetIds: [first!._id] },
+      });
+
+      await asUser.mutation(api.designs.removeAsset, { assetId: first!._id });
+
+      const row = await t.run((ctx) => ctx.db.get(designId));
+      const galleries = row!.blocks.filter((b) => b.kind === "gallery");
+      expect(galleries.map((g) => g.assetIds)).toEqual([[second!._id], []]);
+      // The blocks themselves survive — only the reference goes.
+      expect(row!.blocks.map((b) => b.id)).toEqual(["b-overview", "g1", "g2"]);
+    });
+
+    it("keeps the design's last file — a design is never fileless", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await asUser.mutation(api.designs.createDesign, {
+        title: "Only file",
+        blocks: [overview],
+        files: [await fakeFile(t)],
+      });
+      const [only] = await assetsOf(t, designId);
+
+      await expect(
+        asUser.mutation(api.designs.removeAsset, { assetId: only!._id }),
+      ).rejects.toThrow(/at least one file/i);
+      expect(await assetsOf(t, designId)).toHaveLength(1);
+    });
+
+    it("refuses an owner deleting a file staff uploaded", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const asAdmin = await seedAdmin(t);
+      await asAdmin.mutation(api.designs.addAssets, {
+        designId,
+        files: [
+          await fakeFile(t, {
+            filename: "staff.pdf",
+            contentType: "application/pdf",
+          }),
+        ],
+      });
+      const staffAsset = (await assetsOf(t, designId))[2]!;
+
+      await expect(
+        asUser.mutation(api.designs.removeAsset, { assetId: staffAsset._id }),
+      ).rejects.toThrow(/Sidestep/i);
+      expect(await assetsOf(t, designId)).toHaveLength(3);
+    });
+
+    it("lets an admin delete anything, including a captain's upload", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const asAdmin = await seedAdmin(t);
+      const [first] = await assetsOf(t, designId);
+
+      await asAdmin.mutation(api.designs.removeAsset, { assetId: first!._id });
+
+      expect(await assetsOf(t, designId)).toHaveLength(1);
+    });
+
+    it("refuses a caller who neither owns the design nor is an admin", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const { asUser: asStranger } = await seedOwner(t, "user_stranger_clerk");
+      const [first] = await assetsOf(t, designId);
+
+      await expect(
+        asStranger.mutation(api.designs.removeAsset, { assetId: first!._id }),
+      ).rejects.toThrow(/access/i);
+      expect(await assetsOf(t, designId)).toHaveLength(2);
+    });
+
+    it("rejects an asset that is already gone", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedOwner(t);
+      const designId = await seedDesign(t, asUser);
+      const [first] = await assetsOf(t, designId);
+      await t.run((ctx) => ctx.db.delete(first!._id));
+
+      await expect(
+        asUser.mutation(api.designs.removeAsset, { assetId: first!._id }),
+      ).rejects.toThrow(/no longer/i);
+    });
+  });
+
+  // The pool hides a delete button it knows would fail, which means the page
+  // has to know who is looking at it.
+  it("getMyDesign carries the viewer's identity for the permission rules", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedOwner(t);
+    const designId = await seedDesign(t, asUser);
+
+    const design = await asUser.query(api.designs.getMyDesign, { designId });
+    expect(design?.viewer).toEqual({ userId, isAdmin: false });
+  });
+});

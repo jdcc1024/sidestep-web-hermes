@@ -54,6 +54,8 @@ node scripts/snap.mjs --login
 
 Once that's re-run, D-09 can capture D-01/D-02/D-03/D-04 in one pass — and no dev data has to be deleted for any of it.
 
+**Update (2026-07-26, ralph-loop):** D-05 shipped too, so the pass now covers **D-01 → D-05** — including the new file pool and gallery picker on `/portal/designs/<id>`, which are the most visual surfaces of the whole track. `.auth/state.json` is unchanged since 2026-07-19, so this iteration didn't re-photograph the sign-in wall.
+
 **Answer:** _(human fills in — or just re-run `--login` and unpark D-09 with `node scripts/dag-update.js answer D-09`)_
 
 ## Answered
