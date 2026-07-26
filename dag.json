@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T16:33:01.895Z",
+  "lastUpdated": "2026-07-26T16:40:53.287Z",
   "phases": [
     {
       "id": "phase-1",
@@ -1128,9 +1128,9 @@
       "phase": "phase-3",
       "type": "improvement",
       "description": "Once the roster is locked, freeze the order: details go read-only and edit mutations are rejected so the production basis cannot drift. Reacts to the external locked run state; standalone designs stay editable. BLOCKED on the external Confirm/Lock slice (jerseyRuns.locked status).",
-      "status": "pending",
-      "agent": null,
-      "startedAt": null,
+      "status": "in-progress",
+      "agent": "ralph-loop",
+      "startedAt": "2026-07-26T16:34:03.211Z",
       "completedAt": null,
       "issueFile": "backlog/O-06-freeze-order-when-roster-locked.md",
       "prdRef": "docs/prd/new-edit-order-page.md#5-scope",
@@ -1505,6 +1505,24 @@
       ],
       "needsHuman": true,
       "humanQuestion": "May we delete the one pre-D-01 design on the dev deployment so the schema can push (screenshots are blocked for all of Track D)?"
+    },
+    {
+      "id": "R-08",
+      "title": "Run Surface Lock Controls",
+      "phase": "phase-3",
+      "type": "improvement",
+      "description": "R-06 shipped lock/unlock mutations with no UI. The captain run surfaces (run setup, run responses) still offer Manage-run affordances on a locked run and expose no lock/unlock control, so a captain can neither lock deliberately nor see why a run stopped accepting edits.",
+      "status": "blocked",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/R-08-run-surface-lock-controls.md",
+      "prdRef": "docs/prd/roster-manager-and-lock.md#6-implementation-decisions",
+      "acceptanceCriteria": [
+        "captain/admin can lock a run from the run surface",
+        "a locked run shows a locked badge and read-only run settings",
+        "admin unlock (and pre-deadline captain unlock) is reachable from the UI"
+      ]
     }
   ],
   "edges": [
@@ -1867,6 +1885,14 @@
     {
       "from": "D-09",
       "to": "D-08"
+    },
+    {
+      "from": "R-06",
+      "to": "R-08"
+    },
+    {
+      "from": "O-06",
+      "to": "R-08"
     }
   ],
   "agents": [
@@ -2195,8 +2221,8 @@
     {
       "id": "ralph-loop",
       "name": "Ralph Loop",
-      "status": "idle",
-      "currentTask": null,
+      "status": "working",
+      "currentTask": "O-06",
       "tasksCompleted": 16
     },
     {
@@ -2208,27 +2234,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-06-01T07:40:07.018Z",
-      "event": "task_started",
-      "nodeId": "O-03",
-      "agent": "opus-o03",
-      "message": "Opus O-03 picked up: Order Links Many Designs"
-    },
-    {
-      "timestamp": "2026-06-01T07:43:06.316Z",
-      "event": "task_completed",
-      "nodeId": "O-03",
-      "agent": "opus-o03",
-      "message": "Completed: Order Links Many Designs"
-    },
-    {
-      "timestamp": "2026-06-01T07:56:36.207Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "opus-o04",
-      "message": "Opus (O-04) joined the workforce"
-    },
     {
       "timestamp": "2026-06-01T07:56:36.278Z",
       "event": "task_started",
@@ -2907,6 +2912,27 @@
       "nodeId": "D-07",
       "agent": "ralph-loop",
       "message": "Completed: Order Page Design Main Image"
+    },
+    {
+      "timestamp": "2026-07-26T16:33:21.124Z",
+      "event": "agent_joined",
+      "nodeId": null,
+      "agent": "ralph-loop",
+      "message": "Ralph Loop joined the workforce"
+    },
+    {
+      "timestamp": "2026-07-26T16:34:03.212Z",
+      "event": "task_started",
+      "nodeId": "O-06",
+      "agent": "ralph-loop",
+      "message": "Ralph Loop picked up: Freeze Order When Roster Locked"
+    },
+    {
+      "timestamp": "2026-07-26T16:40:50.180Z",
+      "event": "nodes_added",
+      "nodeId": "R-08",
+      "agent": null,
+      "message": "New task added: Run Surface Lock Controls"
     }
   ]
 }

@@ -11,6 +11,7 @@ import { isWebSafeImage } from "@/lib/designAsset";
 import { cn } from "@/lib/utils";
 import { OrderTimeline } from "@/components/portal/OrderTimeline";
 import { RemovedDesigns } from "@/components/portal/DesignRemoval";
+import { OrderLockedNotice } from "@/components/portal/OrderLocked";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,7 +56,9 @@ export default function OrderDetailPage({ params }: PageProps) {
   if (result === undefined) return <Loading />;
   if (result === null) return <NotFound />;
 
-  const { order, designs } = result;
+  // Locked (O-06) means the confirmed production basis is frozen: every edit
+  // affordance on this page goes away and the note below says why.
+  const { order, designs, locked } = result;
   const stage = deriveCustomerStage(order.internalStages);
   const tone = chipToneForStage(stage);
 
@@ -84,14 +87,18 @@ export default function OrderDetailPage({ params }: PageProps) {
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <StageChip stage={stage} tone={tone} />
-          <Link
-            href={`/portal/orders/${orderId}/edit`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            Edit order
-          </Link>
+          {!locked && (
+            <Link
+              href={`/portal/orders/${orderId}/edit`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              Edit order
+            </Link>
+          )}
         </div>
       </header>
+
+      {locked && <OrderLockedNotice className="mt-6" />}
 
       <Card aria-labelledby="timeline-heading" className="mt-10 py-6">
         <CardHeader className="gap-1.5">
@@ -164,16 +171,18 @@ export default function OrderDetailPage({ params }: PageProps) {
                   } in this order.`}
             </p>
           </div>
-          <Link
-            href={`/portal/orders/${orderId}/edit`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            {designs.length === 0 ? "Attach a design" : "Manage designs"}
-          </Link>
+          {!locked && (
+            <Link
+              href={`/portal/orders/${orderId}/edit`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              {designs.length === 0 ? "Attach a design" : "Manage designs"}
+            </Link>
+          )}
         </div>
 
         {designs.length === 0 ? (
-          <NoDesigns orderId={orderId} />
+          <NoDesigns orderId={orderId} locked={locked} />
         ) : (
           <div className="mt-4 space-y-4">
             {designs.map((design) => (
@@ -305,25 +314,37 @@ function DesignThumbnail({
   );
 }
 
-function NoDesigns({ orderId }: { orderId: Id<"orders"> }) {
+// The empty state doubles as the nudge to attach a design — but a locked
+// order can't attach one, so it drops the CTA rather than offering a button
+// that lands on a frozen edit page.
+function NoDesigns({
+  orderId,
+  locked,
+}: {
+  orderId: Id<"orders">;
+  locked: boolean;
+}) {
   return (
     <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/40 px-6 py-10 text-center">
       <p className="text-sm font-medium text-foreground">
         No designs attached yet
       </p>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        Attach at least one design to move this order forward and unlock
-        collecting sizes from your team.
+        {locked
+          ? "This order was locked without a design attached — contact Sidestep and we'll sort it out with you."
+          : "Attach at least one design to move this order forward and unlock collecting sizes from your team."}
       </p>
-      <Link
-        href={`/portal/orders/${orderId}/edit`}
-        className={cn(
-          buttonVariants({ size: "sm" }),
-          "mt-4 bg-teal-600 font-semibold text-white hover:bg-teal-700",
-        )}
-      >
-        Attach a design
-      </Link>
+      {!locked && (
+        <Link
+          href={`/portal/orders/${orderId}/edit`}
+          className={cn(
+            buttonVariants({ size: "sm" }),
+            "mt-4 bg-teal-600 font-semibold text-white hover:bg-teal-700",
+          )}
+        >
+          Attach a design
+        </Link>
+      )}
     </div>
   );
 }
@@ -338,10 +359,7 @@ function CollectSection({
   hasDesigns,
 }: {
   orderId: Id<"orders">;
-  run:
-    | { _id: Id<"jerseyRuns">; deadline: number; status: "open" | "closed" | "locked" }
-    | null
-    | undefined;
+  run: RunSummary | null | undefined;
   hasDesigns: boolean;
 }) {
   return (
@@ -386,29 +404,45 @@ function CollectSection({
   );
 }
 
+// The run behind the collect CTA. `effectiveStatus` (R-06) is the lazily
+// resolved status — a run stored "open" past its deadline is already locked,
+// and reading `status` here would show "Collecting" on a run whose mutations
+// all reject.
+type RunSummary = {
+  _id: Id<"jerseyRuns">;
+  deadline: number;
+  effectiveStatus: "open" | "closed" | "locked";
+};
+
+const RUN_STATUS_LABEL: Record<RunSummary["effectiveStatus"], string> = {
+  open: "Collecting",
+  closed: "Collection closed",
+  locked: "Roster locked",
+};
+
 function RunStatus({
   orderId,
   run,
 }: {
   orderId: Id<"orders">;
-  run: { deadline: number; status: "open" | "closed" | "locked" };
+  run: RunSummary;
 }) {
-  const closed = run.status === "closed";
+  const collecting = run.effectiveStatus === "open";
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <Badge
           className={cn(
             "border-transparent",
-            closed
-              ? "bg-muted text-muted-foreground"
-              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200",
+            collecting
+              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200"
+              : "bg-muted text-muted-foreground",
           )}
         >
-          {closed ? "Collection closed" : "Collecting"}
+          {RUN_STATUS_LABEL[run.effectiveStatus]}
         </Badge>
         <span className="text-sm text-muted-foreground">
-          {closed ? "Closed " : "Closes "}
+          {collecting ? "Closes " : "Closed "}
           {formatDate(run.deadline)}
         </span>
       </div>

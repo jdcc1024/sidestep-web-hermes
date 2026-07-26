@@ -43,7 +43,10 @@ function design(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function orderWith(designs: ReturnType<typeof design>[]) {
+function orderWith(
+  designs: ReturnType<typeof design>[],
+  overrides: { locked?: boolean } = {},
+) {
   return {
     order: {
       _id: ORDER_ID,
@@ -56,6 +59,7 @@ function orderWith(designs: ReturnType<typeof design>[]) {
       updatedAt: Date.parse("2026-03-02T12:00:00Z"),
     },
     designs,
+    locked: overrides.locked ?? false,
   };
 }
 
@@ -176,5 +180,74 @@ describe("/portal/orders/[id] — design main image (D-07)", () => {
     expect(
       within(sectionFor("Away kit")).getByRole("img", { name: /away kit/i }),
     ).toHaveAttribute("src", "https://example.test/away.png");
+  });
+});
+
+describe("/portal/orders/[id] — frozen once the roster is locked (O-06)", () => {
+  const RUN = {
+    _id: "run_1" as Id<"jerseyRuns">,
+    deadline: Date.parse("2026-04-01T12:00:00Z"),
+  };
+
+  function editLinks() {
+    return screen.queryAllByRole("link", {
+      name: /edit order|manage designs|attach a design/i,
+    });
+  }
+
+  it("keeps every edit affordance while the roster is unlocked", async () => {
+    orderResult = orderWith([design()]);
+    runResult = { ...RUN, status: "open", effectiveStatus: "open" };
+    await renderPage();
+
+    expect(
+      screen.getByRole("link", { name: /edit order/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /manage designs/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
+  it("drops the edit affordances and explains who to contact when locked", async () => {
+    orderResult = orderWith([design()], { locked: true });
+    runResult = { ...RUN, status: "locked", effectiveStatus: "locked" };
+    await renderPage();
+
+    expect(editLinks()).toHaveLength(0);
+    const note = screen.getByRole("note", { name: /locked/i });
+    expect(note).toHaveTextContent(/locked/i);
+    expect(note).toHaveTextContent(/sidestep/i);
+  });
+
+  it("still offers the design's own page when locked — designs stay editable", async () => {
+    orderResult = orderWith([design()], { locked: true });
+    runResult = { ...RUN, status: "locked", effectiveStatus: "locked" };
+    await renderPage();
+
+    expect(
+      within(sectionFor("Home kit")).getByRole("link", { name: /view design/i }),
+    ).toBeInTheDocument();
+  });
+
+  // With no design attached the unlocked page nudges "Attach a design"; a
+  // locked order can't attach one, so the empty state must not pretend it can.
+  it("does not invite attaching a design to a locked order with none", async () => {
+    orderResult = orderWith([], { locked: true });
+    runResult = { ...RUN, status: "locked", effectiveStatus: "locked" };
+    await renderPage();
+
+    expect(editLinks()).toHaveLength(0);
+  });
+
+  // Lazy auto-lock (R-06): the run row still reads "open" past its deadline,
+  // so the badge has to follow `effectiveStatus`, not the stored status.
+  it("shows the run as locked when it has auto-locked past its deadline", async () => {
+    orderResult = orderWith([design()], { locked: true });
+    runResult = { ...RUN, status: "open", effectiveStatus: "locked" };
+    await renderPage();
+
+    expect(screen.getByText(/roster locked/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^collecting$/i)).toBeNull();
   });
 });

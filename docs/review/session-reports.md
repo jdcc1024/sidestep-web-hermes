@@ -623,3 +623,59 @@ One entry per completed loop task. This is the human's fast path for UX critique
 
 - Follow-ups filed: none. D-08 is unblocked by this on the code side; it still
   waits on D-09.
+
+## 2026-07-26 — O-06: Freeze Order When Roster Locked
+
+- What shipped:
+  - **One lock rule, read and write.** `convex/orders.ts` gained an
+    `isOrderLocked` helper; `orders.getMyOrder` now returns `locked` and
+    `orders.updateOrder`'s guard goes through the same helper. The UI can
+    therefore never render an edit affordance the mutation would reject. It
+    resolves the lazy past-deadline case too (R-06 auto-locks on read, so a run
+    stored `open` past its deadline is already frozen and nothing has written
+    that down).
+  - **`/portal/orders/[id]` drops every edit affordance when locked** — Edit
+    order, Manage designs, and the empty-state Attach a design all disappear —
+    and shows the new `components/portal/OrderLocked.tsx` notice ("Locked —
+    contact Sidestep to change") instead. The run badge now reads
+    `effectiveStatus` rather than the stored `status`, so an auto-locked run
+    reads "Roster locked" instead of cheerfully claiming "Collecting".
+  - **`/portal/orders/[id]/edit` swaps the form for a read-only summary** plus
+    the same notice. The route stays reachable (bookmarks, back button), so it
+    explains the freeze rather than 404ing. "View design" links survive on both
+    pages — the freeze is scoped to the order, designs stay editable.
+
+- UX surfaces to eyeball: `/portal/orders/<id>` and `/portal/orders/<id>/edit`,
+  for an order whose run is locked (or whose deadline has passed) and one whose
+  run is still open. Look for: does the locked page read as *finished* rather
+  than *broken* now that its buttons are gone; is the amber notice the right
+  weight next to the stage chip; does the read-only edit page justify its own
+  existence or should it redirect to the detail page instead.
+  **No screenshots** — see Blocked below.
+
+- Decisions I made that a human may want to veto:
+  1. **`locked` ships on the order read, not a separate query.** The alternative
+     was each page calling `jerseyRuns.getByOrder` and deriving it. One flag on
+     the order means the page that renders the button and the mutation that
+     rejects the save can't disagree.
+  2. **The edit route renders read-only instead of redirecting to the detail
+     page.** A redirect is tidier but silently swallows a deliberate navigation;
+     this explains itself and shows the order back to the captain so they know
+     what to quote when they email Sidestep. Easy to flip if you disagree.
+  3. **"Manage run" still links out from a locked order.** The run surfaces have
+     no lock awareness at all yet (R-06 shipped backend-only), so hiding the
+     link here would just hide the problem. Filed as R-08 instead.
+  4. **A closed run is not frozen.** Collection being over isn't the same as the
+     basis being confirmed — a captain can still fix a team name before locking.
+     Follows `effectiveStatus`, which distinguishes the two.
+
+- Blocked: **screenshots, eighth slice running.** I did attempt a capture this
+  time rather than inferring: `node scripts/snap.mjs O-06 /portal` produced six
+  photographs of the Clerk sign-in wall, which I deleted. `.auth/state.json` is
+  still the session saved 2026-07-19 and both O-06 routes are behind Clerk.
+  `node scripts/snap.mjs --login`, then unpark D-09, now covers D-01 → D-07
+  plus these two order routes.
+
+- Follow-ups filed: **R-08** (Run Surface Lock Controls) — R-06 listed "lock
+  control + locked badge" as frontend scope but shipped no UI, so today a run
+  can only reach `locked` by its deadline passing; nobody can lock deliberately.

@@ -342,6 +342,75 @@ describe("orders.updateOrder", () => {
     // Sanity: the run really is the one we just locked, not a stray guard.
     expect((await t.run((ctx) => ctx.db.get(runId)))?.status).toBe("locked");
   });
+
+  // Auto-lock is lazy (R-06) — no scheduler flips the row — so the freeze
+  // has to bite on a run that is still stored "open" past its deadline.
+  it("rejects updating an order whose run has lazily auto-locked (O-06)", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedCaptain(t);
+    const orderId = await seedOrder(t, asUser);
+    const now = Date.now();
+    await t.run((ctx) =>
+      ctx.db.insert("jerseyRuns", {
+        orderId,
+        captainId: userId,
+        sizeOptions: ["S", "M", "L"],
+        namesMode: "open",
+        customQuestions: [],
+        deadline: now - 24 * 60 * 60 * 1000,
+        status: "open",
+        createdAt: now,
+      }),
+    );
+
+    await expect(
+      asUser.mutation(api.orders.updateOrder, {
+        orderId,
+        teamName: "Renamed FC",
+        sport: VALID_ORDER.sport,
+        estimatedQuantity: VALID_ORDER.estimatedQuantity,
+        hasOwnDesign: VALID_ORDER.hasOwnDesign,
+        designIds: [],
+      }),
+    ).rejects.toThrow(/locked/i);
+  });
+
+  // The freeze is scoped to the order: a design is reusable across orders,
+  // so one locked run must not make the design record itself read-only.
+  it("leaves the linked design editable in its own surface while the order is frozen", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, asUser } = await seedCaptain(t);
+    const designId = await seedDesign(t, userId, "Home kit");
+    await seedAsset(t, designId, userId);
+    const orderId = await asUser.mutation(api.orders.createOrder, {
+      ...VALID_ORDER,
+      designIds: [designId],
+    });
+    const now = Date.now();
+    await t.run((ctx) =>
+      ctx.db.insert("jerseyRuns", {
+        orderId,
+        captainId: userId,
+        sizeOptions: ["S", "M", "L"],
+        namesMode: "open",
+        customQuestions: [],
+        deadline: now + 7 * 24 * 60 * 60 * 1000,
+        status: "locked",
+        lockSnapshot: { lockedAt: now, total: 0, byDesign: [] },
+        createdAt: now,
+      }),
+    );
+
+    await asUser.mutation(api.designs.updateDesign, {
+      designId,
+      title: "Home kit v2",
+      addFiles: [],
+    });
+
+    expect((await t.run((ctx) => ctx.db.get(designId)))?.title).toBe(
+      "Home kit v2",
+    );
+  });
 });
 
 describe("orders.getMyOrder", () => {
@@ -473,5 +542,103 @@ describe("orders.getMyOrder", () => {
       ["Home kit", "home.png"],
       ["Away kit", "away.png"],
     ]);
+  });
+
+  // The freeze (O-06) is one flag on the order read, so every order surface
+  // — detail and edit — reads the same lock state the mutation enforces,
+  // rather than each page re-deriving it from the run.
+  describe("locked flag (O-06)", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    async function seedRun(
+      t: ReturnType<typeof convexTest>,
+      orderId: Id<"orders">,
+      captainId: Id<"users">,
+      run: { status: "open" | "closed" | "locked"; deadline: number },
+    ) {
+      return t.run((ctx) =>
+        ctx.db.insert("jerseyRuns", {
+          orderId,
+          captainId,
+          sizeOptions: ["S", "M", "L"],
+          namesMode: "open",
+          customQuestions: [],
+          deadline: run.deadline,
+          status: run.status,
+          createdAt: Date.now(),
+        }),
+      );
+    }
+
+    it("reads unlocked for an order with no jersey run yet", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser } = await seedCaptain(t);
+      const orderId = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
+
+      expect((await asUser.query(api.orders.getMyOrder, { orderId }))?.locked).toBe(
+        false,
+      );
+    });
+
+    it("reads unlocked while the run is still collecting", async () => {
+      const t = convexTest(schema, modules);
+      const { userId, asUser } = await seedCaptain(t);
+      const orderId = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
+      await seedRun(t, orderId, userId, {
+        status: "open",
+        deadline: Date.now() + 7 * DAY,
+      });
+
+      expect((await asUser.query(api.orders.getMyOrder, { orderId }))?.locked).toBe(
+        false,
+      );
+    });
+
+    it("reads locked once the run is locked", async () => {
+      const t = convexTest(schema, modules);
+      const { userId, asUser } = await seedCaptain(t);
+      const orderId = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
+      await seedRun(t, orderId, userId, {
+        status: "locked",
+        deadline: Date.now() + 7 * DAY,
+      });
+
+      expect((await asUser.query(api.orders.getMyOrder, { orderId }))?.locked).toBe(
+        true,
+      );
+    });
+
+    // Lazy auto-lock (R-06): nothing materializes the status, so the read
+    // has to resolve it — otherwise the page would still offer Edit on an
+    // order whose mutations already reject.
+    it("reads locked for an open run whose deadline has passed", async () => {
+      const t = convexTest(schema, modules);
+      const { userId, asUser } = await seedCaptain(t);
+      const orderId = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
+      await seedRun(t, orderId, userId, {
+        status: "open",
+        deadline: Date.now() - DAY,
+      });
+
+      expect((await asUser.query(api.orders.getMyOrder, { orderId }))?.locked).toBe(
+        true,
+      );
+    });
+
+    // A closed run is done collecting but not yet confirmed — the captain
+    // can still fix the team name or swap a design before locking.
+    it("reads unlocked for a closed run", async () => {
+      const t = convexTest(schema, modules);
+      const { userId, asUser } = await seedCaptain(t);
+      const orderId = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
+      await seedRun(t, orderId, userId, {
+        status: "closed",
+        deadline: Date.now() - DAY,
+      });
+
+      expect((await asUser.query(api.orders.getMyOrder, { orderId }))?.locked).toBe(
+        false,
+      );
+    });
   });
 });
