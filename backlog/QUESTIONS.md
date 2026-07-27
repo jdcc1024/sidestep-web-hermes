@@ -64,6 +64,8 @@ Once that's re-run, D-09 can capture D-01/D-02/D-03/D-04 in one pass — and no 
 
 **Update (2026-07-27, ralph-loop, from C-01):** re-confirmed — `node scripts/snap.mjs C-01 /portal/orders/jh7ad7376r9ffvkz1vhs0s5b458b9v0e` again returned six photographs of the sign-in wall, which were deleted. `.auth/state.json` is still the 2026-07-19 session. C-01 put the collected roster (name/number/size lines per design) and a combined size-breakdown chip row on `/portal/orders/<id>`, so that route now owes screenshots for its **collected-roster state** as well as O-06's locked/unlocked pair. Order `jh7ad7376r9ffvkz1vhs0s5b458b9v0e` ("Westerns Test") is the one with a live run and five order entries across XS/S/M/L/4XL — it's the order worth photographing, since the empty orders show none of the new UI.
 
+**Update (2026-07-27, ralph-loop, from C-02):** re-confirmed once more — `node scripts/snap.mjs C-02 /portal/orders/jh7ad7376r9ffvkz1vhs0s5b458b9v0e/run/responses` returned six more photographs of the sign-in wall, deleted. C-02 added an **All responses / By roster / By fan** tab switcher plus a size-breakdown chip row to `/portal/orders/<id>/run/responses`, so the pass now also owes that route **in each of its three views** (a captain session is enough). The same "Westerns Test" order above is the one to shoot — its run has the five entries; every other run is empty and shows only the share-link empty state.
+
 **Answer:** _(human fills in — or just re-run `--login` and unpark D-09 with `node scripts/dag-update.js answer D-09`)_
 
 ## Answered

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   entriesForDesigns,
   jerseyLabel,
+  jerseysByFan,
   rosterLinesByDesign,
   sizeTally,
   type BreakdownEntry,
+  type FanEntry,
 } from "./jerseyBreakdown";
 
 const HOME = { _id: "design_home", title: "Home kit" };
@@ -193,6 +195,91 @@ describe("sizeTally", () => {
 
   it("is empty for an empty roster", () => {
     expect(sizeTally([])).toEqual([]);
+  });
+});
+
+describe("jerseysByFan", () => {
+  function fan(overrides: Partial<FanEntry> = {}): FanEntry {
+    return {
+      ...entry(),
+      submitterName: "Sam Fan",
+      submitterEmail: "sam@example.com",
+      ...overrides,
+    };
+  }
+
+  it("gives a fan one group holding every jersey they ordered", () => {
+    const groups = jerseysByFan([
+      fan({ name: "Kobe", number: "21", size: "M" }),
+      fan({ name: "Kobe", number: "21", size: "L" }),
+      fan({ name: "Bryant", number: "6", size: "S" }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].email).toBe("sam@example.com");
+    expect(groups[0].jerseys.map((j) => `${j.label} ${j.size}`)).toEqual([
+      "Kobe #21 M",
+      "Kobe #21 L",
+      "Bryant #6 S",
+    ]);
+  });
+
+  it("keeps every jersey as its own row rather than collapsing the fan to one line", () => {
+    const groups = jerseysByFan([
+      fan({ name: "Kobe", number: "21", size: "M" }),
+      fan({ name: "Kobe", number: "21", size: "M" }),
+    ]);
+
+    expect(groups[0].jerseys).toHaveLength(2);
+    expect(new Set(groups[0].jerseys.map((j) => j.key)).size).toBe(2);
+  });
+
+  it("reads one fan however they capitalized or padded their email", () => {
+    // The submit path stores trim+lowercase (checkSubmitterEmail); grouping
+    // has to normalize the same way or a fan splits into two groups.
+    const groups = jerseysByFan([
+      fan({ submitterEmail: "  SAM@Example.com " }),
+      fan({ submitterEmail: "sam@example.com" }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].email).toBe("sam@example.com");
+    expect(groups[0].jerseys).toHaveLength(2);
+  });
+
+  it("splits distinct fans and orders them by name", () => {
+    const groups = jerseysByFan([
+      fan({ submitterName: "Zoe", submitterEmail: "zoe@example.com" }),
+      fan({ submitterName: "Ana", submitterEmail: "ana@example.com" }),
+    ]);
+
+    expect(groups.map((g) => g.name)).toEqual(["Ana", "Zoe"]);
+  });
+
+  it("totals a fan's jerseys as Σ qty, not row count", () => {
+    const groups = jerseysByFan([
+      fan({ size: "L", qty: 2 }),
+      fan({ name: undefined, number: undefined, size: "XL", qty: 5 }),
+    ]);
+
+    expect(groups[0].total).toBe(7);
+    expect(groups[0].jerseys[1].label).toBe("Blank");
+  });
+
+  it("carries the design each jersey was ordered on", () => {
+    const groups = jerseysByFan([
+      fan(),
+      fan({ designId: AWAY._id, designTitle: AWAY.title }),
+    ]);
+
+    expect(groups[0].jerseys.map((j) => j.designTitle)).toEqual([
+      "Home kit",
+      "Away kit",
+    ]);
+  });
+
+  it("is empty for an empty run", () => {
+    expect(jerseysByFan([])).toEqual([]);
   });
 });
 

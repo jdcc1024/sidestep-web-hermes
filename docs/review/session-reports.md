@@ -826,3 +826,53 @@ One entry per completed loop task. This is the human's fast path for UX critique
 - Follow-ups filed: none
 
 - Also in this commit, because it gated the receipt: **`components/intake/IntakeForm.test.tsx` was failing on master before C-01** (confirmed by stashing this work and running the suite on a clean tree — 884 passed, same 1 failure). Two of its tests intermittently blew vitest's 5s default timeout when the suite runs in parallel: `user.type` enters text one keystroke at a time, and each key re-renders a validating form, so the multi-sentence brief plus a 45-character share URL was most of the budget. Fixed by pasting those two long values instead of typing them — which is also what the test's own name says it does ("sends a **pasted** share-folder link"). Assertions, coverage, and the typed path on the short fields are all unchanged; no timeout was raised.
+
+## 2026-07-27 — C-02: Captain Responses Page — Multi-View Breakdown (By Roster / By Fan)
+
+- What shipped:
+  - `jerseysByFan` in `lib/jerseyBreakdown.ts` — the run read from the
+    submitter's side: one group per fan keyed on the normalized email the
+    submit path stores (`trim` + `toLowerCase`, matching `checkSubmitterEmail`),
+    holding **one row per jersey they ordered**, fans ordered by display name.
+  - `components/portal/FanBreakdown.tsx` — the by-fan view. Name + email as the
+    group heading, Σ qty beside it, then a row per jersey (label / design /
+    size / ×qty). Query-free, same shape as C-01's components.
+  - `/portal/orders/<id>/run/responses` gains an **All responses / By roster /
+    By fan** tab switcher over the same `listOrderEntries` data, plus C-01's
+    combined size-breakdown chip row above it. By roster mounts C-01's
+    `RosterBreakdown` verbatim — no new grouping arithmetic beyond `jerseysByFan`.
+
+- UX surfaces to eyeball: `/portal/orders/<id>/run/responses` in each of its
+  three views, on an order whose run actually has entries (see below — no
+  screenshots this round).
+
+- Decisions I made that a human may want to veto:
+  - **The raw table stays the default view**, as the issue's decision note
+    proposed — it's the only view carrying submitter, email, custom answers and
+    timestamps. Say the word and "By roster" becomes the landing view.
+  - **Tab labels**: "All responses" / "By roster" / "By fan". Pure copy.
+  - **The two derived views (and the size chips) are scoped to the order's
+    current designs**, the way C-01 scoped the order detail page, so their
+    numbers reconcile with `countsByRun`. The raw table stays unscoped — it's
+    the O-08 receipt for what was actually submitted, so a jersey on a
+    since-removed design still appears there and nowhere else. That asymmetry
+    is deliberate but it is a judgement call.
+  - **By fan does not collapse identical jerseys.** `rosterLinesByDesign` merges
+    the same slot in the same size into one production line; the by-fan view
+    deliberately does not, because it answers "what did this person ask for?"
+    and two identical jerseys on one submission are two things they asked for.
+  - **The design name under each by-fan row is dropped when the run has only one
+    design**, where it would repeat on every row.
+  - **The switcher is local `useState`, not a URL param** — a reload lands back
+    on the table. Fine unless captains want to link someone to a specific view.
+
+- Screenshots: **none — `.auth/state.json` is still the expired 2026-07-19 Clerk
+  session.** Confirmed rather than assumed: `snap.mjs` photographed the sign-in
+  wall at all six viewport/scheme combinations again, and those were deleted
+  rather than filed. The D-09 entry in `backlog/QUESTIONS.md` now also owes this
+  route in its three views. One `node scripts/snap.mjs --login` unblocks it.
+  The layout was therefore reasoned about rather than seen: the by-fan row uses
+  the same flex shape as C-01's roster lines (truncating label, fixed-width size
+  chip and qty), so 375px behaves the way that already-reviewed row does.
+
+- Follow-ups filed: none

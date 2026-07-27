@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { use } from "react";
+import { use, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FanBreakdown } from "@/components/portal/FanBreakdown";
+import { RosterBreakdown } from "@/components/portal/RosterBreakdown";
+import { SizeBreakdown } from "@/components/portal/SizeBreakdown";
+import { entriesForDesigns, type DesignRef } from "@/lib/jerseyBreakdown";
 import { cn } from "@/lib/utils";
 import {
   describeDeadline,
@@ -99,20 +104,88 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
         />
       </section>
 
-      <section
-        aria-label="Response table"
-        className="mt-8 overflow-hidden rounded-lg border border-border bg-card shadow-sm"
-      >
-        {entries.length === 0 ? (
+      {entries.length === 0 ? (
+        <section
+          aria-label="Response table"
+          className="mt-8 overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+        >
           <EmptyState jerseyRunId={run._id} />
-        ) : (
-          <EntryTable
-            entries={entries}
-            customQuestions={run.customQuestions}
-          />
-        )}
-      </section>
+        </section>
+      ) : (
+        <CollectedViews
+          entries={entries}
+          designs={order.designs}
+          customQuestions={run.customQuestions}
+        />
+      )}
     </div>
+  );
+}
+
+// The same collected entries, read three ways (C-02). The raw table stays
+// the default — it's the only view carrying submitter, email, custom answers
+// and timestamps, and captains already know where those live. The two
+// derived views sit beside it rather than replacing it.
+function CollectedViews({
+  entries,
+  designs,
+  customQuestions,
+}: {
+  entries: EntryRow[];
+  designs: readonly DesignRef[];
+  customQuestions: { id: string; label: string }[];
+}) {
+  const [view, setView] = useState("table");
+
+  // The derived views are scoped to the designs the order still carries, the
+  // same way the order detail page scopes them (C-01), so their numbers
+  // reconcile with `orderEntries.countsByRun`. The raw table below stays
+  // unscoped on purpose — it's the receipt for what was actually submitted.
+  const scoped = entriesForDesigns(entries, designs);
+
+  return (
+    <>
+      <SizeBreakdown entries={scoped} className="mt-8" />
+
+      <Tabs
+        value={view}
+        onValueChange={(next) => setView(next as string)}
+        className="mt-4"
+      >
+        <TabsList aria-label="Response view">
+          <TabsTrigger value="table">All responses</TabsTrigger>
+          <TabsTrigger value="roster">By roster</TabsTrigger>
+          <TabsTrigger value="fan">By fan</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="table">
+          <section
+            aria-label="Response table"
+            className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+          >
+            <EntryTable entries={entries} customQuestions={customQuestions} />
+          </section>
+        </TabsContent>
+
+        <TabsContent value="roster">
+          <section
+            aria-label="Roster view"
+            className="rounded-lg border border-border bg-card p-5 shadow-sm sm:p-6"
+          >
+            <RosterBreakdown entries={scoped} designs={designs} />
+          </section>
+        </TabsContent>
+
+        <TabsContent value="fan">
+          <section
+            aria-label="Fan view"
+            className="rounded-lg border border-border bg-card p-5 shadow-sm sm:p-6"
+          >
+            <FanBreakdown entries={scoped} />
+          </section>
+        </TabsContent>
+      </Tabs>
+    </>
   );
 }
 
@@ -120,6 +193,7 @@ type EntryRow = {
   _id: Id<"orderEntries">;
   submitterName: string;
   submitterEmail: string;
+  designId: string;
   designTitle: string;
   name?: string;
   number?: string;
