@@ -5,6 +5,7 @@ import {
   requireCurrentUser,
   requireOrderOwnership,
 } from "./_auth";
+import { qtyByDesign, type QtyByDesign } from "./_orderEntries";
 import {
   checkQty,
   checkSize,
@@ -114,10 +115,7 @@ export const listByRun = query({
 export const countsByRun = query({
   args: { runId: v.id("jerseyRuns") },
   handler: async (ctx, { runId }) => {
-    const empty: {
-      total: number;
-      byDesign: Array<{ designId: Id<"designs">; title: string; total: number }>;
-    } = { total: 0, byDesign: [] };
+    const empty: QtyByDesign = { total: 0, byDesign: [] };
 
     const run = await ctx.db.get(runId);
     if (!run) return empty;
@@ -129,31 +127,7 @@ export const countsByRun = query({
     const order = await ctx.db.get(run.orderId);
     if (!order) return empty;
 
-    const entries = await ctx.db
-      .query("orderEntries")
-      .withIndex("by_run", (q) => q.eq("runId", runId))
-      .collect();
-
-    // One pass tallies Σ qty per design id across every entry on the run.
-    const qtyByDesign = new Map<string, number>();
-    for (const e of entries)
-      qtyByDesign.set(e.designId, (qtyByDesign.get(e.designId) ?? 0) + e.qty);
-
-    // Project onto the order's current designs only — this is what excludes
-    // removed-design entries (their qty is in the map but never read).
-    const byDesign = await Promise.all(
-      order.designIds.map(async (designId) => {
-        const design = await ctx.db.get(designId);
-        return {
-          designId,
-          title: design?.title ?? "Untitled design",
-          total: qtyByDesign.get(designId) ?? 0,
-        };
-      }),
-    );
-    const total = byDesign.reduce((sum, d) => sum + d.total, 0);
-
-    return { total, byDesign };
+    return qtyByDesign(ctx, run, order);
   },
 });
 

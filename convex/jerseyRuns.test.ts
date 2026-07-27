@@ -239,6 +239,63 @@ describe("jerseyRuns.lock / unlock (R-06)", () => {
     expect(run?.lockSnapshot?.lockedAt).toBeTypeOf("number");
   });
 
+  it("freezes exactly the live count: lockSnapshot total/byDesign equals a prior countsByRun (A-08)", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+
+    // Two designs so the per-design rollup has something to split across.
+    const [homeId, awayId] = await t.run(async (ctx) => {
+      const home = await ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Home",
+        blocks: overviewBlocks("home"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      const away = await ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Away",
+        blocks: overviewBlocks("away"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await ctx.db.patch(orderId, { designIds: [home, away] });
+      return [home, away];
+    });
+    await t.run(async (ctx) => {
+      for (const [designId, qty] of [
+        [homeId, 2],
+        [homeId, 3],
+        [awayId, 4],
+      ] as const) {
+        await ctx.db.insert("orderEntries", {
+          runId,
+          designId,
+          size: "M",
+          qty,
+          source: "captain",
+          submitterName: "Sam",
+          submitterEmail: "sam@example.com",
+          createdAt: Date.now(),
+        });
+      }
+    });
+
+    // The number the captain sees live, right before locking.
+    const live = await asUser.query(api.orderEntries.countsByRun, { runId });
+
+    await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+    const run = await t.run((ctx) => ctx.db.get(runId));
+
+    // One source of arithmetic, so the frozen basis is the live count exactly.
+    expect(run?.lockSnapshot?.total).toBe(live.total);
+    expect(run?.lockSnapshot?.byDesign).toEqual(live.byDesign);
+  });
+
   it("admin can lock a captain's run", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);

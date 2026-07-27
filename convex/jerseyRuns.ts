@@ -24,6 +24,7 @@ import {
   effectiveStatus,
   statusAfterUnlock,
 } from "../lib/jerseyRun/lock";
+import { qtyByDesign } from "./_orderEntries";
 
 // Get the jersey run linked to one of the captain's orders. Returns null
 // if no run exists yet — the order detail page uses that to show the
@@ -439,25 +440,9 @@ export const lock = mutation({
     const order = await ctx.db.get(run.orderId);
     if (!order) throw new ConvexError("Order not found.");
 
-    const entries = await ctx.db
-      .query("orderEntries")
-      .withIndex("by_run", (q) => q.eq("runId", jerseyRunId))
-      .collect();
-    const qtyByDesign = new Map<string, number>();
-    for (const e of entries)
-      qtyByDesign.set(e.designId, (qtyByDesign.get(e.designId) ?? 0) + e.qty);
-
-    const byDesign = await Promise.all(
-      order.designIds.map(async (designId) => {
-        const design = await ctx.db.get(designId);
-        return {
-          designId,
-          title: design?.title ?? "Untitled design",
-          total: qtyByDesign.get(designId) ?? 0,
-        };
-      }),
-    );
-    const total = byDesign.reduce((sum, d) => sum + d.total, 0);
+    // Same rollup orderEntries.countsByRun serves live, so the frozen basis
+    // provably matches what the captain saw the moment before locking (A-08).
+    const { total, byDesign } = await qtyByDesign(ctx, run, order);
 
     await ctx.db.patch(jerseyRunId, {
       status: "locked",
