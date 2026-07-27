@@ -1,6 +1,6 @@
 # Issue: Jersey Breakdown Derivations + Order Detail Roster/Size View
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -17,14 +17,24 @@ This issue touches:
 Today the order detail page (`app/portal/orders/[id]/page.tsx`) shows only a Σ-qty rollup per design (`DesignRollup`, reading `countsByRun`). This slice adds the actual collected jerseys — each ordered jersey's **name, number, and size** — grouped **per design**, plus a small **combined size breakdown** (S×3 · M×5 · L×2) that is a pure UI-only derivation. It also establishes `lib/jerseyBreakdown.ts`, the reusable pure-function layer C-02 builds its captain-responses views on.
 
 ## Acceptance Criteria
-- [ ] `lib/jerseyBreakdown.ts` exports pure derivations over the `listOrderEntries` entry shape: roster lines grouped by design (in the order's design order) and a size tally (combined, and per design)
-- [ ] The order detail page fetches entries via `jerseyRuns.listOrderEntries` (skipped until a run exists) and renders, inside each design's section, that design's collected jerseys as name / number / size lines
-- [ ] A design with no collected jerseys keeps its existing "nothing collected yet" empty treatment
-- [ ] A combined size breakdown renders as a UI-only component derived from the same entries (no new query)
-- [ ] The per-design line totals reconcile with the existing `countsByRun` per-design count already shown (same underlying entries)
-- [ ] Admin surfaces are untouched (out of scope, deferred)
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] `lib/jerseyBreakdown.ts` exports pure derivations over the `listOrderEntries` entry shape: roster lines grouped by design (in the order's design order) and a size tally (combined, and per design)
+- [x] The order detail page fetches entries via `jerseyRuns.listOrderEntries` (skipped until a run exists) and renders, inside each design's section, that design's collected jerseys as name / number / size lines
+- [x] A design with no collected jerseys keeps its existing "nothing collected yet" empty treatment
+- [x] A combined size breakdown renders as a UI-only component derived from the same entries (no new query)
+- [x] The per-design line totals reconcile with the existing `countsByRun` per-design count already shown (same underlying entries)
+- [x] Admin surfaces are untouched (out of scope, deferred)
+- [x] All tests pass
+- [x] No regressions in existing tests
+
+## Outcome
+Shipped 2026-07-27. `rosterLinesByDesign` / `sizeTally` / `entriesForDesigns` /
+`jerseyLabel` in `lib/jerseyBreakdown.ts`; `RosterLines` + `RosterBreakdown`
+(`components/portal/RosterBreakdown.tsx`) and `SizeBreakdown`. Two decisions
+worth knowing: identical jerseys (same slot, same size) collapse to one line
+with Σ qty, and entries on a since-removed design are scoped out so the lines
+reconcile with `countsByRun`. `RosterBreakdown` is tested but not yet mounted —
+it exists for C-02's "By roster" view. **No screenshots**: the saved Clerk
+session is expired (D-09).
 
 ## Dependencies
 - Blocked by: none (R-07 landed the `orderEntries` model and `listOrderEntries`; A-08 settled the qty rollup)

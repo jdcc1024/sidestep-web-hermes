@@ -6,10 +6,12 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 // Queries are told apart by function name, not args shape, so the page can
 // grow another query without silently re-pointing one of these stubs. The
 // page reads its order, the run behind the collect CTA, the derived roster
-// counts (O-07), and (through RemovedDesigns) the O-08 receipt.
+// counts (O-07), the collected entries behind the roster breakdown (C-01),
+// and (through RemovedDesigns) the O-08 receipt.
 let orderResult: unknown = undefined;
 let runResult: unknown = null;
 let countsResult: unknown = undefined;
+let entriesResult: unknown = undefined;
 let removedResult: unknown = [];
 
 vi.mock("convex/react", async () => {
@@ -17,6 +19,7 @@ vi.mock("convex/react", async () => {
   return {
     useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
       const name = getFunctionName(ref);
+      if (name === "jerseyRuns:listOrderEntries") return entriesResult;
       if (name.startsWith("jerseyRuns:")) return runResult;
       if (name === "orderEntries:countsByRun") return countsResult;
       if (name.startsWith("orderEntries:")) return removedResult;
@@ -86,6 +89,7 @@ afterEach(() => {
   orderResult = undefined;
   runResult = null;
   countsResult = undefined;
+  entriesResult = undefined;
   removedResult = [];
 });
 
@@ -256,6 +260,225 @@ describe("/portal/orders/[id] — order total derived from the roster (O-07)", (
     await renderPage();
 
     expect(screen.getByText(/0 collected/i)).toBeInTheDocument();
+  });
+});
+
+describe("/portal/orders/[id] — collected roster and size breakdown (C-01)", () => {
+  const RUN = {
+    _id: "run_1" as Id<"jerseyRuns">,
+    deadline: Date.parse("2026-04-01T12:00:00Z"),
+    status: "open",
+    effectiveStatus: "open" as const,
+  };
+
+  function entry(overrides: Record<string, unknown> = {}) {
+    return {
+      designId: "design_home",
+      designTitle: "Home kit",
+      name: "Gretzky",
+      number: "99",
+      size: "L",
+      qty: 1,
+      ...overrides,
+    };
+  }
+
+  it("lists each design's collected jerseys as name / number / size", async () => {
+    orderResult = orderWith([
+      design(),
+      design({ _id: "design_away" as Id<"designs">, title: "Away kit" }),
+    ]);
+    runResult = RUN;
+    countsResult = {
+      total: 3,
+      byDesign: [
+        { designId: "design_home", title: "Home kit", total: 2 },
+        { designId: "design_away", title: "Away kit", total: 1 },
+      ],
+    };
+    entriesResult = {
+      entries: [
+        entry(),
+        entry({ name: "Sosa", number: "25", size: "S" }),
+        entry({
+          designId: "design_away",
+          designTitle: "Away kit",
+          name: "Luongo",
+          number: "1",
+          size: "M",
+        }),
+      ],
+    };
+    await renderPage();
+
+    const home = within(sectionFor("Home kit"));
+    const gretzky = home.getByRole("listitem", { name: /gretzky #99/i });
+    expect(within(gretzky).getByText("L")).toBeInTheDocument();
+    expect(
+      home.getByRole("listitem", { name: /sosa #25/i }),
+    ).toHaveTextContent("S");
+    // The away jersey belongs to the away design's section, not this one.
+    expect(home.queryByText(/luongo/i)).toBeNull();
+
+    expect(
+      within(sectionFor("Away kit")).getByRole("listitem", {
+        name: /luongo #1/i,
+      }),
+    ).toHaveTextContent("M");
+  });
+
+  it("shows a nameless bulk jersey as a blank line with its quantity", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    countsResult = {
+      total: 4,
+      byDesign: [{ designId: "design_home", title: "Home kit", total: 4 }],
+    };
+    entriesResult = {
+      entries: [
+        entry({ name: undefined, number: undefined, size: "XL", qty: 4 }),
+      ],
+    };
+    await renderPage();
+
+    const blank = within(sectionFor("Home kit")).getByRole("listitem", {
+      name: /blank/i,
+    });
+    expect(blank).toHaveTextContent("XL");
+    expect(blank).toHaveTextContent("×4");
+  });
+
+  it("keeps the empty treatment for a design nobody has ordered", async () => {
+    orderResult = orderWith([
+      design(),
+      design({ _id: "design_away" as Id<"designs">, title: "Away kit" }),
+    ]);
+    runResult = RUN;
+    countsResult = {
+      total: 1,
+      byDesign: [
+        { designId: "design_home", title: "Home kit", total: 1 },
+        { designId: "design_away", title: "Away kit", total: 0 },
+      ],
+    };
+    entriesResult = { entries: [entry()] };
+    await renderPage();
+
+    const away = within(sectionFor("Away kit"));
+    expect(away.getByText(/no jerseys collected yet/i)).toBeInTheDocument();
+    expect(away.queryByRole("list", { name: /collected jerseys/i })).toBeNull();
+  });
+
+  it("reconciles each design's lines with the count already shown", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    countsResult = {
+      total: 5,
+      byDesign: [{ designId: "design_home", title: "Home kit", total: 5 }],
+    };
+    entriesResult = {
+      entries: [
+        entry({ size: "L", qty: 1 }),
+        entry({ size: "L", qty: 2 }),
+        entry({ name: "Sosa", number: "25", size: "S", qty: 2 }),
+      ],
+    };
+    await renderPage();
+
+    const home = within(sectionFor("Home kit"));
+    // The rollup says 5; the lines below it add up to the same 5.
+    expect(home.getByText("5")).toBeInTheDocument();
+    expect(
+      within(home.getByRole("listitem", { name: /gretzky #99/i })).getByText(
+        "×3",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(home.getByRole("listitem", { name: /sosa #25/i })).getByText("×2"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the combined size breakdown across every design", async () => {
+    orderResult = orderWith([
+      design(),
+      design({ _id: "design_away" as Id<"designs">, title: "Away kit" }),
+    ]);
+    runResult = RUN;
+    countsResult = {
+      total: 6,
+      byDesign: [
+        { designId: "design_home", title: "Home kit", total: 4 },
+        { designId: "design_away", title: "Away kit", total: 2 },
+      ],
+    };
+    entriesResult = {
+      entries: [
+        entry({ size: "M", qty: 3 }),
+        entry({ name: "Sosa", number: "25", size: "S", qty: 1 }),
+        entry({ designId: "design_away", designTitle: "Away kit", size: "M", qty: 2 }),
+      ],
+    };
+    await renderPage();
+
+    const breakdown = within(screen.getByRole("list", { name: /size breakdown/i }));
+    // Sizes read in canonical order, summed across both designs.
+    expect(breakdown.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "S ×1",
+      "M ×5",
+    ]);
+  });
+
+  it("shows no size breakdown before anything has been collected", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    countsResult = {
+      total: 0,
+      byDesign: [{ designId: "design_home", title: "Home kit", total: 0 }],
+    };
+    entriesResult = { entries: [] };
+    await renderPage();
+
+    expect(screen.queryByRole("list", { name: /size breakdown/i })).toBeNull();
+  });
+
+  it("renders without a roster before a run exists", async () => {
+    orderResult = orderWith([design()]);
+    runResult = null;
+    entriesResult = undefined;
+    await renderPage();
+
+    expect(
+      within(sectionFor("Home kit")).getByText(/no jerseys collected yet/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: /size breakdown/i })).toBeNull();
+  });
+
+  it("leaves a since-removed design's jerseys out of the linked sections", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    countsResult = {
+      total: 1,
+      byDesign: [{ designId: "design_home", title: "Home kit", total: 1 }],
+    };
+    entriesResult = {
+      entries: [
+        entry(),
+        entry({
+          designId: "design_warmup",
+          designTitle: "Warmup",
+          name: "Bure",
+          number: "10",
+          size: "M",
+        }),
+      ],
+    };
+    await renderPage();
+
+    expect(screen.queryByText(/bure/i)).toBeNull();
+    // …and it doesn't inflate the combined breakdown either.
+    const breakdown = within(screen.getByRole("list", { name: /size breakdown/i }));
+    expect(breakdown.getAllByRole("listitem")).toHaveLength(1);
+    expect(breakdown.getByText("L ×1")).toBeInTheDocument();
   });
 });
 

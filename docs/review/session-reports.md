@@ -770,3 +770,59 @@ One entry per completed loop task. This is the human's fast path for UX critique
 - Follow-ups filed: **R-08** (Run Surface Lock Controls) — R-06 listed "lock
   control + locked badge" as frontend scope but shipped no UI, so today a run
   can only reach `locked` by its deadline passing; nobody can lock deliberately.
+
+## 2026-07-27 — C-01: Jersey Breakdown Derivations + Order Detail Roster/Size View
+
+- What shipped — the order detail page now shows the **jerseys**, not just
+  the count.
+  - **`lib/jerseyBreakdown.ts`** — the pure layer C-02 builds on.
+    `rosterLinesByDesign(entries, designs)` groups the collected jerseys by
+    design in the order's own design sequence (empty designs included as empty
+    groups); `sizeTally(entries)` sums Σ qty per size in canonical size order;
+    `entriesForDesigns` scopes a run's entries to the designs the order still
+    carries; `jerseyLabel` is the name/number join ("Gretzky #99" → "Blank"),
+    lifted out of the responses table so nothing re-implements it.
+  - **`RosterLines` / `RosterBreakdown` + `SizeBreakdown`** components, both
+    entry-array-shaped and query-free. `RosterLines` renders one design's lines
+    (order detail mounts it inside each design section, which already carries
+    the title); `RosterBreakdown` renders every design under its own heading —
+    that one exists for C-02's "By roster" view and is tested but not yet
+    mounted anywhere.
+  - **Order detail wiring** — one new `jerseyRuns.listOrderEntries` read, gated
+    on `run` exactly like the counts query. The combined size chip row sits
+    above the design cards; each design card keeps its existing rollup and
+    empty state, with the lines beneath it.
+
+- UX surfaces to eyeball: `/portal/orders/<id>` — **no screenshots, blocked**
+  (see below). What to look at once it's shootable: the size chip row under the
+  "Designs" heading, and the roster list inside each design card (jersey label
+  left, size pill, "×N" only when the quantity isn't 1). Order
+  `jh7ad7376r9ffvkz1vhs0s5b458b9v0e` ("Westerns Test") is the only one on dev
+  with collected entries — the others render none of this.
+
+- Decisions I made that a human may want to veto:
+  - **Identical jerseys collapse into one line with Σ qty.** Two fans ordering
+    #99 Gretzky in L render as one line "×2", not two identical rows. This view
+    answers "what are we making"; the responses table stays the submission log.
+    Trade-off: an open-mode name collision reads as a quantity here rather than
+    as two rows. Nothing is dropped — the lines still sum to the design's count.
+  - **"×N" is hidden when N is 1.** Most lines are one jersey and "×1" on every
+    row is noise. If you'd rather always see a quantity column, it's one line.
+  - **Sort is player name (numeric-aware, case-insensitive), blanks last, then
+    canonical size.** Not submission order — a captain scans for a name.
+  - **Removed designs are scoped out** of both the lines and the size chips, so
+    the numbers reconcile with `countsByRun`; those entries keep their existing
+    "Removed designs" section.
+  - **Placement of the combined breakdown** — above the per-design cards rather
+    than in the "Order details" card. Pure taste; easy to move.
+
+- Screenshots: **none — `.auth/state.json` is still the expired 2026-07-19
+  Clerk session.** `snap.mjs` photographed the sign-in wall at all six
+  viewport/scheme combinations; those were deleted rather than filed, and the
+  D-09 entry in `backlog/QUESTIONS.md` was updated to add this route's
+  collected-roster state to the pass it owes. One `node scripts/snap.mjs
+  --login` unblocks it.
+
+- Follow-ups filed: none
+
+- Also in this commit, because it gated the receipt: **`components/intake/IntakeForm.test.tsx` was failing on master before C-01** (confirmed by stashing this work and running the suite on a clean tree — 884 passed, same 1 failure). Two of its tests intermittently blew vitest's 5s default timeout when the suite runs in parallel: `user.type` enters text one keystroke at a time, and each key re-renders a validating form, so the multi-sentence brief plus a 45-character share URL was most of the budget. Fixed by pasting those two long values instead of typing them — which is also what the test's own name says it does ("sends a **pasted** share-folder link"). Assertions, coverage, and the typed path on the short fields are all unchanged; no timeout was raised.

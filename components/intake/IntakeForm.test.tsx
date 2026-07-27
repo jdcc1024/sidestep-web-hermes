@@ -49,6 +49,12 @@ describe("IntakeForm", () => {
 
 const DRIVE_LINK = "https://drive.google.com/drive/folders/abc123";
 
+// Long free-text values go in by paste rather than keystroke-by-keystroke.
+// Every keystroke re-renders a validating form, and the multi-sentence brief
+// alone was enough to push these tests past the 5s default timeout when the
+// suite runs in parallel. Paste fires the same change handling the assertions
+// below care about — they check what gets submitted, not per-key behaviour —
+// while the short fields keep typing so the typed path stays covered.
 async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/your name/i), "Sam Captain");
   await user.type(
@@ -58,10 +64,8 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^email$/i), "sam@example.com");
   await user.type(screen.getByLabelText(/sport or activity/i), "Soccer");
   await user.click(screen.getByText(/i need help designing/i));
-  await user.type(
-    screen.getByLabelText(/tell us about your team/i),
-    "Navy kit with gold trim.",
-  );
+  await user.click(screen.getByLabelText(/tell us about your team/i));
+  await user.paste("Navy kit with gold trim.");
 }
 
 describe("IntakeForm — inspiration links", () => {
@@ -86,7 +90,9 @@ describe("IntakeForm — inspiration links", () => {
     render(<IntakeForm />);
 
     await fillRequiredFields(user);
-    await user.type(screen.getByLabelText(/^inspiration link 1$/i), DRIVE_LINK);
+    // Pasted, as the name says — nobody types a 45-character share URL.
+    await user.click(screen.getByLabelText(/^inspiration link 1$/i));
+    await user.paste(DRIVE_LINK);
     await user.click(screen.getByRole("button", { name: /send my inquiry/i }));
 
     await screen.findByText(/thanks — we've got it/i);

@@ -62,6 +62,8 @@ Once that's re-run, D-09 can capture D-01/D-02/D-03/D-04 in one pass — and no 
 
 **Update (2026-07-26, ralph-loop, from O-06):** confirmed the session really is expired rather than assuming it — `node scripts/snap.mjs O-06 /portal` returned six photographs of the Clerk sign-in wall, which were deleted. Beyond Track D, the pass now also owes screenshots for **O-06**'s two routes: `/portal/orders/<id>` and `/portal/orders/<id>/edit`, each in a locked and an unlocked state (a captain session is enough for both).
 
+**Update (2026-07-27, ralph-loop, from C-01):** re-confirmed — `node scripts/snap.mjs C-01 /portal/orders/jh7ad7376r9ffvkz1vhs0s5b458b9v0e` again returned six photographs of the sign-in wall, which were deleted. `.auth/state.json` is still the 2026-07-19 session. C-01 put the collected roster (name/number/size lines per design) and a combined size-breakdown chip row on `/portal/orders/<id>`, so that route now owes screenshots for its **collected-roster state** as well as O-06's locked/unlocked pair. Order `jh7ad7376r9ffvkz1vhs0s5b458b9v0e` ("Westerns Test") is the one with a live run and five order entries across XS/S/M/L/4XL — it's the order worth photographing, since the empty orders show none of the new UI.
+
 **Answer:** _(human fills in — or just re-run `--login` and unpark D-09 with `node scripts/dag-update.js answer D-09`)_
 
 ## Answered

@@ -12,6 +12,13 @@ import { cn } from "@/lib/utils";
 import { OrderTimeline } from "@/components/portal/OrderTimeline";
 import { RemovedDesigns } from "@/components/portal/DesignRemoval";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
+import { RosterLines } from "@/components/portal/RosterBreakdown";
+import { SizeBreakdown } from "@/components/portal/SizeBreakdown";
+import {
+  entriesForDesigns,
+  rosterLinesByDesign,
+  type RosterLine,
+} from "@/lib/jerseyBreakdown";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,6 +67,13 @@ export default function OrderDetailPage({ params }: PageProps) {
     api.orderEntries.countsByRun,
     run ? { runId: run._id } : "skip",
   );
+  // The jerseys behind that total (C-01) — who's on the roster, in what
+  // size. Same gating as the counts: no run means nothing was collected,
+  // so the sections fall back to their empty treatment.
+  const collected = useQuery(
+    api.jerseyRuns.listOrderEntries,
+    run ? { jerseyRunId: run._id } : "skip",
+  );
 
   if (result === undefined) return <Loading />;
   if (result === null) return <NotFound />;
@@ -75,6 +89,16 @@ export default function OrderDetailPage({ params }: PageProps) {
   const total = counts?.total ?? 0;
   const countByDesign = new Map(
     (counts?.byDesign ?? []).map((d) => [d.designId, d.total] as const),
+  );
+
+  // Scoped to the designs the order still carries, so both the roster lines
+  // and the size chips reconcile with the counts above — entries on a
+  // since-removed design keep their own section further down (O-08).
+  const entries = entriesForDesigns(collected?.entries ?? [], designs);
+  const linesByDesign = new Map(
+    rosterLinesByDesign(entries, designs).map(
+      (group) => [group.designId, group.lines] as const,
+    ),
   );
 
   return (
@@ -204,6 +228,10 @@ export default function OrderDetailPage({ params }: PageProps) {
           )}
         </div>
 
+        {/* The whole order's size run, above the per-design sections: the
+            captain reads "what are we making" once, then drills in. */}
+        <SizeBreakdown entries={entries} className="mt-4" />
+
         {designs.length === 0 ? (
           <NoDesigns orderId={orderId} locked={locked} />
         ) : (
@@ -213,6 +241,7 @@ export default function OrderDetailPage({ params }: PageProps) {
                 key={design._id}
                 design={design}
                 count={countByDesign.get(design._id) ?? 0}
+                lines={linesByDesign.get(design._id) ?? []}
               />
             ))}
           </div>
@@ -233,14 +262,17 @@ export default function OrderDetailPage({ params }: PageProps) {
 }
 
 // Each linked design renders as its own section under the one order timeline
-// (O-05). It carries the design's silhouette specs and its own collected count
-// — Σ qty over the roster rows tagged with this design (O-07).
+// (O-05). It carries the design's silhouette specs, its own collected count
+// — Σ qty over the roster rows tagged with this design (O-07) — and, since
+// C-01, the jerseys making up that count.
 function DesignSection({
   design,
   count,
+  lines,
 }: {
   design: OrderDesign;
   count: number;
+  lines: RosterLine[];
 }) {
   const hasSpecs = design.jerseyStyle || design.neckline || design.sleeveStyle;
   return (
@@ -291,8 +323,11 @@ function DesignSection({
 
         {/* Per-design rollup — Σ qty over this design's roster rows (O-07).
             The run spans every design, so "which design" is a per-row tag the
-            derived-counts query groups on. */}
+            derived-counts query groups on. The lines beneath it are that same
+            Σ broken out per player slot and size (C-01), so the two always
+            add up to each other. */}
         <DesignRollup count={count} />
+        <RosterLines lines={lines} />
       </CardContent>
     </Card>
   );

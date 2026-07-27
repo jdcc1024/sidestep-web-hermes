@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-27T07:05:08.466Z",
+  "lastUpdated": "2026-07-27T07:08:10.811Z",
   "phases": [
     {
       "id": "phase-1",
@@ -166,8 +166,8 @@
       "phase": "3",
       "type": "feature",
       "description": "Add lib/jerseyBreakdown.ts (pure derivations over listOrderEntries) and render collected jerseys as name/number/size per design on the order detail page, plus a combined size breakdown UI component. Foundation for the responses-page views.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-27T07:08:10.810Z",
       "completedAt": null,
       "issueFile": "backlog/C-01-jersey-breakdown-derivations-and-order-detail-view.md",
       "prdRef": "docs/prd/roster-manager-and-lock.md#collected-roster-surfacing",
@@ -396,6 +396,12 @@
       "event": "needs_human",
       "nodeId": "A-05",
       "message": "Needs human: Consolidate Order Design Intake Validation Rules — Hold off until we finalize order UI"
+    },
+    {
+      "timestamp": "2026-07-27T07:08:10.811Z",
+      "event": "task_started",
+      "nodeId": "C-01",
+      "message": "Picked up: Jersey Breakdown Derivations + Order Detail Roster/Size View"
     }
   ]
 }
