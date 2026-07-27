@@ -41,8 +41,8 @@ if (fs.existsSync(ARCHIVE_FILE)) {
   }
 }
 
-const completedNodes = dag.nodes.filter(n => n.status === 'completed');
-const activeNodes = dag.nodes.filter(n => n.status !== 'completed');
+const completedNodes = dag.nodes.filter(n => n.status === 'completed' || n.status === 'obsolete');
+const activeNodes = dag.nodes.filter(n => n.status !== 'completed' && n.status !== 'obsolete');
 
 const activeNodeIds = new Set(activeNodes.map(n => n.id));
 

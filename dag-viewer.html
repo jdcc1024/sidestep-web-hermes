@@ -130,6 +130,15 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0B1121; colo
 .detail-link .link-label { font-size: 11px; color: #6B7280; display: block; }
 .detail-link .link-path { color: #60A5FA; font-family: monospace; font-size: 12px; word-break: break-all; }
 
+.action-btn-group { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.action-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 9px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s ease; font-family: inherit; }
+.btn-purple { background: rgba(147, 51, 234, 0.2); color: #C084FC; border-color: #9333EA; }
+.btn-purple:hover { background: rgba(147, 51, 234, 0.35); border-color: #A855F7; }
+.btn-danger { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; border-color: #EF4444; }
+.btn-danger:hover { background: rgba(239, 68, 68, 0.35); border-color: #F87171; }
+.btn-success { background: rgba(34, 197, 94, 0.2); color: #86EFAC; border-color: #22C55E; }
+.btn-success:hover { background: rgba(34, 197, 94, 0.35); border-color: #4ADE80; }
+
 .error-banner { background: #7F1D1D; color: #FCA5A5; padding: 10px 24px; font-size: 13px; text-align: center; display: none; }
 .error-banner.visible { display: block; }
 </style>
@@ -946,6 +955,22 @@ function openDetail(nodeId) {
       <span><span class="link-label">PRD Reference</span><span class="link-path">${node.prdRef}</span></span></a>` : ''}
   </div></div>`;
 
+  if (node.status !== 'completed') {
+    html += `<div class="detail-section"><div class="detail-section-title">Quick Actions</div><div class="action-btn-group">`;
+    if (node.needsHuman) {
+      html += `<button class="action-btn btn-success" onclick="userActionNode('${node.id}', 'answer')">✅ Question Answered / Unpark</button>`;
+    } else {
+      html += `<button class="action-btn btn-purple" onclick="userActionNode('${node.id}', 'needs-human')">❓ Flag as Needs Human</button>`;
+    }
+
+    if (node.status === 'blocked' && !node.needsHuman) {
+      html += `<button class="action-btn btn-success" onclick="userActionNode('${node.id}', 'unblock')">🟢 Unblock (Set to Pending)</button>`;
+    } else if (node.status !== 'blocked') {
+      html += `<button class="action-btn btn-danger" onclick="userActionNode('${node.id}', 'blocked')">🚫 Mark as Blocked</button>`;
+    }
+    html += `</div></div>`;
+  }
+
   html += `<div class="detail-section"><div class="detail-section-title">Timeline</div><div class="detail-timestamps">
     ${node.startedAt   ? `<div>Started: <span>${new Date(node.startedAt).toLocaleString()}</span></div>` : ''}
     ${node.completedAt ? `<div>Completed: <span>${new Date(node.completedAt).toLocaleString()}</span></div>` : ''}
@@ -961,6 +986,54 @@ function openDetail(nodeId) {
 function closeDetail() {
   document.getElementById('detailPanel').classList.remove('open');
   document.getElementById('detailOverlay').classList.remove('open');
+}
+
+async function userActionNode(nodeId, action) {
+  let reason = '';
+  let question = '';
+
+  if (action === 'blocked') {
+    reason = prompt('Reason for marking this task blocked:');
+    if (reason === null) return;
+  } else if (action === 'needs-human') {
+    question = prompt('What question or decision is needed from the human?');
+    if (question === null) return;
+  }
+
+  try {
+    const res = await fetch('/api/node-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodeId, action, reason, question })
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      let msg = 'Server returned HTTP ' + res.status;
+      try {
+        const json = JSON.parse(text);
+        if (json.error) msg = json.error;
+      } catch (e) {
+        if (res.status === 404) {
+          msg = 'API endpoint not found. Please restart the DAG viewer server:\n  node scripts/serve-dag.js';
+        } else if (text) {
+          msg = text;
+        }
+      }
+      alert('Error: ' + msg);
+      return;
+    }
+
+    const data = await res.json();
+    if (data.success) {
+      await fetchDAG();
+      openDetail(nodeId);
+    } else {
+      alert('Error updating status: ' + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert('Failed to connect to server: ' + err.message);
+  }
 }
 
 function statusColor(s) {

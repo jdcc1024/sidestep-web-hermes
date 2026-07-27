@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "archivedAt": "2026-07-26T18:14:28.941Z",
+  "archivedAt": "2026-07-27T06:59:42.440Z",
   "nodes": [
     {
       "id": "1-01",
@@ -1314,6 +1314,81 @@
         "Order page renders thumbnail beside count with no-image fallback",
         "Handles unavailable URLs gracefully"
       ]
+    },
+    {
+      "id": "3-04",
+      "title": "Customer Participation History",
+      "phase": "phase-3",
+      "type": "feature",
+      "description": "Participated In section in the portal dashboard: shows jersey runs the customer submitted responses to (matched by email), with team name, jersey details, and submission date. Read-only. OBSOLETE — superseded by 3-08, which covers the dashboard section plus a per-run panel on /run/[id].",
+      "status": "obsolete",
+      "supersededBy": "3-08",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/3-04-customer-participation-history.md",
+      "prdRef": "docs/prd/sidestep-website-phase1.md#4-user-stories",
+      "acceptanceCriteria": [
+        "Participated In section shows on portal dashboard",
+        "Entries matched by respondentEmail to logged-in user email",
+        "Each entry shows team name, size, jersey name, number, and submission date",
+        "Empty state when no participations",
+        "Read-only in Phase 1"
+      ]
+    },
+    {
+      "id": "O-07",
+      "title": "Order Total Derived From Roster",
+      "phase": "phase-3",
+      "type": "improvement",
+      "description": "Replace the static estimate with a live total derived from the unified roster: order total and per-design counts are summed from roster rows. BLOCKED on the external Roster Manager slice (unified rosterEntries table).",
+      "status": "completed",
+      "agent": null,
+      "startedAt": "2026-07-26T22:16:27.415Z",
+      "completedAt": "2026-07-26T22:20:09.415Z",
+      "issueFile": "backlog/O-07-order-total-derived-from-roster.md",
+      "prdRef": "docs/prd/new-edit-order-page.md#6-implementation-decisions",
+      "acceptanceCriteria": [
+        "order total equals sum of roster row quantities",
+        "each design section shows its count from rows tagged with that designId",
+        "empty roster reads 0; estimatedQuantity shown only as informational seed"
+      ]
+    },
+    {
+      "id": "R-07",
+      "title": "Migrate Remaining Surfaces + Retire Old Tables",
+      "phase": "phase-3",
+      "type": "improvement",
+      "description": "Cleanup slice: migrate admin oversight, run responses page, participation history and response views onto the new model, then delete jerseyRunResponses + jerseyRuns.fixedRoster. Done last so every writer is migrated before the legacy table is dropped.",
+      "status": "completed",
+      "agent": null,
+      "startedAt": "2026-07-26T22:30:06.301Z",
+      "completedAt": "2026-07-26T22:51:12.995Z",
+      "issueFile": "backlog/R-07-migrate-remaining-surfaces-retire-old-tables.md",
+      "prdRef": "docs/prd/roster-manager-and-lock.md#5-scope",
+      "acceptanceCriteria": [
+        "all read surfaces use orderEntries/rosterEntries",
+        "jerseyRunResponses + fixedRoster removed; no references remain",
+        "full suite green, convex dev clean"
+      ]
+    },
+    {
+      "id": "A-08",
+      "title": "Extract Qty-By-Design Rollup Helper",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Collapse the Σ-qty-grouped-by-design rollup duplicated across countsByRun, jerseyRuns.lock, and admin.exportOrder into one shared helper so the live count and the frozen lock snapshot are provably the same computation.",
+      "status": "completed",
+      "startedAt": "2026-07-26T23:26:20.769Z",
+      "completedAt": "2026-07-27T04:04:25.391Z",
+      "issueFile": "backlog/A-08-extract-qty-by-design-rollup-helper.md",
+      "prdRef": "docs/architecture/improvement-report-2026-07-26.md",
+      "acceptanceCriteria": [
+        "Single qtyByDesign helper owns the rollup",
+        "countsByRun and jerseyRuns.lock both derive from it",
+        "Lock snapshot equals the live count (one source)",
+        "No behavior change; all tests pass"
+      ]
     }
   ],
   "edges": [
@@ -1620,6 +1695,30 @@
     {
       "from": "D-05",
       "to": "D-06"
+    },
+    {
+      "from": "2-09",
+      "to": "3-04"
+    },
+    {
+      "from": "O-05",
+      "to": "O-07"
+    },
+    {
+      "from": "R-05",
+      "to": "R-07"
+    },
+    {
+      "from": "R-06",
+      "to": "R-07"
+    },
+    {
+      "from": "R-04",
+      "to": "O-07"
+    },
+    {
+      "from": "R-07",
+      "to": "A-08"
     }
   ],
   "log": []

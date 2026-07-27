@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-27T04:37:18.451Z",
+  "lastUpdated": "2026-07-27T07:05:08.466Z",
   "phases": [
     {
       "id": "phase-1",
@@ -20,27 +20,6 @@
   ],
   "nodes": [
     {
-      "id": "3-04",
-      "title": "Customer Participation History",
-      "phase": "phase-3",
-      "type": "feature",
-      "description": "Participated In section in the portal dashboard: shows jersey runs the customer submitted responses to (matched by email), with team name, jersey details, and submission date. Read-only. OBSOLETE — superseded by 3-08, which covers the dashboard section plus a per-run panel on /run/[id].",
-      "status": "obsolete",
-      "supersededBy": "3-08",
-      "agent": null,
-      "startedAt": null,
-      "completedAt": null,
-      "issueFile": "backlog/3-04-customer-participation-history.md",
-      "prdRef": "docs/prd/sidestep-website-phase1.md#4-user-stories",
-      "acceptanceCriteria": [
-        "Participated In section shows on portal dashboard",
-        "Entries matched by respondentEmail to logged-in user email",
-        "Each entry shows team name, size, jersey name, number, and submission date",
-        "Empty state when no participations",
-        "Read-only in Phase 1"
-      ]
-    },
-    {
       "id": "3-05",
       "title": "SEO Performance and Polish",
       "phase": "phase-3",
@@ -58,7 +37,9 @@
         "Lighthouse Performance >= 85 on mobile",
         "Lighthouse Accessibility >= 90 on all public pages",
         "TypeScript compiles clean with zero errors"
-      ]
+      ],
+      "needsHuman": true,
+      "humanQuestion": "Wait for the OK from human before starting task"
     },
     {
       "id": "3-07",
@@ -77,7 +58,9 @@
         "No unauthenticated mutations callable from outside the system",
         "Solution works in local dev without ngrok or manual steps",
         "Existing users table data preserved"
-      ]
+      ],
+      "needsHuman": true,
+      "humanQuestion": "Worry about user auth later"
     },
     {
       "id": "A-05",
@@ -97,7 +80,9 @@
         "no duplicated validation constants remain across lib and convex",
         "all existing tests pass",
         "A-02 smoke tests still pass"
-      ]
+      ],
+      "needsHuman": true,
+      "humanQuestion": "Hold off until we finalize order UI"
     },
     {
       "id": "A-07",
@@ -116,42 +101,6 @@
         "if confirmed, useJerseyRunForm, useIntakeForm, useJerseyRunPublicForm, useDesignForm, useOrderForm hooks live in sibling files",
         "each form component shrinks to ~300 lines of JSX plus onSubmit wiring",
         "all existing tests pass"
-      ]
-    },
-    {
-      "id": "O-07",
-      "title": "Order Total Derived From Roster",
-      "phase": "phase-3",
-      "type": "improvement",
-      "description": "Replace the static estimate with a live total derived from the unified roster: order total and per-design counts are summed from roster rows. BLOCKED on the external Roster Manager slice (unified rosterEntries table).",
-      "status": "completed",
-      "agent": null,
-      "startedAt": "2026-07-26T22:16:27.415Z",
-      "completedAt": "2026-07-26T22:20:09.415Z",
-      "issueFile": "backlog/O-07-order-total-derived-from-roster.md",
-      "prdRef": "docs/prd/new-edit-order-page.md#6-implementation-decisions",
-      "acceptanceCriteria": [
-        "order total equals sum of roster row quantities",
-        "each design section shows its count from rows tagged with that designId",
-        "empty roster reads 0; estimatedQuantity shown only as informational seed"
-      ]
-    },
-    {
-      "id": "R-07",
-      "title": "Migrate Remaining Surfaces + Retire Old Tables",
-      "phase": "phase-3",
-      "type": "improvement",
-      "description": "Cleanup slice: migrate admin oversight, run responses page, participation history and response views onto the new model, then delete jerseyRunResponses + jerseyRuns.fixedRoster. Done last so every writer is migrated before the legacy table is dropped.",
-      "status": "completed",
-      "agent": null,
-      "startedAt": "2026-07-26T22:30:06.301Z",
-      "completedAt": "2026-07-26T22:51:12.995Z",
-      "issueFile": "backlog/R-07-migrate-remaining-surfaces-retire-old-tables.md",
-      "prdRef": "docs/prd/roster-manager-and-lock.md#5-scope",
-      "acceptanceCriteria": [
-        "all read surfaces use orderEntries/rosterEntries",
-        "jerseyRunResponses + fixedRoster removed; no references remain",
-        "full suite green, convex dev clean"
       ]
     },
     {
@@ -212,24 +161,6 @@
       ]
     },
     {
-      "id": "A-08",
-      "title": "Extract Qty-By-Design Rollup Helper",
-      "phase": "3",
-      "type": "improvement",
-      "description": "Collapse the Σ-qty-grouped-by-design rollup duplicated across countsByRun, jerseyRuns.lock, and admin.exportOrder into one shared helper so the live count and the frozen lock snapshot are provably the same computation.",
-      "status": "completed",
-      "startedAt": "2026-07-26T23:26:20.769Z",
-      "completedAt": "2026-07-27T04:04:25.391Z",
-      "issueFile": "backlog/A-08-extract-qty-by-design-rollup-helper.md",
-      "prdRef": "docs/architecture/improvement-report-2026-07-26.md",
-      "acceptanceCriteria": [
-        "Single qtyByDesign helper owns the rollup",
-        "countsByRun and jerseyRuns.lock both derive from it",
-        "Lock snapshot equals the live count (one source)",
-        "No behavior change; all tests pass"
-      ]
-    },
-    {
       "id": "C-01",
       "title": "Jersey Breakdown Derivations + Order Detail Roster/Size View",
       "phase": "3",
@@ -268,10 +199,6 @@
   ],
   "edges": [
     {
-      "from": "2-09",
-      "to": "3-04"
-    },
-    {
       "from": "2-13",
       "to": "3-05"
     },
@@ -296,22 +223,6 @@
       "to": "A-07"
     },
     {
-      "from": "O-05",
-      "to": "O-07"
-    },
-    {
-      "from": "R-05",
-      "to": "R-07"
-    },
-    {
-      "from": "R-06",
-      "to": "R-07"
-    },
-    {
-      "from": "R-04",
-      "to": "O-07"
-    },
-    {
       "from": "D-06",
       "to": "D-08"
     },
@@ -332,78 +243,11 @@
       "to": "R-08"
     },
     {
-      "from": "R-07",
-      "to": "A-08"
-    },
-    {
       "from": "C-01",
       "to": "C-02"
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T02:45:28.644Z",
-      "event": "nodes_added",
-      "nodeId": "D-09",
-      "agent": null,
-      "message": "New task added: Wipe Stale Dev Design and Capture Track D Screenshots"
-    },
-    {
-      "timestamp": "2026-07-26T02:45:28.785Z",
-      "event": "needs_human",
-      "nodeId": "D-09",
-      "agent": "ralph-loop",
-      "message": "Needs human: Wipe Stale Dev Design and Capture Track D Screenshots — May we delete the one pre-D-01 design on the dev deployment so the schema can push (screenshots are blocked for all of Track D)?"
-    },
-    {
-      "timestamp": "2026-07-26T02:46:44.703Z",
-      "event": "task_completed",
-      "nodeId": "D-03",
-      "agent": "ralph-loop",
-      "message": "Completed: Shared Block Editor: Text Sections and Reorder"
-    },
-    {
-      "timestamp": "2026-07-26T07:55:05.661Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "ralph-loop",
-      "message": "Ralph Loop joined the workforce"
-    },
-    {
-      "timestamp": "2026-07-26T07:58:38.081Z",
-      "event": "task_started",
-      "nodeId": "D-04",
-      "agent": "ralph-loop",
-      "message": "Ralph Loop picked up: Palette Block Editor"
-    },
-    {
-      "timestamp": "2026-07-26T08:09:45.974Z",
-      "event": "task_completed",
-      "nodeId": "D-04",
-      "agent": "ralph-loop",
-      "message": "Completed: Palette Block Editor"
-    },
-    {
-      "timestamp": "2026-07-26T08:10:08.472Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "ralph-loop",
-      "message": "Ralph Loop joined the workforce"
-    },
-    {
-      "timestamp": "2026-07-26T08:10:28.900Z",
-      "event": "task_started",
-      "nodeId": "D-05",
-      "agent": "ralph-loop",
-      "message": "Ralph Loop picked up: Gallery Blocks and Asset Pool"
-    },
-    {
-      "timestamp": "2026-07-26T08:25:21.806Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "ralph-loop",
-      "message": "Ralph Loop joined the workforce"
-    },
     {
       "timestamp": "2026-07-26T08:26:32.717Z",
       "event": "task_completed",
@@ -534,6 +378,24 @@
       "event": "nodes_added",
       "nodeId": "C-02",
       "message": "New task added: Captain Responses Page — Multi-View Breakdown (By Roster / By Fan)"
+    },
+    {
+      "timestamp": "2026-07-27T07:04:17.983Z",
+      "event": "needs_human",
+      "nodeId": "3-05",
+      "message": "Needs human: SEO Performance and Polish — Wait for the OK from human before starting task"
+    },
+    {
+      "timestamp": "2026-07-27T07:04:44.328Z",
+      "event": "needs_human",
+      "nodeId": "3-07",
+      "message": "Needs human: User Sync Architecture Revisit — Worry about user auth later"
+    },
+    {
+      "timestamp": "2026-07-27T07:05:08.466Z",
+      "event": "needs_human",
+      "nodeId": "A-05",
+      "message": "Needs human: Consolidate Order Design Intake Validation Rules — Hold off until we finalize order UI"
     }
   ]
 }
