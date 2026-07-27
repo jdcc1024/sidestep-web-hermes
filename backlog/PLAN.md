@@ -253,3 +253,27 @@ Turns the flat design page into a structured internal brief built from **reorder
 - **Before D-03**: exact drag-reorder affordance (whole-block handle vs edge grip) + mobile behavior — pick a default, note it in the session report (PRD §10).
 - **During D-03**: where the required **Overview** is authored on create (create form vs editor) — lean: create form requires an Overview body, editor handles the rest (PRD §10).
 - **Before D-08**: agree the motion/polish direction with a human (park `needs-human` / short `/grill-me`) before implementing.
+
+---
+
+# Track C — Collected Jersey Breakdown Views (2 issues)
+## Source PRD: docs/prd/roster-manager-and-lock.md (collected-roster surfacing)
+## Generated: 2026-07-26
+
+Surfaces the collected jerseys as **roster name / number / size** — per design (primary) and a combined size breakdown (UI-only). Establishes `lib/jerseyBreakdown.ts` as the reusable pure-derivation layer, then adds multiple read views to the captain responses page. Admin run surface is explicitly **out of scope / deferred**.
+
+### Issues
+| # | Issue | Type | Depends On |
+|---|-------|------|------------|
+| C-01 | Jersey Breakdown Derivations + Order Detail Roster/Size View | feature | none |
+| C-02 | Captain Responses Page — Multi-View Breakdown (By Roster / By Fan) | feature | C-01 |
+
+### Parallelization Notes for Track C
+- C-01 is the foundation slice: it ships the pure derivations + reusable `RosterBreakdown` / `SizeBreakdown` components while delivering the order-detail per-design view end-to-end. C-02 reuses that layer for the responses-page views and adds only `jerseysByFan`.
+- No new backend query — both slices read the existing `jerseyRuns.listOrderEntries`.
+
+### Critical Path
+`C-01 → C-02`
+
+### Open Questions Affecting Track C
+- **During C-02**: whether the existing detailed per-entry table stays the default view or is replaced by "By roster". Default: keep the detailed table as default, add the new views as tabs — flag in the session report if the human wants otherwise.

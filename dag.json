@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-26T22:51:12.996Z",
+  "lastUpdated": "2026-07-27T04:37:18.451Z",
   "phases": [
     {
       "id": "phase-1",
@@ -217,9 +217,9 @@
       "phase": "3",
       "type": "improvement",
       "description": "Collapse the Σ-qty-grouped-by-design rollup duplicated across countsByRun, jerseyRuns.lock, and admin.exportOrder into one shared helper so the live count and the frozen lock snapshot are provably the same computation.",
-      "status": "pending",
-      "startedAt": null,
-      "completedAt": null,
+      "status": "completed",
+      "startedAt": "2026-07-26T23:26:20.769Z",
+      "completedAt": "2026-07-27T04:04:25.391Z",
       "issueFile": "backlog/A-08-extract-qty-by-design-rollup-helper.md",
       "prdRef": "docs/architecture/improvement-report-2026-07-26.md",
       "acceptanceCriteria": [
@@ -227,6 +227,42 @@
         "countsByRun and jerseyRuns.lock both derive from it",
         "Lock snapshot equals the live count (one source)",
         "No behavior change; all tests pass"
+      ]
+    },
+    {
+      "id": "C-01",
+      "title": "Jersey Breakdown Derivations + Order Detail Roster/Size View",
+      "phase": "3",
+      "type": "feature",
+      "description": "Add lib/jerseyBreakdown.ts (pure derivations over listOrderEntries) and render collected jerseys as name/number/size per design on the order detail page, plus a combined size breakdown UI component. Foundation for the responses-page views.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/C-01-jersey-breakdown-derivations-and-order-detail-view.md",
+      "prdRef": "docs/prd/roster-manager-and-lock.md#collected-roster-surfacing",
+      "acceptanceCriteria": [
+        "lib/jerseyBreakdown.ts owns the roster-by-design + size-tally derivations",
+        "Order detail shows name/number/size per design via listOrderEntries",
+        "Combined size breakdown is a UI-only derived component",
+        "Per-design lines reconcile with countsByRun; no regressions"
+      ]
+    },
+    {
+      "id": "C-02",
+      "title": "Captain Responses Page — Multi-View Breakdown (By Roster / By Fan)",
+      "phase": "3",
+      "type": "feature",
+      "description": "Add a view switcher on the captain responses page over the same listOrderEntries data: By roster (reuses C-01) and By fan (email to ordered jerseys), plus the combined size breakdown. Adds only the jerseysByFan derivation.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/C-02-responses-page-multi-view-breakdown.md",
+      "prdRef": "docs/prd/roster-manager-and-lock.md#collected-roster-surfacing",
+      "acceptanceCriteria": [
+        "Responses page has a By roster / By fan view switcher",
+        "By roster reuses C-01's per-design breakdown component",
+        "By fan groups by normalized submitter email to jersey lines",
+        "Existing detailed table remains; no regressions"
       ]
     }
   ],
@@ -298,6 +334,10 @@
     {
       "from": "R-07",
       "to": "A-08"
+    },
+    {
+      "from": "C-01",
+      "to": "C-02"
     }
   ],
   "log": [
@@ -470,6 +510,30 @@
       "event": "task_completed",
       "nodeId": "R-07",
       "message": "Completed: Migrate Remaining Surfaces + Retire Old Tables"
+    },
+    {
+      "timestamp": "2026-07-26T23:26:20.770Z",
+      "event": "task_started",
+      "nodeId": "A-08",
+      "message": "Picked up: Extract Qty-By-Design Rollup Helper"
+    },
+    {
+      "timestamp": "2026-07-27T04:04:25.392Z",
+      "event": "task_completed",
+      "nodeId": "A-08",
+      "message": "Completed: Extract Qty-By-Design Rollup Helper"
+    },
+    {
+      "timestamp": "2026-07-27T04:37:12.140Z",
+      "event": "nodes_added",
+      "nodeId": "C-01",
+      "message": "New task added: Jersey Breakdown Derivations + Order Detail Roster/Size View"
+    },
+    {
+      "timestamp": "2026-07-27T04:37:15.180Z",
+      "event": "nodes_added",
+      "nodeId": "C-02",
+      "message": "New task added: Captain Responses Page — Multi-View Breakdown (By Roster / By Fan)"
     }
   ]
 }
