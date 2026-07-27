@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-27T07:23:55.123Z",
+  "lastUpdated": "2026-07-27T07:31:09.113Z",
   "phases": [
     {
       "id": "phase-1",
@@ -184,9 +184,9 @@
       "phase": "3",
       "type": "feature",
       "description": "Add a view switcher on the captain responses page over the same listOrderEntries data: By roster (reuses C-01) and By fan (email to ordered jerseys), plus the combined size breakdown. Adds only the jerseysByFan derivation.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-07-27T07:23:55.122Z",
-      "completedAt": null,
+      "completedAt": "2026-07-27T07:31:09.112Z",
       "issueFile": "backlog/C-02-responses-page-multi-view-breakdown.md",
       "prdRef": "docs/prd/roster-manager-and-lock.md#collected-roster-surfacing",
       "acceptanceCriteria": [
@@ -414,6 +414,12 @@
       "event": "task_started",
       "nodeId": "C-02",
       "message": "Picked up: Captain Responses Page — Multi-View Breakdown (By Roster / By Fan)"
+    },
+    {
+      "timestamp": "2026-07-27T07:31:09.113Z",
+      "event": "task_completed",
+      "nodeId": "C-02",
+      "message": "Completed: Captain Responses Page — Multi-View Breakdown (By Roster / By Fan)"
     }
   ]
 }
