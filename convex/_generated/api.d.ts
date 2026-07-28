@@ -11,6 +11,7 @@
 import type * as _auth from "../_auth.js";
 import type * as _designAssets from "../_designAssets.js";
 import type * as _designBlocks from "../_designBlocks.js";
+import type * as _devSeed from "../_devSeed.js";
 import type * as _migrations from "../_migrations.js";
 import type * as _orderEntries from "../_orderEntries.js";
 import type * as _schemaSmokeTest from "../_schemaSmokeTest.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   _auth: typeof _auth;
   _designAssets: typeof _designAssets;
   _designBlocks: typeof _designBlocks;
+  _devSeed: typeof _devSeed;
   _migrations: typeof _migrations;
   _orderEntries: typeof _orderEntries;
   _schemaSmokeTest: typeof _schemaSmokeTest;

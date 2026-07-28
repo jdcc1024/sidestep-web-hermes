@@ -302,7 +302,38 @@ Division of labor:
 - **The loop builds.** TDD, screenshots for UI work (`node scripts/snap.mjs <nodeId> <routes...>` → `docs/review/<nodeId>/` at 375/768/1280, light+dark), verify (`node scripts/verify.mjs` — mandatory, gates `complete`), commit, update DAG, append to `docs/review/session-reports.md`.
 - **The human decides and critiques.** Product/UX questions land in `backlog/QUESTIONS.md` (see needs-human above); code review happens in batches via `/review-batch` against the `last-human-review` branch, using the screenshots and session reports as the UX review surface. Never push or advance `last-human-review` autonomously.
 
-One-time human setup for authenticated screenshots: `node scripts/snap.mjs --login` (saves a Clerk session to `.auth/state.json`, gitignored).
+### Screenshotting authenticated routes (`/portal`, `/admin`)
+
+**Refresh the session first, every time:** `node scripts/snap.mjs --login`. The
+Clerk `__session` JWT saved in `.auth/state.json` expires within a minute, and
+`snap.mjs` only auto-logs-in when that file is **absent** — so a stale-but-
+present file gets used as-is and every authed route lands on the Clerk Account
+Portal sign-in, or aborts in a redirect loop (`net::ERR_ABORTED`). That was the
+whole of B-07's "/portal won't load" symptom; there is no routing bug. With
+`SNAP_UID` / `SNAP_PWD` in `.env.local` the login is fully automatic and
+headless — it is **not** a human step any more.
+
+**On Windows, invoke `snap.mjs` from PowerShell, not Git Bash.** MSYS path
+conversion rewrites a leading-slash route argument (`/portal` →
+`C:/Program Files/Git/portal`) and every capture fails with "Cannot navigate to
+invalid URL".
+
+**Fixture data for the snap account** (B-07) — `SNAP_UID` owns no real orders,
+so captain surfaces have nothing to render. Seed them once per deployment:
+
+```
+npx convex run _devSeed:seedPortalFixtures '{"email":"jcc@sidestep.design"}'
+```
+
+Idempotent. Gives the account two designs, an order **with** a live run
+(roster + entries, so breakdown views have content) and an order **with no
+run**, for empty-state captures. Returns the ids to put in snap routes.
+
+**Known screenshot artifact, not a bug:** `PortalShell`'s sidebar is
+`position: fixed`, and Playwright's `fullPage` capture paints fixed elements at
+viewport height. So on tall pages the sidebar looks cut off, and a stray Clerk
+avatar can appear mid-page on mobile. Both have zero-sized boxes in a real
+viewport — don't "fix" them.
 
 If you are running as a loop iteration, `scripts/ralph-prompt.md` is your contract — one task, then exit.
 

@@ -1111,3 +1111,85 @@ One entry per completed loop task. This is the human's fast path for UX critique
 
 - Follow-ups filed: **B-07** (seed a snap-owned dev order + fix the `/portal`
   Playwright abort, so `/portal/orders/*` can be screenshotted at all)
+
+## 2026-07-28 — B-07: Snap account owns no orders, so no /portal/orders/* surface can be screenshotted
+
+- **What shipped**
+  - `convex/_devSeed.ts` — `seedPortalFixtures({ email })`, an
+    `internalMutation` (never client-reachable, `_migrations.ts` precedent) that
+    gives one named account the smallest set of rows that makes captain
+    surfaces photographable: two designs, an order **with** a live run (3
+    roster slots + 4 order entries across 4 sizes, one blank/spare line, one
+    submitter with two lines) and an order **with no run at all**. Idempotent —
+    rows are matched by owner + fixture title, so a re-run adopts what's there
+    and a half-finished earlier run is completed rather than duplicated. It
+    refuses to create `users` rows: a Clerk account must exist first.
+  - 7 tests (`convex/_devSeed.test.ts`), all failing before the module existed:
+    one-with-run/one-without, roster+entry shape (both the "By roster" and "By
+    fan" views need content, hence the deliberate spare line), design ownership,
+    idempotency, other accounts untouched, unknown-email refusal, and adopting a
+    pre-existing fixture design without overwriting its brief.
+  - Ran it against dev: `jcc@sidestep.design` now owns orders
+    `jh70c9faf0z6hckes2eafx1ymd8bc6x0` (live run) and
+    `jh78tchkpkxczry0xsrw21fmw58bdx3c` (no run). Second run returned
+    `created: false`, so idempotency holds on the real deployment too.
+  - `CLAUDE.md` — replaced the "one-time human setup" line with what actually
+    makes authed screenshots work (below).
+
+- **The `/portal` `net::ERR_ABORTED` was never a routing bug.** The Clerk
+  `__session` JWT in `.auth/state.json` expires within a minute, and `snap.mjs`
+  only auto-logs-in when that file is **absent** — a stale-but-present file is
+  used as-is, so `auth.protect()` bounces to the Clerk Account Portal and the
+  redirect chain aborts. Traced it: with the stale state the final URL was
+  `tender-platypus-62.accounts.dev/sign-in?redirect_url=…` looping; after
+  `node scripts/snap.mjs --login` the same route returned 200 and rendered
+  "Welcome back, Captain." The fix is procedural and now documented in
+  CLAUDE.md: **re-run `--login` before every authed snap.** Worth flagging that
+  with `SNAP_UID`/`SNAP_PWD` in `.env.local` this is fully automatic and
+  headless — it is no longer a human step, which means D-09's blocked-on-login
+  note is stale for the captain-side routes.
+
+- **UX surfaces to eyeball** (24/24 in `docs/review/B-07/`, all six
+  viewport/scheme combinations, first non-blank authed captures the loop has
+  produced):
+  - `/portal` — dashboard with two real order cards and two design cards
+    instead of three empty states.
+  - `/portal/orders/jh78tchkpkxczry0xsrw21fmw58bdx3c/run/responses` — **B-04's
+    `NoRunYet` state, finally photographable.** "No jersey run yet" + "Set up
+    your run". This is the review surface B-04 shipped without.
+  - `/portal/orders/jh70c9faf0z6hckes2eafx1ymd8bc6x0/run/responses` — C-02's
+    All/By roster/By fan switcher, size chips (S×1 M×1 L×1 2XL×2), 4 rows with
+    a custom-question column and a Blank jersey line.
+  - `/portal/orders/jh70c9faf0z6hckes2eafx1ymd8bc6x0` — C-01's per-design
+    roster/size sections and the combined chip row.
+  - What to judge: whether the fixture *content* reads plausibly (names,
+    "Snap Demo — " titles, dodgeball, the shorts question), and the real taste
+    questions these surfaces have never been reviewed for. Two things I checked
+    and ruled out as bugs: the sidebar looking cut off on tall pages, and a
+    stray Clerk avatar mid-page on mobile — `PortalShell`'s sidebar is
+    `position: fixed` and Playwright's `fullPage` paints fixed elements at
+    viewport height. Both elements measure 0×0 in a real viewport. Noted in
+    CLAUDE.md so nobody "fixes" them.
+
+- **Decisions a human may want to veto**
+  - *Wrote data to the shared dev deployment.* B-04 parked this for sign-off;
+    B-07 was filed as the task to do it and wasn't flagged `needsHuman`, so I
+    treated it as authorized. Everything written is additive, scoped to one
+    account, and prefixed "Snap Demo — " so you can spot and delete it. Nothing
+    existing was modified — verified by test and by re-running the seed.
+  - *Fixture titles as the idempotency key* rather than an `isFixture` flag on
+    the schema. Adding a dev-seed marker to production tables to support
+    screenshots would be the tail wagging the dog.
+  - *Seeded entries as `source: "fan"` with example.com emails.* They're
+    indistinguishable from real fan submissions in the UI, which is the point —
+    but it does mean the responses table shows fake people. Say the word and
+    they can carry an obvious marker instead.
+  - *Documented the `--login` refresh in CLAUDE.md rather than automating it.*
+    `snap.mjs` is off-limits to the loop, and a wrapper script wouldn't get
+    called since `ralph-prompt.md` names `snap.mjs` directly. If you want this
+    airtight, the one-line change is `snap.mjs` re-logging in whenever the
+    saved state is older than ~30s.
+  - *Did not touch B-06.* The snap account still isn't an admin, so `/admin/*`
+    still photographs as 403. Unchanged and still parked.
+
+- Follow-ups filed: none. B-06 already covers the remaining snap blind spot.
