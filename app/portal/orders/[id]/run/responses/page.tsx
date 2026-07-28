@@ -47,9 +47,13 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
 
   if (orderResult.status === "loading") return <Loading orderId={orderId} />;
   if (orderResult.status === "not-found") return <NotFound orderId={orderId} />;
-  if (runStub === undefined || data === undefined)
-    return <Loading orderId={orderId} />;
+  // Settle the run BEFORE looking at `data`: the entries query is skipped
+  // while there is no run, so its `undefined` means "nothing to load", not
+  // "still loading". Reading it first left a captain with no run staring at
+  // the skeleton forever (B-04).
+  if (runStub === undefined) return <Loading orderId={orderId} />;
   if (runStub === null) return <NoRunYet orderId={orderId} />;
+  if (data === undefined) return <Loading orderId={orderId} />;
   if (data === null) return <NotFound orderId={orderId} />;
 
   const ownedOrder = orderResult.data;

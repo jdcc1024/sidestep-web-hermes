@@ -306,3 +306,52 @@ describe("/portal/orders/[id]/run/responses — view switcher (C-02)", () => {
     expect(screen.queryByRole("list", { name: /size breakdown/i })).toBeNull();
   });
 });
+
+// The entries query is skipped until a run is found, so `undefined` entries
+// mean two different things — "still loading" and "there is nothing to load".
+// Only the run tells them apart (B-04). The skeleton renders no headings at
+// all, which is what distinguishes it from every settled state below.
+describe("/portal/orders/[id]/run/responses — no-run-yet gate (B-04)", () => {
+  it("sends a captain with no run yet to set one up instead of hanging", async () => {
+    orderResult = orderWith();
+    runResult = null;
+    entriesResult = undefined;
+    await renderPage();
+
+    expect(
+      screen.getByRole("heading", { name: /no jersey run yet/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /set up your run/i }),
+    ).toHaveAttribute("href", `/portal/orders/${ORDER_ID}/run/setup`);
+  });
+
+  it("keeps the skeleton while the run itself is still loading", async () => {
+    orderResult = orderWith();
+    runResult = undefined;
+    entriesResult = undefined;
+    await renderPage();
+
+    expect(screen.queryByRole("heading")).toBeNull();
+  });
+
+  it("keeps the skeleton while a found run's entries are still loading", async () => {
+    orderResult = orderWith();
+    runResult = RUN;
+    entriesResult = undefined;
+    await renderPage();
+
+    expect(screen.queryByRole("heading")).toBeNull();
+  });
+
+  it("shows not-found when the run is there but its entries come back null", async () => {
+    orderResult = orderWith();
+    runResult = RUN;
+    entriesResult = null;
+    await renderPage();
+
+    expect(
+      screen.getByRole("heading", { name: /couldn.t find that jersey run/i }),
+    ).toBeInTheDocument();
+  });
+});

@@ -1051,3 +1051,63 @@ One entry per completed loop task. This is the human's fast path for UX critique
     `.env.local.example`, so that file can't be committed and my note about the
     Convex-side env var went into `README.md` instead. A `!.env.local.example`
     negation would fix it; left alone as out of scope.
+
+## 2026-07-28 — B-04: Run responses page hangs on loading when no run exists
+
+- **What shipped**
+  - `app/portal/orders/[id]/run/responses/page.tsx` now settles the run before
+    reading the entries query. The entries read is `"skip"`ped while there is
+    no run, and a skipped `useQuery` returns `undefined` — the same value it
+    returns while loading. The page gated its skeleton on
+    `runStub === undefined || data === undefined`, so a captain with no run yet
+    hit a `data` that was permanently `undefined` and got an endless skeleton;
+    the `NoRunYet` branch one line below was dead code. Four lines of reorder:
+    run undefined → skeleton, run null → NoRunYet, then entries undefined →
+    skeleton, entries null → NotFound.
+  - Four regression tests (`page.test.tsx`, new `no-run-yet gate (B-04)`
+    describe): the no-run-yet path, both genuine loading paths, and the
+    entries-null NotFound path. The first one failed before the fix and passes
+    after; the other three pinned the behaviour I was reordering around. The
+    skeleton renders no headings at all, which is what lets the tests tell it
+    apart from every settled state.
+  - Wrote the missing `backlog/B-04-*.md` — the DAG node pointed at a file that
+    had never been created.
+
+- **UX surfaces to eyeball: none captured, and it's an environment gap, not a
+  taste call.** `/portal/orders/<id>/run/responses` at all six viewport/scheme
+  combinations came back a blank page, and `/portal` wouldn't load at all
+  (`net::ERR_ABORTED`). Cause: `SNAP_UID` (jcc@sidestep.design) owns **zero**
+  orders on the dev deployment — all four dev orders belong to other users, and
+  all four already have a run — so there is no order the snap account can open,
+  let alone one in the no-run-yet state this fix is about. I deleted the 6 blank
+  PNGs rather than leave them in `docs/review/B-04/`. Filed as **B-07**. This is
+  the second snap blind spot after B-06 (`/admin/*`); together they mean the
+  loop currently cannot photograph any authenticated surface.
+  - If you want to eyeball it by hand: sign in, create an order, and open
+    Responses from the order detail page *before* setting up a run. You should
+    land on "No jersey run yet" with a "Set up your run" button. Before this
+    commit that URL was a dead end.
+  - The markup itself is unchanged — `NoRunYet` and `Loading` already existed
+    and are already styled. The bug only ever made `NoRunYet` unreachable.
+
+- **Decisions a human may want to veto**
+  - *Fixed the ordering in place rather than routing the run/entries pair
+    through `useOwnedResource`.* `lib/ownedResource.ts` exists to make exactly
+    this loading-vs-verdict distinction explicit, and this is the second bug in
+    the family (B-03 was the first). But that helper is shaped for the
+    auth-gated owner read, not for a skipped dependent query, so reusing it here
+    would have meant generalising it — a refactor with a much wider blast radius
+    than a one-page bug fix warrants. If a third instance shows up, that's the
+    signal to generalise it.
+  - *Did not seed a dev order for the snap user to get the screenshot.*
+    Creating data on the shared dev deployment to satisfy a screenshot felt like
+    it belonged in its own task with your sign-off, hence B-07.
+  - *Marked B-02 `complete` in the DAG at the start of this session.* It was
+    still `in-progress`, but its work was committed (`2640aa4`), its backlog
+    file said `done`, and its session report was already written — the previous
+    iteration evidently ended between the commit and the `complete` call. Its
+    receipt was re-earned against the clean tree before completing. Nothing new
+    was implemented for it.
+
+- Follow-ups filed: **B-07** (seed a snap-owned dev order + fix the `/portal`
+  Playwright abort, so `/portal/orders/*` can be screenshotted at all)
