@@ -51,6 +51,16 @@ npm run build       # production build (also typechecks)
 ### Environment variables
 All required keys are documented in `.env.local.example`. Never commit `.env.local`. Clerk's `CLERK_SECRET_KEY` and `RESEND_API_KEY` are server-side only; only the `NEXT_PUBLIC_*` keys are exposed to the browser.
 
+`CLERK_SECRET_KEY` must **also** be set on the Convex deployment itself — Convex functions don't read `.env.local`. `users.hydrateProfileFromClerk` uses it to fetch a signed-in user's real name and email, which the Convex session token doesn't carry (see `lib/clerkProfile.ts`). Without it, every `users` row stays blank and admin lists show "Unnamed captain":
+
+```bash
+npx convex env set CLERK_SECRET_KEY sk_test_...          # dev
+npx convex env set --prod CLERK_SECRET_KEY sk_live_...   # production
+
+# One-off repair of rows that were already saved blank:
+npx convex run users:backfillProfilesFromClerk '{}'      # add --prod for production
+```
+
 ### Project structure
 ```
 sidestep-website/

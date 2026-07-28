@@ -987,3 +987,67 @@ One entry per completed loop task. This is the human's fast path for UX critique
   captain with no run yet sees an endless skeleton. Found while re-ordering
   those guards; left alone here because the fix is a separate behaviour change
   with its own empty-state copy to get right.
+
+## 2026-07-28 — B-02: Blank user name/email across admin surfaces
+
+- **What shipped**
+  - `lib/clerkProfile.ts` — one place that reads a name/email out of a Clerk
+    user payload, plus a Backend API fetch. The webhook, the registration
+    email and Convex all use it now.
+  - `users.hydrateProfileFromClerk` (action) + `users.backfillProfilesFromClerk`
+    (internal action). `UserSync` calls the former only when the row is missing
+    a name or email, so a populated user still costs zero writes per load.
+  - Dev deployment backfilled: 4/4 blank rows now carry real names. Every
+    order, design and jersey run in dev joins to a named captain.
+
+- **Root cause was two bugs, both confirmed against the live Clerk instance**
+  - The `convex` JWT template the issue asked about **does not exist, and
+    shouldn't**. `ConvexProviderWithClerk` sees `sessionClaims.aud === "convex"`
+    and skips templates entirely, so Convex gets Clerk's *default* session
+    token. Decoded, it is `{aud, exp, fva, iat, iss, nbf, sid, sts, sub, v}` —
+    no `name`, no `email`. `identity.name` was always null; `syncCurrentUser`
+    faithfully wrote `""` forever.
+  - The webhook, the one path that *does* see a full profile, resolved the
+    primary email with `email_addresses.find((e) => e.primary)`. Clerk payloads
+    have no `primary` boolean — the primary is named by
+    `primary_email_address_id` — so that never matched and it wrote `""` too.
+  - Bonus: `syncCurrentUser` patched name/email unconditionally, so a client
+    sync would wipe a profile the webhook had just written correctly.
+
+- **UX surfaces to eyeball: none captured, and that's a gap.** Every
+  `/admin/*` screenshot came back "403 — Access Denied": `SNAP_UID`
+  (jcc@sidestep.design) is not an admin, so the loop cannot photograph any
+  admin surface at all. I deleted the misleading captures rather than leave 20
+  blank PNGs in `docs/review/B-02/`. Filed as **B-06**. Verified the fix at the
+  data layer instead (a Convex query joining orders/designs/runs to users:
+  zero blank rows, real names everywhere) — the rendering code is unchanged and
+  already covered by the existing page tests.
+
+- **Decisions a human may want to veto**
+  - *Fetching from Clerk's Backend API instead of adding the claims to the
+    session token.* Clerk's dashboard can add `name`/`email` to the session
+    token, which would be cheaper (no extra round trip) and would make
+    `syncCurrentUser` sufficient on its own. There is no Backend API for that
+    setting, so it is dashboard-only and I couldn't do it or verify it. The
+    fetch works without any dashboard change and is trustworthy (server-side,
+    Clerk is the source). If you'd rather customise the token, the fetch path
+    stays harmless — it only fires when a row is incomplete, which would then
+    be never.
+  - *Not letting the client supply its own name/email.* Simpler, but it would
+    let a signed-in user write an email they don't own into a field admins read
+    as verified.
+  - *`hydrateProfileFromClerk` never writes `isAdmin`* — the webhook keeps sole
+    ownership, so a profile refresh can't escalate anyone. Tested.
+  - *Rows for users Clerk has deleted are counted `missing` and left blank*
+    rather than removed; orders still reference them.
+  - `CLERK_SECRET_KEY` is now set on the **dev** Convex deployment. Production
+    needs the same env var plus one backfill run — **B-05**.
+
+- Follow-ups filed: **B-05** (set `CLERK_SECRET_KEY` on prod Convex + run the
+  backfill there), **B-06** (grant the snap user admin so `/admin/*` can be
+  screenshotted).
+
+  - Minor observation, not acted on: `.gitignore:34` (`.env*`) also ignores
+    `.env.local.example`, so that file can't be committed and my note about the
+    Convex-side env var went into `README.md` instead. A `!.env.local.example`
+    negation would fix it; left alone as out of scope.

@@ -9,14 +9,16 @@
 // this module testable without network mocks and lets the route own the
 // "is Resend configured at all" decision.
 
+import {
+  fullNameOf,
+  primaryEmailOf,
+  type ClerkUserPayload,
+} from "./clerkProfile";
+
 const DEFAULT_FROM_EMAIL = "noreply@sidestep.design";
 const DEFAULT_OPS_EMAIL = "info@sidestep.design";
 
-export type ClerkRegistrationData = {
-  id: string;
-  email_addresses: Array<{ email_address: string; primary: boolean }>;
-  first_name: string | null;
-  last_name: string | null;
+export type ClerkRegistrationData = ClerkUserPayload & {
   // Set by <SignUp unsafeMetadata={{ registeredViaInvite: true }} /> when the
   // invite cookie is present at sign-up. public_metadata is checked too so a
   // server-side promotion of the flag keeps working.
@@ -65,15 +67,6 @@ export function isSelfRegistration(data: ClerkRegistrationData): boolean {
     data.unsafe_metadata?.registeredViaInvite !== true &&
     data.public_metadata?.registeredViaInvite !== true
   );
-}
-
-function primaryEmailOf(data: ClerkRegistrationData): string {
-  const primary = data.email_addresses.find((e) => e.primary);
-  return (primary ?? data.email_addresses[0])?.email_address ?? "";
-}
-
-function fullNameOf(data: ClerkRegistrationData): string {
-  return [data.first_name, data.last_name].filter(Boolean).join(" ").trim();
 }
 
 function escapeHtml(value: string): string {

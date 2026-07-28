@@ -68,6 +68,56 @@ Once that's re-run, D-09 can capture D-01/D-02/D-03/D-04 in one pass — and no 
 
 **Answer:** _(human fills in — or just re-run `--login` and unpark D-09 with `node scripts/dag-update.js answer D-09`)_
 
+**Update (2026-07-28, ralph-loop, from B-02):** the expired-session diagnosis
+above is now **out of date, and the admin half of D-09 has a different cause**.
+`snap.mjs` re-logged in on its own this iteration and photographed real pages —
+`/admin/orders`, `/admin/designs`, `/admin/jersey-runs` and `/admin/customers`
+all rendered, and every single one rendered **"403 — Access Denied"**. So the
+session works; the account behind `SNAP_UID` (jcc@sidestep.design) simply isn't
+an admin. Its `users` row reads `isAdmin: false`, and only jdcc1024@gmail.com
+has `isAdmin: true`. That blocks `/admin/designs/<id>` for D-09 and every other
+admin surface for every future iteration — tracked separately as **B-06**.
+Captain-side routes are unaffected and photograph fine.
+
+### [B-05] Populate user profiles on production Convex — 2026-07-28, ralph-loop
+**Question:** Please set `CLERK_SECRET_KEY` on the **production** Convex deployment and run the one-off profile backfill there — or confirm you'd like an agent to do it.
+
+**Context:** B-02 fixed blank captain/owner names. The fix reads a user's real name and email from Clerk's Backend API, which needs `CLERK_SECRET_KEY` as a *Convex* environment variable (it is currently only in `.env.local`, which Convex functions cannot see). I set it on dev (`benevolent-starling-766`) and ran the backfill — 4/4 rows repaired, every order/design/run now joins to a named captain. Production (`befitting-caiman-205`) is read-only from the loop by design, and pushing to prod is outside what an iteration may do.
+
+**What's needed, once B-02 is deployed:**
+```
+npx convex env set --prod CLERK_SECRET_KEY sk_live_...
+npx convex run --prod users:backfillProfilesFromClerk '{}'
+```
+The second command prints `{ scanned, patched, missing }`. `missing` counts users Clerk no longer has; those rows stay blank on purpose, since orders still reference them.
+
+**Options considered:**
+1. **You run both commands** — a minute of work, and the secret never leaves your machine.
+2. **Skip the backfill and let it self-heal** — every existing user's row is repaired the next time they sign in, since `UserSync` now fetches a profile whenever the row is incomplete. Correct but slow, and admin lists stay wrong for anyone who doesn't log back in.
+3. **Grant an agent prod write access** — not worth it for a one-off.
+
+**Recommendation:** Option 1. Note that even without the backfill, the env var alone is required — without it `hydrateProfileFromClerk` logs a warning and no-ops, so new sign-ups on prod would keep landing blank.
+
+**Answer:** _(human fills in)_
+
+### [B-06] Snap user cannot reach any /admin route — 2026-07-28, ralph-loop
+**Question:** Should the screenshot account (`SNAP_UID` = jcc@sidestep.design) be granted admin, or would you rather admin surfaces never be screenshotted by the loop?
+
+**Context:** Verifying B-02's admin-surface criterion, `snap.mjs` logged in cleanly and captured `/admin/orders`, `/admin/designs`, `/admin/jersey-runs` and `/admin/customers` — all four returned **"403 — Access Denied"** at every viewport. The account's `users` row has `isAdmin: false`; only jdcc1024@gmail.com is an admin. I deleted the captures rather than file 24 pictures of an error page, and verified B-02 at the data layer instead.
+
+This is not specific to B-02. **No admin UI can be reviewed from the loop at all** until it's resolved — including `/admin/designs/<id>`, which D-09 is waiting to photograph.
+
+`isAdmin` is written only by the Clerk webhook from `privateMetadata.is_admin`, so this is a Clerk dashboard change, and granting admin is a privilege decision I shouldn't make unilaterally.
+
+**Options considered:**
+1. **Set `privateMetadata.is_admin = true` on jcc@sidestep.design in Clerk.** Unblocks every admin screenshot. It is a real account with real admin power in dev; if that account is only ever used for screenshots, the blast radius is the dev deployment.
+2. **Point `SNAP_UID` at a dedicated `snapbot@sidestep.design` admin user.** Same effect, keeps a human's account out of it, costs one new Clerk user and a password in `.env.local`.
+3. **Accept that admin surfaces are never screenshotted** and review them by running the app yourself. Zero setup; the loop keeps shipping admin UI blind.
+
+**Recommendation:** Option 2 if you plan to keep the loop running on admin surfaces — a purpose-built account is cleaner than promoting one you use. Option 1 is fine if jcc@sidestep.design is already just a test identity.
+
+**Answer:** _(human fills in)_
+
 ## Answered
 
 ### [2-14] Optional Intake Image Uploads — 2026-07-19, ralph-loop

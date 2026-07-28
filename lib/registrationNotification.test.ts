@@ -12,8 +12,9 @@ function userData(
 ): ClerkRegistrationData {
   return {
     id: "user_123",
+    primary_email_address_id: "idn_primary",
     email_addresses: [
-      { email_address: "captain@example.com", primary: true },
+      { id: "idn_primary", email_address: "captain@example.com" },
     ],
     first_name: "Alex",
     last_name: "Chen",
@@ -135,8 +136,8 @@ describe("notifyNewRegistration", () => {
     await notifyNewRegistration(
       userData({
         email_addresses: [
-          { email_address: "old@example.com", primary: false },
-          { email_address: "primary@example.com", primary: true },
+          { id: "idn_old", email_address: "old@example.com" },
+          { id: "idn_primary", email_address: "primary@example.com" },
         ],
       }),
       { send },

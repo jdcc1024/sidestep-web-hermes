@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { ConvexHttpClient } from "convex/browser";
 import { Resend } from "resend";
 import { api } from "@/convex/_generated/api";
+import { clerkProfileOf } from "@/lib/clerkProfile";
 import {
   notifyNewRegistration,
   type ClerkRegistrationData,
@@ -67,17 +68,13 @@ export async function POST(req: Request) {
     return new Response(null, { status: 200 });
   }
 
-  const { id, email_addresses, first_name, last_name, private_metadata } =
-    event.data;
-  const primaryEmail =
-    email_addresses.find((e) => e.primary)?.email_address ?? "";
-  const name =
-    [first_name, last_name].filter(Boolean).join(" ").trim() || primaryEmail;
+  const { id, private_metadata } = event.data;
+  const { name, email } = clerkProfileOf(event.data);
   const isAdmin = private_metadata?.is_admin === true;
 
   await convex.mutation(api.users.syncUser, {
     clerkId: id,
-    email: primaryEmail,
+    email,
     name,
     isAdmin,
   });

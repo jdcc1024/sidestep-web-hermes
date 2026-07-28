@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-28T09:10:42.550Z",
+  "lastUpdated": "2026-07-28T09:25:03.886Z",
   "phases": [
     {
       "id": "phase-1",
@@ -202,8 +202,8 @@
       "phase": "3",
       "type": "bug",
       "description": "Admin Captain/Owner columns and customer names render blank; syncCurrentUser is gated behind getCurrentUser===null so existing rows never backfill, and the Clerk convex JWT template may not map name/email claims. Cosmetic fallbacks landed; real fix = populate the data.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-28T09:15:01.479Z",
       "completedAt": null,
       "issueFile": "backlog/B-02-blank-user-name-email-across-admin-surfaces.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#section-6",
@@ -355,6 +355,43 @@
         "A run that exists still renders its responses unchanged",
         "Regression test covers the no-run-yet path"
       ]
+    },
+    {
+      "id": "B-05",
+      "title": "Populate user profiles on production Convex",
+      "phase": "3",
+      "type": "infrastructure",
+      "description": "Set CLERK_SECRET_KEY on the production Convex deployment and run the one-off users:backfillProfilesFromClerk so prod rows get real names, same as dev did in B-02.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-05-populate-user-profiles-on-production-convex.md",
+      "prdRef": "backlog/B-02-blank-user-name-email-in-admin-surfaces.md#fix",
+      "acceptanceCriteria": [
+        "CLERK_SECRET_KEY is set on the prod Convex deployment",
+        "npx convex run --prod users:backfillProfilesFromClerk reports 0 remaining blank rows",
+        "Admin surfaces on production show real captain/owner names"
+      ],
+      "needsHuman": true,
+      "humanQuestion": "Set CLERK_SECRET_KEY on prod Convex and run users:backfillProfilesFromClerk"
+    },
+    {
+      "id": "B-06",
+      "title": "Snap user cannot reach any /admin route",
+      "phase": "3",
+      "type": "infrastructure",
+      "description": "SNAP_UID (jcc@sidestep.design) is not an admin, so every /admin/* screenshot captures a 403 page. No admin UI can be reviewed from the loop until this account is granted admin.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-06-snap-user-cannot-reach-any-admin-route.md",
+      "prdRef": "docs/review/session-reports.md#2026-07-28--b-02",
+      "acceptanceCriteria": [
+        "The snap account can load /admin/* without a 403",
+        "node scripts/snap.mjs on an admin route produces a real page capture"
+      ],
+      "needsHuman": true,
+      "humanQuestion": "Grant the snap account admin (or point SNAP_UID at an admin) so /admin/* can be screenshotted"
     }
   ],
   "edges": [
@@ -421,6 +458,10 @@
     {
       "from": "M-02",
       "to": "M-05"
+    },
+    {
+      "from": "B-02",
+      "to": "B-05"
     }
   ],
   "log": [
@@ -656,6 +697,36 @@
       "event": "task_completed",
       "nodeId": "B-03",
       "message": "Completed: Portal pages flash 'not found' while auth loading"
+    },
+    {
+      "timestamp": "2026-07-28T09:15:01.480Z",
+      "event": "task_started",
+      "nodeId": "B-02",
+      "message": "Picked up: Blank user name/email across admin surfaces"
+    },
+    {
+      "timestamp": "2026-07-28T09:24:18.168Z",
+      "event": "nodes_added",
+      "nodeId": "B-05",
+      "message": "New task added: Populate user profiles on production Convex"
+    },
+    {
+      "timestamp": "2026-07-28T09:24:18.210Z",
+      "event": "nodes_added",
+      "nodeId": "B-06",
+      "message": "New task added: Snap user cannot reach any /admin route"
+    },
+    {
+      "timestamp": "2026-07-28T09:25:03.848Z",
+      "event": "needs_human",
+      "nodeId": "B-05",
+      "message": "Needs human: Populate user profiles on production Convex — Set CLERK_SECRET_KEY on prod Convex and run users:backfillProfilesFromClerk"
+    },
+    {
+      "timestamp": "2026-07-28T09:25:03.886Z",
+      "event": "needs_human",
+      "nodeId": "B-06",
+      "message": "Needs human: Snap user cannot reach any /admin route — Grant the snap account admin (or point SNAP_UID at an admin) so /admin/* can be screenshotted"
     }
   ]
 }
