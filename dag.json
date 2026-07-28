@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-28T09:33:31.737Z",
+  "lastUpdated": "2026-07-28T09:34:56.727Z",
   "phases": [
     {
       "id": "phase-1",
@@ -345,9 +345,9 @@
       "phase": "3",
       "type": "bug",
       "description": "app/portal/orders/[id]/run/responses gates its loading return on data === undefined, but data is skipped whenever \runStub is null - so the NoRunYet branch below it is unreachable and a captain with no run yet sees an endless skeleton.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-07-28T09:30:28.072Z",
-      "completedAt": null,
+      "completedAt": "2026-07-28T09:34:56.726Z",
       "issueFile": "backlog/B-04-run-responses-page-hangs-on-loading-when-no-run-exists.md",
       "prdRef": "backlog/B-03-portal-pages-flash-not-found-while-auth-loading.md",
       "acceptanceCriteria": [
@@ -762,6 +762,12 @@
       "event": "nodes_added",
       "nodeId": "B-07",
       "message": "New task added: Snap account owns no orders, so no /portal/orders/* surface can be screenshotted"
+    },
+    {
+      "timestamp": "2026-07-28T09:34:56.727Z",
+      "event": "task_completed",
+      "nodeId": "B-04",
+      "message": "Completed: Run responses page hangs on loading when no run exists"
     }
   ]
 }
