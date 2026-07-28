@@ -56,3 +56,46 @@ export const backfillDesignBlocks = internalMutation({
     return { scanned: designs.length, fixed };
   },
 });
+
+/**
+ * One-off cleanup for the R-07 schema swap, which removed `jerseyRuns.fixedRoster`
+ * in favour of the `rosterEntries` table. R-07 assumed "no real data to preserve"
+ * and shipped no migration, but the dev deployment still holds legacy runs that
+ * carry the old field, so every `convex dev` push fails schema validation with
+ * "Object contains extra field `fixedRoster` that is not in the validator".
+ *
+ * Run (after temporarily re-admitting the field as optional in schema.ts):
+ *   npx convex run _migrations:dropFixedRoster
+ *
+ * For each run still carrying the field it drops `fixedRoster` (setting it to
+ * `undefined` deletes it in a patch). No name/number data is migrated into
+ * `rosterEntries` — a roster entry requires a `designId`, which `fixedRoster`
+ * never recorded, so there is nothing to faithfully map. Idempotent: a run
+ * without the field is skipped. Once this has run everywhere, delete the
+ * temporary `fixedRoster` lines from schema.ts and push clean.
+ */
+export const dropFixedRoster = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const runs = await ctx.db.query("jerseyRuns").collect();
+    let fixed = 0;
+
+    for (const run of runs) {
+      // `fixedRoster` is no longer on the generated Doc type — read it loosely.
+      const legacy = run as typeof run & { fixedRoster?: unknown };
+      if (!("fixedRoster" in legacy) || legacy.fixedRoster === undefined)
+        continue;
+
+      // `undefined` deletes the dead field. The field isn't on the generated
+      // Doc type, so patch is cast to accept the dynamic shape.
+      const patch = ctx.db.patch as (
+        id: typeof run._id,
+        value: Record<string, unknown>,
+      ) => Promise<void>;
+      await patch(run._id, { fixedRoster: undefined });
+      fixed++;
+    }
+
+    return { scanned: runs.length, fixed };
+  },
+});

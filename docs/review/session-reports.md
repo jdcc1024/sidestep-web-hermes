@@ -4,6 +4,57 @@ One entry per completed loop task. This is the human's fast path for UX critique
 
 ---
 
+## 2026-07-27 — Fix: broken pages from undeployed `listOrderEntries` + UI walkthrough
+
+- **Root cause of the broken pages.** The error `Could not find public function
+  for 'jerseyRuns:listOrderEntries'` was **not a code bug** — the function exists
+  in source (added in R-07). The dev Convex deployment (`benevolent-starling-766`)
+  was simply **stale**: it still had the old `listResponses`/`listMyResponses`
+  functions and had never received a successful push. Every `convex dev` push was
+  being **rejected by schema validation** because 3 legacy `jerseyRuns` documents
+  still carried the `fixedRoster` field that R-07 removed from the schema. So the
+  three pages that read `listOrderEntries` (portal order detail, captain responses,
+  admin run detail) all 500'd.
+- **Fix.** Added `_migrations:dropFixedRoster` (idempotent, mirrors the existing
+  `backfillDesignBlocks` pattern), temporarily re-admitted `fixedRoster` as
+  optional in schema so the migration could deploy, ran it (dropped the field
+  from all 3 runs), then removed the temp schema lines and pushed clean. No name
+  data was migrated into `rosterEntries` — a roster entry needs a `designId` that
+  `fixedRoster` never recorded, and R-07 explicitly chose "no data migration,
+  nothing to preserve (pre-launch)". Dev/test data only.
+- **Verified fixed** by walking the UI: portal order detail (C-01 jersey
+  breakdown — size chips + per-design roster lines), captain responses page (C-02
+  — All / By roster / By fan views), and admin run detail all render correctly.
+- **UX polish landed this session:** admin order detail Captain card no longer
+  renders an *invisible empty link* when the captain's name/email are blank — it
+  now shows "Unnamed captain" (still links to the profile) + "Not set" for a
+  missing email. Admin Orders and Jersey Runs list "Captain" columns fall back to
+  "Unnamed captain" too.
+- **Filed [B-02]** (blank user name/email across admin surfaces): the underlying
+  data problem behind those fallbacks — `syncCurrentUser` is gated behind
+  `getCurrentUser === null` so existing blank rows never backfill, and the Clerk
+  `convex` JWT template may not even map name/email claims. Needs human/Clerk-dash
+  verification; too big to fix blind. Cross-referenced with 3-07.
+- 936 tests green; typecheck clean.
+
+### UX surfaces to eyeball
+- `/admin/orders/[id]` — Captain card with blank data (now "Unnamed captain" / "Not set")
+- `/admin/orders` and `/admin/jersey-runs` — Captain columns (now fall back gracefully)
+
+### Notes for the human to review later
+- **Transient "not found" flashes.** During the walkthrough, `/portal/orders/[id]`,
+  `/portal/designs/[id]` and `/portal/designs` briefly showed "not found" / "no
+  designs" immediately after the Convex redeploys, then rendered correctly on
+  reload. This is the Convex client reconnecting before the Clerk auth token
+  re-attaches (unauthenticated → owner-scoped query returns null/empty). Harmless
+  in normal use, but if you want zero-flash you could gate these pages on Clerk's
+  `isLoaded`/`isSignedIn` before trusting a null result. Left as-is — not filing
+  an issue unless you see it outside a redeploy.
+- **B-02 needs your input** (Clerk dashboard): confirm the `convex` JWT template
+  maps `name` and `email`. That's the one thing I can't verify from the repo.
+
+---
+
 ## 2026-07-26 — R-07: Migrate Remaining Surfaces + Retire Old Tables
 
 - What shipped — the interim dual-model state is gone. `jerseyRunResponses`

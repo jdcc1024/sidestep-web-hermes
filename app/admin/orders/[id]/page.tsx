@@ -83,19 +83,23 @@ export default function AdminOrderDetailPage({
                     href={`/admin/customers/${captain._id}`}
                     className="text-teal-700 hover:underline dark:text-teal-300"
                   >
-                    {captain.name}
+                    {captain.name || "Unnamed captain"}
                   </Link>
                 }
               />
               <Field
                 label="Email"
                 value={
-                  <a
-                    href={`mailto:${captain.email}`}
-                    className="text-teal-700 hover:underline dark:text-teal-300"
-                  >
-                    {captain.email}
-                  </a>
+                  captain.email ? (
+                    <a
+                      href={`mailto:${captain.email}`}
+                      className="text-teal-700 hover:underline dark:text-teal-300"
+                    >
+                      {captain.email}
+                    </a>
+                  ) : (
+                    <span className="italic text-muted-foreground">Not set</span>
+                  )
                 }
               />
             </dl>

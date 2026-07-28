@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-27T07:31:09.113Z",
+  "lastUpdated": "2026-07-28T00:52:13.782Z",
   "phases": [
     {
       "id": "phase-1",
@@ -194,6 +194,24 @@
         "By roster reuses C-01's per-design breakdown component",
         "By fan groups by normalized submitter email to jersey lines",
         "Existing detailed table remains; no regressions"
+      ]
+    },
+    {
+      "id": "B-02",
+      "title": "Blank user name/email across admin surfaces",
+      "phase": "3",
+      "type": "bug",
+      "description": "Admin Captain/Owner columns and customer names render blank; syncCurrentUser is gated behind getCurrentUser===null so existing rows never backfill, and the Clerk convex JWT template may not map name/email claims. Cosmetic fallbacks landed; real fix = populate the data.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-02-blank-user-name-email-across-admin-surfaces.md",
+      "prdRef": "docs/prd/sidestep-website-phase1.md#section-6",
+      "acceptanceCriteria": [
+        "Clerk convex JWT template confirmed to include name+email",
+        "Signed-in user's Convex row has name/email after login",
+        "Existing blank rows backfilled",
+        "Admin surfaces show real names"
       ]
     }
   ],
@@ -420,6 +438,12 @@
       "event": "task_completed",
       "nodeId": "C-02",
       "message": "Completed: Captain Responses Page — Multi-View Breakdown (By Roster / By Fan)"
+    },
+    {
+      "timestamp": "2026-07-28T00:52:13.781Z",
+      "event": "nodes_added",
+      "nodeId": "B-02",
+      "message": "New task added: Blank user name/email across admin surfaces"
     }
   ]
 }

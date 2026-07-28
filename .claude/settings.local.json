@@ -60,7 +60,10 @@
       "Bash(find app *)",
       "Bash(find components *)",
       "Bash(netstat -ano)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "mcp__convex-mcp__functionSpec",
+      "mcp__convex-mcp__runOneoffQuery",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080)"
     ]
   }
 }

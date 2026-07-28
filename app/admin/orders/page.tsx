@@ -117,10 +117,14 @@ export default function AdminOrdersPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <div className="text-foreground">{row.captainName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {row.captainEmail}
+                      <div className="text-foreground">
+                        {row.captainName || "Unnamed captain"}
                       </div>
+                      {row.captainEmail && (
+                        <div className="text-xs text-muted-foreground">
+                          {row.captainEmail}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-foreground">
                       {row.sport}
