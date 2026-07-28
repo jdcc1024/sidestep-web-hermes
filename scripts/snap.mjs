@@ -122,13 +122,17 @@ async function login() {
   };
 
   let context;
-  try {
-    context = await chromium.launchPersistentContext(userDataDir, {
-      ...launchOptions,
-      channel: 'chrome',
-    });
-  } catch {
+  if (snapUid) {
     context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+  } else {
+    try {
+      context = await chromium.launchPersistentContext(userDataDir, {
+        ...launchOptions,
+        channel: 'chrome',
+      });
+    } catch {
+      context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+    }
   }
 
   await setupClerkTestingToken({ context }); // bypasses Clerk's Cloudflare bot check for this session
@@ -141,25 +145,36 @@ async function login() {
     // Primary strategy: @clerk/testing helper
     try {
       await page.goto(BASE);
-      if (snapPwd) {
-        await clerk.signIn({
-          page,
-          signInParams: {
-            strategy: 'password',
-            identifier: snapUid,
-            password: snapPwd,
-          },
-        });
+      const isAlreadySignedIn = await page.evaluate(() => Boolean(window.Clerk?.user));
+      if (isAlreadySignedIn) {
+        loggedIn = true;
+        console.log('[snap] User is already signed in.');
       } else {
-        await clerk.signIn({
-          page,
-          emailAddress: snapUid,
-        });
+        if (snapPwd) {
+          await clerk.signIn({
+            page,
+            signInParams: {
+              strategy: 'password',
+              identifier: snapUid,
+              password: snapPwd,
+            },
+          });
+        } else {
+          await clerk.signIn({
+            page,
+            emailAddress: snapUid,
+          });
+        }
+        loggedIn = true;
+        console.log('[snap] Programmatic login via @clerk/testing succeeded.');
       }
-      loggedIn = true;
-      console.log('[snap] Programmatic login via @clerk/testing succeeded.');
     } catch (err) {
-      console.warn(`[snap] @clerk/testing sign-in error: ${err.message}. Trying UI automation fallback...`);
+      if (err.message?.includes('already signed in')) {
+        loggedIn = true;
+        console.log('[snap] User is already signed in.');
+      } else {
+        console.warn(`[snap] @clerk/testing sign-in error: ${err.message}. Trying UI automation fallback...`);
+      }
     }
 
     // Secondary strategy: Playwright UI automation fallback

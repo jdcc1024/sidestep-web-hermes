@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-28T00:52:13.782Z",
+  "lastUpdated": "2026-07-28T08:56:27.831Z",
   "phases": [
     {
       "id": "phase-1",
@@ -213,6 +213,131 @@
         "Existing blank rows backfilled",
         "Admin surfaces show real names"
       ]
+    },
+    {
+      "id": "B-03",
+      "title": "Portal pages flash 'not found' while auth loading",
+      "phase": "3",
+      "type": "bug",
+      "description": "Owner-scoped queries (getMyOrder/getMyDesign/listMyDesigns) return null both for 'not found' and 'no authenticated user yet'; pages render null as a definitive not-found, so users flash 'Order not found' before the Clerk token attaches. Gate on Clerk isLoaded, or distinguish the two nulls server-side.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-03-portal-pages-flash-not-found-while-auth-loading.md",
+      "prdRef": "docs/prd/sidestep-website-phase1.md#section-6",
+      "acceptanceCriteria": [
+        "Auth-loading shows a loading state not not-found",
+        "Genuine missing/forbidden still shows not-found",
+        "Covers order detail, design detail, designs list",
+        "No flash on normal cold load for signed-in user"
+      ]
+    },
+    {
+      "id": "M-01",
+      "title": "Unified Roster Read + Design-Card Roster Preview",
+      "phase": "3",
+      "type": "feature",
+      "description": "Join rosterEntries with orderEntries into one per-design read (slots with their ordered sizes, plus blank/bulk lines) and put it on the order page's design cards. Fixes the defect where the order page reads order entries while Run Setup reads roster entries, so a seeded-but-unordered player is invisible. Foundation for the rest of Track M.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/M-01-unified-roster-read-and-design-card-preview.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
+      "acceptanceCriteria": [
+        "listForRun returns each slot with filled, collision, ordered sizes and total",
+        "Blank/bulk lines (no rosterEntryId) come back grouped per design",
+        "Pure derivation in lib/jerseyBreakdown.ts turns the read into per-design rows",
+        "Design cards show the roster with unfilled slots rendered muted",
+        "Preview is capped with an overflow count",
+        "Per-design totals still reconcile with orderEntries.countsByRun",
+        "Responses page (C-02) does not regress"
+      ]
+    },
+    {
+      "id": "M-02",
+      "title": "Roster Sheet on Design Cards",
+      "phase": "3",
+      "type": "feature",
+      "description": "Each design card gets a Manage roster button opening a Sheet with that design's full roster and inline add/edit/remove. Surfaces the collision flag listForRun already computes but the UI drops, and opens read-only for locked runs. RosterManager retires from Run Setup.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/M-02-roster-sheet-on-design-cards.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
+      "acceptanceCriteria": [
+        "Manage roster button opens a Sheet scoped to one design",
+        "Add, edit, and remove slots inline with server errors surfaced as readable toasts",
+        "Collision flag surfaced on affected slots",
+        "Locked runs open the sheet read-only with a note",
+        "No run yet shows a hint, not a button; nothing creates a run implicitly",
+        "Usable at 375px with 15 rows",
+        "RosterManager removed from JerseyRunSetup",
+        "Fan-created slot behaviour unchanged"
+      ]
+    },
+    {
+      "id": "M-03",
+      "title": "Bulk Paste Roster Import",
+      "phase": "3",
+      "type": "feature",
+      "description": "Paste a roster straight out of Excel or Google Sheets into the roster sheet. A pure parser in lib/ handles TSV, CSV, and single-column trailing-number formats with per-row Name/Number order detection; a preview-and-confirm step flags duplicates and unparseable rows before a new createMany mutation commits the rest.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/M-03-bulk-paste-roster-import.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
+      "acceptanceCriteria": [
+        "Pure DOM-free parser in lib/rosterEntry/",
+        "Accepts TSV, CSV, and single-column trailing number",
+        "Detects Name/Number column order per row via the numeric column",
+        "Rows validated with existing checkRosterName/checkRosterNumber",
+        "Preview flags existing, unparseable, and in-paste duplicate rows and excludes them",
+        "Nothing writes until confirm; button states the real count",
+        "createMany enforces ownership, lock, design-on-order, and a batch bound"
+      ]
+    },
+    {
+      "id": "M-04",
+      "title": "Mirror Roster Between Designs",
+      "phase": "3",
+      "type": "feature",
+      "description": "One-action mirror so a home/away kit is seeded once, not twice. From inside a design's roster sheet the captain picks another design in the order and copies its player slots across — names and numbers only, never sizes or order entries. Strictly additive, with silent skip on slots that already exist.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/M-04-mirror-roster-between-designs.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
+      "acceptanceCriteria": [
+        "Pull-direction Copy roster from picker in the sheet, one source at a time",
+        "Copies name and number only, never sizes or order entries",
+        "Copied slots land as source captain and unfilled",
+        "Existing slots matched on normalized name and number are skipped silently",
+        "Result reported plainly, e.g. 18 copied, 2 already there",
+        "Purely additive: existing target slots, filled state, and order entries unchanged",
+        "copyToDesign rejects locked runs, foreign designs, non-owners, and same-design copies"
+      ]
+    },
+    {
+      "id": "M-05",
+      "title": "Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Removes size choice entirely (fixed 8-size catalog, field retained and populated from the constant), relocates names mode to the order page where a fixed-mode design with no players can warn, and moves run creation to a Start collecting affordance taking only a deadline. /run/setup survives as management-only, with no lock control. The only M slice touching the public form — take it last.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/M-05-run-setup-slimming-and-names-mode-relocation.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#6-implementation-decisions",
+      "acceptanceCriteria": [
+        "jerseyRuns.create drops sizeOptions and populates all 8 sizes",
+        "Size picker gone; public form still offers all 8 and checkSize is unchanged",
+        "Pre-existing runs keep their narrower sizeOptions with no migration",
+        "New setNamesMode mutation, ownership-gated and locked-run-rejecting",
+        "Names mode lives on the order page and switches freely both directions, verified end-to-end on the public form",
+        "Fixed mode with zero slots warns inline, does not block",
+        "Start collecting on the order page takes only a deadline; nothing creates a run implicitly",
+        "/run/setup holds share link, deadline, custom questions, summary — no lock control"
+      ]
     }
   ],
   "edges": [
@@ -263,6 +388,22 @@
     {
       "from": "C-01",
       "to": "C-02"
+    },
+    {
+      "from": "M-01",
+      "to": "M-02"
+    },
+    {
+      "from": "M-02",
+      "to": "M-03"
+    },
+    {
+      "from": "M-02",
+      "to": "M-04"
+    },
+    {
+      "from": "M-02",
+      "to": "M-05"
     }
   ],
   "log": [
@@ -444,6 +585,42 @@
       "event": "nodes_added",
       "nodeId": "B-02",
       "message": "New task added: Blank user name/email across admin surfaces"
+    },
+    {
+      "timestamp": "2026-07-28T02:23:49.797Z",
+      "event": "nodes_added",
+      "nodeId": "B-03",
+      "message": "New task added: Portal pages flash 'not found' while auth loading"
+    },
+    {
+      "timestamp": "2026-07-28T08:56:03.676Z",
+      "event": "nodes_added",
+      "nodeId": "M-01",
+      "message": "New task added: Unified Roster Read + Design-Card Roster Preview"
+    },
+    {
+      "timestamp": "2026-07-28T08:56:06.788Z",
+      "event": "nodes_added",
+      "nodeId": "M-02",
+      "message": "New task added: Roster Sheet on Design Cards"
+    },
+    {
+      "timestamp": "2026-07-28T08:56:13.887Z",
+      "event": "nodes_added",
+      "nodeId": "M-03",
+      "message": "New task added: Bulk Paste Roster Import"
+    },
+    {
+      "timestamp": "2026-07-28T08:56:17.873Z",
+      "event": "nodes_added",
+      "nodeId": "M-04",
+      "message": "New task added: Mirror Roster Between Designs"
+    },
+    {
+      "timestamp": "2026-07-28T08:56:24.955Z",
+      "event": "nodes_added",
+      "nodeId": "M-05",
+      "message": "New task added: Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting"
     }
   ]
 }

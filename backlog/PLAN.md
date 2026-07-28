@@ -277,3 +277,38 @@ Surfaces the collected jerseys as **roster name / number / size** — per design
 
 ### Open Questions Affecting Track C
 - **During C-02**: whether the existing detailed per-entry table stays the default view or is replaced by "By roster". Default: keep the detailed table as default, add the new views as tabs — flag in the session report if the human wants otherwise.
+
+---
+
+# Track M — Roster on Design Cards (5 issues)
+## Source PRD: docs/prd/roster-on-design-cards.md
+## Generated: 2026-07-28
+
+Moves roster management off `/run/setup` and onto the order page's design cards, and strips Run Setup back to the run config that genuinely belongs to a collection campaign. Fixes the underlying defect first: the order page reads **order entries** while Run Setup reads **roster entries**, so a seeded-but-unordered player is invisible on the page the captain actually uses.
+
+### Issues
+| # | Issue | Type | Depends On |
+|---|-------|------|------------|
+| M-01 | Unified Roster Read + Design-Card Roster Preview | feature | none |
+| M-02 | Roster Sheet on Design Cards | feature | M-01 |
+| M-03 | Bulk Paste Roster Import | feature | M-02 |
+| M-04 | Mirror Roster Between Designs | feature | M-02 |
+| M-05 | Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting | improvement | M-02 |
+
+### Parallelization Notes for Track M
+- **M-01 is the foundation and must land first.** It ships the joined roster read (slots + their ordered sizes + blank/bulk lines) and delivers the design-card preview end-to-end. Everything else reads through it.
+- **M-03, M-04, and M-05 are independent of each other** and can run in parallel once M-02 lands.
+- M-03 and M-04 share one normalization helper, `rosterSlotKey(name, number)` — whichever lands first creates it, the other imports it. Paste dedupe and mirror dedupe must not drift.
+- **M-05 should be taken last by preference** even though it's only blocked by M-02: it's the sole slice touching the public form (`JerseyRunPublicForm`) and the run-creation path.
+- Ordering hazard: M-02 retires `RosterManager` from `JerseyRunSetup`. Running M-05 before M-02 would strip Run Setup of the roster with nothing to replace it.
+
+### Critical Path
+`M-01 → M-02 → (M-03 ‖ M-04 ‖ M-05)`
+
+### Explicitly Out of Scope for Track M
+- **Captain-entered jerseys** (size + qty). The production total stays fan-driven by decision. `orderEntries.create` is already captain-gated server-side but stays unwired; `orderEntries.update` / `remove` are deliberately not built. See PRD §5 Future Considerations for the three questions that must be answered before revisiting.
+- **Lock controls.** `R-08 Run Surface Lock Controls` stays parked until Track M lands — building it into a surface M-05 rewrites means building it twice. The `locked` *state* is still honoured throughout (M-02's read-only sheet), since runs auto-lock lazily on deadline.
+
+### Open Questions Affecting Track M
+- **During M-01**: the design-card preview cap — 5 slots and an overflow count, or scale to height? Decide against a real 15-player card and note it in the session report (PRD §10).
+- **During M-05**: whether the admin jersey-run page should keep showing a size list that is now identical for every run (`app/admin/jersey-runs/[id]/page.tsx:148`). Leave it unless it reads as noise (PRD §10).
