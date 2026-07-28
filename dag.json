@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-28T09:07:41.286Z",
+  "lastUpdated": "2026-07-28T09:10:42.550Z",
   "phases": [
     {
       "id": "phase-1",
@@ -220,9 +220,9 @@
       "phase": "3",
       "type": "bug",
       "description": "Owner-scoped queries (getMyOrder/getMyDesign/listMyDesigns) return null both for 'not found' and 'no authenticated user yet'; pages render null as a definitive not-found, so users flash 'Order not found' before the Clerk token attaches. Gate on Clerk isLoaded, or distinguish the two nulls server-side.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-07-28T09:00:53.880Z",
-      "completedAt": null,
+      "completedAt": "2026-07-28T09:10:42.550Z",
       "issueFile": "backlog/B-03-portal-pages-flash-not-found-while-auth-loading.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#section-6",
       "acceptanceCriteria": [
@@ -650,6 +650,12 @@
       "event": "nodes_added",
       "nodeId": "B-04",
       "message": "New task added: Run responses page hangs on loading when no run exists"
+    },
+    {
+      "timestamp": "2026-07-28T09:10:42.550Z",
+      "event": "task_completed",
+      "nodeId": "B-03",
+      "message": "Completed: Portal pages flash 'not found' while auth loading"
     }
   ]
 }
