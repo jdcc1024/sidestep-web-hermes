@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-28T09:37:03.257Z",
+  "lastUpdated": "2026-07-28T09:49:20.448Z",
   "phases": [
     {
       "id": "phase-1",
@@ -399,9 +399,9 @@
       "phase": "3",
       "type": "infrastructure",
       "description": "SNAP_UID (jcc@sidestep.design) owns zero orders on the dev deployment and /portal itself aborts under Playwright (net::ERR_ABORTED), so every /portal/orders/* capture comes back blank. Seed a dev order owned by the snap user (ideally one with a run and one without) and fix the /portal navigation abort.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-07-28T09:37:03.257Z",
-      "completedAt": null,
+      "completedAt": "2026-07-28T09:49:20.447Z",
       "issueFile": "backlog/B-07-snap-account-owns-no-orders-so-no-portal-orders-surface-can-be-screenshotted.md",
       "prdRef": "backlog/B-04-run-responses-page-hangs-on-loading-when-no-run-exists.md",
       "acceptanceCriteria": [
@@ -774,6 +774,12 @@
       "event": "task_started",
       "nodeId": "B-07",
       "message": "Picked up: Snap account owns no orders, so no /portal/orders/* surface can be screenshotted"
+    },
+    {
+      "timestamp": "2026-07-28T09:49:20.448Z",
+      "event": "task_completed",
+      "nodeId": "B-07",
+      "message": "Completed: Snap account owns no orders, so no /portal/orders/* surface can be screenshotted"
     }
   ]
 }
