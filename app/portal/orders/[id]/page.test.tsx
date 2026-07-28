@@ -13,6 +13,9 @@ let runResult: unknown = null;
 let countsResult: unknown = undefined;
 let entriesResult: unknown = undefined;
 let removedResult: unknown = [];
+// Convex's view of auth (B-03). Settled-and-signed-in is the resting state;
+// the flash tests below rewind it to the token-attach window.
+let auth = { isLoading: false, isAuthenticated: true };
 
 vi.mock("convex/react", async () => {
   const { getFunctionName } = await import("convex/server");
@@ -25,6 +28,7 @@ vi.mock("convex/react", async () => {
       if (name.startsWith("orderEntries:")) return removedResult;
       return orderResult;
     },
+    useConvexAuth: () => auth,
   };
 });
 
@@ -91,6 +95,34 @@ afterEach(() => {
   countsResult = undefined;
   entriesResult = undefined;
   removedResult = [];
+  auth = { isLoading: false, isAuthenticated: true };
+});
+
+describe("/portal/orders/[id] — no 'not found' flash while auth loads (B-03)", () => {
+  it("should show a loading state when a null order arrives while auth is loading", async () => {
+    auth = { isLoading: true, isAuthenticated: false };
+    orderResult = null;
+    await renderPage();
+
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
+    expect(screen.queryByText(/order not found/i)).toBeNull();
+  });
+
+  it("should show a loading state when the token has not attached yet", async () => {
+    auth = { isLoading: false, isAuthenticated: false };
+    orderResult = null;
+    await renderPage();
+
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
+    expect(screen.queryByText(/order not found/i)).toBeNull();
+  });
+
+  it("should still say 'not found' for an order that genuinely isn't there", async () => {
+    orderResult = null;
+    await renderPage();
+
+    expect(screen.getByText(/order not found/i)).toBeInTheDocument();
+  });
 });
 
 describe("/portal/orders/[id] — design main image (D-07)", () => {

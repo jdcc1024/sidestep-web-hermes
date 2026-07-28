@@ -7,11 +7,14 @@ import type { Doc } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { overviewOf } from "@/lib/designBlock";
+import { useOwnedList } from "@/lib/ownedResource";
 
 const OVERVIEW_PREVIEW_CHARS = 160;
 
 export default function MyDesignsPage() {
-  const designs = useQuery(api.designs.listMyDesigns);
+  // The list answers "no identity yet" with the same `[]` as "you have no
+  // designs", so the empty state waits for auth to settle (B-03).
+  const designs = useOwnedList(useQuery(api.designs.listMyDesigns));
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">

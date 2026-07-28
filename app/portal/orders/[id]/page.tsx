@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useOwnedResource } from "@/lib/ownedResource";
 import {
   chipToneForStage,
   deriveCustomerStage,
@@ -54,7 +55,12 @@ type OrderDesign = {
 export default function OrderDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const orderId = id as Id<"orders">;
-  const result = useQuery(api.orders.getMyOrder, { orderId });
+  // Owner-scoped, so a bare `null` can mean "not yours" *or* "no identity
+  // attached yet" — useOwnedResource keeps the second from rendering as the
+  // first (B-03).
+  const result = useOwnedResource(
+    useQuery(api.orders.getMyOrder, { orderId }),
+  );
   // Run state drives the handoff CTA. A run only exists once the captain has
   // gone through Run Setup ("first collect") — saving an order never creates
   // one, so null here is the common starting state, not an error.
@@ -75,12 +81,12 @@ export default function OrderDetailPage({ params }: PageProps) {
     run ? { jerseyRunId: run._id } : "skip",
   );
 
-  if (result === undefined) return <Loading />;
-  if (result === null) return <NotFound />;
+  if (result.status === "loading") return <Loading />;
+  if (result.status === "not-found") return <NotFound />;
 
   // Locked (O-06) means the confirmed production basis is frozen: every edit
   // affordance on this page goes away and the note below says why.
-  const { order, designs, locked } = result;
+  const { order, designs, locked } = result.data;
   const stage = deriveCustomerStage(order.internalStages);
   const tone = chipToneForStage(stage);
 
@@ -604,7 +610,11 @@ function StageChip({
 
 function Loading() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+    <div
+      role="status"
+      aria-label="Loading order"
+      className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8"
+    >
       <div className="h-6 w-32 animate-pulse rounded bg-muted" />
       <div className="mt-6 h-10 w-2/3 animate-pulse rounded bg-muted" />
       <div className="mt-8 h-32 animate-pulse rounded bg-muted" />

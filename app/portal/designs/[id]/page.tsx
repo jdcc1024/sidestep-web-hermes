@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useOwnedResource } from "@/lib/ownedResource";
 import { DesignForm } from "@/components/portal/DesignForm";
 import { DesignBlockEditor } from "@/components/design/DesignBlockEditor";
 
@@ -17,16 +18,22 @@ type PageProps = {
 export default function DesignDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const designId = id as Id<"designs">;
-  const design = useQuery(api.designs.getMyDesign, { designId });
+  // A `null` here means "not yours" only once Convex knows who's asking —
+  // before that it's just the token still attaching (B-03).
+  const result = useOwnedResource(
+    useQuery(api.designs.getMyDesign, { designId }),
+  );
   const [editing, setEditing] = useState(false);
 
-  if (design === undefined) {
+  if (result.status === "loading") {
     return <Loading />;
   }
 
-  if (design === null) {
+  if (result.status === "not-found") {
     return <NotFound />;
   }
+
+  const design = result.data;
 
   if (editing) {
     return (
@@ -162,7 +169,11 @@ function SpecItem({ label, value }: { label: string; value?: string }) {
 
 function Loading() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+    <div
+      role="status"
+      aria-label="Loading design"
+      className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8"
+    >
       <div className="h-6 w-32 animate-pulse rounded bg-muted" />
       <div className="mt-6 h-10 w-2/3 animate-pulse rounded bg-muted" />
       <div className="mt-8 h-32 animate-pulse rounded bg-muted" />

@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useOwnedResource } from "@/lib/ownedResource";
 import { JerseyRunSetup } from "@/components/portal/JerseyRunSetup";
 
 type PageProps = {
@@ -20,12 +21,14 @@ type PageProps = {
 export default function RunSetupPage({ params }: PageProps) {
   const { id } = use(params);
   const orderId = id as Id<"orders">;
-  const result = useQuery(api.orders.getMyOrder, { orderId });
+  const result = useOwnedResource(
+    useQuery(api.orders.getMyOrder, { orderId }),
+  );
 
-  if (result === undefined) return <Loading orderId={orderId} />;
-  if (result === null) return <NotFound />;
+  if (result.status === "loading") return <Loading orderId={orderId} />;
+  if (result.status === "not-found") return <NotFound />;
 
-  const { order } = result;
+  const { order } = result.data;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">

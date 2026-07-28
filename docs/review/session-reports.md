@@ -927,3 +927,63 @@ One entry per completed loop task. This is the human's fast path for UX critique
   chip and qty), so 375px behaves the way that already-reviewed row does.
 
 - Follow-ups filed: none
+
+## 2026-07-28 — B-03: Portal pages flash "not found" while auth loading
+
+- What shipped:
+  - `lib/ownedResource.ts` — a pure `resolveOwnedResource` (8 unit tests) plus
+    `useOwnedResource` / `useOwnedList` hooks that fold "Convex auth not ready"
+    and "query not resolved" into one `loading` state. A page now only renders
+    "not found" on an answer the server gave while it knew who was asking.
+  - Applied to every owner-scoped portal surface: `/portal/orders/[id]`,
+    `/portal/orders/[id]/edit`, `/portal/orders/[id]/run/setup`,
+    `/portal/orders/[id]/run/responses`, `/portal/designs/[id]`,
+    `/portal/designs`, and the `/portal` dashboard's three list sections.
+  - The two skeleton screens that tests now assert on gained
+    `role="status" aria-label="Loading order|design"` — they had no accessible
+    name at all before, so a screen reader announced nothing during the wait.
+
+- UX surfaces to eyeball: `/portal` and `/portal/designs`
+  (screenshots in `docs/review/B-03/`). Both are the *settled* state — the bug
+  is a sub-second transient, so a static snapshot can't show the fix; the tests
+  are the real evidence. What the screenshots are good for: confirming the
+  empty states ("You don't have any orders yet", "No designs yet") still render
+  when they should, since this change gates exactly those.
+  To see the fix live: hard-reload `/portal/orders/<id>` on a throttled
+  connection — it should go skeleton → order, never "Order not found".
+  Pre-existing and untouched by this task, but visible at 1280 light: in the
+  sidebar footer the Clerk avatar overlaps the "Account" label, and the white
+  sidebar panel stops short of the viewport bottom.
+
+- Decisions I made that a human may want to veto:
+  - **Gated on Convex's `useConvexAuth()`, not Clerk's `useAuth()`** (option 1
+    in the issue named Clerk). `useConvexAuth` flips to authenticated only once
+    the Convex client has validated the token — which is the exact moment
+    owner-scoped queries start answering for a real identity — and it re-enters
+    loading on a reconnect, which is where the flash was most visible. Clerk's
+    `isLoaded` would still leave the token-attach gap open.
+  - **Unauthenticated renders as loading, not as an error.** `/portal/*` is
+    middleware-protected, so a genuinely signed-out visitor is redirected and
+    never sits on a spinner. If that middleware matcher ever changes, this
+    becomes an indefinite skeleton.
+  - **Scope went past the three routes the issue names.** The dashboard, the
+    edit page and the two run pages carry the identical defect and the fix is
+    one line each; shipping a shared hook that fixed half the call sites seemed
+    worse than the small overreach.
+  - Existing test mocks for `convex/react` gained a `useConvexAuth` stub
+    (settled + signed in) — no assertions were changed or removed.
+
+- **Screenshots are unblocked again.** The previous two reports concluded
+  `.auth/state.json` needed a human `--login`; it didn't. The file was present
+  but held an expired session, and `snap.mjs` only auto-logs-in when the file is
+  *absent* — so it silently photographed the sign-in wall. Moving the stale file
+  aside let snap re-login from `SNAP_UID` on its own, and authed captures work
+  now. Worth knowing for D-09 and any future "auth wall" snap failure: delete
+  `.auth/state.json`, don't assume it needs a human.
+
+- Follow-ups filed: **B-04** — `/portal/orders/[id]/run/responses` gates its
+  loading return on `data === undefined`, but `data` is skipped whenever
+  `runStub` is null, so the `NoRunYet` branch beneath it is unreachable and a
+  captain with no run yet sees an endless skeleton. Found while re-ordering
+  those guards; left alone here because the fix is a separate behaviour change
+  with its own empty-state copy to get right.

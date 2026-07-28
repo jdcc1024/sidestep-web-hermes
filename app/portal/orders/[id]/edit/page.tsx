@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useOwnedResource } from "@/lib/ownedResource";
 import { OrderForm } from "@/components/portal/OrderForm";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,12 +28,14 @@ type PageProps = {
 export default function EditOrderPage({ params }: PageProps) {
   const { id } = use(params);
   const orderId = id as Id<"orders">;
-  const result = useQuery(api.orders.getMyOrder, { orderId });
+  const result = useOwnedResource(
+    useQuery(api.orders.getMyOrder, { orderId }),
+  );
 
-  if (result === undefined) return <Loading />;
-  if (result === null) return <NotFound />;
+  if (result.status === "loading") return <Loading />;
+  if (result.status === "not-found") return <NotFound />;
 
-  const { order, designs, locked } = result;
+  const { order, designs, locked } = result.data;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">

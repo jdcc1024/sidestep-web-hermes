@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-28T08:56:27.831Z",
+  "lastUpdated": "2026-07-28T09:07:41.286Z",
   "phases": [
     {
       "id": "phase-1",
@@ -220,8 +220,8 @@
       "phase": "3",
       "type": "bug",
       "description": "Owner-scoped queries (getMyOrder/getMyDesign/listMyDesigns) return null both for 'not found' and 'no authenticated user yet'; pages render null as a definitive not-found, so users flash 'Order not found' before the Clerk token attaches. Gate on Clerk isLoaded, or distinguish the two nulls server-side.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-28T09:00:53.880Z",
       "completedAt": null,
       "issueFile": "backlog/B-03-portal-pages-flash-not-found-while-auth-loading.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#section-6",
@@ -337,6 +337,23 @@
         "Fixed mode with zero slots warns inline, does not block",
         "Start collecting on the order page takes only a deadline; nothing creates a run implicitly",
         "/run/setup holds share link, deadline, custom questions, summary — no lock control"
+      ]
+    },
+    {
+      "id": "B-04",
+      "title": "Run responses page hangs on loading when no run exists",
+      "phase": "3",
+      "type": "bug",
+      "description": "app/portal/orders/[id]/run/responses gates its loading return on data === undefined, but data is skipped whenever \runStub is null - so the NoRunYet branch below it is unreachable and a captain with no run yet sees an endless skeleton.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-04-run-responses-page-hangs-on-loading-when-no-run-exists.md",
+      "prdRef": "backlog/B-03-portal-pages-flash-not-found-while-auth-loading.md",
+      "acceptanceCriteria": [
+        "A captain opening /run/responses before any run exists sees the NoRunYet state, not a skeleton",
+        "A run that exists still renders its responses unchanged",
+        "Regression test covers the no-run-yet path"
       ]
     }
   ],
@@ -621,6 +638,18 @@
       "event": "nodes_added",
       "nodeId": "M-05",
       "message": "New task added: Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting"
+    },
+    {
+      "timestamp": "2026-07-28T09:00:53.881Z",
+      "event": "task_started",
+      "nodeId": "B-03",
+      "message": "Picked up: Portal pages flash 'not found' while auth loading"
+    },
+    {
+      "timestamp": "2026-07-28T09:07:41.285Z",
+      "event": "nodes_added",
+      "nodeId": "B-04",
+      "message": "New task added: Run responses page hangs on loading when no run exists"
     }
   ]
 }

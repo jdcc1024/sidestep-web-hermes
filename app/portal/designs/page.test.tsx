@@ -1,0 +1,74 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+
+// `listMyDesigns` answers "no identity yet" with the same `[]` it uses for
+// "you have no designs", so the empty state has to be gated on auth (B-03).
+let designsResult: unknown = undefined;
+let auth = { isLoading: false, isAuthenticated: true };
+
+vi.mock("convex/react", () => ({
+  useQuery: () => designsResult,
+  useConvexAuth: () => auth,
+}));
+
+import MyDesignsPage from "./page";
+
+async function renderPage() {
+  await act(async () => {
+    render(<MyDesignsPage />);
+  });
+}
+
+afterEach(() => {
+  vi.clearAllMocks();
+  designsResult = undefined;
+  auth = { isLoading: false, isAuthenticated: true };
+});
+
+describe("/portal/designs — no 'no designs' flash while auth loads (B-03)", () => {
+  it("should show the loading grid when an empty list arrives while auth is loading", async () => {
+    auth = { isLoading: true, isAuthenticated: false };
+    designsResult = [];
+    await renderPage();
+
+    expect(screen.getByLabelText(/loading/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no designs yet/i)).toBeNull();
+  });
+
+  it("should show the loading grid when the token has not attached yet", async () => {
+    auth = { isLoading: false, isAuthenticated: false };
+    designsResult = [];
+    await renderPage();
+
+    expect(screen.getByLabelText(/loading/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no designs yet/i)).toBeNull();
+  });
+
+  it("should show the empty state once an authenticated read comes back empty", async () => {
+    designsResult = [];
+    await renderPage();
+
+    expect(screen.getByText(/no designs yet/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /upload a design/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("should list the designs once they load", async () => {
+    designsResult = [
+      {
+        _id: "design_1",
+        title: "Home kit",
+        blocks: [],
+        fileCount: 2,
+      },
+    ];
+    await renderPage();
+
+    expect(
+      screen.getByRole("heading", { name: "Home kit", level: 3 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 files")).toBeInTheDocument();
+  });
+});

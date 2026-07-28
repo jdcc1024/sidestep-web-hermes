@@ -18,6 +18,9 @@ vi.mock("convex/react", async () => {
       return null;
     },
     useMutation: () => vi.fn(),
+    // The page gates its owner-scoped read on Convex auth (B-03); these
+    // cases all run as a settled, signed-in captain.
+    useConvexAuth: () => ({ isLoading: false, isAuthenticated: true }),
   };
 });
 

@@ -1,6 +1,6 @@
 # Issue: Owner-scoped portal pages flash "not found" while auth is still loading
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -29,10 +29,23 @@ auth-token-attach window the query legitimately returns `null`, and the user see
 "not found."
 
 ## Acceptance Criteria
-- [ ] While Clerk auth is still loading (token not yet attached), these pages show a loading state, not "not found"
-- [ ] A genuine missing/forbidden resource still shows "not found" (no regression)
-- [ ] Applies to `/portal/orders/[id]`, `/portal/designs/[id]`, and `/portal/designs` (empty state)
-- [ ] No flash of "not found" / "no designs" on a normal cold load for a signed-in user
+- [x] While Clerk auth is still loading (token not yet attached), these pages show a loading state, not "not found"
+- [x] A genuine missing/forbidden resource still shows "not found" (no regression)
+- [x] Applies to `/portal/orders/[id]`, `/portal/designs/[id]`, and `/portal/designs` (empty state)
+- [x] No flash of "not found" / "no designs" on a normal cold load for a signed-in user
+
+## Resolution
+Option 3 — `lib/ownedResource.ts` holds a pure `resolveOwnedResource` plus
+`useOwnedResource` / `useOwnedList` hooks. The gate is Convex's
+`useConvexAuth()` rather than Clerk's `useAuth()`: it only reports
+authenticated once the Convex client has validated the token, which is the
+precise moment owner-scoped queries begin answering for a real identity, and it
+re-enters loading on a reconnect. Unauthenticated renders as loading — safe
+because `/portal/*` is middleware-protected.
+
+Applied beyond the three routes above, to every surface with the same defect:
+`/portal` (all three list sections), `/portal/orders/[id]/edit`,
+`/portal/orders/[id]/run/setup`, `/portal/orders/[id]/run/responses`.
 
 ## Implementation options
 1. **Gate on Clerk `isLoaded`/`isSignedIn`** (`useAuth()` from `@clerk/nextjs`) before trusting a `null` result — treat `null` as "loading" until auth is known-ready.

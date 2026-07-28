@@ -8,6 +8,7 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { overviewOf } from "@/lib/designBlock";
+import { useOwnedList } from "@/lib/ownedResource";
 import {
   chipToneForStage,
   deriveCustomerStage,
@@ -36,9 +37,15 @@ const OVERVIEW_PREVIEW_CHARS = 140;
 
 export default function PortalDashboardPage() {
   const { user, isLoaded: isUserLoaded } = useUser();
-  const orders = useQuery(api.orders.listMyOrders);
-  const designs = useQuery(api.designs.listMyDesigns);
-  const jerseyRunResponses = useQuery(api.jerseyRuns.listMyResponses);
+  // All three lists answer "no identity attached yet" with the same `[]` they
+  // use for "you have none", so each stays on its skeleton until Convex is
+  // authenticated — otherwise every cold load flashes three empty states
+  // (B-03).
+  const orders = useOwnedList(useQuery(api.orders.listMyOrders));
+  const designs = useOwnedList(useQuery(api.designs.listMyDesigns));
+  const jerseyRunResponses = useOwnedList(
+    useQuery(api.jerseyRuns.listMyResponses),
+  );
 
   const greetingName = user?.firstName ?? "Captain";
 

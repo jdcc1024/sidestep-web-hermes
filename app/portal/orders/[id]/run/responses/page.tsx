@@ -12,6 +12,7 @@ import { RosterBreakdown } from "@/components/portal/RosterBreakdown";
 import { SizeBreakdown } from "@/components/portal/SizeBreakdown";
 import { entriesForDesigns, type DesignRef } from "@/lib/jerseyBreakdown";
 import { cn } from "@/lib/utils";
+import { useOwnedResource } from "@/lib/ownedResource";
 import {
   describeDeadline,
   estimateForResponses,
@@ -29,7 +30,12 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
   // Resolve the run from the order so the URL stays /orders/[id]/run/...
   // — captains link straight into this page from the order detail and
   // don't see jerseyRunIds anywhere in the UI.
-  const order = useQuery(api.orders.getMyOrder, { orderId });
+  // Owner-scoped: a `null` order is only a verdict once Convex is
+  // authenticated, so the downstream queries stay skipped until then (B-03).
+  const orderResult = useOwnedResource(
+    useQuery(api.orders.getMyOrder, { orderId }),
+  );
+  const order = orderResult.status === "ready" ? orderResult.data : undefined;
   const runStub = useQuery(
     api.jerseyRuns.getByOrder,
     order ? { orderId } : "skip",
@@ -39,19 +45,21 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
     runStub ? { jerseyRunId: runStub._id } : "skip",
   );
 
-  if (order === undefined || runStub === undefined || data === undefined)
+  if (orderResult.status === "loading") return <Loading orderId={orderId} />;
+  if (orderResult.status === "not-found") return <NotFound orderId={orderId} />;
+  if (runStub === undefined || data === undefined)
     return <Loading orderId={orderId} />;
-  if (order === null) return <NotFound orderId={orderId} />;
   if (runStub === null) return <NoRunYet orderId={orderId} />;
   if (data === null) return <NotFound orderId={orderId} />;
 
+  const ownedOrder = orderResult.data;
   const { run, entries } = data;
   const deadlineStatus = describeDeadline(run.deadline);
   // Production total is Σ order-entry qty (R-04) — the estimate and the
   // participation count both read the real jersey count, not a row tally.
   const totalJerseys = entries.reduce((sum, e) => sum + e.qty, 0);
-  const estimate = estimateForResponses(totalJerseys, order.order);
-  const teamName = order.order.teamName;
+  const estimate = estimateForResponses(totalJerseys, ownedOrder.order);
+  const teamName = ownedOrder.order.teamName;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -114,7 +122,7 @@ export default function JerseyRunResponsesPage({ params }: PageProps) {
       ) : (
         <CollectedViews
           entries={entries}
-          designs={order.designs}
+          designs={ownedOrder.designs}
           customQuestions={run.customQuestions}
         />
       )}
