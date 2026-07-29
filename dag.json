@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-29T05:37:34.357Z",
+  "lastUpdated": "2026-07-29T05:47:17.123Z",
   "phases": [
     {
       "id": "phase-1",
@@ -259,9 +259,9 @@
       "phase": "3",
       "type": "feature",
       "description": "Each design card gets a Manage roster button opening a Sheet with that design's full roster and inline add/edit/remove. Surfaces the collision flag listForRun already computes but the UI drops, and opens read-only for locked runs. RosterManager retires from Run Setup.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-07-29T05:37:34.356Z",
-      "completedAt": null,
+      "completedAt": "2026-07-29T05:47:17.122Z",
       "issueFile": "backlog/M-02-roster-sheet-on-design-cards.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
       "acceptanceCriteria": [
@@ -281,7 +281,7 @@
       "phase": "3",
       "type": "feature",
       "description": "Paste a roster straight out of Excel or Google Sheets into the roster sheet. A pure parser in lib/ handles TSV, CSV, and single-column trailing-number formats with per-row Name/Number order detection; a preview-and-confirm step flags duplicates and unparseable rows before a new createMany mutation commits the rest.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/M-03-bulk-paste-roster-import.md",
@@ -302,7 +302,7 @@
       "phase": "3",
       "type": "feature",
       "description": "One-action mirror so a home/away kit is seeded once, not twice. From inside a design's roster sheet the captain picks another design in the order and copies its player slots across — names and numbers only, never sizes or order entries. Strictly additive, with silent skip on slots that already exist.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/M-04-mirror-roster-between-designs.md",
@@ -323,7 +323,7 @@
       "phase": "3",
       "type": "improvement",
       "description": "Removes size choice entirely (fixed 8-size catalog, field retained and populated from the constant), relocates names mode to the order page where a fixed-mode design with no players can warn, and moves run creation to a Start collecting affordance taking only a deadline. /run/setup survives as management-only, with no lock control. The only M slice touching the public form — take it last.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/M-05-run-setup-slimming-and-names-mode-relocation.md",
@@ -798,6 +798,12 @@
       "event": "task_started",
       "nodeId": "M-02",
       "message": "Picked up: Roster Sheet on Design Cards"
+    },
+    {
+      "timestamp": "2026-07-29T05:47:17.122Z",
+      "event": "task_completed",
+      "nodeId": "M-02",
+      "message": "Completed: Roster Sheet on Design Cards"
     }
   ]
 }
