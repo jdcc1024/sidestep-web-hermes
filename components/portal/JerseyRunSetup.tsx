@@ -36,14 +36,13 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RosterManager } from "@/components/portal/RosterManager";
 
 // Colocated zod schema. Constants reused from lib/jerseyRun.ts so the
 // client and server cap values the same way (the Convex mutation enforces
-// matching limits server-side). Fixed-mode named slots are seeded through
-// the roster manager (RosterManager, R-03) after the run is created, so
-// the setup form no longer collects a roster. superRefine only handles the
-// per-question label rules that depend on the whole array.
+// matching limits server-side). Fixed-mode named slots are seeded from the
+// order page's design cards (RosterSheet, M-02), not here, so the setup
+// form never collects a roster. superRefine only handles the per-question
+// label rules that depend on the whole array.
 const formSchema = z
   .object({
     sizeOptions: z
@@ -432,9 +431,14 @@ function JerseyRunSummary({
 
       <Separator />
 
-      {/* Per-design roster seeding (R-03) — the unified model's single
-          source of truth for named slots, in both open and fixed mode. */}
-      <RosterManager runId={run._id} />
+      {/* Roster seeding moved to the order page's design cards (M-02) —
+          this surface is the collection campaign, not the team list. */}
+      <Link
+        href={`/portal/orders/${orderId}`}
+        className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+      >
+        Manage rosters on your order page →
+      </Link>
 
       {run.customQuestions.length > 0 && (
         <div>

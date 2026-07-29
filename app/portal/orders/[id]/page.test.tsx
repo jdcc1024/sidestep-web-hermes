@@ -2,6 +2,7 @@
 import { Suspense } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // Queries are told apart by function name, not args shape, so the page can
 // grow another query without silently re-pointing one of these stubs. The
@@ -19,9 +20,14 @@ let removedResult: unknown = [];
 // the flash tests below rewind it to the token-attach window.
 let auth = { isLoading: false, isAuthenticated: true };
 
+// The roster sheet (M-02) writes through the rosterEntries mutations; the
+// page itself never calls one, so a shared no-op stub is enough.
+const mutationStub = vi.fn(async (_args?: unknown) => undefined);
+
 vi.mock("convex/react", async () => {
   const { getFunctionName } = await import("convex/server");
   return {
+    useMutation: () => mutationStub,
     useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
       const name = getFunctionName(ref);
       if (name === "jerseyRuns:listOrderEntries") return entriesResult;
@@ -553,6 +559,87 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
     const home = within(sectionFor("Home kit"));
     expect(home.getByText(/no jerseys collected yet/i)).toBeInTheDocument();
     expect(home.queryByRole("list", { name: /roster/i })).toBeNull();
+  });
+});
+
+// Roster editing lives on the card now (M-02): the preview above is the
+// summary, the sheet behind this button is the whole roster. Before a run
+// exists there is nothing to edit — roster entries carry a runId — so the
+// card points at collecting instead of opening an editor that can't write.
+describe("/portal/orders/[id] — roster sheet on the design card (M-02)", () => {
+  const RUN = {
+    _id: "run_1" as Id<"jerseyRuns">,
+    deadline: Date.parse("2026-04-01T12:00:00Z"),
+    status: "open",
+    effectiveStatus: "open" as const,
+  };
+
+  function rosterWith(entries: Record<string, unknown>[]) {
+    return {
+      runId: RUN._id,
+      designs: [
+        { designId: "design_home", title: "Home kit", entries, blankSizes: [] },
+      ],
+    };
+  }
+
+  const GRETZKY = {
+    _id: "slot_gretzky",
+    name: "Gretzky",
+    number: "99",
+    source: "captain",
+    filled: true,
+    collision: false,
+    sizes: [{ size: "L", qty: 1 }],
+    total: 1,
+  };
+
+  it("opens the design's whole roster from a Manage roster button", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    rosterResult = rosterWith([GRETZKY]);
+    await renderPage();
+
+    await user.click(
+      within(sectionFor("Home kit")).getByRole("button", {
+        name: /manage roster/i,
+      }),
+    );
+
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(sheet.getByRole("listitem", { name: /gretzky #99/i })).toBeInTheDocument();
+    expect(sheet.getByLabelText(/add player name/i)).toBeInTheDocument();
+  });
+
+  it("points at collecting instead of the sheet before a run exists", async () => {
+    orderResult = orderWith([design()]);
+    runResult = null;
+    rosterResult = undefined;
+    await renderPage();
+
+    const home = within(sectionFor("Home kit"));
+    expect(home.queryByRole("button", { name: /roster/i })).toBeNull();
+    expect(home.getByText(/building this design/i)).toBeInTheDocument();
+  });
+
+  it("opens read-only once the run has locked", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()], { locked: true });
+    runResult = { ...RUN, status: "open", effectiveStatus: "locked" };
+    rosterResult = rosterWith([GRETZKY]);
+    await renderPage();
+
+    await user.click(
+      within(sectionFor("Home kit")).getByRole("button", {
+        name: /view roster/i,
+      }),
+    );
+
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(sheet.getByRole("listitem", { name: /gretzky #99/i })).toBeInTheDocument();
+    expect(sheet.queryByLabelText(/add player name/i)).toBeNull();
+    expect(sheet.queryByRole("button", { name: /edit gretzky/i })).toBeNull();
   });
 });
 

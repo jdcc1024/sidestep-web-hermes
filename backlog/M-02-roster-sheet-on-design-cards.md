@@ -1,6 +1,6 @@
 # Issue: Roster Sheet on Design Cards
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -17,18 +17,18 @@ This issue touches:
 Roster editing currently lives inside `/portal/orders/[id]/run/setup`, a page framed around sharing a link — the captain has no reason to be there while seeding a team. This slice moves the editor onto the design cards: each card's preview (M-01) gains a **Manage roster** button opening a Sheet with that design's full roster and inline CRUD. `RosterManager` is retired and its mount removed from `JerseyRunSetup`.
 
 ## Acceptance Criteria
-- [ ] Each design card has a **Manage roster** button opening a Sheet scoped to that design
-- [ ] The sheet lists the design's slots with the existing `filled` / `not yet filled` treatment, and shows each filled slot's ordered sizes
-- [ ] Add a slot (name + optional number) from inside the sheet; the card preview and the order total update without a reload
-- [ ] Edit a slot's name/number inline; remove a slot, with the server's existing "slot has orders on it" rejection surfaced as a readable toast, not a raw error
-- [ ] The **collision** flag from `listForRun` is surfaced on the affected slot (two different submitter emails on one slot in open mode) — it is currently computed and dropped by the UI
-- [ ] When the run is **locked**, the sheet opens **read-only**: no add row, no edit/remove affordances, and a note saying why. Reachable via deadline auto-lock with no lock control exposed.
-- [ ] When **no run exists yet**, the card shows a hint pointing at collecting rather than a Manage roster button — the sheet is not reachable and nothing creates a run implicitly
-- [ ] Usable at **375px**: the sheet is the primary editing surface on a phone, with 15 rows and an add row visible without horizontal scroll
-- [ ] `RosterManager` is removed from `JerseyRunSetup`; `components/portal/RosterManager.tsx` is deleted or fully absorbed into the sheet
-- [ ] Fan-created slots behave exactly as today — renameable, not removable while filled. **No behaviour change.**
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] Each design card has a **Manage roster** button opening a Sheet scoped to that design
+- [x] The sheet lists the design's slots with the existing `filled` / `not yet filled` treatment, and shows each filled slot's ordered sizes
+- [x] Add a slot (name + optional number) from inside the sheet; the card preview and the order total update without a reload
+- [x] Edit a slot's name/number inline; remove a slot, with the server's existing "slot has orders on it" rejection surfaced as a readable toast, not a raw error
+- [x] The **collision** flag from `listForRun` is surfaced on the affected slot (two different submitter emails on one slot in open mode) — it is currently computed and dropped by the UI
+- [x] When the run is **locked**, the sheet opens **read-only**: no add row, no edit/remove affordances, and a note saying why. Reachable via deadline auto-lock with no lock control exposed.
+- [x] When **no run exists yet**, the card shows a hint pointing at collecting rather than a Manage roster button — the sheet is not reachable and nothing creates a run implicitly
+- [x] Usable at **375px**: the sheet is the primary editing surface on a phone, with 15 rows and an add row visible without horizontal scroll
+- [x] `RosterManager` is removed from `JerseyRunSetup`; `components/portal/RosterManager.tsx` is deleted or fully absorbed into the sheet
+- [x] Fan-created slots behave exactly as today — renameable, not removable while filled. **No behaviour change.**
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: M-01

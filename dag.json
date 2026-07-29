@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-29T02:45:49.209Z",
+  "lastUpdated": "2026-07-29T05:37:34.357Z",
   "phases": [
     {
       "id": "phase-1",
@@ -259,8 +259,8 @@
       "phase": "3",
       "type": "feature",
       "description": "Each design card gets a Manage roster button opening a Sheet with that design's full roster and inline add/edit/remove. Surfaces the collision flag listForRun already computes but the UI drops, and opens read-only for locked runs. RosterManager retires from Run Setup.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-29T05:37:34.356Z",
       "completedAt": null,
       "issueFile": "backlog/M-02-roster-sheet-on-design-cards.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
@@ -792,6 +792,12 @@
       "event": "task_completed",
       "nodeId": "M-01",
       "message": "Completed: Unified Roster Read + Design-Card Roster Preview"
+    },
+    {
+      "timestamp": "2026-07-29T05:37:34.357Z",
+      "event": "task_started",
+      "nodeId": "M-02",
+      "message": "Picked up: Roster Sheet on Design Cards"
     }
   ]
 }

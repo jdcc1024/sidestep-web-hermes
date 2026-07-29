@@ -1269,3 +1269,59 @@ One entry per completed loop task. This is the human's fast path for UX critique
   runtime — plus a comment on why the separator exists and why it must stay
   escaped. Pre-existing since C-01, not an M-01 regression; fixed here because
   it blocked review of M-01. Committed separately (`811ee3a`).
+
+## 2026-07-28 — M-02: Roster Sheet on Design Cards
+
+- What shipped:
+  - `components/portal/RosterSheet.tsx` — the per-design roster editor, opened
+    from a **Manage roster** button on each design card of
+    `/portal/orders/[id]`. Inline add / edit / remove, the `filled` /
+    `not yet filled` treatment, each filled slot's ordered sizes, and the
+    **collision** flag M-01 computed and the UI dropped ("Two people claimed
+    this"). No query of its own: the page hands it the slots it already read
+    for the card preview, so preview and editor cannot drift apart again.
+  - **Locked runs open read-only** — no add row, no edit/remove, and the
+    description says why. Read from the run's `effectiveStatus`, so a run that
+    auto-locked past its deadline (R-06's lazy lock, reachable with no lock
+    control anywhere) renders correctly.
+  - **`RosterManager` is deleted.** Its mount in `JerseyRunSetup` is replaced
+    by a link back to the order page; Run Setup keeps only the share link,
+    summary, and custom questions.
+
+- UX surfaces to eyeball (screenshots in `docs/review/M-02/`):
+  - `roster-sheet-open-w{375,768,1280}-{light,dark}.png` — **the review
+    surface for this slice**: the sheet open on the 15-player Home Kit. Judge
+    the row density (name on one line, state/size badges under it), whether
+    the pencil/× pair reads as edit/remove without labels, and whether the
+    375px add row (`Player name` / `No.` / `Add`) is typeable one-handed.
+  - `portal-orders-jh70c9...-w*.png` — the cards themselves: **Manage roster**
+    sits under the 6-row preview on both designs.
+  - `portal-orders-jh78tc...-w*.png` — the no-run order: "Set up a run below to
+    start building this design's roster" where the button would be.
+  - `portal-orders-jh70c9...-run-setup-w*.png` — Run Setup with the roster
+    editor gone, ending in "Manage rosters on your order page →".
+  - The Clerk avatar overlapping the 375px add row is the artifact CLAUDE.md
+    already documents (fixed-position element, 0×0 in a real viewport).
+
+- Decisions I made that a human may want to veto:
+  - **The trigger reads "View roster" when the run is locked**, not "Manage
+    roster". The issue's criterion says Manage roster; on a locked run that
+    would promise an editor the sheet deliberately doesn't offer.
+  - **One sheet width, `w-full` under `sm` and a right-side panel above it**,
+    rather than the PRD's "bottom sheet at 375px". Base UI's `side` is static,
+    so a true bottom sheet needs a media-query hook; full-bleed from the right
+    gives the same 375px working width for free. Both width classes carry the
+    `data-[side=right]` prefix — the primitive's own width is variant-prefixed
+    and tailwind-merge only overrides across matching variants. The first pass
+    without the prefix silently rendered at 3/4 width; caught in the captures.
+  - **Collision copy: "Two people claimed this."** Amber, no resolve action —
+    PRD §6 says surfaced-only.
+  - **The sheet takes slots as props instead of querying.** Deliberate, per the
+    issue: a second `listForRun` subscription is exactly the drift M-01 exists
+    to prevent.
+  - **Screenshots of the open sheet were captured with a throwaway Playwright
+    script** (temp dir, not committed) mirroring `snap.mjs`'s contexts —
+    `snap.mjs` only navigates, and this slice's whole surface is behind a
+    click. `snap.mjs` itself is untouched.
+
+- Follow-ups filed: none.

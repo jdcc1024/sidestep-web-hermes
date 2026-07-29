@@ -13,6 +13,10 @@ import { OrderTimeline } from "@/components/portal/OrderTimeline";
 import { RemovedDesigns } from "@/components/portal/DesignRemoval";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
 import { DesignRosterPreview } from "@/components/portal/DesignRosterPreview";
+import {
+  RosterSheet,
+  type RosterSheetSlot,
+} from "@/components/portal/RosterSheet";
 import { SizeBreakdown } from "@/components/portal/SizeBreakdown";
 import {
   entriesForDesigns,
@@ -115,6 +119,14 @@ export default function OrderDetailPage({ params }: PageProps) {
       (view) => [view.designId, view.rows] as const,
     ),
   );
+  // The same read again, unflattened: the card renders rows, the sheet (M-02)
+  // edits slots, and both come from this one query so they can't disagree.
+  const slotsByDesign = new Map(
+    (roster?.designs ?? []).map((d) => [d.designId, d.entries] as const),
+  );
+  // A locked run freezes the roster (R-06's lazy auto-lock, so this is
+  // reachable with no lock control anywhere): the sheet opens read-only.
+  const runLocked = run?.effectiveStatus === "locked";
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -257,6 +269,9 @@ export default function OrderDetailPage({ params }: PageProps) {
                 design={design}
                 count={countByDesign.get(design._id) ?? 0}
                 rows={rowsByDesign.get(design._id) ?? []}
+                runId={run?._id ?? null}
+                slots={slotsByDesign.get(design._id) ?? []}
+                locked={runLocked}
               />
             ))}
           </div>
@@ -279,15 +294,23 @@ export default function OrderDetailPage({ params }: PageProps) {
 // Each linked design renders as its own section under the one order timeline
 // (O-05). It carries the design's silhouette specs, its own collected count
 // — Σ qty over the roster rows tagged with this design (O-07) — and, since
-// M-01, the design's roster: every player slot, ordered against or not.
+// M-01, the design's roster: every player slot, ordered against or not. M-02
+// puts the editor for that roster behind a button here, so seeding a team no
+// longer means hunting for Run Setup.
 function DesignSection({
   design,
   count,
   rows,
+  runId,
+  slots,
+  locked,
 }: {
   design: OrderDesign;
   count: number;
   rows: RosterRow[];
+  runId: Id<"jerseyRuns"> | null;
+  slots: readonly RosterSheetSlot[];
+  locked: boolean;
 }) {
   const hasSpecs = design.jerseyStyle || design.neckline || design.sleeveStyle;
   return (
@@ -344,6 +367,23 @@ function DesignSection({
             count alone can't show. */}
         <DesignRollup count={count} />
         <DesignRosterPreview rows={rows} />
+
+        {/* Roster entries hang off a run, so there is nothing to edit until
+            one exists — the card sends the captain to Collect rather than
+            opening an editor whose every write would reject. */}
+        {runId ? (
+          <RosterSheet
+            runId={runId}
+            designId={design._id}
+            designTitle={design.title}
+            slots={slots}
+            locked={locked}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Set up a run below to start building this design&apos;s roster.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
