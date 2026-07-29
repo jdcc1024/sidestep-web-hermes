@@ -8,8 +8,9 @@ import { getFunctionName } from "convex/server";
 // One stub per mutation, told apart by function name so a test can assert
 // "create was called with this designId" without guessing which of the three
 // roster mutations fired.
-const { create, update, remove } = vi.hoisted(() => ({
+const { create, createMany, update, remove } = vi.hoisted(() => ({
   create: vi.fn(async (_args: unknown) => "slot_new"),
+  createMany: vi.fn(async (_args: unknown) => ["slot_a", "slot_b"]),
   update: vi.fn(async (_args: unknown) => "slot_1"),
   remove: vi.fn(async (_args: unknown) => "slot_1"),
 }));
@@ -18,14 +19,20 @@ vi.mock("convex/react", () => ({
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const name = getFunctionName(ref);
     if (name === "rosterEntries:create") return create;
+    if (name === "rosterEntries:createMany") return createMany;
     if (name === "rosterEntries:update") return update;
     if (name === "rosterEntries:remove") return remove;
     throw new Error(`Unexpected mutation: ${name}`);
   },
 }));
 
-const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { error: toastError, success: vi.fn() } }));
+const { toastError, toastSuccess } = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}));
+vi.mock("sonner", () => ({
+  toast: { error: toastError, success: toastSuccess },
+}));
 
 import type { Id } from "@/convex/_generated/dataModel";
 import { RosterSheet, type RosterSheetSlot } from "./RosterSheet";
@@ -69,10 +76,13 @@ async function openSheet(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   create.mockClear();
+  createMany.mockClear();
   update.mockClear();
   remove.mockClear();
   toastError.mockClear();
+  toastSuccess.mockClear();
   create.mockResolvedValue("slot_new");
+  createMany.mockResolvedValue(["slot_a", "slot_b"]);
   update.mockResolvedValue("slot_1");
   remove.mockResolvedValue("slot_1");
 });
@@ -253,6 +263,147 @@ describe("RosterSheet — editing and removing", () => {
   });
 });
 
+// M-03: seeding fifteen people is one paste, and the preview is the only
+// safety net — there is no undo, so what the captain approves has to be
+// exactly what gets written.
+describe("RosterSheet — bulk paste", () => {
+  // The clipboard, not the keyboard: `type` would mangle the tabs a
+  // spreadsheet paste is made of.
+  async function pasteInto(
+    sheet: ReturnType<typeof within>,
+    user: ReturnType<typeof userEvent.setup>,
+    text: string,
+  ) {
+    await user.click(sheet.getByRole("button", { name: /paste a list/i }));
+    const box = sheet.getByLabelText(/paste roster rows/i);
+    await user.click(box);
+    await user.paste(text);
+    return box;
+  }
+
+  // The textarea still holds the pasted block, so a bare getByText would
+  // match it as well as the preview row it produced.
+  function preview(sheet: ReturnType<typeof within>) {
+    return within(sheet.getByRole("list", { name: /paste preview/i }));
+  }
+
+  it("previews what a pasted block would create, with the real count on the button", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [] });
+
+    const sheet = await openSheet(user);
+    await pasteInto(sheet, user, "Gretzky\t99\n66\tLemieux");
+
+    const rows = preview(sheet);
+    expect(rows.getByText("Gretzky #99")).toBeInTheDocument();
+    expect(rows.getByText("Lemieux #66")).toBeInTheDocument();
+    expect(
+      sheet.getByRole("button", { name: /add 2 players/i }),
+    ).toBeEnabled();
+    expect(createMany).not.toHaveBeenCalled();
+  });
+
+  it("writes exactly the rows it promised, then returns to the roster", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [] });
+
+    const sheet = await openSheet(user);
+    await pasteInto(sheet, user, "Gretzky\t99\nBo");
+    await user.click(sheet.getByRole("button", { name: /add 2 players/i }));
+
+    expect(createMany).toHaveBeenCalledWith({
+      runId: RUN_ID,
+      designId: DESIGN_ID,
+      players: [
+        { name: "Gretzky", number: "99" },
+        { name: "Bo", number: undefined },
+      ],
+    });
+    expect(toastSuccess).toHaveBeenCalledWith(
+      expect.stringMatching(/2 players/i),
+    );
+    expect(sheet.queryByLabelText(/paste roster rows/i)).toBeNull();
+  });
+
+  it("flags rows already on the roster, repeats, and rows it can't read — and excludes all three", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [slot({ name: "Gretzky", number: "99" })] });
+
+    const sheet = await openSheet(user);
+    await pasteInto(
+      sheet,
+      user,
+      "gretzky\t99\nLemieux\t66\nLEMIEUX\t66\n99",
+    );
+
+    expect(sheet.getByText(/already on this roster/i)).toBeInTheDocument();
+    expect(sheet.getByText(/repeated earlier/i)).toBeInTheDocument();
+    expect(sheet.getByText(/number but no name/i)).toBeInTheDocument();
+
+    await user.click(sheet.getByRole("button", { name: /add 1 player$/i }));
+    expect(createMany).toHaveBeenCalledWith({
+      runId: RUN_ID,
+      designId: DESIGN_ID,
+      players: [{ name: "Lemieux", number: "66" }],
+    });
+  });
+
+  it("offers nothing to commit when every pasted row is already there", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [slot({ name: "Gretzky", number: "99" })] });
+
+    const sheet = await openSheet(user);
+    await pasteInto(sheet, user, "Gretzky\t99");
+
+    expect(sheet.getByRole("button", { name: /nothing to add/i })).toBeDisabled();
+    expect(sheet.getByText(/already on this roster/i)).toBeInTheDocument();
+  });
+
+  it("refuses a paste past the batch bound instead of previewing it", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [] });
+
+    const sheet = await openSheet(user);
+    await pasteInto(
+      sheet,
+      user,
+      Array.from({ length: 201 }, (_, i) => `Player ${i}\t${i}`).join("\n"),
+    );
+
+    expect(sheet.getByText(/too many rows/i)).toBeInTheDocument();
+    expect(sheet.getByRole("button", { name: /nothing to add/i })).toBeDisabled();
+  });
+
+  it("surfaces a rejected commit as a toast and keeps the paste on screen", async () => {
+    const user = userEvent.setup();
+    createMany.mockRejectedValueOnce(new Error("This jersey run is locked."));
+    renderSheet({ slots: [] });
+
+    const sheet = await openSheet(user);
+    await pasteInto(sheet, user, "Gretzky\t99");
+    await user.click(sheet.getByRole("button", { name: /add 1 player/i }));
+
+    expect(toastError).toHaveBeenCalledWith(
+      expect.stringMatching(/could not add/i),
+      expect.objectContaining({ description: "This jersey run is locked." }),
+    );
+    expect(sheet.getByLabelText(/paste roster rows/i)).toBeInTheDocument();
+  });
+
+  it("leaves the roster alone when the paste is cancelled", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [] });
+
+    const sheet = await openSheet(user);
+    await pasteInto(sheet, user, "Gretzky\t99");
+    await user.click(sheet.getByRole("button", { name: /^cancel$/i }));
+
+    expect(createMany).not.toHaveBeenCalled();
+    expect(sheet.queryByLabelText(/paste roster rows/i)).toBeNull();
+    expect(sheet.getByLabelText(/add player name/i)).toBeInTheDocument();
+  });
+});
+
 describe("RosterSheet — collisions", () => {
   it("flags a slot two different people both claimed", async () => {
     const user = userEvent.setup();
@@ -283,6 +434,7 @@ describe("RosterSheet — locked run", () => {
     expect(sheet.queryByRole("button", { name: /^add$/i })).toBeNull();
     expect(sheet.queryByRole("button", { name: /edit gretzky/i })).toBeNull();
     expect(sheet.queryByRole("button", { name: /remove gretzky/i })).toBeNull();
+    expect(sheet.queryByRole("button", { name: /paste a list/i })).toBeNull();
   });
 
   it("says why the roster can't be edited", async () => {

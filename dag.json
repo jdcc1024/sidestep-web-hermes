@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-29T05:47:17.123Z",
+  "lastUpdated": "2026-07-29T05:47:56.267Z",
   "phases": [
     {
       "id": "phase-1",
@@ -281,8 +281,8 @@
       "phase": "3",
       "type": "feature",
       "description": "Paste a roster straight out of Excel or Google Sheets into the roster sheet. A pure parser in lib/ handles TSV, CSV, and single-column trailing-number formats with per-row Name/Number order detection; a preview-and-confirm step flags duplicates and unparseable rows before a new createMany mutation commits the rest.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-29T05:47:56.266Z",
       "completedAt": null,
       "issueFile": "backlog/M-03-bulk-paste-roster-import.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
@@ -804,6 +804,12 @@
       "event": "task_completed",
       "nodeId": "M-02",
       "message": "Completed: Roster Sheet on Design Cards"
+    },
+    {
+      "timestamp": "2026-07-29T05:47:56.267Z",
+      "event": "task_started",
+      "nodeId": "M-03",
+      "message": "Picked up: Bulk Paste Roster Import"
     }
   ]
 }

@@ -1,20 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation } from "convex/react";
-import { PencilIcon, PlusIcon, UsersIcon, XIcon } from "lucide-react";
+import {
+  ClipboardPasteIcon,
+  PencilIcon,
+  PlusIcon,
+  UsersIcon,
+  XIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { jerseyLabel, type RosterSlotRead } from "@/lib/jerseyBreakdown";
+import { cn } from "@/lib/utils";
 import {
   ROSTER_NAME_MAX_LENGTH,
   ROSTER_NUMBER_MAX_LENGTH,
+  ROSTER_PASTE_MAX_ROWS,
+  parseRosterPaste,
   validateRosterEntry,
+  type RosterPasteRow,
 } from "@/lib/rosterEntry";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
   SheetContent,
@@ -54,8 +65,14 @@ export function RosterSheet({
   slots: readonly RosterSheetSlot[];
   locked: boolean;
 }) {
+  // The sheet is either the roster or the paste preview, never both: the
+  // preview is a decision the captain has to finish, and at 375px a
+  // textarea plus fifteen preview rows plus the roster underneath is a
+  // scroll nobody reads.
+  const [pasting, setPasting] = useState(false);
+
   return (
-    <Sheet>
+    <Sheet onOpenChange={(open) => !open && setPasting(false)}>
       <SheetTrigger
         render={<Button type="button" variant="outline" size="sm" />}
       >
@@ -74,34 +91,202 @@ export function RosterSheet({
         <SheetHeader className="pr-12">
           <SheetTitle>{designTitle}</SheetTitle>
           <SheetDescription>
-            {locked
-              ? "This run is locked, so the roster is read-only. Contact Sidestep if something needs to change."
-              : "Add the players on this design. A slot stays not yet filled until someone orders a size for it."}
+            {pasting
+              ? "Paste two columns — name and number — straight out of Excel or Google Sheets. Nothing is added until you confirm."
+              : locked
+                ? "This run is locked, so the roster is read-only. Contact Sidestep if something needs to change."
+                : "Add the players on this design. A slot stays not yet filled until someone orders a size for it."}
           </SheetDescription>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4">
-          {slots.length === 0 ? (
-            <p className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
-              No players yet.
-              {locked ? "" : " Add the first one below."}
-            </p>
-          ) : (
-            <ul aria-label="Roster" className="space-y-2">
-              {slots.map((slot) => (
-                <SlotRow key={slot._id} slot={slot} locked={locked} />
-              ))}
-            </ul>
-          )}
-        </div>
+        {pasting ? (
+          <PasteRoster
+            runId={runId}
+            designId={designId}
+            slots={slots}
+            onDone={() => setPasting(false)}
+          />
+        ) : (
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4">
+              {slots.length === 0 ? (
+                <p className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
+                  No players yet.
+                  {locked ? "" : " Add the first one below."}
+                </p>
+              ) : (
+                <ul aria-label="Roster" className="space-y-2">
+                  {slots.map((slot) => (
+                    <SlotRow key={slot._id} slot={slot} locked={locked} />
+                  ))}
+                </ul>
+              )}
+            </div>
 
-        {!locked && (
-          <SheetFooter className="border-t border-border">
-            <AddSlotRow runId={runId} designId={designId} />
-          </SheetFooter>
+            {!locked && (
+              <SheetFooter className="border-t border-border">
+                <AddSlotRow runId={runId} designId={designId} />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="self-start"
+                  onClick={() => setPasting(true)}
+                >
+                  <ClipboardPasteIcon aria-hidden />
+                  Paste a list
+                </Button>
+              </SheetFooter>
+            )}
+          </>
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+// The bulk-paste flow (M-03): parse, preview, confirm. The parser is pure
+// and lives in `lib/rosterEntry`, so the rows shown here and the array sent
+// to `createMany` are literally the same object — there is no undo, and the
+// count on the button is the promise this screen has to keep.
+function PasteRoster({
+  runId,
+  designId,
+  slots,
+  onDone,
+}: {
+  runId: Id<"jerseyRuns">;
+  designId: Id<"designs">;
+  slots: readonly RosterSheetSlot[];
+  onDone: () => void;
+}) {
+  const createMany = useMutation(api.rosterEntries.createMany);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const parsed = useMemo(() => parseRosterPaste(text, slots), [text, slots]);
+  const { additions, counts, rows, tooManyRows } = parsed;
+
+  async function onConfirm() {
+    setBusy(true);
+    try {
+      await createMany({ runId, designId, players: additions });
+      toast.success(
+        `Added ${additions.length} player${additions.length === 1 ? "" : "s"}`,
+      );
+      onDone();
+    } catch (err) {
+      // Stays on the paste screen: the block is still in the box, so the
+      // captain can fix a row and try again rather than re-copying it.
+      toast.error("Could not add players", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4">
+        <Textarea
+          value={text}
+          rows={4}
+          aria-label="Paste roster rows"
+          placeholder={"Gretzky\t99\nLemieux\t66"}
+          className="max-h-40 font-mono text-xs"
+          onChange={(e) => setText(e.target.value)}
+        />
+
+        {tooManyRows ? (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            Too many rows — paste {ROSTER_PASTE_MAX_ROWS} or fewer at a time.
+          </p>
+        ) : rows.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
+            Nothing pasted yet. Either column order works — we read whichever
+            one is the number.
+          </p>
+        ) : (
+          <>
+            <PasteSummary counts={counts} />
+            <ul aria-label="Paste preview" className="space-y-1.5">
+              {rows.map((row) => (
+                <PastePreviewRow key={row.line} row={row} />
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
+      <SheetFooter className="flex-row justify-end gap-2 border-t border-border">
+        <Button type="button" variant="ghost" disabled={busy} onClick={onDone}>
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          disabled={busy || additions.length === 0}
+          onClick={() => void onConfirm()}
+        >
+          {additions.length === 0
+            ? "Nothing to add"
+            : `Add ${additions.length} player${
+                additions.length === 1 ? "" : "s"
+              }`}
+        </Button>
+      </SheetFooter>
+    </>
+  );
+}
+
+// What the paste adds up to, before the row-by-row detail. Only the
+// non-zero parts show, so a clean fifteen-row paste reads as one number.
+function PasteSummary({
+  counts,
+}: {
+  counts: ReturnType<typeof parseRosterPaste>["counts"];
+}) {
+  const parts = [
+    `${counts.additions} to add`,
+    counts.existing > 0 ? `${counts.existing} already there` : null,
+    counts.duplicate > 0 ? `${counts.duplicate} repeated` : null,
+    counts.invalid > 0 ? `${counts.invalid} couldn't be read` : null,
+  ].filter(Boolean);
+  return (
+    <p className="text-sm font-medium text-foreground">{parts.join(" · ")}</p>
+  );
+}
+
+// One parsed row. An excluded row keeps its place in the list — the captain
+// is checking their paste against what they copied, so a silently dropped
+// line would be the one thing they can't verify.
+function PastePreviewRow({ row }: { row: RosterPasteRow }) {
+  const excluded = row.status !== "new";
+  return (
+    <li
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-md border px-3 py-2",
+        excluded
+          ? "border-dashed border-border bg-muted/40"
+          : "border-border/60 bg-background",
+      )}
+    >
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-sm",
+          excluded ? "text-muted-foreground" : "font-medium text-foreground",
+        )}
+      >
+        {row.status === "invalid"
+          ? row.raw
+          : jerseyLabel(row.name, row.number)}
+      </span>
+      {row.problem && (
+        <Badge variant="secondary" className="bg-muted text-muted-foreground">
+          {row.problem}
+        </Badge>
+      )}
+    </li>
   );
 }
 

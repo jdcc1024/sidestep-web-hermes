@@ -1,6 +1,6 @@
 # Issue: Bulk Paste Roster Import
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -8,7 +8,7 @@
 
 ## Vertical Slice
 This issue touches:
-- [ ] Database: none
+- [x] Database: none
 - [x] API: new `rosterEntries.createMany` mutation (bulk insert, same ownership/lock/design gates as `create`)
 - [x] Frontend: a paste box in the roster sheet with a **preview-and-confirm** step showing what will be created, what's already there, and what didn't parse
 - [x] Tests: heavy unit coverage on the pure parser; mutation tests for the gates; component test for the preview flow
@@ -17,18 +17,18 @@ This issue touches:
 A captain seeding ~15 players types them one at a time today. This slice lets them paste straight out of Excel or Google Sheets: the pasted block is parsed into name/number rows, shown as a preview with duplicates and unparseable rows flagged and excluded, and committed in one action. The parser is a pure function in `lib/` so the preview and the commit can never disagree about what a paste means.
 
 ## Acceptance Criteria
-- [ ] A **pure, DOM-free parser** in `lib/rosterEntry/` takes a pasted string and returns parsed rows plus per-row problems — no Convex, no React
-- [ ] Accepts **tab-separated** (the Sheets/Excel clipboard format), **comma-separated**, and a **single column with a trailing number** (`Gretzky 99`)
-- [ ] Detects `Name⇄Number` column order **per row**, based on which column is numeric — a captain's two columns may be in either order
-- [ ] Rows are validated with the existing `checkRosterName` / `checkRosterNumber` rules so the paste can't create something the single-add path would reject
-- [ ] The preview lists every parsed row and separately flags: rows **already on this design's roster**, rows that **failed to parse**, and rows that **repeat within the paste itself** — all three excluded from the commit count
-- [ ] The confirm button states the real count ("Add 15 players"), and nothing is written until it's pressed
-- [ ] `rosterEntries.createMany` enforces the **same gates as `create`**: order ownership, run not locked, design belongs to the order, per-row name/number rules
-- [ ] `createMany` is bounded — reject an unreasonably large paste rather than inserting it
-- [ ] Pasting into a **locked** run is not possible (no paste box in read-only mode) and would be rejected server-side anyway
-- [ ] Empty paste, whitespace-only paste, and a paste of entirely duplicate rows all produce a readable preview rather than an error
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] A **pure, DOM-free parser** in `lib/rosterEntry/` takes a pasted string and returns parsed rows plus per-row problems — no Convex, no React
+- [x] Accepts **tab-separated** (the Sheets/Excel clipboard format), **comma-separated**, and a **single column with a trailing number** (`Gretzky 99`)
+- [x] Detects `Name⇄Number` column order **per row**, based on which column is numeric — a captain's two columns may be in either order
+- [x] Rows are validated with the existing `checkRosterName` / `checkRosterNumber` rules so the paste can't create something the single-add path would reject
+- [x] The preview lists every parsed row and separately flags: rows **already on this design's roster**, rows that **failed to parse**, and rows that **repeat within the paste itself** — all three excluded from the commit count
+- [x] The confirm button states the real count ("Add 15 players"), and nothing is written until it's pressed
+- [x] `rosterEntries.createMany` enforces the **same gates as `create`**: order ownership, run not locked, design belongs to the order, per-row name/number rules
+- [x] `createMany` is bounded — reject an unreasonably large paste rather than inserting it
+- [x] Pasting into a **locked** run is not possible (no paste box in read-only mode) and would be rejected server-side anyway
+- [x] Empty paste, whitespace-only paste, and a paste of entirely duplicate rows all produce a readable preview rather than an error
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: M-02

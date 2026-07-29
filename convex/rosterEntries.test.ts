@@ -6,6 +6,7 @@ import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { overviewBlocks } from "../lib/designBlock";
+import { ROSTER_PASTE_MAX_ROWS } from "../lib/rosterEntry/paste";
 
 const modules = import.meta.glob("./**/*.*s");
 const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -162,6 +163,153 @@ describe("rosterEntries.create", () => {
         runId,
         designId,
         name: "Nope",
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+// M-03: the bulk-paste commit. Same gates as `create`, applied once for the
+// batch — the parser has already decided what the rows are, so the mutation's
+// job is to refuse anything the single-add path would have refused.
+describe("rosterEntries.createMany", () => {
+  it("creates every player in one call, as captain-sourced slots", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+
+    const ids = await asCaptain.mutation(api.rosterEntries.createMany, {
+      runId,
+      designId,
+      players: [
+        { name: "Gretzky", number: "99" },
+        { name: "Lemieux", number: "66" },
+        { name: "Bo" },
+      ],
+    });
+
+    expect(ids).toHaveLength(3);
+    const entries = await asCaptain.query(api.rosterEntries.listByRun, {
+      runId,
+    });
+    expect(entries.map((e) => e.name).sort()).toEqual([
+      "Bo",
+      "Gretzky",
+      "Lemieux",
+    ]);
+    expect(entries.every((e) => e.source === "captain")).toBe(true);
+    expect(entries.find((e) => e.name === "Bo")?.number).toBeUndefined();
+  });
+
+  it("rejects an empty batch rather than silently doing nothing", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.createMany, {
+        runId,
+        designId,
+        players: [],
+      }),
+    ).rejects.toThrow(/no players/i);
+  });
+
+  it("rejects a batch past the bound rather than inserting it", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    const players = Array.from(
+      { length: ROSTER_PASTE_MAX_ROWS + 1 },
+      (_, i) => ({ name: `Player ${i}` }),
+    );
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.createMany, {
+        runId,
+        designId,
+        players,
+      }),
+    ).rejects.toThrow(/too many/i);
+    const entries = await asCaptain.query(api.rosterEntries.listByRun, {
+      runId,
+    });
+    expect(entries).toEqual([]);
+  });
+
+  it("rejects the whole batch when one row breaks the name rules", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.createMany, {
+        runId,
+        designId,
+        players: [{ name: "Gretzky", number: "99" }, { name: "  " }],
+      }),
+    ).rejects.toThrow();
+
+    const entries = await asCaptain.query(api.rosterEntries.listByRun, {
+      runId,
+    });
+    expect(entries).toEqual([]);
+  });
+
+  it("rejects a locked run", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    await asCaptain.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.createMany, {
+        runId,
+        designId,
+        players: [{ name: "Too late" }],
+      }),
+    ).rejects.toThrow(/locked/i);
+  });
+
+  it("rejects a design not on the order", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, userId, asCaptain } = await seedRun(t);
+    const strayDesignId = await t.run((ctx) =>
+      ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Stray",
+        blocks: overviewBlocks("x"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.createMany, {
+        runId,
+        designId: strayDesignId,
+        players: [{ name: "Ghost" }],
+      }),
+    ).rejects.toThrow(/isn't part of this order/);
+  });
+
+  it("rejects a caller who doesn't own the order", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId } = await seedRun(t);
+    await t.run((ctx) =>
+      ctx.db.insert("users", {
+        clerkId: "stranger_clerk",
+        email: "stranger@example.com",
+        name: "Stranger",
+        isAdmin: false,
+        createdAt: Date.now(),
+      }),
+    );
+    const stranger = t.withIdentity({
+      subject: "stranger_clerk",
+      email: "stranger@example.com",
+      name: "Stranger",
+    });
+
+    await expect(
+      stranger.mutation(api.rosterEntries.createMany, {
+        runId,
+        designId,
+        players: [{ name: "Nope" }],
       }),
     ).rejects.toThrow();
   });

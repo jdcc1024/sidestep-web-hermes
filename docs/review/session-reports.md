@@ -1325,3 +1325,62 @@ One entry per completed loop task. This is the human's fast path for UX critique
     click. `snap.mjs` itself is untouched.
 
 - Follow-ups filed: none.
+
+## 2026-07-28 — M-03: Bulk Paste Roster Import
+
+- What shipped:
+  - `lib/rosterEntry/paste.ts` — a pure, DOM-free `parseRosterPaste(text,
+    existing)`. TSV, CSV, and single-column trailing-number all land; the
+    `Name⇄Number` order is decided **per row** by which cell is digits, so a
+    block with the columns swapped halfway through still parses. Rows come
+    back classified `new` / `existing` / `duplicate` / `invalid`, each excluded
+    one carrying its own user-facing reason. `rosterSlotKey(name, number)` was
+    extracted from `rosterMatchKey` so paste dedupe, fan attach, and M-04's
+    mirror share one normalization.
+  - `rosterEntries.createMany` — the commit. Same gates as `create`
+    (ownership, lock, design-on-order, per-row name/number rules), plus a
+    200-row bound. Validates the whole batch before writing any of it.
+  - **Paste preview in the roster sheet.** "Paste a list" swaps the sheet body
+    for a textarea + a row-by-row preview + a confirm button that states the
+    real count ("Add 3 players", disabled and reading "Nothing to add" when
+    there's nothing new). Nothing is written until it's pressed; there is no
+    undo, per PRD §6.
+
+- UX surfaces to eyeball (screenshots in `docs/review/M-03/`):
+  - `paste-preview-w{375,768,1280}-{light,dark}.png` — **the review surface**:
+    one paste exercising every state at once (a row already on the roster, a
+    row repeated inside the paste, a number-only row, and both column orders).
+    Judge whether the excluded-row treatment (dashed, muted, reason badge)
+    reads as "skipped, not lost", and whether the summary line
+    ("3 to add · 1 already there · 1 repeated · 1 couldn't be read") is the
+    right density at 375px, where it wraps to two lines.
+  - `roster-sheet-w{375,1280}-{light,dark}.png` — the sheet's normal state,
+    for where "Paste a list" sits relative to the add row.
+  - `portal-orders-jh70c9...-w*.png` — the cards, unchanged by this slice.
+  - The Clerk avatar over the 375px footer is the artifact CLAUDE.md documents.
+
+- Decisions I made that a human may want to veto:
+  - **Paste replaces the sheet body rather than sitting above the roster.** A
+    textarea plus fifteen preview rows plus the roster underneath is a scroll
+    nobody reads at 375px, and the preview is a decision the captain has to
+    finish before anything else matters.
+  - **"Paste a list" is a ghost button under the add row**, not a tab or a
+    header action — it reads as the alternative to the row above it. It is the
+    lowest-emphasis thing in the footer, which may be too quiet for the feature
+    the PRD calls out as the reason this slice exists.
+  - **`createMany` does not dedupe server-side.** The client previewed this
+    exact array against the design's roster and the captain approved a count;
+    silently dropping rows server-side would make the mutation disagree with
+    the button they pressed. Two tabs racing can therefore produce a duplicate
+    slot — same outcome as adding it twice by hand.
+  - **A number-only row is invalid**, not a slot named "99". A three-column row
+    is invalid too, rather than guessing which two columns were meant.
+  - **The batch bound is 200 rows**, and a paste over it is refused whole
+    rather than truncated — no preview, no partial commit.
+  - **Verified against the deployed mutation** with a throwaway Playwright
+    script (temp dir, not committed): pasted onto the away design, confirmed
+    the three slots landed, then removed them so the fixture is unchanged. The
+    preview captures came from the same kind of script — `snap.mjs` navigates
+    only, and this surface is two clicks deep. `snap.mjs` itself is untouched.
+
+- Follow-ups filed: none.

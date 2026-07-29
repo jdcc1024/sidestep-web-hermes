@@ -52,16 +52,28 @@ export function checkRosterNumber(
   return { ok: true, value: trimmed.length > 0 ? trimmed : undefined };
 }
 
-// Identity of a player slot for attach-to-existing-slot matching (R-02):
-// a design + case-insensitive name + number. Two fans typing "Gretzky 99"
-// under the same design resolve to the same key (and so the same slot),
-// regardless of casing or surrounding whitespace.
-export function rosterMatchKey(
-  designId: string,
+// Identity of a player *within* one design: case-insensitive name +
+// number, both trimmed. The single normalization every dedupe rule shares
+// — fan attach (R-02, via rosterMatchKey below), paste preview (M-03), and
+// mirror skip (M-04) — so "already on this roster" can't come to mean
+// three different things.
+export function rosterSlotKey(
   name: string,
   number: string | undefined,
 ): string {
   const normName = name.trim().toLowerCase();
   const normNumber = (number ?? "").trim().toLowerCase();
-  return `${designId}::${normName}::${normNumber}`;
+  return `${normName}::${normNumber}`;
+}
+
+// Identity of a player slot for attach-to-existing-slot matching (R-02):
+// a design + the slot key above. Two fans typing "Gretzky 99" under the
+// same design resolve to the same key (and so the same slot), regardless
+// of casing or surrounding whitespace.
+export function rosterMatchKey(
+  designId: string,
+  name: string,
+  number: string | undefined,
+): string {
+  return `${designId}::${rosterSlotKey(name, number)}`;
 }

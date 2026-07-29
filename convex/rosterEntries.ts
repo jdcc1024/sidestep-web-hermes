@@ -8,6 +8,7 @@ import {
   checkRosterName,
   checkRosterNumber,
 } from "../lib/rosterEntry/rules";
+import { ROSTER_PASTE_MAX_ROWS } from "../lib/rosterEntry/paste";
 import { isLocked } from "../lib/jerseyRun/lock";
 import { sortSizes } from "../lib/jerseyRun/rules";
 
@@ -53,6 +54,71 @@ export const create = mutation({
       source: args.source ?? "captain",
       createdAt: Date.now(),
     });
+  },
+});
+
+// The bulk-paste commit (M-03). One call for a whole pasted block, gated
+// exactly like `create` — ownership, lock, design-on-order, and the same
+// per-row name/number rules — so nothing reaches the roster through a paste
+// that couldn't be typed in one at a time. Bounded, because an unreasonable
+// paste is a wrong-clipboard accident, not a big team.
+//
+// Deliberately not deduped server-side: the client has already previewed
+// this exact array against the design's roster and the captain approved a
+// count, so silently dropping rows here would make the mutation disagree
+// with the button they pressed. Convex mutations are transactional, so one
+// bad row rejects the batch rather than half-inserting it.
+export const createMany = mutation({
+  args: {
+    runId: v.id("jerseyRuns"),
+    designId: v.id("designs"),
+    players: v.array(
+      v.object({ name: v.string(), number: v.optional(v.string()) }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.runId);
+    if (!run) throw new ConvexError("Jersey run not found.");
+    const { order } = await requireOrderOwnership(ctx, run.orderId);
+
+    if (isLocked(run)) throw new ConvexError("This jersey run is locked.");
+
+    if (!order.designIds.includes(args.designId))
+      throw new ConvexError("That design isn't part of this order.");
+
+    if (args.players.length === 0)
+      throw new ConvexError("No players to add.");
+    if (args.players.length > ROSTER_PASTE_MAX_ROWS)
+      throw new ConvexError(
+        `Too many players at once — paste ${ROSTER_PASTE_MAX_ROWS} or fewer.`,
+      );
+
+    // Validate the whole batch before writing any of it, so a bad row at the
+    // end can't leave the earlier ones behind on a retry.
+    const players = args.players.map((player) => {
+      const nameCheck = checkRosterName(player.name);
+      if (!nameCheck.ok) throw new ConvexError(nameCheck.error);
+      const numberCheck = checkRosterNumber(player.number);
+      if (!numberCheck.ok) throw new ConvexError(numberCheck.error);
+      return { name: nameCheck.value, number: numberCheck.value };
+    });
+
+    const createdAt = Date.now();
+    const ids = [];
+    for (const player of players) {
+      ids.push(
+        await ctx.db.insert("rosterEntries", {
+          runId: args.runId,
+          orderId: run.orderId,
+          designId: args.designId,
+          name: player.name,
+          number: player.number,
+          source: "captain",
+          createdAt,
+        }),
+      );
+    }
+    return ids;
   },
 });
 
