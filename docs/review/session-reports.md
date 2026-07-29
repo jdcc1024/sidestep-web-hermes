@@ -1254,3 +1254,18 @@ One entry per completed loop task. This is the human's fast path for UX critique
     page (C-02) still reads them, per the issue's instruction.
 
 - Follow-ups filed: none.
+
+- Verification pass (2026-07-28, follow-up session): `node scripts/verify.mjs`
+  green — typecheck, lint (0 errors, 3 pre-existing warnings), 1011 tests
+  across 56 files, build. Screenshots for both the live-run and no-run orders
+  are present in `docs/review/M-01/` at 375/768/1280, light + dark.
+
+- Defect found and fixed while verifying: `lib/jerseyBreakdown.ts` contained a
+  **raw NUL control character** in its source — `rosterLinesByDesign` used one
+  as the separator in its merge key (`\`${label}<NUL>${entry.size}\``). Git
+  classified the file as binary, so M-01's own ~3.5KB change to it showed up
+  as "Binary files differ" and was unreviewable by `git show` or
+  `/review-batch`. Replaced with the escape `\u0000` — identical byte at
+  runtime — plus a comment on why the separator exists and why it must stay
+  escaped. Pre-existing since C-01, not an M-01 regression; fixed here because
+  it blocked review of M-01. Committed separately (`811ee3a`).
