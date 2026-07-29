@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-28T09:49:20.448Z",
+  "lastUpdated": "2026-07-29T02:25:21.059Z",
   "phases": [
     {
       "id": "phase-1",
@@ -238,8 +238,8 @@
       "phase": "3",
       "type": "feature",
       "description": "Join rosterEntries with orderEntries into one per-design read (slots with their ordered sizes, plus blank/bulk lines) and put it on the order page's design cards. Fixes the defect where the order page reads order entries while Run Setup reads roster entries, so a seeded-but-unordered player is invisible. Foundation for the rest of Track M.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-29T02:25:21.058Z",
       "completedAt": null,
       "issueFile": "backlog/M-01-unified-roster-read-and-design-card-preview.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
@@ -780,6 +780,12 @@
       "event": "task_completed",
       "nodeId": "B-07",
       "message": "Completed: Snap account owns no orders, so no /portal/orders/* surface can be screenshotted"
+    },
+    {
+      "timestamp": "2026-07-29T02:25:21.059Z",
+      "event": "task_started",
+      "nodeId": "M-01",
+      "message": "Picked up: Unified Roster Read + Design-Card Roster Preview"
     }
   ]
 }

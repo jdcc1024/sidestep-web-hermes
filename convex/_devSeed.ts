@@ -119,6 +119,114 @@ export const seedPortalFixtures = internalMutation({
   },
 });
 
+/**
+ * A full-size, mostly-unfilled roster on the fixture order's home kit (M-01).
+ *
+ * `seedPortalFixtures` seeds three slots and orders against all three, which
+ * photographs the "everyone has ordered" case and nothing else. The design-card
+ * roster preview exists for the opposite case — a captain seeds fifteen players
+ * and needs to see that it saved — and its overflow cap can only be judged
+ * against a card that actually overflows. This tops the home kit up to fifteen
+ * slots, leaving the extras unordered so they render muted.
+ *
+ * Run against the dev deployment with:
+ *   npx convex run _devSeed:seedLargeRoster '{"email":"jcc@sidestep.design"}'
+ *
+ * Idempotent: it tops up to `size` and stops, so re-running adds nothing. It
+ * only ever *adds* unfilled slots — nothing existing is edited or removed, and
+ * `rosterEntries.remove` still refuses any slot that has orders on it.
+ */
+const PREVIEW_ROSTER_SIZE = 15;
+
+// Padding names, deliberately ordinary — the point of the capture is the
+// muted/filled contrast and the row rhythm, not the names.
+const PADDING_PLAYERS = [
+  "Jordan Blake",
+  "Casey Moreau",
+  "Devon Ellis",
+  "Harper Vance",
+  "Kai Nakamura",
+  "Logan Reyes",
+  "Marlow Dunn",
+  "Noa Sharpe",
+  "Parker Iyer",
+  "Quinn Adeyemi",
+  "Rowan Petit",
+  "Sasha Volkov",
+  "Toby Marchetti",
+  "Umi Castellano",
+  "Vera Lindqvist",
+];
+
+export const seedLargeRoster = internalMutation({
+  args: { email: v.string(), size: v.optional(v.number()) },
+  handler: async (ctx, { email, size }) => {
+    const user = await findUserByEmail(ctx, email);
+    if (!user)
+      throw new ConvexError(
+        `Found no user with email "${email}". Run seedPortalFixtures first.`,
+      );
+
+    const target = size ?? PREVIEW_ROSTER_SIZE;
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_captain", (q) => q.eq("captainId", user._id))
+      .collect();
+    const order = orders.find((o) => o.teamName === ORDER_WITH_RUN_TEAM);
+    if (!order)
+      throw new ConvexError(
+        `Found no "${ORDER_WITH_RUN_TEAM}" order. Run seedPortalFixtures first.`,
+      );
+
+    const run = await ctx.db
+      .query("jerseyRuns")
+      .withIndex("by_order", (q) => q.eq("orderId", order._id))
+      .unique();
+    if (!run)
+      throw new ConvexError("That order has no run. Run seedPortalFixtures first.");
+
+    // The home kit — designIds[0], the design seedPortalFixtures puts the
+    // already-filled slots on, so the card shows filled and unfilled together.
+    const designId = order.designIds[0];
+    if (!designId) throw new ConvexError("That order has no designs.");
+
+    const existing = (
+      await ctx.db
+        .query("rosterEntries")
+        .withIndex("by_run", (q) => q.eq("runId", run._id))
+        .collect()
+    ).filter((e) => e.designId === designId);
+
+    const now = Date.now();
+    const taken = new Set(existing.map((e) => e.name));
+    const added: Id<"rosterEntries">[] = [];
+    for (const name of PADDING_PLAYERS) {
+      if (existing.length + added.length >= target) break;
+      if (taken.has(name)) continue;
+      added.push(
+        await ctx.db.insert("rosterEntries", {
+          runId: run._id,
+          orderId: order._id,
+          designId,
+          name,
+          number: `${30 + added.length}`,
+          source: "captain",
+          createdAt: now + added.length,
+        }),
+      );
+    }
+
+    return {
+      orderId: order._id,
+      designId,
+      runId: run._id,
+      before: existing.length,
+      added: added.length,
+      total: existing.length + added.length,
+    };
+  },
+});
+
 async function findUserByEmail(
   ctx: MutationCtx,
   email: string,

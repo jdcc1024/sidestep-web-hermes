@@ -9,6 +9,7 @@ import {
   checkRosterNumber,
 } from "../lib/rosterEntry/rules";
 import { isLocked } from "../lib/jerseyRun/lock";
+import { sortSizes } from "../lib/jerseyRun/rules";
 
 // Create a roster entry — a name+number player slot on one of the order's
 // designs (R-01 foundation; the captain-seeding UI lands in R-03, the fan
@@ -138,11 +139,40 @@ export const listByRun = query({
   },
 });
 
-// The captain's seeding view (R-03): the run's roster grouped by design,
-// each slot annotated with whether it's been filled. "Not yet filled" is
-// purely derived — a slot with zero order entries — so there's no status
-// field to keep in sync. Only walks the order's current designs; entries
-// on a since-removed design are R-05's concern. Captain or admin only.
+// Σ qty per size, in canonical display order — the shape both a slot's
+// sizes and a design's blank lines come back in, so every surface that
+// renders sizes (card, sheet, SizeBreakdown) agrees on their order.
+function toSizeCounts(qtyBySize: Map<string, number>) {
+  return sortSizes([...qtyBySize.keys()]).map((size) => ({
+    size,
+    qty: qtyBySize.get(size)!,
+  }));
+}
+
+function addQty(
+  bySize: Map<string, Map<string, number>>,
+  key: string,
+  size: string,
+  qty: number,
+) {
+  const sizes = bySize.get(key) ?? new Map<string, number>();
+  sizes.set(size, (sizes.get(size) ?? 0) + qty);
+  bySize.set(key, sizes);
+}
+
+// The unified roster read (M-01, extending R-03's seeding view): the run's
+// roster grouped by design, each slot annotated with whether it's been
+// filled and with the sizes ordered against it, plus the design's
+// blank/bulk lines — order entries carrying no slot. One read behind both
+// the design-card preview and the roster editor, so the two can't disagree
+// about what a design's roster is the way the order page and Run Setup
+// used to.
+//
+// "Not yet filled" stays purely derived — a slot with zero order entries —
+// so there's no status field to keep in sync. Only walks the order's
+// current designs; entries on a since-removed design are R-05's concern,
+// which is also what keeps the totals here reconciling with
+// `orderEntries.countsByRun`. Captain or admin only.
 export const listForRun = query({
   args: { runId: v.id("jerseyRuns") },
   handler: async (ctx, { runId }) => {
@@ -162,21 +192,32 @@ export const listForRun = query({
       .collect();
 
     // A slot is "filled" once any order entry references it. One scan of
-    // the run's order entries builds the set of filled slot ids, and — for
-    // open-names runs — the set of distinct submitter emails per slot, so
-    // a slot two different fans both claimed reads as a collision (R-02).
+    // the run's order entries builds the set of filled slot ids, the sizes
+    // ordered against each slot, the design's unattached blank/bulk lines,
+    // and — for open-names runs — the set of distinct submitter emails per
+    // slot, so a slot two different fans both claimed reads as a collision
+    // (R-02). One pass, no extra queries: the sizes and blanks (M-01) ride
+    // along on the scan that was already happening.
     const orderEntries = await ctx.db
       .query("orderEntries")
       .withIndex("by_run", (q) => q.eq("runId", runId))
       .collect();
     const filledSlotIds = new Set<string>();
     const emailsBySlot = new Map<string, Set<string>>();
+    const sizesBySlot = new Map<string, Map<string, number>>();
+    const blankSizesByDesign = new Map<string, Map<string, number>>();
     for (const e of orderEntries) {
-      if (!e.rosterEntryId) continue;
+      // No slot behind it: a bulk/spare jersey, counted under its design so
+      // no jersey drops out of the view.
+      if (!e.rosterEntryId) {
+        addQty(blankSizesByDesign, e.designId, e.size, e.qty);
+        continue;
+      }
       filledSlotIds.add(e.rosterEntryId);
       const set = emailsBySlot.get(e.rosterEntryId) ?? new Set<string>();
       set.add(e.submitterEmail);
       emailsBySlot.set(e.rosterEntryId, set);
+      addQty(sizesBySlot, e.rosterEntryId, e.size, e.qty);
     }
     // Collision is shown only (PRD §6) — the captain edits freely; there's
     // no resolve workflow. Fixed-mode runs share seeded slots by design,
@@ -190,18 +231,28 @@ export const listForRun = query({
         const designEntries = entries
           .filter((e) => e.designId === designId)
           .sort((a, b) => a.createdAt - b.createdAt)
-          .map((e) => ({
-            _id: e._id,
-            name: e.name,
-            number: e.number,
-            source: e.source,
-            filled: filledSlotIds.has(e._id),
-            collision: isCollision(e._id),
-          }));
+          .map((e) => {
+            const sizes = toSizeCounts(
+              sizesBySlot.get(e._id) ?? new Map<string, number>(),
+            );
+            return {
+              _id: e._id,
+              name: e.name,
+              number: e.number,
+              source: e.source,
+              filled: filledSlotIds.has(e._id),
+              collision: isCollision(e._id),
+              sizes,
+              total: sizes.reduce((sum, s) => sum + s.qty, 0),
+            };
+          });
         return {
           designId,
           title: design?.title ?? "Untitled design",
           entries: designEntries,
+          blankSizes: toSizeCounts(
+            blankSizesByDesign.get(designId) ?? new Map<string, number>(),
+          ),
         };
       }),
     );

@@ -432,3 +432,228 @@ describe("rosterEntries.listForRun", () => {
     expect(result?.designs[0].entries[0].filled).toBe(false);
   });
 });
+
+// M-01: the same read now carries what the design card needs to render the
+// roster — each slot's ordered sizes, and the design's unattached blank
+// lines — so the card and the roster editor read one source instead of two.
+describe("rosterEntries.listForRun — sizes and blank lines (M-01)", () => {
+  // Links a second design to the order so per-design bucketing is testable.
+  async function addDesign(
+    t: ReturnType<typeof convexTest>,
+    userId: Id<"users">,
+    orderId: Id<"orders">,
+    title: string,
+  ) {
+    return t.run(async (ctx) => {
+      const designId = await ctx.db.insert("designs", {
+        ownerId: userId,
+        title,
+        blocks: overviewBlocks(title),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      const order = await ctx.db.get(orderId);
+      await ctx.db.patch(orderId, {
+        designIds: [...(order?.designIds ?? []), designId],
+      });
+      return designId;
+    });
+  }
+
+  it("carries each slot's ordered sizes in canonical order, summed by qty", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    const slotId = await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Gretzky",
+      number: "99",
+    });
+    // Ordered out of canonical order, and twice in the same size.
+    for (const [size, qty] of [
+      ["L", 1],
+      ["S", 2],
+      ["L", 1],
+    ] as const) {
+      await asCaptain.mutation(api.orderEntries.create, {
+        runId,
+        designId,
+        rosterEntryId: slotId,
+        size,
+        qty,
+        source: "fan",
+        submitterName: "Fan",
+        submitterEmail: "fan@example.com",
+      });
+    }
+
+    const result = await asCaptain.query(api.rosterEntries.listForRun, {
+      runId,
+    });
+    const slot = result?.designs[0].entries[0];
+    expect(slot?.sizes).toEqual([
+      { size: "S", qty: 2 },
+      { size: "L", qty: 2 },
+    ]);
+    expect(slot?.total).toBe(4);
+  });
+
+  it("gives a seeded slot nobody ordered for no sizes and a total of 0", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Bure",
+      number: "10",
+    });
+
+    const result = await asCaptain.query(api.rosterEntries.listForRun, {
+      runId,
+    });
+    expect(result?.designs[0].entries[0]).toMatchObject({
+      filled: false,
+      sizes: [],
+      total: 0,
+    });
+  });
+
+  it("returns the design's blank/bulk lines summed by size", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    for (const [size, qty] of [
+      ["M", 3],
+      ["M", 1],
+      ["S", 2],
+    ] as const) {
+      await asCaptain.mutation(api.orderEntries.create, {
+        runId,
+        designId,
+        size,
+        qty,
+        source: "captain",
+        submitterName: "Cap",
+        submitterEmail: "captain@example.com",
+      });
+    }
+
+    const result = await asCaptain.query(api.rosterEntries.listForRun, {
+      runId,
+    });
+    expect(result?.designs[0].blankSizes).toEqual([
+      { size: "S", qty: 2 },
+      { size: "M", qty: 4 },
+    ]);
+  });
+
+  it("buckets blank lines under their own design", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, orderId, userId, asCaptain } = await seedRun(t);
+    const awayId = await addDesign(t, userId, orderId, "Away");
+    await asCaptain.mutation(api.orderEntries.create, {
+      runId,
+      designId,
+      size: "M",
+      qty: 2,
+      source: "captain",
+      submitterName: "Cap",
+      submitterEmail: "captain@example.com",
+    });
+
+    const result = await asCaptain.query(api.rosterEntries.listForRun, {
+      runId,
+    });
+    const away = result?.designs.find((d) => d.designId === awayId);
+    expect(away?.blankSizes).toEqual([]);
+    expect(
+      result?.designs.find((d) => d.designId === designId)?.blankSizes,
+    ).toEqual([{ size: "M", qty: 2 }]);
+  });
+
+  it("reconciles per design with orderEntries.countsByRun", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, orderId, userId, asCaptain } = await seedRun(t);
+    const awayId = await addDesign(t, userId, orderId, "Away");
+    const slotId = await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Gretzky",
+      number: "99",
+    });
+    // Seeded but unordered — must contribute nothing to either number.
+    await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Bure",
+      number: "10",
+    });
+    await asCaptain.mutation(api.orderEntries.create, {
+      runId,
+      designId,
+      rosterEntryId: slotId,
+      size: "L",
+      qty: 2,
+      source: "fan",
+      submitterName: "Fan",
+      submitterEmail: "fan@example.com",
+    });
+    await asCaptain.mutation(api.orderEntries.create, {
+      runId,
+      designId,
+      size: "S",
+      qty: 3,
+      source: "captain",
+      submitterName: "Cap",
+      submitterEmail: "captain@example.com",
+    });
+    await asCaptain.mutation(api.orderEntries.create, {
+      runId,
+      designId: awayId,
+      size: "M",
+      qty: 1,
+      source: "captain",
+      submitterName: "Cap",
+      submitterEmail: "captain@example.com",
+    });
+
+    const counts = await asCaptain.query(api.orderEntries.countsByRun, {
+      runId,
+    });
+    const result = await asCaptain.query(api.rosterEntries.listForRun, {
+      runId,
+    });
+
+    for (const design of result!.designs) {
+      const fromRead =
+        design.entries.reduce((sum, e) => sum + e.total, 0) +
+        design.blankSizes.reduce((sum, s) => sum + s.qty, 0);
+      expect(fromRead).toBe(
+        counts.byDesign.find((d) => d.designId === design.designId)?.total,
+      );
+    }
+    expect(counts.total).toBe(6);
+  });
+
+  it("still refuses a caller who doesn't own the order", async () => {
+    const t = convexTest(schema, modules);
+    const { runId } = await seedRun(t);
+    await t.run((ctx) =>
+      ctx.db.insert("users", {
+        clerkId: "stranger_clerk",
+        email: "stranger@example.com",
+        name: "Stranger",
+        isAdmin: false,
+        createdAt: Date.now(),
+      }),
+    );
+    const stranger = t.withIdentity({
+      subject: "stranger_clerk",
+      email: "stranger@example.com",
+      name: "Stranger",
+    });
+
+    await expect(
+      stranger.query(api.rosterEntries.listForRun, { runId }),
+    ).rejects.toThrow(/access/i);
+  });
+});

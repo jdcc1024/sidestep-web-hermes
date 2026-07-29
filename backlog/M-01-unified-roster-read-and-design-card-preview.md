@@ -1,6 +1,6 @@
 # Issue: Unified Roster Read + Design-Card Roster Preview
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -17,16 +17,16 @@ This issue touches:
 The order detail page and Run Setup currently disagree about what a design's roster is: the order page derives its lines from **order entries** (`lib/jerseyBreakdown.ts` → `rosterLinesByDesign`), so a captain-seeded player nobody has ordered for is invisible there, while `RosterManager` reads **roster entries** and shows that same player as "not yet filled". This slice makes one read that joins both and puts it on the design cards, so a seeded roster is visible where the captain reads their order. It is the foundation every other M slice builds on — no editing yet.
 
 ## Acceptance Criteria
-- [ ] `rosterEntries.listForRun` returns, per design, each slot with `filled`, `collision`, its **ordered sizes** (`{size, qty}[]`, canonical order), and a `total` (Σ qty)
-- [ ] The same read returns the run's **blank/bulk lines** — order entries with no `rosterEntryId` — grouped per design, so no jersey is dropped from the view
-- [ ] A new pure derivation in `lib/jerseyBreakdown.ts` turns that read into render-ready per-design rows; slots and blank lines are one list per design
-- [ ] Each design card on `/portal/orders/[id]` shows that design's roster: **unfilled slots rendered muted**, filled slots showing their sizes, blank lines labelled via the existing `jerseyLabel` "Blank" treatment
-- [ ] The preview is **capped** with an overflow count ("+ 10 more") — pick a cap against a real 15-player design and note the choice in the session report (PRD §10 open question)
-- [ ] Per-design Σ qty still reconciles exactly with `orderEntries.countsByRun` — the header total and `DesignRollup` are unchanged
-- [ ] A design with no run yet, or a run with an empty roster, keeps a sensible empty treatment (no crash, no "0 jerseys" where "not started" is meant)
-- [ ] `RosterLines` / `rosterLinesByDesign` are removed from the order detail page, or retained only where the responses page still needs them — **the responses page (C-02) must not regress**
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] `rosterEntries.listForRun` returns, per design, each slot with `filled`, `collision`, its **ordered sizes** (`{size, qty}[]`, canonical order), and a `total` (Σ qty)
+- [x] The same read returns the run's **blank/bulk lines** — order entries with no `rosterEntryId` — grouped per design, so no jersey is dropped from the view
+- [x] A new pure derivation in `lib/jerseyBreakdown.ts` turns that read into render-ready per-design rows; slots and blank lines are one list per design
+- [x] Each design card on `/portal/orders/[id]` shows that design's roster: **unfilled slots rendered muted**, filled slots showing their sizes, blank lines labelled via the existing `jerseyLabel` "Blank" treatment
+- [x] The preview is **capped** with an overflow count ("+ 10 more") — pick a cap against a real 15-player design and note the choice in the session report (PRD §10 open question) — **6**, see session report
+- [x] Per-design Σ qty still reconciles exactly with `orderEntries.countsByRun` — the header total and `DesignRollup` are unchanged
+- [x] A design with no run yet, or a run with an empty roster, keeps a sensible empty treatment (no crash, no "0 jerseys" where "not started" is meant)
+- [x] `RosterLines` / `rosterLinesByDesign` are removed from the order detail page, or retained only where the responses page still needs them — **the responses page (C-02) must not regress** — dropped from the order page, left intact for `RosterBreakdown`
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: none

@@ -217,3 +217,84 @@ describe("_devSeed:seedPortalFixtures", () => {
     expect(homeKits[0].blocks[0]).toMatchObject({ body: "Pre-existing" });
   });
 });
+
+// M-01: the design-card roster preview's overflow cap can only be judged
+// against a card that overflows, and its muted "not yet filled" row only
+// against slots nobody has ordered for. seedPortalFixtures produces neither.
+describe("_devSeed:seedLargeRoster", () => {
+  async function seedBase(t: ReturnType<typeof convexTest>) {
+    await seedUser(t);
+    return t.mutation(internal._devSeed.seedPortalFixtures, {
+      email: SNAP_EMAIL,
+    });
+  }
+
+  it("should top the home design up to a full roster of unfilled slots", async () => {
+    const t = convexTest(schema, modules);
+    const base = await seedBase(t);
+
+    const result = await t.mutation(internal._devSeed.seedLargeRoster, {
+      email: SNAP_EMAIL,
+    });
+
+    expect(result.total).toBe(15);
+    expect(result.designId).toBe(base.designIds[0]);
+
+    const onDesign = await t.run(async (ctx) =>
+      (await ctx.db.query("rosterEntries").collect()).filter(
+        (r) => r.designId === result.designId,
+      ),
+    );
+    expect(onDesign).toHaveLength(15);
+
+    // The added slots must be unordered, or the card photographs as fully
+    // filled and the muted treatment never appears.
+    const entries = await t.run((ctx) => ctx.db.query("orderEntries").collect());
+    const filled = new Set(
+      entries.map((e) => e.rosterEntryId).filter(Boolean) as string[],
+    );
+    expect(onDesign.filter((r) => !filled.has(r._id))).toHaveLength(
+      15 - result.before,
+    );
+  });
+
+  it("should be idempotent — a second run adds nothing", async () => {
+    const t = convexTest(schema, modules);
+    await seedBase(t);
+
+    await t.mutation(internal._devSeed.seedLargeRoster, { email: SNAP_EMAIL });
+    const second = await t.mutation(internal._devSeed.seedLargeRoster, {
+      email: SNAP_EMAIL,
+    });
+
+    expect(second.added).toBe(0);
+    expect(second.total).toBe(15);
+  });
+
+  it("should leave the already-filled slots and their jerseys alone", async () => {
+    const t = convexTest(schema, modules);
+    const base = await seedBase(t);
+    const before = await t.run((ctx) => ctx.db.query("orderEntries").collect());
+
+    await t.mutation(internal._devSeed.seedLargeRoster, { email: SNAP_EMAIL });
+
+    const after = await t.run((ctx) => ctx.db.query("orderEntries").collect());
+    expect(after).toEqual(before);
+    // …and the away design keeps exactly the roster it had.
+    const away = await t.run(async (ctx) =>
+      (await ctx.db.query("rosterEntries").collect()).filter(
+        (r) => r.designId === base.designIds[1],
+      ),
+    );
+    expect(away).toHaveLength(1);
+  });
+
+  it("should refuse before the base fixtures exist", async () => {
+    const t = convexTest(schema, modules);
+    await seedUser(t);
+
+    await expect(
+      t.mutation(internal._devSeed.seedLargeRoster, { email: SNAP_EMAIL }),
+    ).rejects.toThrow(/seedPortalFixtures/i);
+  });
+});

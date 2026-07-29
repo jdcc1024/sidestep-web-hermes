@@ -12,12 +12,12 @@ import { cn } from "@/lib/utils";
 import { OrderTimeline } from "@/components/portal/OrderTimeline";
 import { RemovedDesigns } from "@/components/portal/DesignRemoval";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
-import { RosterLines } from "@/components/portal/RosterBreakdown";
+import { DesignRosterPreview } from "@/components/portal/DesignRosterPreview";
 import { SizeBreakdown } from "@/components/portal/SizeBreakdown";
 import {
   entriesForDesigns,
-  rosterLinesByDesign,
-  type RosterLine,
+  rosterRowsByDesign,
+  type RosterRow,
 } from "@/lib/jerseyBreakdown";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,12 +73,20 @@ export default function OrderDetailPage({ params }: PageProps) {
     api.orderEntries.countsByRun,
     run ? { runId: run._id } : "skip",
   );
-  // The jerseys behind that total (C-01) — who's on the roster, in what
-  // size. Same gating as the counts: no run means nothing was collected,
-  // so the sections fall back to their empty treatment.
+  // The jerseys behind that total (C-01) — every collected entry, which is
+  // what the order-wide size run is a projection of. Same gating as the
+  // counts: no run means nothing was collected.
   const collected = useQuery(
     api.jerseyRuns.listOrderEntries,
     run ? { jerseyRunId: run._id } : "skip",
+  );
+  // The roster itself (M-01) — every slot on every design, seeded-unfilled
+  // included, with the sizes ordered against it. This is what the design
+  // cards render: the entries above can only describe jerseys somebody
+  // ordered, so on their own they hide a seeded player nobody ordered for.
+  const roster = useQuery(
+    api.rosterEntries.listForRun,
+    run ? { runId: run._id } : "skip",
   );
 
   if (result.status === "loading") return <Loading />;
@@ -97,13 +105,14 @@ export default function OrderDetailPage({ params }: PageProps) {
     (counts?.byDesign ?? []).map((d) => [d.designId, d.total] as const),
   );
 
-  // Scoped to the designs the order still carries, so both the roster lines
-  // and the size chips reconcile with the counts above — entries on a
-  // since-removed design keep their own section further down (O-08).
+  // Scoped to the designs the order still carries, so the size chips
+  // reconcile with the counts above — entries on a since-removed design keep
+  // their own section further down (O-08). `listForRun` applies the same
+  // scoping server-side, so the per-design rows need no filtering here.
   const entries = entriesForDesigns(collected?.entries ?? [], designs);
-  const linesByDesign = new Map(
-    rosterLinesByDesign(entries, designs).map(
-      (group) => [group.designId, group.lines] as const,
+  const rowsByDesign = new Map(
+    rosterRowsByDesign(roster?.designs ?? []).map(
+      (view) => [view.designId, view.rows] as const,
     ),
   );
 
@@ -247,7 +256,7 @@ export default function OrderDetailPage({ params }: PageProps) {
                 key={design._id}
                 design={design}
                 count={countByDesign.get(design._id) ?? 0}
-                lines={linesByDesign.get(design._id) ?? []}
+                rows={rowsByDesign.get(design._id) ?? []}
               />
             ))}
           </div>
@@ -270,15 +279,15 @@ export default function OrderDetailPage({ params }: PageProps) {
 // Each linked design renders as its own section under the one order timeline
 // (O-05). It carries the design's silhouette specs, its own collected count
 // — Σ qty over the roster rows tagged with this design (O-07) — and, since
-// C-01, the jerseys making up that count.
+// M-01, the design's roster: every player slot, ordered against or not.
 function DesignSection({
   design,
   count,
-  lines,
+  rows,
 }: {
   design: OrderDesign;
   count: number;
-  lines: RosterLine[];
+  rows: RosterRow[];
 }) {
   const hasSpecs = design.jerseyStyle || design.neckline || design.sleeveStyle;
   return (
@@ -329,11 +338,12 @@ function DesignSection({
 
         {/* Per-design rollup — Σ qty over this design's roster rows (O-07).
             The run spans every design, so "which design" is a per-row tag the
-            derived-counts query groups on. The lines beneath it are that same
-            Σ broken out per player slot and size (C-01), so the two always
-            add up to each other. */}
+            derived-counts query groups on. The roster beneath it breaks that
+            same Σ out per player slot and size (M-01), so the two always add
+            up to each other — plus the seeded slots contributing 0, which the
+            count alone can't show. */}
         <DesignRollup count={count} />
-        <RosterLines lines={lines} />
+        <DesignRosterPreview rows={rows} />
       </CardContent>
     </Card>
   );

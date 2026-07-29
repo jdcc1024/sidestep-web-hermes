@@ -1193,3 +1193,64 @@ One entry per completed loop task. This is the human's fast path for UX critique
     still photographs as 403. Unchanged and still parked.
 
 - Follow-ups filed: none. B-06 already covers the remaining snap blind spot.
+
+## 2026-07-28 — M-01: Unified Roster Read + Design-Card Roster Preview
+
+- What shipped:
+  - `rosterEntries.listForRun` now carries, per slot, the **sizes ordered
+    against it** (`{size, qty}[]` in canonical order) and their `total`, plus
+    each design's **blank/bulk lines** (`blankSizes`) — the order entries with
+    no slot behind them. All of it rides on the single order-entry scan the
+    query already did for `filled` / `collision`; no extra reads.
+  - New pure derivation `rosterRowsByDesign` in `lib/jerseyBreakdown.ts` turns
+    that read into render-ready rows — slots and the design's blank line in one
+    list — and a `DesignRosterPreview` component renders it on each design card
+    of `/portal/orders/[id]`.
+  - The order page's design cards **stop reading order entries** for their
+    roster. A captain-seeded player nobody has ordered for is now visible on
+    the card as a muted "Not yet filled" row instead of being invisible — the
+    disagreement between this page and the roster editor (PRD §1) is gone.
+
+- UX surfaces to eyeball (screenshots in `docs/review/M-01/`):
+  - `/portal/orders/<live-run order>` — **Home Kit** is the interesting card:
+    2 filled slots (M, L), 4 muted unfilled, then "+ 9 more". Look at whether
+    the muted rows read as "seeded, waiting" rather than as an error, and
+    whether "+ 9 more" reads as *there's more* rather than *that's all*.
+  - Same page, **Away Kit** — one filled slot plus the italic `Blank` row
+    carrying `2XL ×2`, i.e. a spare nobody's name is on.
+  - `/portal/orders/<no-run order>` — a design with no run at all: dashed
+    "No jerseys collected yet", no roster list, no crash and no "0 jerseys"
+    where "not started" is meant.
+
+- Decisions I made that a human may want to veto:
+  - **Preview cap = 6 rows** (PRD §10 open question, decided against a real
+    15-player card — see the Home Kit capture). Six is enough to recognise the
+    roster as yours and read the first few names without the card growing
+    taller than the order it summarises; the full list is the sheet's job
+    (M-02). The alternative in the PRD, scaling to available height, would make
+    two cards on one page disagree about how much roster they show.
+  - **Slots keep creation order**, not the alphabetical production-line sort
+    `rosterLinesByDesign` uses. The card and the editor have to list the same
+    people in the same sequence, and creation order is what the editor (and,
+    per PRD §4, the roster generally) uses today.
+  - **Blank lines aggregate into one `Blank` row per design**, sizes as chips
+    (`2XL ×2`), rather than one row per size. Keeps a bulk order from eating
+    the cap.
+  - **`collision` is carried in the row type but not rendered on the card.**
+    PRD §5 puts collisions in the sheet; a warning badge on a summary the
+    captain can't act from would be noise. M-02 renders it.
+  - **Kept `jerseyRuns.listOrderEntries` on the page** (the impl note asked me
+    to consider dropping it). It's still the only feed for the order-wide
+    `SizeBreakdown`, whose props C-01 deliberately froze as entry-array-shaped
+    for reuse by the responses page. Dropping it would mean reshaping a
+    component two pages share to save one query.
+  - **Added `_devSeed:seedLargeRoster`** (dev-only `internalMutation`, tested,
+    idempotent) and ran it against the dev deployment. It tops the fixture
+    order's home kit up to 15 slots, leaving the extras unordered — the cap
+    question is unanswerable against B-07's 3-slot, fully-filled fixture. It
+    only ever *adds* unfilled slots; existing slots and every jersey are
+    untouched (asserted by test and by the screenshots).
+  - `RosterLines` / `rosterLinesByDesign` are **untouched** — the responses
+    page (C-02) still reads them, per the issue's instruction.
+
+- Follow-ups filed: none.
