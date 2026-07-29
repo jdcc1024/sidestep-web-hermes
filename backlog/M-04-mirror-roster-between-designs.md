@@ -1,6 +1,6 @@
 # Issue: Mirror Roster Between Designs
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -17,17 +17,17 @@ This issue touches:
 A typical order carries the same ~15 people across a home and an away design, and the captain enters them twice. This slice adds a one-action mirror: from inside a design's roster sheet, pick another design in the order and copy its **player slots** across. It is strictly additive — existing slots and their ordered jerseys are never touched — and slots that already exist on the target are silently skipped.
 
 ## Acceptance Criteria
-- [ ] The roster sheet offers **"Copy roster from ▾ [design]"** — pull direction, listing the order's *other* designs, **one source at a time**
-- [ ] Copying creates a slot on the target for each of the source's slots, carrying **name + number only** — never sizes, quantities, or order entries
-- [ ] Copied slots land as **`source: "captain"`** and **unfilled**, regardless of how the source slot came to exist
-- [ ] Slots already present on the target — matched on normalized `(name, number)` — are **skipped silently**, not duplicated
-- [ ] The result is reported back plainly: "18 copied, 2 already there" (and a clean message when everything was skipped, or when the source roster is empty)
-- [ ] The operation is **purely additive**: existing target slots, their `filled` state, and their order entries are byte-for-byte unchanged after a copy
-- [ ] `copyToDesign` enforces order ownership, rejects a locked run, and rejects a source or target design not on the order
-- [ ] Source and target must differ — copying a design onto itself is rejected
-- [ ] The control is absent in read-only (locked) mode
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] The roster sheet offers **"Copy roster from ▾ [design]"** — pull direction, listing the order's *other* designs, **one source at a time**
+- [x] Copying creates a slot on the target for each of the source's slots, carrying **name + number only** — never sizes, quantities, or order entries
+- [x] Copied slots land as **`source: "captain"`** and **unfilled**, regardless of how the source slot came to exist
+- [x] Slots already present on the target — matched on normalized `(name, number)` — are **skipped silently**, not duplicated
+- [x] The result is reported back plainly: "18 copied, 2 already there" (and a clean message when everything was skipped, or when the source roster is empty)
+- [x] The operation is **purely additive**: existing target slots, their `filled` state, and their order entries are byte-for-byte unchanged after a copy
+- [x] `copyToDesign` enforces order ownership, rejects a locked run, and rejects a source or target design not on the order
+- [x] Source and target must differ — copying a design onto itself is rejected
+- [x] The control is absent in read-only (locked) mode
+- [x] All tests pass
+- [x] No regressions in existing tests
 
 ## Dependencies
 - Blocked by: M-02

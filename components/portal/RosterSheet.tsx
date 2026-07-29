@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import {
+  ChevronDownIcon,
   ClipboardPasteIcon,
+  CopyIcon,
   PencilIcon,
   PlusIcon,
   UsersIcon,
@@ -18,12 +20,19 @@ import {
   ROSTER_NAME_MAX_LENGTH,
   ROSTER_NUMBER_MAX_LENGTH,
   ROSTER_PASTE_MAX_ROWS,
+  describeRosterCopy,
   parseRosterPaste,
   validateRosterEntry,
   type RosterPasteRow,
 } from "@/lib/rosterEntry";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -52,17 +61,25 @@ export type RosterSheetSlot = Omit<RosterSlotRead, "_id"> & {
   _id: Id<"rosterEntries">;
 };
 
+// The order's *other* designs — the sources the mirror can pull from (M-04).
+export type RosterCopySource = {
+  designId: Id<"designs">;
+  title: string;
+};
+
 export function RosterSheet({
   runId,
   designId,
   designTitle,
   slots,
+  otherDesigns,
   locked,
 }: {
   runId: Id<"jerseyRuns">;
   designId: Id<"designs">;
   designTitle: string;
   slots: readonly RosterSheetSlot[];
+  otherDesigns: readonly RosterCopySource[];
   locked: boolean;
 }) {
   // The sheet is either the roster or the paste preview, never both: the
@@ -126,22 +143,93 @@ export function RosterSheet({
             {!locked && (
               <SheetFooter className="border-t border-border">
                 <AddSlotRow runId={runId} designId={designId} />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="self-start"
-                  onClick={() => setPasting(true)}
-                >
-                  <ClipboardPasteIcon aria-hidden />
-                  Paste a list
-                </Button>
+                {/* The two bulk ways in, under the one-at-a-time row they're
+                    shortcuts for. Both wrap at 375px rather than shrink. */}
+                <div className="flex flex-wrap items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPasting(true)}
+                  >
+                    <ClipboardPasteIcon aria-hidden />
+                    Paste a list
+                  </Button>
+                  <CopyRosterMenu
+                    runId={runId}
+                    designId={designId}
+                    otherDesigns={otherDesigns}
+                  />
+                </div>
               </SheetFooter>
             )}
           </>
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+// The mirror (M-04). Pull direction: the captain is already in the sheet for
+// the design that's missing players, so this reads as "fill this one in"
+// (PRD §6). Picking a source *is* the action — the copy only ever adds slots
+// and skips what's already here, so there's nothing to confirm and nothing
+// to undo. Renders nothing on a one-design order, where it would be an
+// affordance with no possible target.
+function CopyRosterMenu({
+  runId,
+  designId,
+  otherDesigns,
+}: {
+  runId: Id<"jerseyRuns">;
+  designId: Id<"designs">;
+  otherDesigns: readonly RosterCopySource[];
+}) {
+  const copyToDesign = useMutation(api.rosterEntries.copyToDesign);
+  const [busy, setBusy] = useState(false);
+
+  if (otherDesigns.length === 0) return null;
+
+  async function onCopy(sourceDesignId: Id<"designs">) {
+    setBusy(true);
+    try {
+      const result = await copyToDesign({
+        runId,
+        sourceDesignId,
+        targetDesignId: designId,
+      });
+      // The server's counts, not a client guess: a slot skipped here was
+      // decided against the roster as it stood at write time.
+      toast.success(describeRosterCopy(result));
+    } catch (err) {
+      toast.error("Could not copy the roster", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button type="button" variant="ghost" size="sm" disabled={busy} />}
+      >
+        <CopyIcon aria-hidden />
+        Copy roster from
+        <ChevronDownIcon aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-auto min-w-48">
+        {otherDesigns.map((design) => (
+          <DropdownMenuItem
+            key={design.designId}
+            onClick={() => void onCopy(design.designId)}
+          >
+            {design.title}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

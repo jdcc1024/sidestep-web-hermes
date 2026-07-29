@@ -15,6 +15,7 @@ import { OrderLockedNotice } from "@/components/portal/OrderLocked";
 import { DesignRosterPreview } from "@/components/portal/DesignRosterPreview";
 import {
   RosterSheet,
+  type RosterCopySource,
   type RosterSheetSlot,
 } from "@/components/portal/RosterSheet";
 import { SizeBreakdown } from "@/components/portal/SizeBreakdown";
@@ -271,6 +272,15 @@ export default function OrderDetailPage({ params }: PageProps) {
                 rows={rowsByDesign.get(design._id) ?? []}
                 runId={run?._id ?? null}
                 slots={slotsByDesign.get(design._id) ?? []}
+                // Everything this design could pull a roster from (M-04) —
+                // the order's designs minus itself, since copying a design
+                // onto itself is the one thing the mutation rejects.
+                otherDesigns={designs
+                  .filter((other) => other._id !== design._id)
+                  .map((other) => ({
+                    designId: other._id,
+                    title: other.title,
+                  }))}
                 locked={runLocked}
               />
             ))}
@@ -303,6 +313,7 @@ function DesignSection({
   rows,
   runId,
   slots,
+  otherDesigns,
   locked,
 }: {
   design: OrderDesign;
@@ -310,6 +321,7 @@ function DesignSection({
   rows: RosterRow[];
   runId: Id<"jerseyRuns"> | null;
   slots: readonly RosterSheetSlot[];
+  otherDesigns: readonly RosterCopySource[];
   locked: boolean;
 }) {
   const hasSpecs = design.jerseyStyle || design.neckline || design.sleeveStyle;
@@ -377,6 +389,7 @@ function DesignSection({
             designId={design._id}
             designTitle={design.title}
             slots={slots}
+            otherDesigns={otherDesigns}
             locked={locked}
           />
         ) : (

@@ -6,8 +6,10 @@ import {
   ROSTER_PASTE_MAX_ROWS,
   checkRosterName,
   checkRosterNumber,
+  describeRosterCopy,
   isRosterSource,
   parseRosterPaste,
+  planRosterCopy,
   rosterMatchKey,
   rosterSlotKey,
   toRosterEntryPayload,
@@ -271,6 +273,111 @@ describe("parseRosterPaste — duplicates", () => {
   it("matches an existing numberless slot on the name alone", () => {
     const { rows } = parseRosterPaste("Bo", [{ name: "bo" }]);
     expect(rows[0].status).toBe("existing");
+  });
+});
+
+// M-04: the mirror's dedupe. Same normalization as the paste above, so
+// "already on this roster" means one thing across every path that says it.
+describe("planRosterCopy", () => {
+  it("copies every source slot onto an empty target, name and number only", () => {
+    const plan = planRosterCopy(
+      [
+        { name: "Gretzky", number: "99" },
+        { name: "Bo" },
+      ],
+      [],
+    );
+    expect(plan.additions).toEqual([
+      { name: "Gretzky", number: "99" },
+      { name: "Bo", number: undefined },
+    ]);
+    expect(plan.copied).toBe(2);
+    expect(plan.skipped).toBe(0);
+  });
+
+  it("skips a slot the target already has, matched case- and space-insensitively", () => {
+    const plan = planRosterCopy(
+      [
+        { name: "Gretzky", number: "99" },
+        { name: "Lemieux", number: "66" },
+      ],
+      [{ name: "  gretzky ", number: " 99 " }],
+    );
+    expect(plan.additions).toEqual([{ name: "Lemieux", number: "66" }]);
+    expect(plan.copied).toBe(1);
+    expect(plan.skipped).toBe(1);
+  });
+
+  it("copies nothing on a re-run, and says everything was already there", () => {
+    const source = [
+      { name: "Gretzky", number: "99" },
+      { name: "Bo" },
+    ];
+    const plan = planRosterCopy(source, source);
+    expect(plan.additions).toEqual([]);
+    expect(plan.copied).toBe(0);
+    expect(plan.skipped).toBe(2);
+  });
+
+  it("treats the same name on a different number as a different player", () => {
+    const plan = planRosterCopy(
+      [{ name: "Gretzky", number: "66" }],
+      [{ name: "Gretzky", number: "99" }],
+    );
+    expect(plan.copied).toBe(1);
+  });
+
+  it("matches a numberless slot on the name alone", () => {
+    const plan = planRosterCopy([{ name: "Bo" }], [{ name: "bo" }]);
+    expect(plan.copied).toBe(0);
+    expect(plan.skipped).toBe(1);
+  });
+
+  // A source roster can hold two identical slots (nothing dedupes `create`),
+  // and copying both would put the duplicate the skip rule exists to prevent
+  // onto the target.
+  it("copies a slot repeated within the source only once", () => {
+    const plan = planRosterCopy(
+      [
+        { name: "Gretzky", number: "99" },
+        { name: "GRETZKY", number: "99" },
+      ],
+      [],
+    );
+    expect(plan.copied).toBe(1);
+    expect(plan.skipped).toBe(1);
+  });
+
+  it("plans nothing at all for an empty source", () => {
+    const plan = planRosterCopy([], [{ name: "Gretzky", number: "99" }]);
+    expect(plan).toMatchObject({ additions: [], copied: 0, skipped: 0 });
+  });
+});
+
+describe("describeRosterCopy", () => {
+  it("reports the copies and the skips together", () => {
+    expect(describeRosterCopy({ copied: 18, skipped: 2 })).toBe(
+      "18 copied, 2 already there",
+    );
+  });
+
+  it("says only what happened when nothing was skipped", () => {
+    expect(describeRosterCopy({ copied: 15, skipped: 0 })).toBe("15 copied");
+  });
+
+  // Reassuring, not alarming (PRD §9): a re-run copying zero is the rule
+  // working, so the message has to read as "you're already set".
+  it("reads as already-done when every slot was skipped", () => {
+    expect(describeRosterCopy({ copied: 0, skipped: 15 })).toMatch(
+      /already/i,
+    );
+    expect(describeRosterCopy({ copied: 0, skipped: 15 })).toContain("15");
+  });
+
+  it("says the source was empty when there was nothing to copy at all", () => {
+    expect(describeRosterCopy({ copied: 0, skipped: 0 })).toMatch(
+      /no players/i,
+    );
   });
 });
 

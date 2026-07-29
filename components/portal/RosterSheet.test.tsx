@@ -8,9 +8,10 @@ import { getFunctionName } from "convex/server";
 // One stub per mutation, told apart by function name so a test can assert
 // "create was called with this designId" without guessing which of the three
 // roster mutations fired.
-const { create, createMany, update, remove } = vi.hoisted(() => ({
+const { create, createMany, copyToDesign, update, remove } = vi.hoisted(() => ({
   create: vi.fn(async (_args: unknown) => "slot_new"),
   createMany: vi.fn(async (_args: unknown) => ["slot_a", "slot_b"]),
+  copyToDesign: vi.fn(async (_args: unknown) => ({ copied: 2, skipped: 0 })),
   update: vi.fn(async (_args: unknown) => "slot_1"),
   remove: vi.fn(async (_args: unknown) => "slot_1"),
 }));
@@ -20,6 +21,7 @@ vi.mock("convex/react", () => ({
     const name = getFunctionName(ref);
     if (name === "rosterEntries:create") return create;
     if (name === "rosterEntries:createMany") return createMany;
+    if (name === "rosterEntries:copyToDesign") return copyToDesign;
     if (name === "rosterEntries:update") return update;
     if (name === "rosterEntries:remove") return remove;
     throw new Error(`Unexpected mutation: ${name}`);
@@ -39,6 +41,7 @@ import { RosterSheet, type RosterSheetSlot } from "./RosterSheet";
 
 const RUN_ID = "run_1" as Id<"jerseyRuns">;
 const DESIGN_ID = "design_home" as Id<"designs">;
+const AWAY_ID = "design_away" as Id<"designs">;
 
 function slot(overrides: Partial<RosterSheetSlot> = {}): RosterSheetSlot {
   return {
@@ -63,6 +66,7 @@ function renderSheet(
       designId={DESIGN_ID}
       designTitle="Home kit"
       slots={[slot()]}
+      otherDesigns={[{ designId: AWAY_ID, title: "Away kit" }]}
       locked={false}
       {...props}
     />,
@@ -77,12 +81,14 @@ async function openSheet(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   create.mockClear();
   createMany.mockClear();
+  copyToDesign.mockClear();
   update.mockClear();
   remove.mockClear();
   toastError.mockClear();
   toastSuccess.mockClear();
   create.mockResolvedValue("slot_new");
   createMany.mockResolvedValue(["slot_a", "slot_b"]);
+  copyToDesign.mockResolvedValue({ copied: 2, skipped: 0 });
   update.mockResolvedValue("slot_1");
   remove.mockResolvedValue("slot_1");
 });
@@ -404,6 +410,93 @@ describe("RosterSheet — bulk paste", () => {
   });
 });
 
+// M-04: the same fifteen people across a home and an away kit, entered once.
+// Pull direction — the captain is in the sheet for the design that's missing
+// players, and picks where to fill it from.
+describe("RosterSheet — mirror", () => {
+  // The menu portals out of the sheet, so it's found on the document rather
+  // than inside the dialog.
+  async function pickSource(
+    sheet: ReturnType<typeof within>,
+    user: ReturnType<typeof userEvent.setup>,
+    title: RegExp,
+  ) {
+    await user.click(sheet.getByRole("button", { name: /copy roster from/i }));
+    await user.click(await screen.findByRole("menuitem", { name: title }));
+  }
+
+  it("offers the order's other designs as sources", async () => {
+    const user = userEvent.setup();
+    renderSheet({
+      otherDesigns: [
+        { designId: AWAY_ID, title: "Away kit" },
+        { designId: "design_warmup" as Id<"designs">, title: "Warmup" },
+      ],
+    });
+
+    const sheet = await openSheet(user);
+    await user.click(sheet.getByRole("button", { name: /copy roster from/i }));
+
+    expect(
+      await screen.findByRole("menuitem", { name: /away kit/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /warmup/i })).toBeInTheDocument();
+    expect(copyToDesign).not.toHaveBeenCalled();
+  });
+
+  it("copies from the picked design into this one and reports the outcome", async () => {
+    const user = userEvent.setup();
+    copyToDesign.mockResolvedValueOnce({ copied: 18, skipped: 2 });
+    renderSheet();
+
+    const sheet = await openSheet(user);
+    await pickSource(sheet, user, /away kit/i);
+
+    expect(copyToDesign).toHaveBeenCalledWith({
+      runId: RUN_ID,
+      sourceDesignId: AWAY_ID,
+      targetDesignId: DESIGN_ID,
+    });
+    expect(toastSuccess).toHaveBeenCalledWith("18 copied, 2 already there");
+  });
+
+  it("reads as already-done when the copy skipped everything", async () => {
+    const user = userEvent.setup();
+    copyToDesign.mockResolvedValueOnce({ copied: 0, skipped: 15 });
+    renderSheet();
+
+    const sheet = await openSheet(user);
+    await pickSource(sheet, user, /away kit/i);
+
+    expect(toastSuccess).toHaveBeenCalledWith(
+      expect.stringMatching(/already/i),
+    );
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("says nothing about copying when this is the order's only design", async () => {
+    const user = userEvent.setup();
+    renderSheet({ otherDesigns: [] });
+
+    const sheet = await openSheet(user);
+    expect(sheet.queryByRole("button", { name: /copy roster from/i })).toBeNull();
+  });
+
+  it("surfaces a rejected copy as a readable toast", async () => {
+    const user = userEvent.setup();
+    copyToDesign.mockRejectedValueOnce(new Error("This jersey run is locked."));
+    renderSheet();
+
+    const sheet = await openSheet(user);
+    await pickSource(sheet, user, /away kit/i);
+
+    expect(toastError).toHaveBeenCalledWith(
+      expect.stringMatching(/could not copy/i),
+      expect.objectContaining({ description: "This jersey run is locked." }),
+    );
+  });
+});
+
 describe("RosterSheet — collisions", () => {
   it("flags a slot two different people both claimed", async () => {
     const user = userEvent.setup();
@@ -435,6 +528,7 @@ describe("RosterSheet — locked run", () => {
     expect(sheet.queryByRole("button", { name: /edit gretzky/i })).toBeNull();
     expect(sheet.queryByRole("button", { name: /remove gretzky/i })).toBeNull();
     expect(sheet.queryByRole("button", { name: /paste a list/i })).toBeNull();
+    expect(sheet.queryByRole("button", { name: /copy roster from/i })).toBeNull();
   });
 
   it("says why the roster can't be edited", async () => {

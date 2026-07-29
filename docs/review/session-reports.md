@@ -1384,3 +1384,62 @@ One entry per completed loop task. This is the human's fast path for UX critique
     only, and this surface is two clicks deep. `snap.mjs` itself is untouched.
 
 - Follow-ups filed: none.
+
+## 2026-07-28 — M-04: Mirror Roster Between Designs
+
+- What shipped:
+  - `rosterEntries.copyToDesign` — additive slot copy from one of the order's
+    designs onto another, deduped server-side on `rosterSlotKey(name, number)`
+    (the same normalization fan-attach and the paste preview use), returning
+    `{ copied, skipped }`. Gates ownership, a locked run, either design not
+    being on the order, and copying a design onto itself.
+  - `planRosterCopy` / `describeRosterCopy` in `lib/rosterEntry/mirror.ts` —
+    pure, so the rule the mutation writes by and the sentence the captain
+    reads come from one place.
+  - A **"Copy roster from ▾"** menu in the roster sheet's footer, beside
+    "Paste a list", listing the order's other designs. Picking one is the
+    action; the outcome lands as a toast.
+
+- UX surfaces to eyeball (screenshots in `docs/review/M-04/`):
+  - `mirror-menu-w{375,768,1280}-{light,dark}.png` — **the review surface**:
+    the sheet for the away kit with the source menu open. Judge whether
+    "Copy roster from" is discoverable enough sitting as a second ghost button
+    next to "Paste a list", and whether the menu opening *upward over the add
+    row* (it's the bottom-most control, so Base UI flips it) is acceptable or
+    wants the control moved into the sheet header.
+  - `mirror-result-copied-w375-light.png` — a real copy of the home kit's 15
+    players onto the away kit: every copied slot lands "Not yet filled", and
+    the pre-existing filled slot (Riley Tran #23, size S) is untouched at the
+    top. Toast reads "15 copied".
+  - `mirror-result-skipped-w375-light.png` — the re-run, which copies zero:
+    "Nothing to copy — all 15 players are already here." This is the message
+    PRD §9 asks to be judged reassuring rather than alarming.
+  - `portal-orders-jh70c9...-w*.png` — the cards, unchanged by this slice.
+  - The Clerk avatar over the 375px footer is the artifact CLAUDE.md documents.
+
+- Decisions I made that a human may want to veto:
+  - **A dropdown menu, not a select + confirm button.** Picking the source is
+    the whole action — the copy only ever adds and silently skips, so there is
+    nothing to confirm. A `<Select>` would leave a chosen-but-not-yet-applied
+    state on screen that means nothing.
+  - **`copyToDesign` dedupes server-side**, unlike `createMany` — deliberately
+    the opposite call. The paste's payload was previewed row by row and
+    approved as a count; here the captain pressed one button, so the skip has
+    to be decided against the roster as it stands at write time.
+  - **A slot repeated inside the *source* copies once**, counting as a skip.
+    Nothing dedupes `create`, so a source roster can hold two of the same
+    player, and copying both would plant exactly the duplicate the skip rule
+    exists to prevent.
+  - **Every source design is offered, including empty ones** — an empty source
+    reports "that design has no players yet" rather than being hidden, so the
+    menu doesn't silently change shape as rosters fill.
+  - **Copying is offered on a locked run's sheet: no.** The control is absent
+    read-only, matching add/edit/remove/paste.
+  - **Verified against the deployed mutation** with a throwaway Playwright
+    script (not committed): copied the home kit onto the away kit, captured
+    both messages, then removed the 15 created slots — confirmed via a
+    read-only query that the fixture is back to its seeded 16 rows.
+    `snap.mjs` navigates only, and this surface is two clicks deep;
+    `snap.mjs` itself is untouched.
+
+- Follow-ups filed: none.

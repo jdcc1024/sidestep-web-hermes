@@ -9,6 +9,7 @@ import {
   checkRosterNumber,
 } from "../lib/rosterEntry/rules";
 import { ROSTER_PASTE_MAX_ROWS } from "../lib/rosterEntry/paste";
+import { planRosterCopy } from "../lib/rosterEntry/mirror";
 import { isLocked } from "../lib/jerseyRun/lock";
 import { sortSizes } from "../lib/jerseyRun/rules";
 
@@ -119,6 +120,74 @@ export const createMany = mutation({
       );
     }
     return ids;
+  },
+});
+
+// The mirror (M-04): seed one design's roster from another's in a single
+// action, so the same fifteen people aren't typed twice for a home and an
+// away kit. Pull direction — the target is the design the captain has open
+// (PRD §6) — but the gate is symmetric, since both designs are named here.
+//
+// Strictly additive. It only ever inserts: no existing target slot, its
+// `filled` state, or its order entries can change through this path. Slots
+// carry across as name + number only and land captain-sourced; copying
+// sizes would fabricate jerseys nobody ordered.
+//
+// Deduped server-side — unlike `createMany`, whose payload the captain has
+// already previewed row by row. Here they pressed one button, so the skip
+// (and the count it reports back) has to be decided against the roster as
+// it is at write time, not against a client's stale read.
+export const copyToDesign = mutation({
+  args: {
+    runId: v.id("jerseyRuns"),
+    sourceDesignId: v.id("designs"),
+    targetDesignId: v.id("designs"),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.runId);
+    if (!run) throw new ConvexError("Jersey run not found.");
+    const { order } = await requireOrderOwnership(ctx, run.orderId);
+
+    if (isLocked(run)) throw new ConvexError("This jersey run is locked.");
+
+    if (args.sourceDesignId === args.targetDesignId)
+      throw new ConvexError("Pick a different design to copy from.");
+
+    for (const designId of [args.sourceDesignId, args.targetDesignId]) {
+      if (!order.designIds.includes(designId))
+        throw new ConvexError("That design isn't part of this order.");
+    }
+
+    const entries = await ctx.db
+      .query("rosterEntries")
+      .withIndex("by_run", (q) => q.eq("runId", args.runId))
+      .collect();
+    const onDesign = (designId: string) =>
+      entries
+        .filter((e) => e.designId === designId)
+        .sort((a, b) => a.createdAt - b.createdAt);
+
+    const { additions, copied, skipped } = planRosterCopy(
+      onDesign(args.sourceDesignId),
+      onDesign(args.targetDesignId),
+    );
+
+    const createdAt = Date.now();
+    for (const player of additions) {
+      await ctx.db.insert("rosterEntries", {
+        runId: args.runId,
+        orderId: run.orderId,
+        designId: args.targetDesignId,
+        name: player.name,
+        number: player.number,
+        source: "captain",
+        createdAt,
+      });
+    }
+
+    // The counts come from the server so the message the captain reads
+    // describes what was actually written.
+    return { copied, skipped };
   },
 });
 

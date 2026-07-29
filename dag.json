@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-29T06:02:24.163Z",
+  "lastUpdated": "2026-07-29T06:04:16.629Z",
   "phases": [
     {
       "id": "phase-1",
@@ -302,8 +302,8 @@
       "phase": "3",
       "type": "feature",
       "description": "One-action mirror so a home/away kit is seeded once, not twice. From inside a design's roster sheet the captain picks another design in the order and copies its player slots across — names and numbers only, never sizes or order entries. Strictly additive, with silent skip on slots that already exist.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-29T06:04:16.628Z",
       "completedAt": null,
       "issueFile": "backlog/M-04-mirror-roster-between-designs.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
@@ -816,6 +816,12 @@
       "event": "task_completed",
       "nodeId": "M-03",
       "message": "Completed: Bulk Paste Roster Import"
+    },
+    {
+      "timestamp": "2026-07-29T06:04:16.629Z",
+      "event": "task_started",
+      "nodeId": "M-04",
+      "message": "Picked up: Mirror Roster Between Designs"
     }
   ]
 }

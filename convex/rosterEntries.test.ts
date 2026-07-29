@@ -71,6 +71,30 @@ async function seedRun(
   };
 }
 
+// Links a second design to the order — what per-design bucketing (M-01) and
+// the mirror (M-04) both need before there's anything to bucket or copy.
+async function addDesign(
+  t: ReturnType<typeof convexTest>,
+  userId: Id<"users">,
+  orderId: Id<"orders">,
+  title: string,
+) {
+  return t.run(async (ctx) => {
+    const designId = await ctx.db.insert("designs", {
+      ownerId: userId,
+      title,
+      blocks: overviewBlocks(title),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    const order = await ctx.db.get(orderId);
+    await ctx.db.patch(orderId, {
+      designIds: [...(order?.designIds ?? []), designId],
+    });
+    return designId;
+  });
+}
+
 describe("rosterEntries.create", () => {
   it("creates a captain-seeded slot defaulting to source captain", async () => {
     const t = convexTest(schema, modules);
@@ -310,6 +334,266 @@ describe("rosterEntries.createMany", () => {
         runId,
         designId,
         players: [{ name: "Nope" }],
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+// M-04: a home and an away kit carry the same fifteen people, so one design
+// seeds the other in a single action. Slots only, additive, silent skip.
+describe("rosterEntries.copyToDesign", () => {
+  // A source design carrying two players, plus the empty target it copies
+  // onto — the shape every test here starts from.
+  async function seedMirror(t: ReturnType<typeof convexTest>) {
+    const seeded = await seedRun(t);
+    const { runId, designId: sourceDesignId, userId, orderId, asCaptain } = seeded;
+    const targetDesignId = await addDesign(t, userId, orderId, "Away");
+    for (const player of [
+      { name: "Gretzky", number: "99" },
+      { name: "Bo" },
+    ]) {
+      await asCaptain.mutation(api.rosterEntries.create, {
+        runId,
+        designId: sourceDesignId,
+        ...player,
+      });
+    }
+    return { ...seeded, sourceDesignId, targetDesignId };
+  }
+
+  // The target's slots, oldest first — what the copy is judged on.
+  async function slotsOn(
+    t: ReturnType<typeof convexTest>,
+    designId: Id<"designs">,
+  ) {
+    return t.run(async (ctx) => {
+      const all = await ctx.db.query("rosterEntries").collect();
+      return all
+        .filter((e) => e.designId === designId)
+        .sort((a, b) => a.createdAt - b.createdAt);
+    });
+  }
+
+  it("copies the source's slots onto the target, name and number only", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, targetDesignId, asCaptain } =
+      await seedMirror(t);
+
+    const result = await asCaptain.mutation(api.rosterEntries.copyToDesign, {
+      runId,
+      sourceDesignId,
+      targetDesignId,
+    });
+
+    expect(result).toEqual({ copied: 2, skipped: 0 });
+    const slots = await slotsOn(t, targetDesignId);
+    expect(slots.map((s) => [s.name, s.number])).toEqual([
+      ["Gretzky", "99"],
+      ["Bo", undefined],
+    ]);
+    // Slots only: nothing about a copy fabricates a jersey.
+    const entries = await t.run((ctx) =>
+      ctx.db.query("orderEntries").collect(),
+    );
+    expect(entries).toEqual([]);
+  });
+
+  it("lands every copied slot as captain-sourced and unfilled, whatever the source was", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, targetDesignId, asCaptain } =
+      await seedMirror(t);
+    await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId: sourceDesignId,
+      name: "Fan Slot",
+      source: "fan",
+    });
+
+    await asCaptain.mutation(api.rosterEntries.copyToDesign, {
+      runId,
+      sourceDesignId,
+      targetDesignId,
+    });
+
+    const slots = await slotsOn(t, targetDesignId);
+    expect(slots.every((s) => s.source === "captain")).toBe(true);
+    // "Unfilled" is derived from having no order entries, and the copy
+    // creates none — so the read has to agree.
+    const roster = await asCaptain.query(api.rosterEntries.listForRun, {
+      runId,
+    });
+    const target = roster?.designs.find((d) => d.designId === targetDesignId);
+    expect(target?.entries.every((e) => !e.filled && e.total === 0)).toBe(true);
+  });
+
+  it("copies nothing on a re-run and reports every slot as already there", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, targetDesignId, asCaptain } =
+      await seedMirror(t);
+    const args = { runId, sourceDesignId, targetDesignId };
+
+    await asCaptain.mutation(api.rosterEntries.copyToDesign, args);
+    const second = await asCaptain.mutation(api.rosterEntries.copyToDesign, args);
+
+    expect(second).toEqual({ copied: 0, skipped: 2 });
+    expect(await slotsOn(t, targetDesignId)).toHaveLength(2);
+  });
+
+  it("skips only the players the target already has", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, targetDesignId, asCaptain } =
+      await seedMirror(t);
+    // Same player, differently typed — the skip normalizes case and space.
+    await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId: targetDesignId,
+      name: " gretzky ",
+      number: "99",
+    });
+
+    const result = await asCaptain.mutation(api.rosterEntries.copyToDesign, {
+      runId,
+      sourceDesignId,
+      targetDesignId,
+    });
+
+    expect(result).toEqual({ copied: 1, skipped: 1 });
+    const slots = await slotsOn(t, targetDesignId);
+    expect(slots.map((s) => s.name)).toEqual(["gretzky", "Bo"]);
+  });
+
+  it("leaves an existing filled slot and its jerseys byte-for-byte alone", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, targetDesignId, asCaptain } =
+      await seedMirror(t);
+    const filledId = await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId: targetDesignId,
+      name: "Gretzky",
+      number: "99",
+    });
+    await asCaptain.mutation(api.orderEntries.create, {
+      runId,
+      designId: targetDesignId,
+      rosterEntryId: filledId,
+      size: "L",
+      qty: 2,
+      source: "fan",
+      submitterName: "Fan",
+      submitterEmail: "fan@example.com",
+    });
+    const before = await t.run((ctx) => ctx.db.get(filledId));
+    const entriesBefore = await t.run((ctx) =>
+      ctx.db.query("orderEntries").collect(),
+    );
+
+    await asCaptain.mutation(api.rosterEntries.copyToDesign, {
+      runId,
+      sourceDesignId,
+      targetDesignId,
+    });
+
+    expect(await t.run((ctx) => ctx.db.get(filledId))).toEqual(before);
+    expect(await t.run((ctx) => ctx.db.query("orderEntries").collect())).toEqual(
+      entriesBefore,
+    );
+  });
+
+  it("reports an empty source honestly rather than erroring", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, userId, orderId, designId, asCaptain } = await seedRun(t);
+    const emptyDesignId = await addDesign(t, userId, orderId, "Away");
+
+    const result = await asCaptain.mutation(api.rosterEntries.copyToDesign, {
+      runId,
+      sourceDesignId: emptyDesignId,
+      targetDesignId: designId,
+    });
+
+    expect(result).toEqual({ copied: 0, skipped: 0 });
+  });
+
+  it("rejects copying a design onto itself", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, asCaptain } = await seedMirror(t);
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.copyToDesign, {
+        runId,
+        sourceDesignId,
+        targetDesignId: sourceDesignId,
+      }),
+    ).rejects.toThrow(/different design/i);
+  });
+
+  it("rejects a locked run", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, targetDesignId, asCaptain } =
+      await seedMirror(t);
+    await asCaptain.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.copyToDesign, {
+        runId,
+        sourceDesignId,
+        targetDesignId,
+      }),
+    ).rejects.toThrow(/locked/i);
+  });
+
+  it("rejects a source or a target design that isn't on the order", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, userId, sourceDesignId, targetDesignId, asCaptain } =
+      await seedMirror(t);
+    const strayDesignId = await t.run((ctx) =>
+      ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Stray",
+        blocks: overviewBlocks("x"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.copyToDesign, {
+        runId,
+        sourceDesignId: strayDesignId,
+        targetDesignId,
+      }),
+    ).rejects.toThrow(/isn't part of this order/);
+    await expect(
+      asCaptain.mutation(api.rosterEntries.copyToDesign, {
+        runId,
+        sourceDesignId,
+        targetDesignId: strayDesignId,
+      }),
+    ).rejects.toThrow(/isn't part of this order/);
+  });
+
+  it("rejects a caller who doesn't own the order", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, targetDesignId } = await seedMirror(t);
+    await t.run((ctx) =>
+      ctx.db.insert("users", {
+        clerkId: "stranger_clerk",
+        email: "stranger@example.com",
+        name: "Stranger",
+        isAdmin: false,
+        createdAt: Date.now(),
+      }),
+    );
+    const stranger = t.withIdentity({
+      subject: "stranger_clerk",
+      email: "stranger@example.com",
+      name: "Stranger",
+    });
+
+    await expect(
+      stranger.mutation(api.rosterEntries.copyToDesign, {
+        runId,
+        sourceDesignId,
+        targetDesignId,
       }),
     ).rejects.toThrow();
   });
@@ -585,29 +869,6 @@ describe("rosterEntries.listForRun", () => {
 // roster — each slot's ordered sizes, and the design's unattached blank
 // lines — so the card and the roster editor read one source instead of two.
 describe("rosterEntries.listForRun — sizes and blank lines (M-01)", () => {
-  // Links a second design to the order so per-design bucketing is testable.
-  async function addDesign(
-    t: ReturnType<typeof convexTest>,
-    userId: Id<"users">,
-    orderId: Id<"orders">,
-    title: string,
-  ) {
-    return t.run(async (ctx) => {
-      const designId = await ctx.db.insert("designs", {
-        ownerId: userId,
-        title,
-        blocks: overviewBlocks(title),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-      const order = await ctx.db.get(orderId);
-      await ctx.db.patch(orderId, {
-        designIds: [...(order?.designIds ?? []), designId],
-      });
-      return designId;
-    });
-  }
-
   it("carries each slot's ordered sizes in canonical order, summed by qty", async () => {
     const t = convexTest(schema, modules);
     const { runId, designId, asCaptain } = await seedRun(t);
