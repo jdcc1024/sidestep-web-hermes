@@ -491,6 +491,75 @@ describe("designs.listMyDesigns", () => {
     expect(designs).toHaveLength(1);
     expect(designs[0]?.fileCount).toBe(2);
   });
+
+  // Every card surface shows the design's picture, not just its file count,
+  // so the list resolves the same main image the order page reads (D-07).
+  it("carries the resolved main image per design", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    await asUser.mutation(api.designs.createDesign, {
+      title: "Away kit",
+      blocks: overviewBlocks("Brief."),
+      files: [
+        await fakeFile(t, {
+          filename: "print-template.pdf",
+          contentType: "application/pdf",
+        }),
+        await fakeFile(t, { filename: "crest.png" }),
+      ],
+    });
+
+    const design = (await asUser.query(api.designs.listMyDesigns, {}))[0];
+    expect(design?.mainImage).toMatchObject({
+      filename: "crest.png",
+      contentType: "image/png",
+    });
+    expect(typeof design?.mainImage?.url).toBe("string");
+  });
+
+  it("honours an explicitly flagged main image over upload order", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    const designId = await asUser.mutation(api.designs.createDesign, {
+      title: "Away kit",
+      blocks: overviewBlocks("Brief."),
+      files: [
+        await fakeFile(t, { filename: "first.png" }),
+        await fakeFile(t, { filename: "chosen.png" }),
+      ],
+    });
+    const chosen = (await assetsOf(t, designId)).find(
+      (asset) => asset.filename === "chosen.png",
+    );
+    await asUser.mutation(api.designs.setMainAsset, { assetId: chosen!._id });
+
+    const design = (await asUser.query(api.designs.listMyDesigns, {}))[0];
+    expect(design?.mainImage?.filename).toBe("chosen.png");
+  });
+
+  // A docs-only design is legitimate — the card falls back to a placeholder
+  // rather than the query inventing an image.
+  it("returns a null main image when no file is web-safe", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+
+    await asUser.mutation(api.designs.createDesign, {
+      title: "Docs only",
+      blocks: overviewBlocks("Brief."),
+      files: [
+        await fakeFile(t, {
+          filename: "spec.pdf",
+          contentType: "application/pdf",
+        }),
+      ],
+    });
+
+    const design = (await asUser.query(api.designs.listMyDesigns, {}))[0];
+    expect(design?.fileCount).toBe(1);
+    expect(design?.mainImage).toBeNull();
+  });
 });
 
 describe("designs.generateUploadUrl", () => {

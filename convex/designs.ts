@@ -7,9 +7,9 @@ import {
   isSleeveStyle,
 } from "../lib/design/rules";
 import {
+  assetSummariesByDesign,
   countDesignAssets,
   deleteDesignAsset,
-  fileCountsByDesign,
   insertDesignAssets,
   mainAssetOf,
   mayDeleteAsset,
@@ -103,8 +103,10 @@ function normalizeSpecs(args: {
 
 // Captain's own designs, newest first. Mirrors the auth/scoping shape of
 // listMyOrders so the portal dashboard can fetch both with the same
-// guarantees. Carries `fileCount` because every list surface shows it and
-// the count now lives in designAssets rather than on the design doc.
+// guarantees. Carries the same `{ fileCount, mainImage }` summary the order
+// page reads (D-07) — both live in designAssets rather than on the design
+// doc, and one summary read resolves exactly one storage URL per design so a
+// card can show what the design looks like, not just how many files it has.
 export const listMyDesigns = query({
   args: {},
   handler: async (ctx) => {
@@ -117,14 +119,18 @@ export const listMyDesigns = query({
       .order("desc")
       .collect();
 
-    const counts = await fileCountsByDesign(
+    const summaries = await assetSummariesByDesign(
       ctx,
       designs.map((d) => d._id),
     );
-    return designs.map((design) => ({
-      ...design,
-      fileCount: counts.get(design._id) ?? 0,
-    }));
+    return designs.map((design) => {
+      const summary = summaries.get(design._id);
+      return {
+        ...design,
+        fileCount: summary?.fileCount ?? 0,
+        mainImage: summary?.mainImage ?? null,
+      };
+    });
   },
 });
 

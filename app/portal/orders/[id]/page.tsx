@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { use, useState } from "react";
+import { use } from "react";
 import { useQuery } from "convex/react";
-import { ImageIcon } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
-import { isWebSafeImage } from "@/lib/designAsset";
 import { cn } from "@/lib/utils";
+import { DesignThumbnail } from "@/components/design/DesignThumbnail";
 import { OrderTimeline } from "@/components/portal/OrderTimeline";
 import { RemovedDesigns } from "@/components/portal/DesignRemoval";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
@@ -350,6 +349,7 @@ function DesignSection({
             <DesignThumbnail
               title={design.title}
               mainImage={design.mainImage}
+              className="size-14 shrink-0"
             />
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-base">{design.title}</CardTitle>
@@ -453,53 +453,6 @@ function DesignRollup({ count }: { count: number }) {
       <span className="text-muted-foreground">
         jersey{count === 1 ? "" : "s"} collected
       </span>
-    </div>
-  );
-}
-
-// The design's picture at a glance (D-07) — deliberately modest, sitting
-// beside the file count rather than replacing it: the count says how much
-// material exists, the thumbnail says what it looks like.
-//
-// Three things stop an image rendering, and all of them land on the same
-// placeholder: the design has no files, the main file isn't something a
-// browser draws (a print template can be the owner's explicit pick), or its
-// short-lived storage URL went stale between the query and the render.
-function DesignThumbnail({
-  title,
-  mainImage,
-}: {
-  title: string;
-  mainImage: OrderDesign["mainImage"];
-}) {
-  const [failed, setFailed] = useState(false);
-  const src =
-    !failed && mainImage?.url && isWebSafeImage(mainImage.contentType)
-      ? mainImage.url
-      : null;
-
-  return (
-    <div className="size-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted/50">
-      {src ? (
-        // Convex storage serves short-lived signed URLs from a per-deployment
-        // host, so next/image optimization doesn't apply.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt={`${title} main image`}
-          className="size-full object-cover"
-          loading="lazy"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <div
-          role="img"
-          aria-label={`No image yet for ${title}`}
-          className="flex size-full items-center justify-center text-muted-foreground"
-        >
-          <ImageIcon className="size-5" aria-hidden />
-        </div>
-      )}
     </div>
   );
 }

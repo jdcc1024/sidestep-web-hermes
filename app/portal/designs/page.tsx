@@ -8,6 +8,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { overviewOf } from "@/lib/designBlock";
 import { useOwnedList } from "@/lib/ownedResource";
+import {
+  DesignThumbnail,
+  type DesignMainImage,
+} from "@/components/design/DesignThumbnail";
 
 const OVERVIEW_PREVIEW_CHARS = 160;
 
@@ -62,10 +66,13 @@ export default function MyDesignsPage() {
   );
 }
 
+// This is the gallery of the captain's designs, so the card leads with the
+// picture: a full-bleed cover band above the title, sized 4:3 so the grid
+// keeps a steady rhythm whatever shape the uploads are.
 function DesignCard({
   design,
 }: {
-  design: Doc<"designs"> & { fileCount: number };
+  design: Doc<"designs"> & { fileCount: number; mainImage: DesignMainImage };
 }) {
   const fileCount = design.fileCount;
   const summary = truncate(overviewOf(design.blocks), OVERVIEW_PREVIEW_CHARS);
@@ -73,17 +80,27 @@ function DesignCard({
   return (
     <Link
       href={`/portal/designs/${design._id}`}
-      className="flex h-full flex-col rounded-lg border border-border bg-card p-5 shadow-sm transition hover:border-teal-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2"
+      className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition hover:border-teal-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2"
     >
-      <h3 className="text-lg font-semibold text-foreground">{design.title}</h3>
-      {summary && (
-        <p className="mt-2 text-sm text-muted-foreground">{summary}</p>
-      )}
-      <p className="mt-auto pt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {fileCount === 0
-          ? "No files yet"
-          : `${fileCount} file${fileCount === 1 ? "" : "s"}`}
-      </p>
+      <DesignThumbnail
+        title={design.title}
+        mainImage={design.mainImage}
+        // The card's own border draws the edge; the thumbnail only needs the
+        // bottom rule separating the picture from the text.
+        className="aspect-[4/3] w-full rounded-none border-0 border-b"
+        iconClassName="size-8"
+      />
+      <div className="flex flex-1 flex-col p-5">
+        <h3 className="text-lg font-semibold text-foreground">{design.title}</h3>
+        {summary && (
+          <p className="mt-2 text-sm text-muted-foreground">{summary}</p>
+        )}
+        <p className="mt-auto pt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {fileCount === 0
+            ? "No files yet"
+            : `${fileCount} file${fileCount === 1 ? "" : "s"}`}
+        </p>
+      </div>
     </Link>
   );
 }

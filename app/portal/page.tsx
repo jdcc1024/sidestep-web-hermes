@@ -10,6 +10,10 @@ import { cn } from "@/lib/utils";
 import { overviewOf } from "@/lib/designBlock";
 import { useOwnedList } from "@/lib/ownedResource";
 import {
+  DesignThumbnail,
+  type DesignMainImage,
+} from "@/components/design/DesignThumbnail";
+import {
   chipToneForStage,
   deriveCustomerStage,
   type ChipTone,
@@ -205,10 +209,14 @@ function OrderCard({ order }: { order: Doc<"orders"> }) {
   );
 }
 
+// The dashboard is a glance across orders, designs and run responses, so the
+// design's picture rides beside its title at the order page's thumbnail size
+// rather than taking the card's full width — the designs gallery is where the
+// image leads.
 function DesignCard({
   design,
 }: {
-  design: Doc<"designs"> & { fileCount: number };
+  design: Doc<"designs"> & { fileCount: number; mainImage: DesignMainImage };
 }) {
   const fileCount = design.fileCount;
   const summary = truncate(overviewOf(design.blocks), OVERVIEW_PREVIEW_CHARS);
@@ -218,10 +226,21 @@ function DesignCard({
       href={`/portal/designs/${design._id}`}
       className="flex h-full flex-col rounded-lg border border-border bg-card p-5 shadow-sm transition hover:border-teal-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2"
     >
-      <h3 className="text-lg font-semibold text-foreground">{design.title}</h3>
-      {summary && (
-        <p className="mt-2 text-sm text-muted-foreground">{summary}</p>
-      )}
+      <div className="flex items-start gap-3">
+        <DesignThumbnail
+          title={design.title}
+          mainImage={design.mainImage}
+          className="size-14 shrink-0"
+        />
+        <div className="min-w-0">
+          <h3 className="text-lg font-semibold text-foreground">
+            {design.title}
+          </h3>
+          {summary && (
+            <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
+          )}
+        </div>
+      </div>
       <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {fileCount === 0
           ? "No files yet"
