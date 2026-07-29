@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-29T02:25:21.059Z",
+  "lastUpdated": "2026-07-29T02:45:49.209Z",
   "phases": [
     {
       "id": "phase-1",
@@ -238,9 +238,9 @@
       "phase": "3",
       "type": "feature",
       "description": "Join rosterEntries with orderEntries into one per-design read (slots with their ordered sizes, plus blank/bulk lines) and put it on the order page's design cards. Fixes the defect where the order page reads order entries while Run Setup reads roster entries, so a seeded-but-unordered player is invisible. Foundation for the rest of Track M.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-07-29T02:25:21.058Z",
-      "completedAt": null,
+      "completedAt": "2026-07-29T02:45:49.208Z",
       "issueFile": "backlog/M-01-unified-roster-read-and-design-card-preview.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
       "acceptanceCriteria": [
@@ -259,7 +259,7 @@
       "phase": "3",
       "type": "feature",
       "description": "Each design card gets a Manage roster button opening a Sheet with that design's full roster and inline add/edit/remove. Surfaces the collision flag listForRun already computes but the UI drops, and opens read-only for locked runs. RosterManager retires from Run Setup.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/M-02-roster-sheet-on-design-cards.md",
@@ -786,6 +786,12 @@
       "event": "task_started",
       "nodeId": "M-01",
       "message": "Picked up: Unified Roster Read + Design-Card Roster Preview"
+    },
+    {
+      "timestamp": "2026-07-29T02:45:49.209Z",
+      "event": "task_completed",
+      "nodeId": "M-01",
+      "message": "Completed: Unified Roster Read + Design-Card Roster Preview"
     }
   ]
 }
