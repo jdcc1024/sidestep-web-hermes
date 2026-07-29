@@ -49,12 +49,12 @@ async function seedCaptainWithOrder(
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
+// "Start collecting" (M-05) takes a deadline and nothing else: sizes are a
+// fixed catalog, names mode is switched afterwards on the order page, and
+// custom questions are edited from /run/setup once the run exists.
 function validRunArgs(orderId: Id<"orders">) {
   return {
     orderId,
-    sizeOptions: ["S", "M", "L"],
-    namesMode: "open" as const,
-    customQuestions: [],
     deadline: Date.now() + 7 * ONE_DAY,
   };
 }
@@ -75,7 +75,88 @@ describe("jerseyRuns.create", () => {
       status: "open",
       namesMode: "open",
     });
-    expect(row?.sizeOptions).toEqual(["S", "M", "L"]);
+  });
+
+  // M-05: the captain is never asked which sizes to offer — every new run
+  // carries the whole catalog, and the public form reads it back as-is.
+  it("populates the full 8-size catalog with no size argument", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const row = await t.run((ctx) => ctx.db.get(runId));
+    expect(row?.sizeOptions).toEqual([
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL",
+      "4XL",
+    ]);
+  });
+
+  it("rejects a sizeOptions argument — sizes are no longer a captain choice", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+
+    await expect(
+      asUser.mutation(api.jerseyRuns.create, {
+        ...validRunArgs(orderId),
+        // @ts-expect-error the argument is gone from the mutation's validator
+        sizeOptions: ["S"],
+      }),
+    ).rejects.toThrow();
+  });
+
+  // PRD §5: no migration. A run created before the fixed catalog keeps the
+  // narrower list it was created with, and submissions are still checked
+  // against *its* sizes, not the new catalog.
+  it("leaves a pre-existing run's narrower sizeOptions alone", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId } = await seedCaptainWithOrder(t);
+    const { runId, designId } = await t.run(async (ctx) => {
+      const designId = await ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Home",
+        blocks: overviewBlocks("h"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await ctx.db.patch(orderId, { designIds: [designId] });
+      const runId = await ctx.db.insert("jerseyRuns", {
+        orderId,
+        captainId: userId,
+        sizeOptions: ["S", "M", "L"],
+        namesMode: "open",
+        customQuestions: [],
+        deadline: Date.now() + 7 * ONE_DAY,
+        status: "open",
+        createdAt: Date.now(),
+      });
+      return { runId, designId };
+    });
+
+    const submit = (size: string) =>
+      t.mutation(api.orderEntries.submitOrder, {
+        jerseyRunId: runId,
+        submitterName: "Pat",
+        submitterEmail: "pat@example.com",
+        customAnswers: {},
+        lines: [{ designId, size, qty: 1 }],
+      });
+
+    await expect(submit("4XL")).rejects.toThrow();
+    await expect(submit("M")).resolves.toBeTruthy();
+    expect((await t.run((ctx) => ctx.db.get(runId)))?.sizeOptions).toEqual([
+      "S",
+      "M",
+      "L",
+    ]);
   });
 
   it("rejects creating a second run for the same order", async () => {
@@ -129,6 +210,221 @@ describe("jerseyRuns.create", () => {
     await expect(
       asOther.mutation(api.jerseyRuns.create, validRunArgs(orderId)),
     ).rejects.toThrow(/don't have access/);
+  });
+});
+
+// M-05: `namesMode` used to be write-once at create. The control now lives on
+// the order page beside the designs it affects, so it has to switch freely in
+// both directions — open→fixed promotes fan-typed names into the picker list,
+// fixed→open only loosens a constraint. Neither loses data.
+describe("jerseyRuns.setNamesMode", () => {
+  it("switches open → fixed and back again", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+
+    await asUser.mutation(api.jerseyRuns.setNamesMode, {
+      jerseyRunId: runId,
+      namesMode: "fixed",
+    });
+    expect((await t.run((ctx) => ctx.db.get(runId)))?.namesMode).toBe("fixed");
+
+    await asUser.mutation(api.jerseyRuns.setNamesMode, {
+      jerseyRunId: runId,
+      namesMode: "open",
+    });
+    expect((await t.run((ctx) => ctx.db.get(runId)))?.namesMode).toBe("open");
+  });
+
+  // The end-to-end half of the switch: what the public form actually reads.
+  // A name a fan typed is already a rosterEntry, so flipping to fixed turns
+  // it into a slot on the picker list without any migration.
+  it("promotes fan-typed names into the public picker list after a switch to fixed", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const designId = await t.run(async (ctx) => {
+      const designId = await ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Home",
+        blocks: overviewBlocks("h"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await ctx.db.patch(orderId, { designIds: [designId] });
+      return designId;
+    });
+
+    // A fan orders under open mode, typing their own name.
+    await t.mutation(api.orderEntries.submitOrder, {
+      jerseyRunId: runId,
+      submitterName: "Pat",
+      submitterEmail: "pat@example.com",
+      customAnswers: {},
+      lines: [{ designId, name: "Gretzky", number: "99", size: "M", qty: 1 }],
+    });
+
+    const before = await t.query(api.jerseyRuns.getPublic, {
+      jerseyRunId: runId,
+    });
+    expect(before!.run.namesMode).toBe("open");
+
+    await asUser.mutation(api.jerseyRuns.setNamesMode, {
+      jerseyRunId: runId,
+      namesMode: "fixed",
+    });
+
+    const after = await t.query(api.jerseyRuns.getPublic, {
+      jerseyRunId: runId,
+    });
+    expect(after!.run.namesMode).toBe("fixed");
+    expect(after!.designs[0].roster).toEqual([
+      { _id: expect.anything(), name: "Gretzky", number: "99" },
+    ]);
+  });
+
+  it("rejects a switch on a locked run", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+
+    await expect(
+      asUser.mutation(api.jerseyRuns.setNamesMode, {
+        jerseyRunId: runId,
+        namesMode: "fixed",
+      }),
+    ).rejects.toThrow(/locked/i);
+  });
+
+  it("rejects a switch from someone who doesn't own the order", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const { asUser: asStranger } = await seedCaptainWithOrder(
+      t,
+      "user_stranger_clerk",
+    );
+
+    await expect(
+      asStranger.mutation(api.jerseyRuns.setNamesMode, {
+        jerseyRunId: runId,
+        namesMode: "fixed",
+      }),
+    ).rejects.toThrow(/access/i);
+  });
+});
+
+// The other half of M-05's split: creation takes only a deadline, so the
+// deadline and the custom questions are edited afterwards from /run/setup.
+describe("jerseyRuns.updateSettings", () => {
+  const questions = [{ id: "q1", label: "How should we deliver?" }];
+
+  it("updates the deadline and the custom questions", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+
+    const deadline = Date.now() + 30 * ONE_DAY;
+    await asUser.mutation(api.jerseyRuns.updateSettings, {
+      jerseyRunId: runId,
+      deadline,
+      customQuestions: questions,
+    });
+
+    const run = await t.run((ctx) => ctx.db.get(runId));
+    expect(run?.deadline).toBe(deadline);
+    expect(run?.customQuestions).toEqual(questions);
+  });
+
+  it("trims question labels and rejects a blank one", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const deadline = Date.now() + 30 * ONE_DAY;
+
+    await asUser.mutation(api.jerseyRuns.updateSettings, {
+      jerseyRunId: runId,
+      deadline,
+      customQuestions: [{ id: "q1", label: "  Allergies?  " }],
+    });
+    expect((await t.run((ctx) => ctx.db.get(runId)))?.customQuestions).toEqual([
+      { id: "q1", label: "Allergies?" },
+    ]);
+
+    await expect(
+      asUser.mutation(api.jerseyRuns.updateSettings, {
+        jerseyRunId: runId,
+        deadline,
+        customQuestions: [{ id: "q1", label: "   " }],
+      }),
+    ).rejects.toThrow(/label/i);
+  });
+
+  it("rejects a deadline in the past", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+
+    await expect(
+      asUser.mutation(api.jerseyRuns.updateSettings, {
+        jerseyRunId: runId,
+        deadline: Date.now() - 1000,
+        customQuestions: [],
+      }),
+    ).rejects.toThrow(/future/i);
+  });
+
+  it("rejects edits to a locked run and from a non-owner", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const { asUser: asStranger } = await seedCaptainWithOrder(
+      t,
+      "user_stranger_clerk",
+    );
+    const deadline = Date.now() + 30 * ONE_DAY;
+
+    await expect(
+      asStranger.mutation(api.jerseyRuns.updateSettings, {
+        jerseyRunId: runId,
+        deadline,
+        customQuestions: [],
+      }),
+    ).rejects.toThrow(/access/i);
+
+    await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
+    await expect(
+      asUser.mutation(api.jerseyRuns.updateSettings, {
+        jerseyRunId: runId,
+        deadline,
+        customQuestions: [],
+      }),
+    ).rejects.toThrow(/locked/i);
   });
 });
 

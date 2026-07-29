@@ -14,10 +14,10 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-// The "collect" surface. The order detail page hands off here, and the run
-// is created lazily the moment the captain completes setup — saving an order
-// never creates a run on its own (O-05). JerseyRunSetup shows the form when
-// no run exists yet, and the run summary + share link once it does.
+// The run-management surface. Since M-05 the run is *created* on the order
+// page ("Start collecting", deadline only) — this page manages one that
+// already exists: share link, deadline, custom questions, and where to read
+// the responses. Rosters and the names-mode switch live with the designs.
 export default function RunSetupPage({ params }: PageProps) {
   const { id } = use(params);
   const orderId = id as Id<"orders">;
@@ -41,14 +41,14 @@ export default function RunSetupPage({ params }: PageProps) {
 
       <header className="mt-3">
         <p className="text-sm font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
-          Run setup · {order.teamName}
+          Your run · {order.teamName}
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          Collect sizes &amp; names
+          Manage collecting
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Set up one shareable link to gather sizes, names, and numbers from
-          your whole team.
+          Your shareable link, when it closes, and anything extra you want to
+          ask. Rosters live on your order page.
         </p>
       </header>
 

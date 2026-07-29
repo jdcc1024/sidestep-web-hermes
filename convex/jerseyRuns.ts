@@ -16,12 +16,13 @@ import {
 import {
   MAX_CUSTOM_QUESTIONS,
   QUESTION_LABEL_MAX_LENGTH,
-  isSizeOption,
+  SIZE_OPTIONS,
 } from "../lib/jerseyRun/rules";
 import {
   canLock,
   canUnlock,
   effectiveStatus,
+  isLocked,
   statusAfterUnlock,
 } from "../lib/jerseyRun/lock";
 import { qtyByDesign } from "./_orderEntries";
@@ -105,71 +106,124 @@ export const getPublic = query({
   },
 });
 
+// What a custom question is allowed to be, server-side. Returns the trimmed
+// list to write; throws a user-facing ConvexError on the first bad row.
+function cleanCustomQuestions(
+  questions: readonly { id: string; label: string }[],
+): { id: string; label: string }[] {
+  if (questions.length > MAX_CUSTOM_QUESTIONS)
+    throw new ConvexError(`Up to ${MAX_CUSTOM_QUESTIONS} custom questions.`);
+
+  const seenQuestionIds = new Set<string>();
+  return questions.map((q) => {
+    const label = q.label.trim();
+    if (!label) throw new ConvexError("Every question needs a label.");
+    if (label.length > QUESTION_LABEL_MAX_LENGTH)
+      throw new ConvexError("A custom question is too long.");
+    if (!q.id || seenQuestionIds.has(q.id))
+      throw new ConvexError("Custom question ids must be unique.");
+    seenQuestionIds.add(q.id);
+    return { id: q.id, label };
+  });
+}
+
+// "Start collecting" (M-05). A deadline is the only thing the captain
+// decides here: sizes are a fixed catalog they're never asked about, names
+// mode is switched afterwards from the order page (`setNamesMode`), and
+// custom questions are edited from /run/setup once the run exists.
+//
+// `sizeOptions` stays on the row rather than being derived at read time so
+// runs created before the fixed catalog keep the narrower list they were
+// created with (PRD §5 — no migration), and per-run scoping remains
+// available if it's ever wanted back.
 export const create = mutation({
   args: {
     orderId: v.id("orders"),
-    sizeOptions: v.array(v.string()),
-    namesMode: v.union(v.literal("open"), v.literal("fixed")),
-    customQuestions: v.array(
-      v.object({ id: v.string(), label: v.string() }),
-    ),
     deadline: v.number(),
   },
   handler: async (ctx, args) => {
     const { user } = await requireOrderOwnership(ctx, args.orderId);
 
-    // One run per order — the captain can edit the existing run if they
-    // need to make changes (handled in a later issue). Creating a second
-    // run for the same order would orphan responses from the first.
+    // One run per order — the captain edits the existing run from
+    // /run/setup if they need to make changes. Creating a second run for
+    // the same order would orphan responses from the first.
     const existing = await ctx.db
       .query("jerseyRuns")
       .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
       .unique();
     if (existing) throw new ConvexError("This order already has a jersey run.");
 
-    const sizeOptions = Array.from(new Set(args.sizeOptions)).filter(
-      isSizeOption,
-    );
-    if (sizeOptions.length === 0)
-      throw new ConvexError("Pick at least one size.");
-
     if (args.deadline <= Date.now())
       throw new ConvexError("Deadline must be in the future.");
 
-    if (args.customQuestions.length > MAX_CUSTOM_QUESTIONS)
-      throw new ConvexError(
-        `Up to ${MAX_CUSTOM_QUESTIONS} custom questions.`,
-      );
-    const seenQuestionIds = new Set<string>();
-    for (const q of args.customQuestions) {
-      const label = q.label.trim();
-      if (!label) throw new ConvexError("Every question needs a label.");
-      if (label.length > QUESTION_LABEL_MAX_LENGTH)
-        throw new ConvexError("A custom question is too long.");
-      if (!q.id || seenQuestionIds.has(q.id))
-        throw new ConvexError("Custom question ids must be unique.");
-      seenQuestionIds.add(q.id);
-    }
-
-    const customQuestions = args.customQuestions.map((q) => ({
-      id: q.id,
-      label: q.label.trim(),
-    }));
-
-    // A fixed-mode run seeds its named slots through the roster manager
-    // (rosterEntries, R-03) after creation — the run row itself no longer
-    // carries a roster array. `namesMode` is preserved so the public form
-    // still shows a slot picker instead of free-text name entry.
+    // A fixed-mode run seeds its named slots through the roster sheet on the
+    // design cards (rosterEntries, M-02). Every run starts open — the mode
+    // only matters once there are slots to pick from, and by then the
+    // captain is on the order page where the control lives.
     return ctx.db.insert("jerseyRuns", {
       orderId: args.orderId,
       captainId: user._id,
-      sizeOptions,
-      namesMode: args.namesMode,
-      customQuestions,
+      sizeOptions: [...SIZE_OPTIONS],
+      namesMode: "open",
+      customQuestions: [],
       deadline: args.deadline,
       status: "open",
       createdAt: Date.now(),
     });
+  },
+});
+
+// Switch how the public form collects names (M-05). Write-once at create
+// until now; the control lives on the order page beside the designs it
+// affects, and switching is safe in both directions — fan-typed names are
+// already `rosterEntries`, so open → fixed promotes them into the picker
+// list and fixed → open only loosens a constraint. Neither loses data,
+// hence no confirmation. Locked runs reject like every other roster write.
+export const setNamesMode = mutation({
+  args: {
+    jerseyRunId: v.id("jerseyRuns"),
+    namesMode: v.union(v.literal("open"), v.literal("fixed")),
+  },
+  handler: async (ctx, { jerseyRunId, namesMode }) => {
+    const run = await ctx.db.get(jerseyRunId);
+    if (!run) throw new ConvexError("Jersey run not found.");
+    await requireOrderOwnership(ctx, run.orderId);
+
+    if (isLocked(run)) throw new ConvexError("This jersey run is locked.");
+
+    await ctx.db.patch(jerseyRunId, { namesMode });
+    return jerseyRunId;
+  },
+});
+
+// The management edit behind /run/setup (M-05). Creation takes only a
+// deadline, so this is where a captain moves the date or adds the custom
+// questions the fan form asks. Sizes and names mode are deliberately absent:
+// the first isn't a captain decision any more, the second has its own
+// mutation next to the designs it affects.
+export const updateSettings = mutation({
+  args: {
+    jerseyRunId: v.id("jerseyRuns"),
+    deadline: v.number(),
+    customQuestions: v.array(
+      v.object({ id: v.string(), label: v.string() }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.jerseyRunId);
+    if (!run) throw new ConvexError("Jersey run not found.");
+    await requireOrderOwnership(ctx, run.orderId);
+
+    if (isLocked(run)) throw new ConvexError("This jersey run is locked.");
+
+    if (args.deadline <= Date.now())
+      throw new ConvexError("Deadline must be in the future.");
+
+    await ctx.db.patch(args.jerseyRunId, {
+      deadline: args.deadline,
+      customQuestions: cleanCustomQuestions(args.customQuestions),
+    });
+    return args.jerseyRunId;
   },
 });
 

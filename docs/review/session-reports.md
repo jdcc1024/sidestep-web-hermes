@@ -1443,3 +1443,70 @@ One entry per completed loop task. This is the human's fast path for UX critique
     `snap.mjs` itself is untouched.
 
 - Follow-ups filed: none.
+
+## 2026-07-28 — M-05: Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting
+
+- What shipped:
+  - **Sizes stop being a captain decision.** `jerseyRuns.create` drops its
+    `sizeOptions` argument and writes the whole 8-size catalog from the
+    `SIZE_OPTIONS` constant. The field stays on the row, so pre-existing runs
+    keep the narrower list they were created with and `checkSize`,
+    `lockSnapshot` and the admin views are untouched (PRD §5, no migration).
+  - **Creation moved to the order page** as a "Start collecting" dialog taking
+    only a deadline. `/portal/orders/[id]/run/setup` is management-only now:
+    share link, status, deadline, custom questions, links to responses and
+    rosters. No lock control anywhere (R-08 stays parked).
+  - **`jerseyRuns.setNamesMode`** — `namesMode` was write-once at create. The
+    control now sits beside the designs on the order page and switches freely
+    both ways, and a **fixed-mode design with zero slots** warns inline
+    ("Nobody can order this design") without blocking anything.
+
+- UX surfaces to eyeball (screenshots in `docs/review/M-05/`):
+  - `portal-orders-jh70c9...-w*.png` — the live-run order. **The review
+    surface**: the *Names & numbers* card now sits between the Designs heading
+    and the size-breakdown chips. Judge whether that is where it belongs, or
+    whether it crowds the run of design cards underneath.
+  - `portal-orders-jh78tc...-w*.png` — the no-run order: "Start collecting"
+    where "Set up your run" used to be, and no names-mode control at all
+    (there is no run to switch).
+  - `dialog-start-collecting-w{375,1280}-{light,dark}.png` — the creation
+    dialog, one date field. Judge whether one field deserves a dialog rather
+    than an inline date + button in the Collect card.
+  - `portal-orders-jh70c9...-run-setup-w*.png` — the slimmed `/run/setup`:
+    "Manage collecting", share link, deadline, questions, Save changes.
+  - `names-mode-fixed-w{375,1280}-light.png` + `public-form-fixed-w*.png` —
+    the switch driven through the real UI against the deployed mutation, and
+    the public form it produces (roster picker instead of free text). The
+    fixture was switched back to open afterwards and verified.
+  - Sidebar-mid-page in the tall captures is the documented `position: fixed`
+    artifact, not a regression.
+  - **Not photographed: the fixed + empty-design warning.** No fixture design
+    is empty on a run — both snap designs carry slots — and manufacturing one
+    would mean either damaging B-04's no-run fixture or deleting seeded rows.
+    It is covered by two component tests (appears in fixed mode with zero
+    slots, gone with the first slot). To see it live: start collecting on
+    "Snap Demo — No Run Yet", switch to Fixed roster, and the warning is
+    immediate (that design has no slots on the new run).
+
+- Decisions I made that a human may want to veto:
+  - **Added `jerseyRuns.updateSettings`, which the issue didn't ask for.**
+    Creation now takes only a deadline, so with the old setup form gone there
+    would have been no way to set custom questions at all — the slice would
+    have silently deleted a feature. `/run/setup` therefore *edits* deadline +
+    questions (ownership-gated, rejects a locked run) rather than displaying
+    them read-only.
+  - **A run is always created `open`.** Names mode is a choice about a roster
+    that doesn't exist yet at creation time, so asking at the dialog would
+    re-add the field the slice removed.
+  - **A closed or locked run drops the settings form** for a read-only summary
+    instead of showing disabled inputs — every save would reject server-side.
+  - **`/run/setup` no longer shows sizes or names mode at all**, not even as
+    summary rows. Sizes are an implementation detail nobody edits, and a
+    second read-only copy of names mode would compete with the live control on
+    the order page.
+  - **The responses page's "no run yet" CTA now points at the order page**
+    ("Start collecting"), since `/run/setup` can no longer create a run.
+  - Fixed a pre-existing copy bug carried into the new form: "Ask up to 5extra
+    questions" → "Ask up to 5 extra questions".
+
+- Follow-ups filed: none.

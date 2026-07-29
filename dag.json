@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-29T06:15:36.143Z",
+  "lastUpdated": "2026-07-29T06:16:18.100Z",
   "phases": [
     {
       "id": "phase-1",
@@ -323,8 +323,8 @@
       "phase": "3",
       "type": "improvement",
       "description": "Removes size choice entirely (fixed 8-size catalog, field retained and populated from the constant), relocates names mode to the order page where a fixed-mode design with no players can warn, and moves run creation to a Start collecting affordance taking only a deadline. /run/setup survives as management-only, with no lock control. The only M slice touching the public form — take it last.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-29T06:16:18.099Z",
       "completedAt": null,
       "issueFile": "backlog/M-05-run-setup-slimming-and-names-mode-relocation.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#6-implementation-decisions",
@@ -828,6 +828,12 @@
       "event": "task_completed",
       "nodeId": "M-04",
       "message": "Completed: Mirror Roster Between Designs"
+    },
+    {
+      "timestamp": "2026-07-29T06:16:18.100Z",
+      "event": "task_started",
+      "nodeId": "M-05",
+      "message": "Picked up: Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting"
     }
   ]
 }

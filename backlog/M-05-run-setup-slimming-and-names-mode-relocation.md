@@ -1,6 +1,6 @@
 # Issue: Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
@@ -17,19 +17,28 @@ This issue touches:
 With the roster moved onto the design cards (M-01…M-04), what's left in Run Setup is a size picker the captain shouldn't be asked about and a names-mode radio whose consequences are only visible next to the designs. This slice removes size choice entirely (a fixed 8-size catalog), relocates names mode to the order page where it can warn about a fixed-mode design with no players, and moves run creation to a "Start collecting" affordance taking only a deadline. `/run/setup` survives as a management-only surface. **Goes last: it is the only M slice that touches the public form.**
 
 ## Acceptance Criteria
-- [ ] `jerseyRuns.create` no longer accepts `sizeOptions` and populates the field with the full `SIZE_OPTIONS` catalog (`XS, S, M, L, XL, 2XL, 3XL, 4XL`)
-- [ ] The size picker is gone from `JerseyRunSetup`; a captain is never asked to choose sizes anywhere
-- [ ] The public form still offers all 8 sizes for a newly created run, and `checkSize` validation is unchanged
-- [ ] Runs created **before** this change keep their narrower `sizeOptions` and still work — no migration (PRD §5)
-- [ ] New `jerseyRuns.setNamesMode` mutation, gated on order ownership and rejecting a locked run
-- [ ] The names-mode control lives in the order page's roster section and switches **freely in both directions**, at any time, with no warning or confirmation
-- [ ] After switching open → fixed, the public form presents the design's slots as the picker list; after fixed → open, fans can type freely — verified end-to-end, not just at the mutation
-- [ ] A design in **fixed** mode with **zero slots** shows an inline warning on its card ("nobody can order this design") — a warning, **not** a block
-- [ ] Run creation is reachable from the order page as **"Start collecting"**, taking only a deadline; it is still gated on at least one design being attached
-- [ ] `/portal/orders/[id]/run/setup` remains reachable and holds share link, deadline, custom questions, and the run summary — **no lock control** (R-08 stays parked, PRD §5)
-- [ ] No path creates a run implicitly — a captain always chooses a deadline
-- [ ] All tests pass
-- [ ] No regressions in existing tests
+- [x] `jerseyRuns.create` no longer accepts `sizeOptions` and populates the field with the full `SIZE_OPTIONS` catalog (`XS, S, M, L, XL, 2XL, 3XL, 4XL`)
+- [x] The size picker is gone from `JerseyRunSetup`; a captain is never asked to choose sizes anywhere
+- [x] The public form still offers all 8 sizes for a newly created run, and `checkSize` validation is unchanged
+- [x] Runs created **before** this change keep their narrower `sizeOptions` and still work — no migration (PRD §5)
+- [x] New `jerseyRuns.setNamesMode` mutation, gated on order ownership and rejecting a locked run
+- [x] The names-mode control lives in the order page's roster section and switches **freely in both directions**, at any time, with no warning or confirmation
+- [x] After switching open → fixed, the public form presents the design's slots as the picker list; after fixed → open, fans can type freely — verified end-to-end, not just at the mutation
+- [x] A design in **fixed** mode with **zero slots** shows an inline warning on its card ("nobody can order this design") — a warning, **not** a block
+- [x] Run creation is reachable from the order page as **"Start collecting"**, taking only a deadline; it is still gated on at least one design being attached
+- [x] `/portal/orders/[id]/run/setup` remains reachable and holds share link, deadline, custom questions, and the run summary — **no lock control** (R-08 stays parked, PRD §5)
+- [x] No path creates a run implicitly — a captain always chooses a deadline
+- [x] All tests pass
+- [x] No regressions in existing tests
+
+## Outcome
+Creation moved to a **"Start collecting"** dialog on the order page (deadline
+only). Because `create` no longer takes custom questions, `/run/setup` needed a
+way to set them or the capability would have been deleted with the form — hence
+a new `jerseyRuns.updateSettings` (deadline + custom questions, ownership-gated,
+locked-run-rejecting), which is what makes "management-only" mean *manageable*
+rather than *read-only*. `lib/jerseyRun/form.ts` is down to two fields
+(`customQuestions`, `deadline`) and now backs that edit form.
 
 ## Dependencies
 - Blocked by: M-02

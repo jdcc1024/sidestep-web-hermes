@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { Suspense } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Queries are told apart by function name, not args shape, so the page can
@@ -640,6 +647,179 @@ describe("/portal/orders/[id] — roster sheet on the design card (M-02)", () =>
     expect(sheet.getByRole("listitem", { name: /gretzky #99/i })).toBeInTheDocument();
     expect(sheet.queryByLabelText(/add player name/i)).toBeNull();
     expect(sheet.queryByRole("button", { name: /edit gretzky/i })).toBeNull();
+  });
+});
+
+// M-05: the run is created here, from a deadline and nothing else, and the
+// names-mode switch sits beside the designs whose rosters it governs.
+describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
+  const RUN = {
+    _id: "run_1" as Id<"jerseyRuns">,
+    deadline: Date.parse("2099-04-01T12:00:00Z"),
+    namesMode: "open" as const,
+    status: "open",
+    effectiveStatus: "open" as const,
+  };
+
+  function rosterWith(entries: Record<string, unknown>[]) {
+    return {
+      runId: RUN._id,
+      designs: [
+        { designId: "design_home", title: "Home kit", entries, blankSizes: [] },
+      ],
+    };
+  }
+
+  it("starts a run from a deadline alone — no sizes, no names mode", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = null;
+    await renderPage();
+
+    await user.click(screen.getByRole("button", { name: /start collecting/i }));
+
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.queryByRole("checkbox", { name: /^xl$/i })).toBeNull();
+    expect(dialog.queryByRole("radio", { name: /fixed roster/i })).toBeNull();
+
+    await user.type(dialog.getByLabelText(/deadline/i), "2099-08-01");
+    await user.click(
+      dialog.getByRole("button", { name: /start collecting/i }),
+    );
+
+    await waitFor(() => {
+      expect(mutationStub).toHaveBeenCalledTimes(1);
+    });
+    expect(mutationStub).toHaveBeenCalledWith({
+      orderId: ORDER_ID,
+      deadline: Date.parse("2099-08-01T23:59:59.999Z"),
+    });
+  });
+
+  it("refuses to start collecting without a deadline", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = null;
+    await renderPage();
+
+    await user.click(screen.getByRole("button", { name: /start collecting/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.click(dialog.getByRole("button", { name: /start collecting/i }));
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(/deadline/i);
+    expect(mutationStub).not.toHaveBeenCalled();
+  });
+
+  it("offers no way to start collecting before a design is attached", async () => {
+    orderResult = orderWith([]);
+    runResult = null;
+    await renderPage();
+
+    expect(
+      screen.queryByRole("button", { name: /start collecting/i }),
+    ).toBeNull();
+    expect(screen.getByText(/attach a design above first/i)).toBeInTheDocument();
+  });
+
+  it("switches names mode to fixed from beside the designs", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    rosterResult = rosterWith([]);
+    await renderPage();
+
+    await user.click(screen.getByRole("radio", { name: /fixed roster/i }));
+
+    await waitFor(() => {
+      expect(mutationStub).toHaveBeenCalledWith({
+        jerseyRunId: RUN._id,
+        namesMode: "fixed",
+      });
+    });
+  });
+
+  // The reverse direction matters as much: nothing is lost either way, so the
+  // captain is never trapped in a mode they picked by accident.
+  it("switches back to open names with no confirmation", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = { ...RUN, namesMode: "fixed" as const };
+    rosterResult = rosterWith([]);
+    await renderPage();
+
+    await user.click(
+      screen.getByRole("radio", { name: /each person types their own/i }),
+    );
+
+    await waitFor(() => {
+      expect(mutationStub).toHaveBeenCalledWith({
+        jerseyRunId: RUN._id,
+        namesMode: "open",
+      });
+    });
+  });
+
+  it("offers no names-mode switch before a run exists", async () => {
+    orderResult = orderWith([design()]);
+    runResult = null;
+    await renderPage();
+
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+  });
+
+  it("warns that nobody can order a fixed-mode design with no players", async () => {
+    orderResult = orderWith([design()]);
+    runResult = { ...RUN, namesMode: "fixed" as const };
+    rosterResult = rosterWith([]);
+    await renderPage();
+
+    const warning = within(sectionFor("Home kit")).getByRole("note", {
+      name: /nobody can order home kit/i,
+    });
+    expect(warning).toHaveTextContent(/nobody can order this design/i);
+    // A warning, not a block: the roster editor is still right there.
+    expect(
+      within(sectionFor("Home kit")).getByRole("button", {
+        name: /manage roster/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("drops the warning once the design has a player", async () => {
+    orderResult = orderWith([design()]);
+    runResult = { ...RUN, namesMode: "fixed" as const };
+    rosterResult = rosterWith([
+      {
+        _id: "slot_gretzky",
+        name: "Gretzky",
+        number: "99",
+        source: "captain",
+        filled: false,
+        collision: false,
+        sizes: [],
+        total: 0,
+      },
+    ]);
+    await renderPage();
+
+    expect(
+      within(sectionFor("Home kit")).queryByRole("note", {
+        name: /nobody can order/i,
+      }),
+    ).toBeNull();
+  });
+
+  it("does not warn an open-mode design with no players", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    rosterResult = rosterWith([]);
+    await renderPage();
+
+    expect(
+      within(sectionFor("Home kit")).queryByRole("note", {
+        name: /nobody can order/i,
+      }),
+    ).toBeNull();
   });
 });
 

@@ -11,17 +11,14 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   MAX_CUSTOM_QUESTIONS,
-  NAMES_MODES,
   QUESTION_LABEL_MAX_LENGTH,
-  SIZE_OPTIONS,
   newQuestionId,
   parseDeadline,
   toJerseyRunPayload,
-  type NamesMode,
 } from "@/lib/jerseyRun";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -33,24 +30,23 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
-// Colocated zod schema. Constants reused from lib/jerseyRun.ts so the
-// client and server cap values the same way (the Convex mutation enforces
-// matching limits server-side). Fixed-mode named slots are seeded from the
-// order page's design cards (RosterSheet, M-02), not here, so the setup
-// form never collects a roster. superRefine only handles the per-question
-// label rules that depend on the whole array.
+// Run Setup is management-only since M-05. The run is created from the order
+// page ("Start collecting", deadline only); sizes are a fixed catalog nobody
+// is asked about, and names mode moved next to the designs it affects. What's
+// left here is genuinely the collection campaign: the share link, the
+// deadline, the custom questions the fan form asks, and where to read the
+// responses. No lock control — R-08 stays parked (PRD §5).
+
+// Colocated zod schema. Constants reused from lib/jerseyRun so the client and
+// server cap values the same way (jerseyRuns.updateSettings enforces matching
+// limits server-side). superRefine handles the per-question label rules that
+// depend on the whole array.
 const formSchema = z
   .object({
-    sizeOptions: z
-      .array(z.enum(SIZE_OPTIONS))
-      .min(1, "Pick at least one size."),
-    namesMode: z.enum(NAMES_MODES, {
-      message: "Choose how names will be collected.",
-    }),
     customQuestions: z.array(
       z.object({ id: z.string(), label: z.string() }),
     ),
@@ -93,28 +89,149 @@ const formSchema = z
 
 type FormValues = z.infer<typeof formSchema>;
 
+type ManagedRun = {
+  _id: Id<"jerseyRuns">;
+  customQuestions: { id: string; label: string }[];
+  deadline: number;
+  effectiveStatus: "open" | "closed" | "locked";
+};
+
 export function JerseyRunSetup({ orderId }: { orderId: Id<"orders"> }) {
   const run = useQuery(api.jerseyRuns.getByOrder, { orderId });
 
   if (run === undefined) return <LoadingSkeleton />;
-  if (run === null) return <JerseyRunForm orderId={orderId} />;
+  if (run === null) return <NoRunYet orderId={orderId} />;
 
-  return <JerseyRunSummary run={run} orderId={orderId} />;
+  return <RunManagement run={run} orderId={orderId} />;
 }
 
-function JerseyRunForm({ orderId }: { orderId: Id<"orders"> }) {
-  const createRun = useMutation(api.jerseyRuns.create);
+// Reachable by typing the URL before starting a run — the order page is the
+// only place a run is created now, and creating one implicitly from here is
+// exactly what M-05 removed.
+function NoRunYet({ orderId }: { orderId: Id<"orders"> }) {
+  return (
+    <div className="rounded-md border border-dashed border-border bg-muted/40 px-6 py-10 text-center">
+      <p className="text-sm font-medium text-foreground">
+        You haven&apos;t started collecting yet
+      </p>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        Pick a deadline on your order page and we&apos;ll create the shareable
+        link — then come back here to manage it.
+      </p>
+      <Link
+        href={`/portal/orders/${orderId}`}
+        className={cn(
+          buttonVariants({ size: "sm" }),
+          "mt-4 bg-teal-600 font-semibold text-white hover:bg-teal-700",
+        )}
+      >
+        Back to your order
+      </Link>
+    </div>
+  );
+}
+
+const RUN_STATUS_LABEL: Record<ManagedRun["effectiveStatus"], string> = {
+  open: "Collecting",
+  closed: "Collection closed",
+  locked: "Roster locked",
+};
+
+function RunManagement({
+  run,
+  orderId,
+}: {
+  run: ManagedRun;
+  orderId: Id<"orders">;
+}) {
+  const shareUrl = useShareUrl(`/run/${run._id}`);
+  const locked = run.effectiveStatus !== "open";
+
+  return (
+    <div className="space-y-6">
+      <ShareLink url={shareUrl} />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Badge
+          className={cn(
+            "border-transparent",
+            run.effectiveStatus === "open"
+              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200"
+              : "bg-muted text-muted-foreground",
+          )}
+        >
+          {RUN_STATUS_LABEL[run.effectiveStatus]}
+        </Badge>
+        <Link
+          href={`/portal/orders/${orderId}/run/responses`}
+          className="text-sm font-semibold text-primary hover:underline"
+        >
+          View responses →
+        </Link>
+        {/* Roster seeding and the names-mode switch live on the order page's
+            design cards (M-02, M-05) — this surface is the collection
+            campaign, not the team list. */}
+        <Link
+          href={`/portal/orders/${orderId}`}
+          className="text-sm font-semibold text-primary hover:underline"
+        >
+          Manage rosters →
+        </Link>
+      </div>
+
+      <Separator />
+
+      {locked ? (
+        <LockedSummary run={run} />
+      ) : (
+        <RunSettingsForm run={run} />
+      )}
+    </div>
+  );
+}
+
+// A closed or locked run rejects every edit server-side, so the form gives
+// way to what it was holding. Read-only, not disabled inputs: there's nothing
+// to type into and pretending otherwise invites a rejected save.
+function LockedSummary({ run }: { run: ManagedRun }) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        This run is no longer collecting, so its settings are frozen. Contact
+        Sidestep if something needs to change.
+      </p>
+      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+        <SummaryField label="Deadline" value={formatDeadline(run.deadline)} />
+        <SummaryField
+          label="Custom questions"
+          value={
+            run.customQuestions.length === 0
+              ? "None"
+              : `${run.customQuestions.length} question${
+                  run.customQuestions.length === 1 ? "" : "s"
+                }`
+          }
+        />
+      </dl>
+      {run.customQuestions.length > 0 && (
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-foreground">
+          {run.customQuestions.map((q) => (
+            <li key={q.id}>{q.label}</li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function RunSettingsForm({ run }: { run: ManagedRun }) {
+  const updateSettings = useMutation(api.jerseyRuns.updateSettings);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      sizeOptions: [],
-      // namesMode starts unselected. zod rejects undefined with the
-      // "Choose how names will be collected." message above, so the cast
-      // just satisfies the typed RadioGroup binding.
-      namesMode: undefined as unknown as NamesMode,
-      customQuestions: [],
-      deadline: "",
+      customQuestions: run.customQuestions,
+      deadline: toDateInput(run.deadline),
     },
   });
 
@@ -132,24 +249,16 @@ function JerseyRunForm({ orderId }: { orderId: Id<"orders"> }) {
   async function onSubmit(values: FormValues) {
     try {
       const payload = toJerseyRunPayload(values);
-      await createRun({
-        orderId,
-        sizeOptions: payload.sizeOptions,
-        namesMode: payload.namesMode,
+      await updateSettings({
+        jerseyRunId: run._id,
         customQuestions: payload.customQuestions,
         deadline: payload.deadline,
       });
-      toast.success("Jersey run created", {
-        description: "Share the link with your team to collect submissions.",
-      });
-      // Convex query is reactive — the summary view swaps in automatically
-      // once the run document appears.
+      toast.success("Run updated");
     } catch (err) {
-      toast.error("Could not save jersey run", {
+      toast.error("Could not save your changes", {
         description:
-          err instanceof Error
-            ? err.message
-            : "Please try again in a moment.",
+          err instanceof Error ? err.message : "Please try again in a moment.",
       });
     }
   }
@@ -167,69 +276,15 @@ function JerseyRunForm({ orderId }: { orderId: Id<"orders"> }) {
       >
         <FormField
           control={form.control}
-          name="sizeOptions"
+          name="deadline"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Jersey sizes</FormLabel>
+              <FormLabel>Deadline</FormLabel>
               <FormDescription>
-                Pick every size your team might need.
+                Submissions close at the end of this day.
               </FormDescription>
               <FormControl>
-                <div className="flex flex-wrap gap-x-5 gap-y-3 pt-1">
-                  {SIZE_OPTIONS.map((size) => {
-                    const checked = field.value.includes(size);
-                    return (
-                      <label
-                        key={size}
-                        className="flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground"
-                      >
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(next) => {
-                            field.onChange(
-                              next
-                                ? [...field.value, size]
-                                : field.value.filter((v) => v !== size),
-                            );
-                          }}
-                        />
-                        {size}
-                      </label>
-                    );
-                  })}
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="namesMode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Names &amp; numbers</FormLabel>
-              <FormDescription>
-                Choose how each fan picks their name on the form.
-              </FormDescription>
-              <FormControl>
-                <RadioGroup
-                  value={field.value ?? ""}
-                  onValueChange={(value) => field.onChange(value)}
-                  className="grid gap-2 pt-1 sm:grid-cols-2"
-                >
-                  <ModeOption
-                    value="open"
-                    title="Open"
-                    description="Each fan types their own name and number."
-                  />
-                  <ModeOption
-                    value="fixed"
-                    title="Fixed roster"
-                    description="You pre-define names; fans pick from a list."
-                  />
-                </RadioGroup>
+                <Input type="date" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -243,8 +298,8 @@ function JerseyRunForm({ orderId }: { orderId: Id<"orders"> }) {
             <FormItem>
               <FormLabel>Custom questions</FormLabel>
               <FormDescription>
-                Ask up to {MAX_CUSTOM_QUESTIONS} extra questions (e.g. &ldquo;How should we
-                deliver?&rdquo;).
+                Ask up to {MAX_CUSTOM_QUESTIONS}{" "}
+                extra questions (e.g. &ldquo;How should we deliver?&rdquo;).
               </FormDescription>
               <div className="space-y-2">
                 {questionsArray.fields.length === 0 ? (
@@ -326,133 +381,18 @@ function JerseyRunForm({ orderId }: { orderId: Id<"orders"> }) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="deadline"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Deadline</FormLabel>
-              <FormDescription>
-                Submissions close at the end of this day.
-              </FormDescription>
-              <FormControl>
-                <Input type="date" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
         <Separator />
 
         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            You&apos;ll get a shareable link to send to your team.
+            Changes apply to everyone who opens your link from now on.
           </p>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Create jersey run"}
+            {isSubmitting ? "Saving…" : "Save changes"}
           </Button>
         </div>
       </form>
     </Form>
-  );
-}
-
-function ModeOption({
-  value,
-  title,
-  description,
-}: {
-  value: NamesMode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-md border border-input bg-background p-4 transition hover:border-ring has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5">
-      <RadioGroupItem value={value} className="mt-0.5" />
-      <span className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-foreground">{title}</span>
-        <span className="text-xs text-muted-foreground">{description}</span>
-      </span>
-    </label>
-  );
-}
-
-function JerseyRunSummary({
-  run,
-  orderId,
-}: {
-  run: {
-    _id: Id<"jerseyRuns">;
-    sizeOptions: string[];
-    namesMode: "open" | "fixed";
-    customQuestions: { id: string; label: string }[];
-    deadline: number;
-  };
-  orderId: Id<"orders">;
-}) {
-  const shareUrl = useShareUrl(`/run/${run._id}`);
-  return (
-    <div className="space-y-6">
-      <ShareLink url={shareUrl} />
-
-      <Link
-        href={`/portal/orders/${orderId}/run/responses`}
-        className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-      >
-        View responses →
-      </Link>
-
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <SummaryField label="Sizes" value={run.sizeOptions.join(", ")} />
-        <SummaryField
-          label="Names mode"
-          value={run.namesMode === "fixed" ? "Fixed roster" : "Open"}
-        />
-        <SummaryField
-          label="Deadline"
-          value={new Date(run.deadline).toLocaleDateString(undefined, {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          })}
-        />
-        <SummaryField
-          label="Custom questions"
-          value={
-            run.customQuestions.length === 0
-              ? "None"
-              : `${run.customQuestions.length} question${
-                  run.customQuestions.length === 1 ? "" : "s"
-                }`
-          }
-        />
-      </dl>
-
-      <Separator />
-
-      {/* Roster seeding moved to the order page's design cards (M-02) —
-          this surface is the collection campaign, not the team list. */}
-      <Link
-        href={`/portal/orders/${orderId}`}
-        className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-      >
-        Manage rosters on your order page →
-      </Link>
-
-      {run.customQuestions.length > 0 && (
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Custom questions
-          </p>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-foreground">
-            {run.customQuestions.map((q) => (
-              <li key={q.id}>{q.label}</li>
-            ))}
-          </ol>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -525,4 +465,19 @@ function LoadingSkeleton() {
       <Skeleton className="h-10 w-2/3" />
     </div>
   );
+}
+
+// Deadlines are stored as an end-of-day UTC timestamp (parseDeadline), so
+// the date input has to read them back in UTC or a captain west of Greenwich
+// sees yesterday.
+function toDateInput(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+function formatDeadline(ms: number): string {
+  return new Date(ms).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }

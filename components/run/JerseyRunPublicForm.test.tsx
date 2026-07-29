@@ -272,6 +272,74 @@ describe("JerseyRunPublicForm", () => {
     ).not.toBeInTheDocument();
   });
 
+  // M-05: names mode is switchable from the order page now, so the public
+  // form has to follow it in both directions. The names a fan typed under
+  // open mode are already roster slots, which is what makes the promotion to
+  // a picker list free.
+  it("presents the roster as a picker after the captain switches to fixed", () => {
+    const fanTyped = [
+      { _id: "slot_1" as Id<"rosterEntries">, name: "Gretzky", number: "99" },
+    ];
+    publicData = {
+      ...singleDesignOpen(),
+      designs: [{ _id: HOME, title: "Home", roster: fanTyped }],
+    };
+    const { unmount } = render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+
+    // Open: free text, and the existing slot is not offered as a choice.
+    expect(screen.getByLabelText(/name on jersey/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /add one M for Gretzky/i }),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    publicData = {
+      ...publicData,
+      run: { ...publicData.run, namesMode: "fixed" },
+    };
+    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+
+    expect(screen.queryByLabelText(/name on jersey/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /add one M for Gretzky/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("lets fans type freely again after a switch back to open", () => {
+    publicData = fixedSingleDesign();
+    const { unmount } = render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    expect(screen.queryByLabelText(/name on jersey/i)).not.toBeInTheDocument();
+    unmount();
+
+    publicData = {
+      ...publicData,
+      run: { ...publicData.run, namesMode: "open" },
+    };
+    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+
+    expect(screen.getByLabelText(/name on jersey/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^number$/i)).toBeInTheDocument();
+  });
+
+  // The captain is never asked which sizes to offer (M-05) — a run created
+  // after that change carries the whole catalog, and the form shows all of it.
+  it("offers every size in the run's catalog, in canonical order", () => {
+    publicData = {
+      ...singleDesignOpen(),
+      run: {
+        ...singleDesignOpen().run,
+        sizeOptions: ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"],
+      },
+    };
+    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+
+    // The radio itself is visually hidden inside its label, so the label is
+    // what carries the size text a fan actually reads.
+    expect(
+      screen.getAllByRole("radio").map((r) => r.closest("label")?.textContent),
+    ).toEqual(["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"]);
+  });
+
   it("blocks a fixed-mode submit with nothing selected", async () => {
     publicData = fixedSingleDesign();
     const user = userEvent.setup();

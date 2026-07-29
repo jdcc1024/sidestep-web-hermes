@@ -312,7 +312,7 @@ describe("/portal/orders/[id]/run/responses — view switcher (C-02)", () => {
 // Only the run tells them apart (B-04). The skeleton renders no headings at
 // all, which is what distinguishes it from every settled state below.
 describe("/portal/orders/[id]/run/responses — no-run-yet gate (B-04)", () => {
-  it("sends a captain with no run yet to set one up instead of hanging", async () => {
+  it("sends a captain with no run yet to start one instead of hanging", async () => {
     orderResult = orderWith();
     runResult = null;
     entriesResult = undefined;
@@ -321,9 +321,11 @@ describe("/portal/orders/[id]/run/responses — no-run-yet gate (B-04)", () => {
     expect(
       screen.getByRole("heading", { name: /no jersey run yet/i }),
     ).toBeInTheDocument();
+    // The order page owns run creation since M-05; /run/setup only manages a
+    // run that already exists.
     expect(
-      screen.getByRole("link", { name: /set up your run/i }),
-    ).toHaveAttribute("href", `/portal/orders/${ORDER_ID}/run/setup`);
+      screen.getByRole("link", { name: /start collecting/i }),
+    ).toHaveAttribute("href", `/portal/orders/${ORDER_ID}`);
   });
 
   it("keeps the skeleton while the run itself is still loading", async () => {

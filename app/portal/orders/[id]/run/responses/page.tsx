@@ -335,16 +335,18 @@ function NoRunYet({ orderId }: { orderId: Id<"orders"> }) {
     <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-foreground">No jersey run yet</h1>
       <p className="mt-2 text-muted-foreground">
-        Set up a run to start collecting sizes and names from your team.
+        Start collecting to gather sizes and names from your team.
       </p>
+      {/* Runs are started from the order page (M-05) — /run/setup manages one
+          that already exists and can't create it. */}
       <Link
-        href={`/portal/orders/${orderId}/run/setup`}
+        href={`/portal/orders/${orderId}`}
         className={cn(
           buttonVariants({ size: "lg" }),
           "mt-6 bg-teal-600 font-semibold text-white shadow-sm hover:bg-teal-700",
         )}
       >
-        Set up your run
+        Start collecting
       </Link>
     </div>
   );

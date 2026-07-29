@@ -13,6 +13,8 @@ import { OrderTimeline } from "@/components/portal/OrderTimeline";
 import { RemovedDesigns } from "@/components/portal/DesignRemoval";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
 import { DesignRosterPreview } from "@/components/portal/DesignRosterPreview";
+import { NamesModeControl } from "@/components/portal/NamesModeControl";
+import { StartCollecting } from "@/components/portal/StartCollecting";
 import {
   RosterSheet,
   type RosterCopySource,
@@ -256,6 +258,18 @@ export default function OrderDetailPage({ params }: PageProps) {
           )}
         </div>
 
+        {/* How the public form collects names (M-05). It lives here, not on
+            Run Setup, because in fixed mode the roster on the cards below
+            *is* the fan-facing picker list. Needs a run — there's no mode to
+            switch before one exists. */}
+        {run && (
+          <NamesModeControl
+            runId={run._id}
+            namesMode={run.namesMode}
+            locked={runLocked}
+          />
+        )}
+
         {/* The whole order's size run, above the per-design sections: the
             captain reads "what are we making" once, then drills in. */}
         <SizeBreakdown entries={entries} className="mt-4" />
@@ -281,6 +295,7 @@ export default function OrderDetailPage({ params }: PageProps) {
                     designId: other._id,
                     title: other.title,
                   }))}
+                namesMode={run?.namesMode ?? null}
                 locked={runLocked}
               />
             ))}
@@ -314,6 +329,7 @@ function DesignSection({
   runId,
   slots,
   otherDesigns,
+  namesMode,
   locked,
 }: {
   design: OrderDesign;
@@ -322,6 +338,7 @@ function DesignSection({
   runId: Id<"jerseyRuns"> | null;
   slots: readonly RosterSheetSlot[];
   otherDesigns: readonly RosterCopySource[];
+  namesMode: "open" | "fixed" | null;
   locked: boolean;
 }) {
   const hasSpecs = design.jerseyStyle || design.neckline || design.sleeveStyle;
@@ -378,6 +395,23 @@ function DesignSection({
             up to each other — plus the seeded slots contributing 0, which the
             count alone can't show. */}
         <DesignRollup count={count} />
+
+        {/* In fixed mode the public form only offers the seeded slots, so a
+            design with none collects nothing (M-05). A warning, not a block:
+            the captain is usually mid-seeding, and blocking would fight the
+            workflow. Disappears with the first slot. */}
+        {namesMode === "fixed" && slots.length === 0 && (
+          <p
+            role="note"
+            aria-label={`Nobody can order ${design.title}`}
+            className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+          >
+            <span className="font-semibold">Nobody can order this design.</span>{" "}
+            You&apos;re collecting from a fixed roster, and this design has no
+            players yet — add some below, or switch to open names.
+          </p>
+        )}
+
         <DesignRosterPreview rows={rows} />
 
         {/* Roster entries hang off a run, so there is nothing to edit until
@@ -394,7 +428,7 @@ function DesignSection({
           />
         ) : (
           <p className="text-sm text-muted-foreground">
-            Set up a run below to start building this design&apos;s roster.
+            Start collecting below to start building this design&apos;s roster.
           </p>
         )}
       </CardContent>
@@ -505,10 +539,12 @@ function NoDesigns({
   );
 }
 
-// The handoff into Run Setup. Run creation is lazy: this section routes the
-// captain to the setup surface, where the first "collect" creates the run.
-// Gated until at least one design is attached so the progress milestone the
-// order page shows stays honest.
+// Where collecting starts (M-05). Run creation lives here now, taking only a
+// deadline — sizes are a fixed catalog and names mode is switched above, so
+// the old setup form had one field left and no reason to be its own page.
+// Still gated until at least one design is attached, so the progress
+// milestone the order page shows stays honest, and still explicit: nothing
+// creates a run implicitly.
 function CollectSection({
   orderId,
   run,
@@ -537,22 +573,14 @@ function CollectSection({
         ) : run !== null ? (
           <RunStatus orderId={orderId} run={run} />
         ) : hasDesigns ? (
-          <Link
-            href={`/portal/orders/${orderId}/run/setup`}
-            className={cn(
-              buttonVariants({ size: "lg" }),
-              "bg-teal-600 font-semibold text-white hover:bg-teal-700",
-            )}
-          >
-            Set up your run
-          </Link>
+          <StartCollecting orderId={orderId} />
         ) : (
           <div className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-4 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
               Not available yet.
             </span>{" "}
-            Attach a design above first — then you can set up a run to collect
-            sizes from your team.
+            Attach a design above first — then you can start collecting sizes
+            from your team.
           </div>
         )}
       </CardContent>
@@ -567,6 +595,7 @@ function CollectSection({
 type RunSummary = {
   _id: Id<"jerseyRuns">;
   deadline: number;
+  namesMode: "open" | "fixed";
   effectiveStatus: "open" | "closed" | "locked";
 };
 

@@ -26,8 +26,6 @@ const PAST_DATE = "2026-05-01";
 
 function validInput(overrides: Partial<JerseyRunInput> = {}): JerseyRunInput {
   return {
-    sizeOptions: ["S", "M", "L"],
-    namesMode: "open",
     customQuestions: [],
     deadline: FUTURE_DATE,
     ...overrides,
@@ -35,14 +33,8 @@ function validInput(overrides: Partial<JerseyRunInput> = {}): JerseyRunInput {
 }
 
 describe("validateJerseyRun — happy path", () => {
-  it("accepts a minimal open-mode run", () => {
+  it("accepts a minimal run", () => {
     expect(validateJerseyRun(validInput(), NOW)).toEqual({});
-  });
-
-  it("accepts a fixed-mode run (named slots are seeded via the roster manager)", () => {
-    expect(
-      validateJerseyRun(validInput({ namesMode: "fixed" }), NOW),
-    ).toEqual({});
   });
 
   it("accepts up to MAX_CUSTOM_QUESTIONS questions", () => {
@@ -57,24 +49,18 @@ describe("validateJerseyRun — happy path", () => {
 });
 
 describe("validateJerseyRun — required fields", () => {
-  it("flags every required field when the form is empty", () => {
+  it("flags the deadline when the form is empty", () => {
     const errors = validateJerseyRun(EMPTY_JERSEY_RUN, NOW);
-    expect(errors.sizeOptions).toBeTruthy();
-    expect(errors.namesMode).toBeTruthy();
     expect(errors.deadline).toBeTruthy();
   });
 
-  it("rejects an empty size selection", () => {
-    expect(
-      validateJerseyRun(validInput({ sizeOptions: [] }), NOW).sizeOptions,
-    ).toBeTruthy();
-  });
-
-  it("ignores unknown sizes when checking the selection", () => {
-    // "XXXL" isn't a valid option — should be treated as if not picked.
-    expect(
-      validateJerseyRun(validInput({ sizeOptions: ["XXXL"] }), NOW).sizeOptions,
-    ).toBeTruthy();
+  // M-05: sizes are a fixed catalog and names mode lives on the order page,
+  // so neither is a field this form can get wrong any more.
+  it("no longer asks about sizes or names mode", () => {
+    expect(EMPTY_JERSEY_RUN).toEqual({ customQuestions: [], deadline: "" });
+    expect(Object.keys(validateJerseyRun(EMPTY_JERSEY_RUN, NOW))).toEqual([
+      "deadline",
+    ]);
   });
 });
 
@@ -177,12 +163,10 @@ describe("parseDeadline", () => {
   });
 });
 
-describe("toJerseyRunPayload — open mode", () => {
-  it("returns the cleaned payload for an open-mode run with custom questions", () => {
+describe("toJerseyRunPayload", () => {
+  it("returns the cleaned payload for a run with custom questions", () => {
     const payload = toJerseyRunPayload(
       validInput({
-        sizeOptions: ["S", "M", "L", "XL"],
-        namesMode: "open",
         customQuestions: [
           { id: "q1", label: "  Delivery method?  " },
           { id: "q2", label: "Allergies?" },
@@ -190,20 +174,11 @@ describe("toJerseyRunPayload — open mode", () => {
         deadline: FUTURE_DATE,
       }),
     );
-    expect(payload.namesMode).toBe("open");
-    expect(payload.sizeOptions).toEqual(["S", "M", "L", "XL"]);
     expect(payload.customQuestions).toEqual([
       { id: "q1", label: "Delivery method?" },
       { id: "q2", label: "Allergies?" },
     ]);
     expect(payload.deadline).toBe(Date.parse(`${FUTURE_DATE}T23:59:59.999Z`));
-  });
-
-  it("drops unknown sizes from the selection", () => {
-    const payload = toJerseyRunPayload(
-      validInput({ sizeOptions: ["S", "XXXL", "M"] }),
-    );
-    expect(payload.sizeOptions).toEqual(["S", "M"]);
   });
 
   it("drops custom questions with blank labels", () => {
@@ -219,25 +194,11 @@ describe("toJerseyRunPayload — open mode", () => {
       { id: "q1", label: "Real question" },
     ]);
   });
-});
 
-describe("toJerseyRunPayload — fixed mode", () => {
-  it("carries namesMode through without a roster (slots are seeded separately)", () => {
-    const payload = toJerseyRunPayload(validInput({ namesMode: "fixed" }));
-    expect(payload.namesMode).toBe("fixed");
-    expect(payload).not.toHaveProperty("fixedRoster");
-  });
-
-  it("throws for an invalid namesMode (caller should have validated)", () => {
-    expect(() =>
-      toJerseyRunPayload(validInput({ namesMode: "" })),
-    ).toThrow();
-  });
-
-  it("throws for an empty size selection (caller should have validated)", () => {
-    expect(() =>
-      toJerseyRunPayload(validInput({ sizeOptions: [] })),
-    ).toThrow();
+  it("carries no sizes or names mode — neither is form state any more", () => {
+    const payload = toJerseyRunPayload(validInput());
+    expect(payload).not.toHaveProperty("sizeOptions");
+    expect(payload).not.toHaveProperty("namesMode");
   });
 
   it("throws for an invalid deadline (caller should have validated)", () => {
