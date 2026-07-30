@@ -1,18 +1,63 @@
 export type PricingTier = {
-  label: string;
+  /** Inclusive lower bound of the tier. */
   min: number;
+  /** Inclusive upper bound, or null for the open-ended top tier. */
   max: number | null;
   pricePerUnit: number;
+  /** Short marketing line shown on the tier's pricing card. */
+  tagline: string;
+  /** The tier we spotlight before a visitor tells us their team size. */
+  popular?: boolean;
 };
 
 export const PRICING_TIERS: ReadonlyArray<PricingTier> = [
-  { label: "5–9 jerseys", min: 5, max: 9, pricePerUnit: 60 },
-  { label: "10–25 jerseys", min: 10, max: 24, pricePerUnit: 50 },
-  { label: "26–50 jerseys", min: 25, max: 49, pricePerUnit: 45 },
-  { label: "51+ jerseys", min: 50, max: null, pricePerUnit: 40 },
+  { min: 5, max: 9, pricePerUnit: 60, tagline: "Small squads" },
+  {
+    min: 10,
+    max: 24,
+    pricePerUnit: 50,
+    tagline: "Our most popular tier",
+    popular: true,
+  },
+  { min: 25, max: 49, pricePerUnit: 45, tagline: "Full teams" },
+  { min: 50, max: null, pricePerUnit: 40, tagline: "Clubs & leagues" },
 ];
 
 export const DESIGN_FEE = 125;
+
+export const MIN_ORDER_QUANTITY = PRICING_TIERS[0].min;
+
+export const POPULAR_TIER_INDEX = Math.max(
+  PRICING_TIERS.findIndex((tier) => tier.popular),
+  0
+);
+
+/**
+ * Heading for a tier card. Derived from min/max so a displayed range can never
+ * drift from the quantity that actually earns the price.
+ */
+export function formatTierRange(tier: PricingTier): string {
+  return tier.max === null
+    ? `${tier.min}+ jerseys`
+    : `${tier.min}–${tier.max} jerseys`;
+}
+
+/**
+ * Which tier card the UI should spotlight for `quantity`. Unlike the pricing
+ * lookup this never answers "no tier": a quantity under the minimum order still
+ * points at the entry tier, because that is the tier the visitor is reaching
+ * for. Returns null only when there is no quantity to reason about at all.
+ */
+export function spotlightTierIndex(quantity: number): number | null {
+  if (!Number.isFinite(quantity) || quantity < 1) return null;
+  const safeQuantity = Math.floor(quantity);
+  const index = PRICING_TIERS.findIndex((tier) => {
+    const withinMin = safeQuantity >= tier.min;
+    const withinMax = tier.max === null || safeQuantity <= tier.max;
+    return withinMin && withinMax;
+  });
+  return index === -1 ? 0 : index;
+}
 
 export type EstimateResult = {
   quantity: number;

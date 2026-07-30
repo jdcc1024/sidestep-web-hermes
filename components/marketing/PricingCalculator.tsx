@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useId, useState } from "react";
 import { ArrowRightIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { calculateEstimate, DESIGN_FEE } from "@/lib/pricing";
+import { cn } from "@/lib/utils";
 
 const currency = new Intl.NumberFormat("en-CA", {
   style: "currency",
@@ -18,8 +19,16 @@ const currency = new Intl.NumberFormat("en-CA", {
   maximumFractionDigits: 0,
 });
 
-export function PricingCalculator() {
-  const [quantityText, setQuantityText] = useState("12");
+type PricingCalculatorProps = {
+  /** Raw field text, owned by the section so the tier cards can follow it. */
+  quantityText: string;
+  onQuantityTextChange: (value: string) => void;
+};
+
+export function PricingCalculator({
+  quantityText,
+  onQuantityTextChange,
+}: PricingCalculatorProps) {
   const [hasDesignFee, setHasDesignFee] = useState(false);
 
   const parsed = Number.parseInt(quantityText, 10);
@@ -52,7 +61,7 @@ export function PricingCalculator() {
               min={1}
               step={1}
               value={quantityText}
-              onChange={(event) => setQuantityText(event.target.value)}
+              onChange={(event) => onQuantityTextChange(event.target.value)}
               className="h-11 text-lg font-semibold"
               aria-describedby={outputId}
             />
@@ -130,15 +139,16 @@ export function PricingCalculator() {
         <p className="text-sm text-muted-foreground">
           Ready to lock in your numbers?
         </p>
-        <Button
-          size="lg"
-          className="h-11 bg-teal-600 px-5 text-sm text-white shadow-sm hover:bg-teal-700"
+        <Link
+          href={`/intake?qty=${intakeQty}`}
+          className={cn(
+            buttonVariants({ size: "lg" }),
+            "h-11 bg-teal-600 px-5 text-sm text-white shadow-sm hover:bg-teal-700"
+          )}
         >
-          <Link href={`/intake?qty=${intakeQty}`}>
-            Get your official quote
-            <ArrowRightIcon aria-hidden="true" />
-          </Link>
-        </Button>
+          Get your official quote
+          <ArrowRightIcon aria-hidden="true" />
+        </Link>
       </div>
     </Card>
   );
