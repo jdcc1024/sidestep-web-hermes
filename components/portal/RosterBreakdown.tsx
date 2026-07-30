@@ -6,6 +6,7 @@ import {
   type RosterLine,
 } from "@/lib/jerseyBreakdown";
 import { cn } from "@/lib/utils";
+import { DesignThumbnail } from "@/components/design/DesignThumbnail";
 
 // The collected roster, read as jerseys rather than as submissions (C-01).
 // The responses table answers "who sent what, when"; this answers the
@@ -87,13 +88,25 @@ export function RosterBreakdown({
   );
 }
 
+// The design's picture leads its group. This view is a list of production
+// lines under several near-identically-shaped headings, and the kit is what a
+// captain recognises a group by faster than its title — so the thumbnail is
+// the heading's anchor, sized to the two-line block it sits against.
 function DesignGroup({ group }: { group: DesignRoster }) {
   return (
     <section aria-label={`Roster: ${group.designTitle}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">
-          {group.designTitle}
-        </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <DesignThumbnail
+            title={group.designTitle}
+            mainImage={group.mainImage}
+            className="size-10 shrink-0"
+            iconClassName="size-4"
+          />
+          <h3 className="truncate text-sm font-semibold text-foreground">
+            {group.designTitle}
+          </h3>
+        </div>
         <p className="text-xs tabular-nums text-muted-foreground">
           {group.total} jersey{group.total === 1 ? "" : "s"}
         </p>

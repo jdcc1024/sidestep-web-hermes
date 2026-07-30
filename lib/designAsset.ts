@@ -44,6 +44,18 @@ export function isWebSafeImage(value: string | null | undefined): boolean {
   return WEB_SAFE_SET.has(normalizeContentType(value));
 }
 
+// The picture that stands in for a design on a summary surface, with its URL
+// already resolved by the query. Lives here rather than beside a component
+// because both the Convex reads and the pure derivations that carry it
+// through (lib/jerseyBreakdown) need the shape without importing UI. A null
+// `url` means the file itself has gone from storage; callers hold
+// `DesignMainImage | null` for "this design has no image at all".
+export type DesignMainImage = {
+  url: string | null;
+  filename: string;
+  contentType: string;
+};
+
 // The minimum an asset must carry to take part in main-image resolution.
 export type MainImageCandidate = {
   contentType: string;

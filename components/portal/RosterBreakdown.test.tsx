@@ -74,6 +74,66 @@ describe("RosterBreakdown", () => {
       screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent),
     ).toEqual(["Away kit", "Home kit"]);
   });
+
+  // Several groups of near-identical lines read the same at a glance, so each
+  // heading carries its design's picture (D-07's resolved main image).
+  it("shows each design's main image beside its heading", () => {
+    render(
+      <RosterBreakdown
+        entries={[entry()]}
+        designs={[
+          {
+            ...HOME,
+            mainImage: {
+              url: "https://storage.test/home.png",
+              filename: "home.png",
+              contentType: "image/png",
+            },
+          },
+          AWAY,
+        ]}
+      />,
+    );
+
+    const home = within(screen.getByLabelText("Roster: Home kit"));
+    expect(home.getByAltText("Home kit main image")).toHaveAttribute(
+      "src",
+      "https://storage.test/home.png",
+    );
+
+    // The design with no image keeps its heading's shape via the placeholder.
+    const away = within(screen.getByLabelText("Roster: Away kit"));
+    expect(away.queryByAltText(/main image/i)).toBeNull();
+    expect(
+      away.getByRole("img", { name: /no image yet for away kit/i }),
+    ).toBeInTheDocument();
+  });
+
+  // A print template can be the owner's explicit main pick, and no browser
+  // draws it — the renderer makes that call, not the query.
+  it("falls back to the placeholder for a non-renderable main file", () => {
+    render(
+      <RosterBreakdown
+        entries={[entry()]}
+        designs={[
+          {
+            ...HOME,
+            mainImage: {
+              url: "https://storage.test/print.pdf",
+              filename: "print.pdf",
+              contentType: "application/pdf",
+            },
+          },
+        ]}
+      />,
+    );
+
+    const home = within(screen.getByLabelText("Roster: Home kit"));
+    expect(home.queryByAltText(/main image/i)).toBeNull();
+    expect(
+      home.getByRole("img", { name: /no image yet for home kit/i }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("SizeBreakdown", () => {

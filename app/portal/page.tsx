@@ -9,10 +9,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { overviewOf } from "@/lib/designBlock";
 import { useOwnedList } from "@/lib/ownedResource";
-import {
-  DesignThumbnail,
-  type DesignMainImage,
-} from "@/components/design/DesignThumbnail";
+import type { DesignMainImage } from "@/lib/designAsset";
+import { DesignThumbnail } from "@/components/design/DesignThumbnail";
 import {
   chipToneForStage,
   deriveCustomerStage,
@@ -216,7 +214,10 @@ function OrderCard({ order }: { order: Doc<"orders"> }) {
 function DesignCard({
   design,
 }: {
-  design: Doc<"designs"> & { fileCount: number; mainImage: DesignMainImage };
+  design: Doc<"designs"> & {
+    fileCount: number;
+    mainImage: DesignMainImage | null;
+  };
 }) {
   const fileCount = design.fileCount;
   const summary = truncate(overviewOf(design.blocks), OVERVIEW_PREVIEW_CHARS);

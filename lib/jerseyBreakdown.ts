@@ -9,6 +9,7 @@
 // `orderEntries.countsByRun`.
 
 import { sortSizes } from "./jerseyRun";
+import type { DesignMainImage } from "./designAsset";
 
 // The slice of a `listOrderEntries` row these derivations need. Structural,
 // not the Convex type, so tests and both pages can pass their own rows.
@@ -22,8 +23,15 @@ export type BreakdownEntry = {
 };
 
 // A design as the order carries it. Titles come from here rather than from
-// the entries so a design with nothing collected still renders as itself.
-export type DesignRef = { _id: string; title: string };
+// the entries so a design with nothing collected still renders as itself —
+// and the same goes for its picture, which `orders.getMyOrder` resolves once
+// per design (D-07). Optional because plenty of callers only care about the
+// scoping, and a fixture shouldn't have to invent an image.
+export type DesignRef = {
+  _id: string;
+  title: string;
+  mainImage?: DesignMainImage | null;
+};
 
 // One production line: this player slot, in this size, this many times.
 export type RosterLine = {
@@ -40,6 +48,9 @@ export type RosterLine = {
 export type DesignRoster = {
   designId: string;
   designTitle: string;
+  // Null both when the design has no image and when the caller didn't hand
+  // one over — a group renders the same placeholder either way.
+  mainImage: DesignMainImage | null;
   lines: RosterLine[];
   total: number;
 };
@@ -147,6 +158,7 @@ export function rosterLinesByDesign(
     return {
       designId: design._id,
       designTitle: design.title,
+      mainImage: design.mainImage ?? null,
       lines: sortLines([...lines.values()]),
       total: own.reduce((sum, e) => sum + e.qty, 0),
     };

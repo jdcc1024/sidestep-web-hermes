@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ImageIcon } from "lucide-react";
-import { isWebSafeImage } from "@/lib/designAsset";
+import { isWebSafeImage, type DesignMainImage } from "@/lib/designAsset";
 import { cn } from "@/lib/utils";
 
 // The picture that stands in for a design on a summary surface (D-07) — the
@@ -14,12 +14,6 @@ import { cn } from "@/lib/utils";
 // placeholder: the design has no files, the main file isn't something a
 // browser draws (a print template can be the owner's explicit pick), or its
 // short-lived storage URL went stale between the query and the render.
-export type DesignMainImage = {
-  url: string | null;
-  filename: string;
-  contentType: string;
-} | null;
-
 export function DesignThumbnail({
   title,
   mainImage,
@@ -27,7 +21,7 @@ export function DesignThumbnail({
   iconClassName,
 }: {
   title: string;
-  mainImage: DesignMainImage;
+  mainImage: DesignMainImage | null;
   // Sizing lives with the caller: a card wants a wide cover band, the order
   // page a small square beside the title.
   className?: string;

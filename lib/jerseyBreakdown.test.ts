@@ -82,6 +82,25 @@ describe("rosterLinesByDesign", () => {
     expect(groups[1].total).toBe(0);
   });
 
+  // The group heading shows the design's picture, so the derivation carries
+  // the already-resolved image straight through from the order's design.
+  it("carries each design's main image onto its group", () => {
+    const image = {
+      url: "https://storage.test/home.png",
+      filename: "home.png",
+      contentType: "image/png",
+    };
+    const groups = rosterLinesByDesign(
+      [entry()],
+      [{ ...HOME, mainImage: image }, AWAY],
+    );
+
+    expect(groups[0].mainImage).toEqual(image);
+    // A design the caller handed over without an image reads as "no image",
+    // not as undefined — the heading renders a placeholder either way.
+    expect(groups[1].mainImage).toBeNull();
+  });
+
   it("keeps blank/bulk lines instead of dropping the nameless ones", () => {
     const groups = rosterLinesByDesign(
       [

@@ -8,6 +8,7 @@ import {
   normalizeContentType,
   normalizeFilename,
   resolveMainAsset,
+  type DesignMainImage,
 } from "../lib/designAsset";
 
 // The Convex-side of the design asset model (D-01). Every read of a design's
@@ -89,16 +90,11 @@ export async function fileCountsByDesign(
   return new Map(unique.map((designId, i) => [designId, counts[i]!]));
 }
 
-// The picture that stands in for a design on a summary surface, with its URL
-// already resolved. Content type travels with it because the resolver may
-// hand back an explicitly flagged non-image — the renderer, not the query,
-// decides whether an <img> can show it.
-export type DesignMainImage = {
-  url: string | null;
-  filename: string;
-  contentType: string;
-};
-
+// The summary shape a card or a design section reads. `mainImage` is the
+// resolved picture (its shape lives in lib/designAsset, shared with the UI) —
+// content type travels with it because the resolver may hand back an
+// explicitly flagged non-image, and the renderer, not the query, decides
+// whether an <img> can show it.
 export type DesignAssetSummary = {
   fileCount: number;
   mainImage: DesignMainImage | null;
