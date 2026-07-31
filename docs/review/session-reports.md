@@ -1510,3 +1510,62 @@ One entry per completed loop task. This is the human's fast path for UX critique
     questions" → "Ask up to 5 extra questions".
 
 - Follow-ups filed: none.
+
+---
+
+## 2026-07-30 — N-01: Adopt Motion and Convert the Pricing Spotlight
+
+- What shipped:
+  - `motion@12.43.0` installed; `<MotionConfig reducedMotion="user">` wraps the
+    app inside `ConvexProviderWithClerk` in `app/providers.tsx`. New
+    `lib/motion.ts` holds the whole motion vocabulary — `SPRING_SPOTLIGHT`,
+    `SPRING_SNAPPY`, `REVEAL_DURATION`/`REVEAL_OFFSET`/`STAGGER_STEP`,
+    `REVEAL_TRANSITION` — so later issues in this track have tokens to draw on.
+  - `PricingSection`'s hand-rolled FLIP is gone: no `ResizeObserver`, no
+    `offsetLeft`/`offsetTop` measurement, no rect equality guard, no
+    `SpotlightRect` type, no first-paint ring fallback, no `useEffect`/`useRef`.
+    A single `<motion.div layoutId="tier-spotlight">` renders inside the spotlit
+    card's `relative` wrapper and Motion FLIPs it. Component went 241 → 178
+    lines. Zero `ResizeObserver` or inline bezier literals remain anywhere in
+    `components/`.
+  - New `scripts/check-reduced-motion.mjs` drives the spotlight in both
+    `no-preference` and `reduce` contexts and asserts movement in one, none in
+    the other. Current run: 30 in-flight positions vs 0. CLAUDE.md gains an
+    "Animation: CSS vs Motion" section stating the boundary and the rules.
+
+- UX surfaces to eyeball: `/` — the pricing section (screenshots in
+  `docs/review/N-01/`, including `grid-*.png` close-ups of the tier grid).
+  - **The main taste call is the spring.** Type quantities across 9/10, 24/25,
+    49/50 and judge whether `SPRING_SPOTLIGHT` (stiffness 320, damping 32,
+    ~0.5s with one soft overshoot) reads premium or bouncy. Open question 3 in
+    the PRD parks exactly this; it is a one-line edit in `lib/motion.ts`.
+  - At 768px the grid wraps to two rows and the spotlight travels diagonally
+    between rows rather than sliding along one — worth a look, it is new
+    behaviour the old measured version also had but nobody has watched closely.
+  - Hammer the quantity input to confirm interruption mid-flight feels right.
+
+- Verified beyond the acceptance criteria: a throwaway Playwright pass checked
+  the spotlight's rect against the correct card's rect at all six tier
+  boundaries × 375/768/1280 — 18/18 exact (dx/dy/dw/dh all 0, `aria-current`
+  on the right card). Alignment is now structural (`absolute inset-0` in the
+  card's wrapper), not measured, so it cannot drift.
+
+- Decisions I made that a human may want to veto:
+  - **`MotionConfig` sits inside the Convex/Clerk providers, not above them.**
+    The issue said "inside ThemeProvider"; putting it innermost keeps the
+    provider ordering that auth depends on untouched. It is context-only, so
+    depth doesn't affect behaviour.
+  - **Each tier card gained a `relative h-full` wrapper div and the `Card`
+    gained `h-full`.** The wrapper is required (the frame must sit outside
+    `Card`'s `overflow-hidden`), and it becomes the grid item — so `h-full`
+    restores the equal card heights that grid stretch used to give directly.
+  - **The frame is `absolute inset-0` rather than a measured box.** That is why
+    the fallback ring could be deleted outright: the frame is correct on first
+    paint by construction, so there is no unmeasured moment to cover.
+  - **`lib/motion.ts` ships tokens N-01 does not itself use** (`SPRING_SNAPPY`,
+    the reveal trio). They are the vocabulary MO-2…PO-4 were specced against;
+    landing them here keeps those issues from each inventing their own.
+  - **The spotlight keeps `data-testid="tier-spotlight"`** — the reduced-motion
+    script needs a stable handle on a decorative, `aria-hidden` element.
+
+- Follow-ups filed: none.

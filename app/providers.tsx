@@ -8,6 +8,7 @@ import {
   useMutation,
   useQuery,
 } from "convex/react";
+import { MotionConfig } from "motion/react";
 import { ThemeProvider } from "next-themes";
 import { useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
@@ -67,9 +68,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-          <UserSync />
-          {children}
-          <Toaster />
+          {/* reducedMotion="user" makes the a11y guarantee structural: transform
+              and layout animations are suppressed for anyone with the OS
+              preference set, without each component remembering to opt in. */}
+          <MotionConfig reducedMotion="user">
+            <UserSync />
+            {children}
+            <Toaster />
+          </MotionConfig>
         </ConvexProviderWithClerk>
       </ClerkProvider>
     </ThemeProvider>

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { SPRING_SPOTLIGHT } from "@/lib/motion";
 import {
   formatTierRange,
   MIN_ORDER_QUANTITY,
@@ -13,8 +15,6 @@ import {
 } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { PricingCalculator } from "./PricingCalculator";
-
-type SpotlightRect = { x: number; y: number; width: number; height: number };
 
 const DEFAULT_QUANTITY = "12";
 
@@ -66,52 +66,6 @@ export function PricingSection() {
   const spotlightIndex = spotlightTierIndex(quantity) ?? POPULAR_TIER_INDEX;
   const caption = tierCaption(quantity, spotlightIndex);
 
-  const gridRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const [spotlight, setSpotlight] = useState<SpotlightRect | null>(null);
-
-  useEffect(() => {
-    const measureSpotlight = () => {
-      const card = cardRefs.current[spotlightIndex];
-      // offset* rather than getBoundingClientRect: it is already relative to
-      // the grid (our offsetParent) and ignores any transform on the cards. A
-      // zero width means there is no layout to measure — server render or
-      // jsdom — so the cards fall back to outlining themselves.
-      if (!card || card.offsetWidth === 0) {
-        setSpotlight(null);
-        return;
-      }
-      const next: SpotlightRect = {
-        x: card.offsetLeft,
-        y: card.offsetTop,
-        width: card.offsetWidth,
-        height: card.offsetHeight,
-      };
-      // Bail on an unchanged rect so a ResizeObserver callback can never feed
-      // itself a new render.
-      setSpotlight((previous) =>
-        previous &&
-        previous.x === next.x &&
-        previous.y === next.y &&
-        previous.width === next.width &&
-        previous.height === next.height
-          ? previous
-          : next
-      );
-    };
-
-    measureSpotlight();
-
-    const grid = gridRef.current;
-    if (!grid || typeof ResizeObserver === "undefined") return;
-
-    // The grid resizes and re-wraps on viewport changes, zoom, and late font
-    // loads; the frame has to follow the card it is framing.
-    const observer = new ResizeObserver(measureSpotlight);
-    observer.observe(grid);
-    return () => observer.disconnect();
-  }, [spotlightIndex]);
-
   return (
     <section
       id="pricing"
@@ -145,86 +99,76 @@ export function PricingSection() {
           )}
         </p>
 
-        <div
-          ref={gridRef}
-          className="relative mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
-        >
-          {spotlight && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute left-0 top-0 z-10 rounded-xl shadow-lg shadow-teal-600/25 ring-2 ring-teal-600 transition-[transform,width,height] duration-500 ease-[cubic-bezier(0.34,1.4,0.64,1)] motion-reduce:transition-none dark:ring-teal-400"
-              style={{
-                transform: `translate3d(${spotlight.x}px, ${spotlight.y}px, 0)`,
-                width: spotlight.width,
-                height: spotlight.height,
-              }}
-            />
-          )}
-
+        <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PRICING_TIERS.map((tier, index) => {
             const isSpotlit = index === spotlightIndex;
             const range = formatTierRange(tier);
             return (
-              <Card
-                key={range}
-                ref={(node) => {
-                  cardRefs.current[index] = node;
-                }}
-                data-active={isSpotlit ? "" : undefined}
-                aria-current={isSpotlit ? "true" : undefined}
-                className={cn(
-                  "transition-colors duration-500 motion-reduce:transition-none",
-                  isSpotlit && "bg-teal-50/70 dark:bg-teal-950/30",
-                  // Until the sliding frame has measured itself, the card
-                  // outlines itself so the spotlight is never missing.
-                  isSpotlit &&
-                    !spotlight &&
-                    "shadow-lg ring-2 ring-teal-600 dark:ring-teal-400"
+              // The frame lives in this wrapper rather than inside the Card:
+              // Card is overflow-hidden, which would clip a ring drawn on an
+              // inset child.
+              <div key={range} className="relative h-full">
+                {isSpotlit && (
+                  <motion.div
+                    layoutId="tier-spotlight"
+                    data-testid="tier-spotlight"
+                    aria-hidden="true"
+                    transition={SPRING_SPOTLIGHT}
+                    className="pointer-events-none absolute inset-0 z-10 rounded-xl shadow-lg shadow-teal-600/25 ring-2 ring-teal-600 dark:ring-teal-400"
+                  />
                 )}
-              >
-                <CardContent className="flex flex-col gap-1">
-                  <div className="mb-3">
-                    <Badge
-                      className={cn(
-                        "transition-colors duration-500 motion-reduce:transition-none",
-                        isSpotlit
-                          ? "bg-teal-600 text-white dark:bg-teal-400 dark:text-teal-950"
-                          : "bg-muted text-muted-foreground",
-                        // Every card reserves the badge row so heights stay
-                        // identical and the frame has nothing to chase.
-                        !isSpotlit && !tier.popular && "invisible"
-                      )}
-                    >
-                      {isSpotlit
-                        ? tier.popular
-                          ? "Your tier · most popular"
-                          : "Your tier"
-                        : "Most popular"}
-                    </Badge>
-                  </div>
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    {tier.tagline}
-                  </p>
-                  <h3 className="mt-1 text-xl font-bold text-foreground">
-                    {range}
-                  </h3>
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span
-                      className={cn(
-                        "text-4xl font-bold tracking-tight transition-colors duration-500 motion-reduce:transition-none",
-                        isSpotlit
-                          ? "text-teal-700 dark:text-teal-300"
-                          : "text-foreground"
-                      )}
-                    >
-                      ${tier.pricePerUnit}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      per jersey
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+                <Card
+                  data-active={isSpotlit ? "" : undefined}
+                  aria-current={isSpotlit ? "true" : undefined}
+                  className={cn(
+                    "h-full transition-colors duration-500 motion-reduce:transition-none",
+                    isSpotlit && "bg-teal-50/70 dark:bg-teal-950/30"
+                  )}
+                >
+                  <CardContent className="flex flex-col gap-1">
+                    <div className="mb-3">
+                      <Badge
+                        className={cn(
+                          "transition-colors duration-500 motion-reduce:transition-none",
+                          isSpotlit
+                            ? "bg-teal-600 text-white dark:bg-teal-400 dark:text-teal-950"
+                            : "bg-muted text-muted-foreground",
+                          // Every card reserves the badge row so heights stay
+                          // identical and the frame has nothing to chase.
+                          !isSpotlit && !tier.popular && "invisible"
+                        )}
+                      >
+                        {isSpotlit
+                          ? tier.popular
+                            ? "Your tier · most popular"
+                            : "Your tier"
+                          : "Most popular"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-semibold text-muted-foreground">
+                      {tier.tagline}
+                    </p>
+                    <h3 className="mt-1 text-xl font-bold text-foreground">
+                      {range}
+                    </h3>
+                    <div className="mt-6 flex items-baseline gap-1">
+                      <span
+                        className={cn(
+                          "text-4xl font-bold tracking-tight transition-colors duration-500 motion-reduce:transition-none",
+                          isSpotlit
+                            ? "text-teal-700 dark:text-teal-300"
+                            : "text-foreground"
+                        )}
+                      >
+                        ${tier.pricePerUnit}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        per jersey
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             );
           })}
         </div>

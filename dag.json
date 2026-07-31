@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-31T03:16:16.724Z",
+  "lastUpdated": "2026-07-31T03:53:59.562Z",
   "phases": [
     {
       "id": "phase-1",
@@ -416,8 +416,8 @@
       "phase": "3",
       "type": "infrastructure",
       "description": "Install motion, mount MotionConfig reducedMotion=user in app/providers.tsx, add lib/motion.ts transition tokens, and replace the hand-rolled FLIP in PricingSection with layoutId. The tracer bullet for the whole PRD: it must delete more component code than it adds.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-31T03:53:59.562Z",
       "completedAt": null,
       "issueFile": "backlog/N-01-adopt-motion-and-convert-the-pricing-spotlight.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
@@ -1069,6 +1069,12 @@
       "event": "nodes_added",
       "nodeId": "N-08",
       "message": "New task added: Removed Designs Section Reveal"
+    },
+    {
+      "timestamp": "2026-07-31T03:53:59.562Z",
+      "event": "task_started",
+      "nodeId": "N-01",
+      "message": "Picked up: Adopt Motion and Convert the Pricing Spotlight"
     }
   ]
 }

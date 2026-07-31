@@ -1,6 +1,6 @@
 # Issue: Adopt Motion and Convert the Pricing Spotlight
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 

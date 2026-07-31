@@ -207,6 +207,48 @@ Don't:
 
 Why: keeping content as the primitive's children means the primitive's classes, icon slots, and variants apply to that content. Moving it into the `render` element bypasses that composition — visually similar but breaks the slot/variant story.
 
+### Animation: CSS vs Motion
+
+Two tools, one boundary. Getting this wrong costs either a JS animation where a
+class would do, or 45 lines of hand-rolled measurement where `layoutId` would do.
+
+**Stay in CSS (Tailwind `transition-*`) for:** hover, focus, active, and color
+changes; anything whose start and end states are both expressible as classes on
+one element that stays mounted. This is the large majority — ~80 usages across
+the codebase, and none of them should be converted.
+
+**Also stay in CSS for `components/ui/*`:** dialog, dropdown, popover, select,
+tooltip, and sheet already animate via `tw-animate-css` and Base UI's
+`data-open`/`data-closed`. Converting them to Motion is a regression.
+
+**Reach for Motion (`motion/react`) only for the three things CSS structurally
+cannot do:**
+
+1. **Moving an element between layout positions** — `layoutId`. CSS has no way
+   to express "where is that other element". See `PricingSection`'s tier
+   spotlight for the reference implementation.
+2. **Animating an element as it unmounts** — `AnimatePresence`. React removes
+   the node instantly, so `{open && <Panel/>}` can never fade out in CSS.
+3. **Orchestrating several elements in sequence** — stagger.
+
+**Rules when you do use Motion:**
+
+- Every transition comes from `lib/motion.ts`. No inline spring or bezier
+  literals in components — tuning the site's feel is a one-file edit.
+- `motion/react` is client-only. To animate around a server component, take
+  `children` as a prop (the `<Reveal>` pattern) rather than spreading
+  `"use client"` up the tree.
+- Don't add `motion-reduce:` variants for Motion animations.
+  `<MotionConfig reducedMotion="user">` in `app/providers.tsx` already handles
+  them globally. CSS transitions still need their own `motion-reduce:`.
+- `AnimatePresence` children need stable `key`s — entity ids, never array index.
+- Test behavior, never animation state. jsdom has no layout, so Motion is inert
+  under vitest by design; assert `data-*`, `aria-*`, and text.
+- A reveal must never leave content invisible in a still `snap.mjs` capture. If
+  a screenshot catches mid-reveal opacity, the reveal config is wrong.
+- `node scripts/check-reduced-motion.mjs` is the automated proof that
+  reduced-motion suppression works; run it after touching motion config.
+
 ### Testing
 
 - Tests live alongside or mirror the source structure
