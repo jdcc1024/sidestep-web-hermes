@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-29T06:37:33.414Z",
+  "lastUpdated": "2026-07-31T03:16:16.724Z",
   "phases": [
     {
       "id": "phase-1",
@@ -409,6 +409,159 @@
         "node scripts/snap.mjs on /portal and /portal/orders/<id>/run/responses produces non-blank captures",
         "The no-run-yet state from B-04 is photographable"
       ]
+    },
+    {
+      "id": "N-01",
+      "title": "Adopt Motion and Convert the Pricing Spotlight",
+      "phase": "3",
+      "type": "infrastructure",
+      "description": "Install motion, mount MotionConfig reducedMotion=user in app/providers.tsx, add lib/motion.ts transition tokens, and replace the hand-rolled FLIP in PricingSection with layoutId. The tracer bullet for the whole PRD: it must delete more component code than it adds.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-01-adopt-motion-and-convert-the-pricing-spotlight.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "PricingSection contains no ResizeObserver, offset measurement, or first-paint fallback",
+        "PricingSection.test.tsx (11 tests) passes unmodified",
+        "MotionConfig reducedMotion=user wraps the app",
+        "lib/motion.ts holds all transition values; no inline bezier or spring literals",
+        "scripts/check-reduced-motion.mjs asserts movement under no-preference and none under reduce",
+        "CLAUDE.md gains a CSS-vs-Motion boundary section"
+      ]
+    },
+    {
+      "id": "N-02",
+      "title": "Reveal Wrapper and Landing Section Reveals",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Add a client Reveal component that fades and rises its children on scroll into view, and wrap the six landing sections in it. Children are passed as props so the sections stay server components.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-02-reveal-wrapper-and-landing-section-reveals.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "components/motion/Reveal.tsx exists; none of the six sections gains use client",
+        "viewport once:true - scrolling back up does not replay",
+        "Content is never permanently invisible under reduced motion or without JS",
+        "snap.mjs screenshots show fully-revealed, settled content",
+        "Reveal parameters come from lib/motion.ts"
+      ]
+    },
+    {
+      "id": "N-03",
+      "title": "Hero Entrance on Load",
+      "phase": "3",
+      "type": "improvement",
+      "description": "The hero is above the fold so a scroll trigger never fires. Give its heading, subcopy, and CTA a short staggered settle on mount, animating opacity and transform only.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-03-hero-entrance-on-load.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "Hero elements animate on mount, not on scroll",
+        "Entrance fully settled well under 1s from paint",
+        "No layout shift - opacity and transform only, never reflowing properties",
+        "Under reduced motion the hero renders immediately in final state",
+        "Timings come from lib/motion.ts"
+      ]
+    },
+    {
+      "id": "N-04",
+      "title": "Staggered Process and Pricing Card Entrances",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Second layer on top of the section reveal: the three process step cards and four pricing tier cards arrive in sequence rather than all at once. Resolves the PRD open question by converting ProcessSection to a client component.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-04-staggered-process-and-pricing-card-entrances.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "Process step cards and pricing tier cards each enter in sequence",
+        "Stagger does not interfere with the layoutId spotlight - it lands correctly once the entrance settles",
+        "Large-paste style cascades stay short; stagger interval comes from lib/motion.ts",
+        "PricingSection.test.tsx still passes unmodified",
+        "Under reduced motion both sets render in place"
+      ]
+    },
+    {
+      "id": "N-05",
+      "title": "Portal Sidebar Active Indicator",
+      "phase": "3",
+      "type": "improvement",
+      "description": "PortalShell already marks the active nav link with aria-current but switches instantly. Add a sliding indicator on layoutId, reusing the primitive proven on the pricing spotlight.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-05-portal-sidebar-active-indicator.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "Active sidebar link is marked by an indicator that slides on client-side navigation",
+        "aria-current=page stays the a11y signal and test surface; indicator is aria-hidden",
+        "Mobile Sheet menu untouched (Base UI already animates it)",
+        "Under reduced motion the indicator jumps without sliding",
+        "Authenticated screenshots captured after snap.mjs --login"
+      ]
+    },
+    {
+      "id": "N-06",
+      "title": "Start Collecting Panel Enter and Exit",
+      "phase": "3",
+      "type": "improvement",
+      "description": "First use of AnimatePresence, and the first thing CSS structurally cannot do: the StartCollecting deadline panel is unmounted instantly on close and can never fade out. Establishes the enter/exit pattern N-07 and N-08 reuse.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-06-start-collecting-panel-enter-and-exit.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "The panel animates out on close, not just disappears",
+        "Rapid open/close leaves no stuck or duplicated panel",
+        "Deadline entry, validation, busy state, and success toast all unchanged",
+        "Conditional child is a direct AnimatePresence child with a stable key",
+        "Under reduced motion it appears and disappears without movement"
+      ]
+    },
+    {
+      "id": "N-07",
+      "title": "Roster Row Add and Remove Animation",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Roster rows appear and vanish instantly and survivors snap up to fill the gap. Animate row entry and exit and let remaining rows slide into position, so a captain can see what just changed.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-07-roster-row-add-and-remove-animation.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "Rows animate in on add and out on remove; remaining rows slide rather than snap",
+        "Rows keyed on stable entry id, never array index - index keys animate the wrong row out",
+        "Bulk paste of many rows settles quickly instead of cascading for seconds",
+        "RosterSheet.test.tsx passes; editing, locking, and the copy toast unchanged",
+        "Under reduced motion rows appear and disappear without movement"
+      ]
+    },
+    {
+      "id": "N-08",
+      "title": "Removed Designs Section Reveal",
+      "phase": "3",
+      "type": "improvement",
+      "description": "RemovedDesigns returns null until its Convex query resolves non-empty, so the section pops into the order page after everything else has settled. Animate its arrival, distinguishing loading from genuinely empty.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-08-removed-designs-section-reveal.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "Section animates in when it goes from absent to present, and out when it empties",
+        "Loading (undefined) and empty (length 0) are distinguished - loading never flashes the section in",
+        "Section is absent, not transparent, when there is nothing to show",
+        "No layout jump on surrounding order page content",
+        "DesignRemoval.test.tsx passes; the removal warning half is unchanged"
+      ]
     }
   ],
   "edges": [
@@ -479,6 +632,34 @@
     {
       "from": "B-02",
       "to": "B-05"
+    },
+    {
+      "from": "N-01",
+      "to": "N-02"
+    },
+    {
+      "from": "N-01",
+      "to": "N-03"
+    },
+    {
+      "from": "N-01",
+      "to": "N-05"
+    },
+    {
+      "from": "N-01",
+      "to": "N-06"
+    },
+    {
+      "from": "N-02",
+      "to": "N-04"
+    },
+    {
+      "from": "N-06",
+      "to": "N-07"
+    },
+    {
+      "from": "N-06",
+      "to": "N-08"
     }
   ],
   "log": [
@@ -840,6 +1021,54 @@
       "event": "task_completed",
       "nodeId": "M-05",
       "message": "Completed: Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting"
+    },
+    {
+      "timestamp": "2026-07-31T03:15:53.595Z",
+      "event": "nodes_added",
+      "nodeId": "N-01",
+      "message": "New task added: Adopt Motion and Convert the Pricing Spotlight"
+    },
+    {
+      "timestamp": "2026-07-31T03:15:53.660Z",
+      "event": "nodes_added",
+      "nodeId": "N-02",
+      "message": "New task added: Reveal Wrapper and Landing Section Reveals"
+    },
+    {
+      "timestamp": "2026-07-31T03:15:53.725Z",
+      "event": "nodes_added",
+      "nodeId": "N-03",
+      "message": "New task added: Hero Entrance on Load"
+    },
+    {
+      "timestamp": "2026-07-31T03:16:04.031Z",
+      "event": "nodes_added",
+      "nodeId": "N-04",
+      "message": "New task added: Staggered Process and Pricing Card Entrances"
+    },
+    {
+      "timestamp": "2026-07-31T03:16:04.100Z",
+      "event": "nodes_added",
+      "nodeId": "N-05",
+      "message": "New task added: Portal Sidebar Active Indicator"
+    },
+    {
+      "timestamp": "2026-07-31T03:16:04.179Z",
+      "event": "nodes_added",
+      "nodeId": "N-06",
+      "message": "New task added: Start Collecting Panel Enter and Exit"
+    },
+    {
+      "timestamp": "2026-07-31T03:16:12.137Z",
+      "event": "nodes_added",
+      "nodeId": "N-07",
+      "message": "New task added: Roster Row Add and Remove Animation"
+    },
+    {
+      "timestamp": "2026-07-31T03:16:12.214Z",
+      "event": "nodes_added",
+      "nodeId": "N-08",
+      "message": "New task added: Removed Designs Section Reveal"
     }
   ]
 }
