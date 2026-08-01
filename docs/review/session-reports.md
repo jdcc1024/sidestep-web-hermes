@@ -1742,3 +1742,56 @@ One entry per completed loop task. This is the human's fast path for UX critique
     block in the pricing file.
 
 - Follow-ups filed: none.
+
+## 2026-08-01 — N-05: Portal Sidebar Active Indicator
+
+- What shipped:
+  - The desktop portal sidebar's current-section pill is now a `layoutId`
+    box (`SPRING_SPOTLIGHT`, from `lib/motion.ts`) that travels between links on
+    client-side navigation, instead of the background switching instantly. The
+    active link's teal *text* still changes via CSS, as before.
+  - `navList` became a `PortalNav` component with a `sliding` flag. The mobile
+    `<Sheet>` copy renders the identical pill as a flat background class and no
+    indicator — untouched behaviourally, and, more to the point, two elements
+    sharing one `layoutId` would have Motion animating between two copies of the
+    same nav.
+  - First tests for `PortalShell` (8): `aria-current="page"` on exactly one link,
+    exact-match vs nested-route ownership, no link claimed on a route no section
+    owns, and the indicator's structural contract (one, inside the current link,
+    `aria-hidden`, absent from the sheet).
+
+- UX surfaces to eyeball: `/portal`, `/portal/designs`, `/portal/designs/new` at
+  375/768/1280 light+dark — screenshots in `docs/review/N-05/`. Look at the pill
+  behind the current link: is teal-on-teal-50 (light) / teal-500/15 (dark) the
+  weight you want for it, and is the pill alone enough of a cue now that it
+  moves? The nested `/portal/designs/new` shot is there to confirm the pill stays
+  on "My Designs" inside a section.
+  The clipped sidebar and the stray avatar in the 375px shots are the documented
+  `position: fixed` + `fullPage` artifact, not a regression.
+
+- Decisions I made that a human may want to veto:
+  - **The PRD's Section 10 open question is answered: `PortalShell` does not
+    remount between portal routes**, so `layoutId` has something to animate from
+    and the slide is real. Verified rather than assumed, with a throwaway
+    Playwright script (deleted): the indicator travels y 81 → 121 across 17
+    in-flight frames under `no-preference`, and lands at the same 121 with **0**
+    in-flight frames under `reduce` — `MotionConfig reducedMotion="user"` covers
+    it exactly as it covers the pricing spotlight.
+  - **`check-reduced-motion.mjs` was left alone.** Its four samplers all drive
+    unauthenticated landing routes; a fifth would need the Clerk login flow
+    inside a script whose whole value is being simple enough to trust. The
+    portal indicator is the same `layoutId` mechanism sampler 1 already proves,
+    and the ad-hoc run above confirmed this specific instance.
+  - **The pill carries the active background now** — I moved `bg-teal-50` /
+    `dark:bg-teal-500/15` off the link and onto the moving box, so the fill
+    travels rather than cross-fading between two links. Taste call; reverting to
+    a separate underline/rail indicator over an unchanged link background is a
+    one-line change if you'd rather see that.
+  - **Screenshot routes deviate from the issue**: it asked for `/portal/orders`,
+    which is not a route (only `/portal/orders/new` and `/portal/orders/[id]`
+    exist). Captured `/portal/designs/new` instead, which exercises the nested-
+    route case the indicator actually needs proving on.
+
+- Follow-ups filed: B-08 — the sidebar's "Jersey Runs" link points at
+  `/portal/runs`, which has no page and 404s. Pre-existing, unrelated to motion,
+  and out of scope here; the indicator correctly sits on it if you land there.

@@ -1,6 +1,6 @@
 # Issue: Portal Sidebar Active Indicator
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 

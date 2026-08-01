@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T09:15:40.788Z",
+  "lastUpdated": "2026-08-01T14:22:54.162Z",
   "phases": [
     {
       "id": "phase-1",
@@ -493,8 +493,8 @@
       "phase": "3",
       "type": "improvement",
       "description": "PortalShell already marks the active nav link with aria-current but switches instantly. Add a sliding indicator on layoutId, reusing the primitive proven on the pricing spotlight.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-01T14:16:59.544Z",
       "completedAt": null,
       "issueFile": "backlog/N-05-portal-sidebar-active-indicator.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
@@ -561,6 +561,23 @@
         "Section is absent, not transparent, when there is nothing to show",
         "No layout jump on surrounding order page content",
         "DesignRemoval.test.tsx passes; the removal warning half is unchanged"
+      ]
+    },
+    {
+      "id": "B-08",
+      "title": "Jersey Runs nav link has no route",
+      "phase": "1",
+      "type": "bug",
+      "description": "The portal sidebar links to /portal/runs, which has no page - the link 404s. Either build the section or drop the link.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-08-jersey-runs-nav-link-has-no-route.md",
+      "prdRef": "docs/prd/motion-adoption.md#5",
+      "acceptanceCriteria": [
+        "Clicking Jersey Runs in the portal nav reaches a real page, or the link is removed",
+        "No portal nav link points at a route that does not exist",
+        "PortalShell tests cover whichever resolution is chosen"
       ]
     }
   ],
@@ -1117,6 +1134,18 @@
       "event": "task_completed",
       "nodeId": "N-04",
       "message": "Completed: Staggered Process and Pricing Card Entrances"
+    },
+    {
+      "timestamp": "2026-08-01T14:16:59.544Z",
+      "event": "task_started",
+      "nodeId": "N-05",
+      "message": "Picked up: Portal Sidebar Active Indicator"
+    },
+    {
+      "timestamp": "2026-08-01T14:22:54.161Z",
+      "event": "nodes_added",
+      "nodeId": "B-08",
+      "message": "New task added: Jersey Runs nav link has no route"
     }
   ]
 }

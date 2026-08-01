@@ -5,8 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { MenuIcon } from "lucide-react";
+import { motion } from "motion/react";
 
 import { Logo } from "./Logo";
+import { SPRING_SPOTLIGHT } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -30,38 +33,78 @@ const portalLinks: PortalLink[] = [
   { href: "/portal/runs", label: "Jersey Runs" },
 ];
 
-export function PortalShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+const isActive = (link: PortalLink, pathname: string) =>
+  link.exact
+    ? pathname === link.href
+    : pathname === link.href || pathname.startsWith(`${link.href}/`);
 
-  const isActive = (link: PortalLink) =>
-    link.exact
-      ? pathname === link.href
-      : pathname === link.href || pathname.startsWith(`${link.href}/`);
+/** The pill behind the current link — as a moving box, or as a flat class. */
+const ACTIVE_PILL = "bg-teal-50 dark:bg-teal-500/15";
 
-  const navList = (
+/**
+ * The portal's section links.
+ *
+ * `sliding` decides how the current link is filled in. In the desktop sidebar
+ * the pill is a `layoutId` box that travels from the old link to the new one on
+ * client-side navigation — `PortalShell` is the `/portal` layout, so it does not
+ * remount between sections and the box survives to animate. In the mobile sheet
+ * the same pill is a plain background class, for two reasons: the sheet closes
+ * on navigation so there is nothing to watch, and a second element sharing one
+ * `layoutId` would leave Motion animating between two copies of the same nav.
+ */
+function PortalNav({
+  pathname,
+  sliding,
+  onNavigate,
+}: {
+  pathname: string;
+  sliding: boolean;
+  onNavigate: () => void;
+}) {
+  return (
     <ul className="flex flex-col gap-1">
       {portalLinks.map((link) => {
-        const active = isActive(link);
+        const active = isActive(link, pathname);
         return (
           <li key={link.href}>
             <Link
               href={link.href}
-              onClick={() => setMobileOpen(false)}
+              onClick={onNavigate}
               aria-current={active ? "page" : undefined}
-              className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={cn(
+                "relative block rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-200"
-                  : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              }`}
+                  ? "text-teal-700 dark:text-teal-200"
+                  : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
+                active && !sliding && ACTIVE_PILL,
+              )}
             >
-              {link.label}
+              {active && sliding && (
+                <motion.span
+                  layoutId="portal-nav-indicator"
+                  data-testid="portal-nav-indicator"
+                  aria-hidden="true"
+                  transition={SPRING_SPOTLIGHT}
+                  className={cn(
+                    "pointer-events-none absolute inset-0 rounded-md",
+                    ACTIVE_PILL,
+                  )}
+                />
+              )}
+              {/* Positioned, and after the pill in the DOM, so the label paints
+                  over it without either one needing a z-index. */}
+              <span className="relative">{link.label}</span>
             </Link>
           </li>
         );
       })}
     </ul>
   );
+}
+
+export function PortalShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const accountFooter = (
     <div className="flex items-center gap-3">
@@ -94,7 +137,11 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
               className="flex-1 overflow-y-auto p-4"
               aria-label="Portal navigation"
             >
-              {navList}
+              <PortalNav
+                pathname={pathname}
+                sliding={false}
+                onNavigate={() => setMobileOpen(false)}
+              />
             </nav>
             <Separator />
             <div className="flex items-center justify-between gap-3 p-4">
@@ -118,7 +165,11 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           className="flex-1 overflow-y-auto p-4"
           aria-label="Portal navigation"
         >
-          {navList}
+          <PortalNav
+            pathname={pathname}
+            sliding
+            onNavigate={() => setMobileOpen(false)}
+          />
         </nav>
         <Separator />
         <div className="p-4">{accountFooter}</div>
