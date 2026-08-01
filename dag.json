@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-07-31T03:53:59.562Z",
+  "lastUpdated": "2026-08-01T08:38:17.493Z",
   "phases": [
     {
       "id": "phase-1",
@@ -416,9 +416,9 @@
       "phase": "3",
       "type": "infrastructure",
       "description": "Install motion, mount MotionConfig reducedMotion=user in app/providers.tsx, add lib/motion.ts transition tokens, and replace the hand-rolled FLIP in PricingSection with layoutId. The tracer bullet for the whole PRD: it must delete more component code than it adds.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-07-31T03:53:59.562Z",
-      "completedAt": null,
+      "completedAt": "2026-08-01T08:38:17.492Z",
       "issueFile": "backlog/N-01-adopt-motion-and-convert-the-pricing-spotlight.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
       "acceptanceCriteria": [
@@ -436,7 +436,7 @@
       "phase": "3",
       "type": "improvement",
       "description": "Add a client Reveal component that fades and rises its children on scroll into view, and wrap the six landing sections in it. Children are passed as props so the sections stay server components.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/N-02-reveal-wrapper-and-landing-section-reveals.md",
@@ -455,7 +455,7 @@
       "phase": "3",
       "type": "improvement",
       "description": "The hero is above the fold so a scroll trigger never fires. Give its heading, subcopy, and CTA a short staggered settle on mount, animating opacity and transform only.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/N-03-hero-entrance-on-load.md",
@@ -493,7 +493,7 @@
       "phase": "3",
       "type": "improvement",
       "description": "PortalShell already marks the active nav link with aria-current but switches instantly. Add a sliding indicator on layoutId, reusing the primitive proven on the pricing spotlight.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/N-05-portal-sidebar-active-indicator.md",
@@ -512,7 +512,7 @@
       "phase": "3",
       "type": "improvement",
       "description": "First use of AnimatePresence, and the first thing CSS structurally cannot do: the StartCollecting deadline panel is unmounted instantly on close and can never fade out. Establishes the enter/exit pattern N-07 and N-08 reuse.",
-      "status": "blocked",
+      "status": "pending",
       "startedAt": null,
       "completedAt": null,
       "issueFile": "backlog/N-06-start-collecting-panel-enter-and-exit.md",
@@ -1075,6 +1075,12 @@
       "event": "task_started",
       "nodeId": "N-01",
       "message": "Picked up: Adopt Motion and Convert the Pricing Spotlight"
+    },
+    {
+      "timestamp": "2026-08-01T08:38:17.493Z",
+      "event": "task_completed",
+      "nodeId": "N-01",
+      "message": "Completed: Adopt Motion and Convert the Pricing Spotlight"
     }
   ]
 }
