@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T14:36:59.733Z",
+  "lastUpdated": "2026-08-01T14:54:49.601Z",
   "phases": [
     {
       "id": "phase-1",
@@ -512,8 +512,8 @@
       "phase": "3",
       "type": "improvement",
       "description": "First use of AnimatePresence, and the first thing CSS structurally cannot do: the StartCollecting deadline panel is unmounted instantly on close and can never fade out. Establishes the enter/exit pattern N-07 and N-08 reuse.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-01T14:40:00.381Z",
       "completedAt": null,
       "issueFile": "backlog/N-06-start-collecting-panel-enter-and-exit.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
@@ -569,9 +569,9 @@
       "phase": "1",
       "type": "bug",
       "description": "The portal sidebar links to /portal/runs, which has no page - the link 404s. Either build the section or drop the link.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-01T14:26:21.687Z",
-      "completedAt": null,
+      "completedAt": "2026-08-01T14:39:56.778Z",
       "issueFile": "backlog/B-08-jersey-runs-nav-link-has-no-route.md",
       "prdRef": "docs/prd/motion-adoption.md#5",
       "acceptanceCriteria": [
@@ -599,6 +599,25 @@
       ],
       "needsHuman": true,
       "humanQuestion": "Do you want a top-level Jersey Runs section in the portal, or is per-order access enough? (B-08 removed the dead nav link)"
+    },
+    {
+      "id": "N-09",
+      "title": "Automate Reduced-Motion Check For Keyframe Primitives",
+      "phase": "3",
+      "type": "improvement",
+      "description": "check-reduced-motion.mjs covers the sheet's transitioned translate but not the tw-animate-css keyframe zoom used by dialog/dropdown/popover/select/tooltip — no instance of those sits on a route reachable without a Clerk session.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-09-automate-reduced-motion-check-for-keyframe-primitives.md",
+      "prdRef": "docs/prd/motion-adoption.md#9-testing-strategy",
+      "acceptanceCriteria": [
+        "The check drives a tw-animate-css keyframe primitive (dialog, select, popover, dropdown or tooltip)",
+        "Movement is observed under no-preference and none under reduce, same shape as the existing four cases",
+        "Sampling reads the property the animation actually uses — transform for keyframes, translate for Tailwind utilities",
+        "The check needs no seeded fixture data, or documents the seed it needs",
+        "node scripts/check-reduced-motion.mjs stays green"
+      ]
     }
   ],
   "edges": [
@@ -697,6 +716,10 @@
     {
       "from": "N-06",
       "to": "N-08"
+    },
+    {
+      "from": "N-06",
+      "to": "N-09"
     }
   ],
   "log": [
@@ -1190,6 +1213,24 @@
       "event": "needs_human",
       "nodeId": "P-01",
       "message": "Needs human: Portal Jersey Runs Index Section — Do you want a top-level Jersey Runs section in the portal, or is per-order access enough? (B-08 removed the dead nav link)"
+    },
+    {
+      "timestamp": "2026-08-01T14:39:56.778Z",
+      "event": "task_completed",
+      "nodeId": "B-08",
+      "message": "Completed: Jersey Runs nav link has no route"
+    },
+    {
+      "timestamp": "2026-08-01T14:40:00.382Z",
+      "event": "task_started",
+      "nodeId": "N-06",
+      "message": "Picked up: Start Collecting Panel Enter and Exit"
+    },
+    {
+      "timestamp": "2026-08-01T14:54:46.413Z",
+      "event": "nodes_added",
+      "nodeId": "N-09",
+      "message": "New task added: Automate Reduced-Motion Check For Keyframe Primitives"
     }
   ]
 }

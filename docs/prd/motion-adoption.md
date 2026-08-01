@@ -102,7 +102,7 @@ Sequence of work:
 
 **Portal first wave (`components/portal/*`, `components/layout/PortalShell.tsx`)**
 - **PO-1** `PortalShell` sidebar active-link indicator on `layoutId`, driven by the existing `aria-current` active state
-- **PO-2** `StartCollecting` deadline panel enter/exit via `AnimatePresence`
+- **PO-2** ~~`StartCollecting` deadline panel enter/exit via `AnimatePresence`~~ — **withdrawn (N-06).** That panel is a Base UI `<Dialog>`, not an `open`-gated div, so it already animates in *and* out via `tw-animate-css`; converting it is the exact regression Out of Scope forbids two sections below. N-06 shipped the defect this item was masking instead: nothing suppressed those CSS animations under reduced motion
 - **PO-3** `RosterSheet` row add/remove via `AnimatePresence`, with `layout` on siblings so remaining rows close the gap
 - **PO-4** `RemovedDesigns` section animating in when it goes from empty to non-empty
 
@@ -141,7 +141,7 @@ Sequence of work:
 | Rejected: AutoAnimate | Not adopted | Fixed vocabulary — cannot express the spotlight or custom springs |
 | Rejected: CSS-only | Not sufficient | `@starting-style` closed the *entry* gap, but nothing in CSS animates a React-unmounted node |
 | Bundle strategy | Import `motion` directly; no `LazyMotion`/`m` | **Explicit human decision:** at this project's size an extra ~30kb is not worth the API friction. Layout animations require the `domMax` feature set anyway, so the split would save little |
-| Reduced motion | `<MotionConfig reducedMotion="user">` at the root | Disables transform and layout animations globally while preserving opacity/color. Makes a11y structural instead of per-class discipline |
+| Reduced motion | `<MotionConfig reducedMotion="user">` at the root, **plus a `prefers-reduced-motion` block in `app/globals.css`** | Disables transform and layout animations globally while preserving opacity/color. Makes a11y structural instead of per-class discipline. N-06 found the `MotionConfig` half only ever covered Motion — the `components/ui/*` primitives this PRD deliberately leaves in CSS were moving unsuppressed, by two mechanisms (tw-animate-css keyframes, and Base UI starting/ending-style transitions on `translate`). The CSS block is the counterpart that makes the "structural, not per-class" claim actually true |
 | Motion parameters | Centralized in `lib/motion.ts` | Directly serves the maintainability goal that prompted this PRD — tuning feel means editing one file |
 | Server components | `<Reveal>` wrapper takes `children` as a prop | Lets the six landing sections stay server components while gaining scroll reveal. Only `ProcessSection` and `PricingSection`, which need per-child stagger, become client components |
 | Reveal replay | `viewport={{ once: true }}` | Re-animating on every scroll-past is distracting on a page users scroll up and down |
@@ -170,9 +170,9 @@ Sequence of work:
 - **Code deleted, not added:** `PricingSection.tsx` no longer contains `ResizeObserver`, `offsetLeft` measurement, the rect equality guard, or the first-paint ring fallback. Net line count for that component goes *down*.
 - **No hand-rolled FLIP anywhere:** zero occurrences of `ResizeObserver` in `components/` at the end of the wave.
 - **One source of feel:** every Motion component draws its transition from `lib/motion.ts`; no inline bezier or spring literals in components.
-- **Reduced motion verified:** an automated Playwright run with `reducedMotion: "reduce"` shows zero positional change for the spotlight, sidebar indicator, and section reveals; the same run with `no-preference` shows movement.
+- **Reduced motion verified:** an automated Playwright run with `reducedMotion: "reduce"` shows zero positional change for the spotlight, sidebar indicator, section reveals, and the CSS `components/ui/*` enter/exit; the same run with `no-preference` shows movement.
 - **Reveals never hide content:** with JS disabled or animations suppressed, all six landing sections are visible and readable.
-- **All ten animations shipped:** MO-1 through MO-4 and PO-1 through PO-4 are implemented, screenshotted, and logged in `docs/review/session-reports.md`.
+- **All nine animations shipped:** MO-1 through MO-4 and PO-1, PO-3, PO-4 are implemented, screenshotted, and logged in `docs/review/session-reports.md`. (PO-2 was withdrawn by N-06 — see Portal first wave.)
 - **No behavioral regressions:** full suite green; the pricing spotlight still tracks tier boundaries at 9/10, 24/25, 49/50 exactly as it does today.
 - **Tuning is one-file:** changing the site's animation feel (e.g. "make everything snappier") is a single edit to `lib/motion.ts`.
 
@@ -198,4 +198,4 @@ Sequence of work:
 - [ ] Does the `layoutId` spotlight clip or distort against `Card`'s `overflow-hidden` in practice? The wrapper-div approach should avoid it — confirmed or disproved by MO-1, the first task.
 - [ ] What reveal distance and spring read as "premium" versus "bouncy toy" for this brand? Needs a human taste call on the first screenshots; `lib/motion.ts` makes it a one-file adjustment.
 - [ ] Should the sidebar indicator (PO-1) animate when navigation causes a full page transition, or only on client-side route changes where the component persists? Depends on whether `PortalShell` remounts between portal routes.
-- [ ] Do any existing portal tests assert on DOM structure that `AnimatePresence`'s wrapper element would break? (Checked per-component during PO-2/PO-3.)
+- [ ] Do any existing portal tests assert on DOM structure that `AnimatePresence`'s wrapper element would break? (PO-2 is withdrawn, so PO-3 is now the first place this is answered.)

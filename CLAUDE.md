@@ -240,7 +240,11 @@ cannot do:**
   `"use client"` up the tree.
 - Don't add `motion-reduce:` variants for Motion animations.
   `<MotionConfig reducedMotion="user">` in `app/providers.tsx` already handles
-  them globally. CSS transitions still need their own `motion-reduce:`.
+  them globally. Nor for `components/ui/*` enter/exit — the
+  `prefers-reduced-motion` block in `app/globals.css` covers those (N-06), both
+  the tw-animate-css keyframes and the sheet's transitioned `translate`. Any
+  *other* CSS transition that moves something still needs its own
+  `motion-reduce:`; hover and color transitions do not.
 - `AnimatePresence` children need stable `key`s — entity ids, never array index.
 - Test behavior, never animation state. jsdom has no layout, so Motion is inert
   under vitest by design; assert `data-*`, `aria-*`, and text.

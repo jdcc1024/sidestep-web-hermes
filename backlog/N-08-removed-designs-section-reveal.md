@@ -37,7 +37,7 @@ See: docs/prd/motion-adoption.md — Section 5 (PO-4)
 
 ## Implementation Notes
 - The guard is at `components/portal/DesignRemoval.tsx:72`: `if (!runId || removed === undefined || removed.length === 0) return null;`. Note it conflates two different states — *loading* (`undefined`) and *genuinely empty* (`length === 0`). Only the second should ever be animated; animating the loading→loaded transition would flash the section in on every page load. Distinguish them.
-- Reuse the N-06 `AnimatePresence` shape.
+- Reuse the `AnimatePresence` shape from **N-07**, not N-06 — N-06 established none, having found its panel was a Base UI dialog whose enter/exit is already CSS.
 - This section sits inside a longer order page. Animating height will push content below it — verify against a real order with content underneath, not an isolated render.
 - Convex queries resolve after first paint, so this animation fires slightly late by nature. That is the reason it exists; do not try to preempt it with a skeleton (out of scope).
 

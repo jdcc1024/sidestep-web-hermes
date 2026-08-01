@@ -54,6 +54,17 @@ const REVEALED_SECTION = '#faq';
 const STAGGERED_CARD = '#process li:last-child h3';
 /** The hero's headline — last-but-four in the entrance stagger, and the LCP. */
 const HERO_ELEMENT = '#top h1';
+/**
+ * The marketing nav's mobile menu — a `components/ui/*` sheet, and the only
+ * such primitive on a route that needs no session. Every one of them (dialog,
+ * sheet, popover, select, dropdown, tooltip) composes its enter/exit from the
+ * same tw-animate-css custom properties, so this one case exercises the
+ * mechanism that suppresses the set. The trigger only exists below the `sm`
+ * breakpoint, hence the narrow viewport this sampler uses.
+ */
+const SHEET_TRIGGER = 'Open menu';
+const SHEET_PANEL = '[data-slot="sheet-content"]';
+const SHEET_VIEWPORT = { width: 375, height: 812 };
 /** Long enough to cover the spring's whole settle, short enough to stay quick. */
 const SAMPLE_MS = 900;
 /** Sub-pixel jitter that should not count as movement. */
@@ -262,6 +273,82 @@ async function sampleHeroEntrance(browser, reducedMotion) {
   }
 }
 
+/**
+ * Opens and then closes the marketing nav's mobile menu, returning the
+ * translateX its panel held on every frame of both transitions.
+ *
+ * This is the CSS half of the site's motion story, and it is suppressed by a
+ * different mechanism from the other three cases: `MotionConfig` cannot reach
+ * an `animate-in`/`animate-out` keyframe, so `app/globals.css` zeroes
+ * tw-animate-css's transform inputs under `prefers-reduced-motion` instead.
+ * Two independent mechanisms making the same promise is exactly the situation
+ * where one silently stops holding, hence a case here.
+ *
+ * The close half matters as much as the open half: Base UI keeps the panel
+ * mounted for the length of its exit animation, so a slide-out is real movement
+ * on screen even though React has already been told the sheet is closed.
+ */
+async function sampleSheetMotion(browser, reducedMotion) {
+  const context = await browser.newContext({
+    viewport: SHEET_VIEWPORT,
+    reducedMotion,
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.getByRole('button', { name: SHEET_TRIGGER }).waitFor({ timeout: 15_000 });
+    // Hydration has to have run before the trigger opens anything.
+    await page.waitForTimeout(1000);
+
+    // Re-queries every frame: the panel does not exist before the click and is
+    // gone once the exit finishes, so a held reference would be null or stale
+    // for most of the recording. Frames where it is absent are simply not
+    // sampled — they are not evidence either way.
+    await page.evaluate(sel => {
+      // `translate`, not `transform`: Tailwind v4 emits `translate-x-*` as the
+      // standalone `translate` property, so this panel's computed `transform`
+      // reads "none" for the whole slide and a transform sampler would quietly
+      // conclude nothing ever moved.
+      const offset = style =>
+        style.translate === 'none' ? 0 : parseFloat(style.translate) || 0;
+      window.__sheetSamples = [];
+      const tick = () => {
+        const el = document.querySelector(sel);
+        if (el) {
+          const style = getComputedStyle(el);
+          window.__sheetSamples.push({ x: offset(style), opacity: Number(style.opacity) });
+        }
+        window.__sheetRaf = requestAnimationFrame(tick);
+      };
+      tick();
+    }, SHEET_PANEL);
+
+    await page.getByRole('button', { name: SHEET_TRIGGER }).click();
+    await page.waitForSelector(SHEET_PANEL, { timeout: 5_000 });
+    await page.waitForTimeout(SAMPLE_MS);
+
+    // Where the open transition came to rest, before the close muddies it.
+    const settled = await page.evaluate(sel => {
+      const style = getComputedStyle(document.querySelector(sel));
+      return {
+        x: style.translate === 'none' ? 0 : parseFloat(style.translate) || 0,
+        opacity: Number(style.opacity),
+      };
+    }, SHEET_PANEL);
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(SAMPLE_MS);
+
+    const samples = await page.evaluate(() => {
+      cancelAnimationFrame(window.__sheetRaf);
+      return window.__sheetSamples;
+    });
+    return { samples, settled };
+  } finally {
+    await context.close();
+  }
+}
+
 const server = await ensureServer();
 const browser = await chromium.launch();
 const failures = [];
@@ -362,6 +449,40 @@ try {
   }
   if (heroMids['reduce'].length > 0) {
     failures.push(`hero/reduce: the headline animated through ${heroMids['reduce'].length} intermediate positions — reducedMotion="user" is not suppressing the load entrance.`);
+  }
+
+  const sheetMoving = await sampleSheetMotion(browser, 'no-preference');
+  const sheetStill = await sampleSheetMotion(browser, 'reduce');
+
+  const sheetMids = {};
+  for (const [label, result] of [['no-preference', sheetMoving], ['reduce', sheetStill]]) {
+    const { samples, settled } = result;
+    if (samples.length === 0) {
+      failures.push(`sheet/${label}: no samples — the panel never appeared, so this check proves nothing.`);
+      sheetMids[label] = [];
+      continue;
+    }
+    // Rest for this element is translateX 0. Anything else is the slide in
+    // flight, on the way in or on the way out.
+    const mid = samples.filter(s => Math.abs(s.x) > EPSILON);
+    sheetMids[label] = mid;
+    console.log(`[reduced-motion] sheet  ${label.padEnd(13)} ${samples.length} samples, ${mid.length} in flight, opens to x ${settled.x.toFixed(1)} at opacity ${settled.opacity.toFixed(2)}`);
+
+    // The same rule the reveal gets: suppressing motion must never mean
+    // leaving the content unreadable or parked off-screen.
+    if (Math.abs(settled.x) > EPSILON) {
+      failures.push(`sheet/${label}: the panel settled at translateX ${settled.x.toFixed(1)}px instead of 0 — the entrance did not complete.`);
+    }
+    if (settled.opacity < 0.99) {
+      failures.push(`sheet/${label}: the panel settled at opacity ${settled.opacity.toFixed(2)} — an opened menu must never be left transparent.`);
+    }
+  }
+
+  if (sheetMids['no-preference'].length === 0) {
+    failures.push('sheet/no-preference: the panel never left its resting position — the slide is not running at all, so the suppression below is untested.');
+  }
+  if (sheetMids['reduce'].length > 0) {
+    failures.push(`sheet/reduce: the panel animated through ${sheetMids['reduce'].length} intermediate positions — prefers-reduced-motion is not suppressing the tw-animate-css slide.`);
   }
 } finally {
   await browser.close();

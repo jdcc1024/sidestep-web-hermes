@@ -37,7 +37,7 @@ A captain editing a roster gets no visual confirmation of what just changed — 
 See: docs/prd/motion-adoption.md — Section 5 (PO-3), Section 7 (stable keys)
 
 ## Implementation Notes
-- Reuse the `AnimatePresence` shape established in N-06 rather than inventing a second one.
+- **N-06 established no `AnimatePresence` shape** — its panel turned out to be a Base UI dialog whose enter/exit is CSS, so nothing was converted. This issue is now the codebase's first `AnimatePresence`, and N-08 copies whatever lands here. Keep it simple and readable rather than clever.
 - **Stable keys are a correctness requirement, not a style preference.** `slots.map((slot) => ...)` at `RosterSheet.tsx:136` must key on the slot/entry id. Index keys will make removals animate the *wrong* row out — the row that visually disappears will not be the row that was deleted.
 - Combine `AnimatePresence` (enter/exit) with `layout` on the sibling rows so the gap closes smoothly. This is the one place in the PRD where both primitives are needed together.
 - Bulk paste (`pasting` state at `:89`) can insert many rows at once. Cap or shorten any stagger so a 30-name paste does not turn into a several-second animation. Check this case explicitly — it is the realistic worst case for this component.

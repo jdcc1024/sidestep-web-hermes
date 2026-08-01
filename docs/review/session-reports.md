@@ -1833,3 +1833,76 @@ One entry per completed loop task. This is the human's fast path for UX critique
     it complete; no code changed.
 
 - Follow-ups filed: P-01 (needs-human) — optional top-level Jersey Runs section.
+
+## 2026-08-01 — N-06: Start Collecting Panel Enter and Exit
+
+- What shipped:
+  - **The issue's premise was wrong, so the animation it asked for was not
+    built.** `StartCollecting`'s "panel" is not an `open`-gated div — it is a
+    Base UI `<Dialog>`, and has been since M-05 created it. Base UI holds the
+    popup mounted for the length of its exit animation and `dialog.tsx` already
+    carries `data-closed:animate-out ... zoom-out-95`, so it already animates
+    out rather than being removed. Measured rather than assumed: sampling the
+    real popup's scale every frame on `/portal/orders/<id>` caught 6 frames in
+    flight — 0.950, 0.979, 0.990, 0.996 opening, then **0.989, 0.954 closing**.
+    Wrapping it in `AnimatePresence` would have been the exact regression that
+    CLAUDE.md and this PRD's own Out of Scope section both forbid.
+  - **The real defect was criterion 4 of the same issue.** Nothing suppressed
+    those CSS animations under reduced motion. `<MotionConfig reducedMotion=
+    "user">` only ever covered Motion, and the repo had no
+    `prefers-reduced-motion` rule at all — so every `components/ui/*` primitive
+    zoomed or slid for users who had explicitly asked it not to. Fixed in
+    `app/globals.css`. Same measurement under `reduce` now gives 0 frames in
+    flight, settling at scale 1 / opacity 1.
+  - It took two rules, because the primitives move by two mechanisms: the
+    tw-animate-css keyframes (dialog, dropdown, popover, select, tooltip) zero
+    their `--tw-enter-*`/`--tw-exit-*` transform inputs, while the sheet
+    transitions Tailwind's standalone `translate` property, which the first rule
+    cannot reach. Opacity is left alone in both — a fade is not movement, and
+    keeping the animation *running* rather than `animation: none` is what lets
+    Base UI still delay unmount.
+  - `scripts/check-reduced-motion.mjs` gained a fifth case (the marketing nav's
+    mobile sheet): 27 frames in flight at no-preference, 0 under reduce. All
+    five cases green.
+  - `StartCollecting` had no test file; added one with 8 behaviour tests —
+    fields absent until open, close genuinely unmounts, rapid open/close leaves
+    exactly one panel, both validation paths, the success path's mutation args +
+    toast + close, and the failure path.
+
+- UX surfaces to eyeball: `/portal/orders/jh78tchkpkxczry0xsrw21fmw58bdx3c` and
+  `/` at 375/768/1280 light+dark — screenshots in `docs/review/N-06/`.
+  **Honestly, there is little to look at:** nothing here changes at default
+  motion settings. The change is only visible with OS reduced motion on, and
+  `snap.mjs` neither emulates that nor can open a dialog, so the open state is
+  not captured. The worthwhile manual check is OS reduced motion enabled →
+  open/close "Start collecting" and the mobile menu, and confirm both fade
+  without sliding or zooming while staying fully usable.
+  The `1280 light` order-page capture caught the Convex query mid-flight and
+  shows only skeletons; the 375 capture of the same page rendered fully. A
+  one-off race in `snap.mjs`, not a regression — worth knowing the screenshot
+  surface can lie like this.
+
+- Decisions I made that a human may want to veto:
+  - **Not doing the task as written, and withdrawing PO-2 from the PRD.** I
+    treated this as technical rather than a product call, because CLAUDE.md and
+    the PRD had already answered it in writing: converting `components/ui/*` off
+    tw-animate-css is a regression. If you disagree, the revert is that the
+    dialog gets `AnimatePresence` and the CSS exit is deleted.
+  - **Fixing reduced motion for all `components/ui/*`, not just the dialog.**
+    Broader than N-06's title. Shipping half of an accessibility guarantee
+    seemed worse than shipping it whole, and the fix belongs in one place by
+    the CSS-vs-Motion boundary. It is ~15 lines in `globals.css`, scoped to a
+    media query, and affects nothing at default settings.
+  - **The sheet, not a dialog, as the committed check case.** Every keyframe
+    primitive in the app sits behind auth or needs seeded data; the sheet needs
+    only a dev server. So the committed check proves the mechanism I could
+    reach, and the dialog half was verified by hand this session. Filed as N-09
+    rather than bolting a Clerk session onto a check whose trustworthiness
+    comes from needing nothing.
+  - Updated N-07/N-08's implementation notes, which both told the next agent to
+    "reuse the `AnimatePresence` shape established in N-06". N-06 established
+    none, so N-07 is now the codebase's first `AnimatePresence`.
+
+- Follow-ups filed: N-09 — automate the reduced-motion check for the keyframe
+  primitives (dialog/select/popover/dropdown/tooltip), which currently have no
+  committed proof.
