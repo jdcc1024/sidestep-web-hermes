@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation } from "convex/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ChevronDownIcon,
   ClipboardPasteIcon,
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { jerseyLabel, type RosterSlotRead } from "@/lib/jerseyBreakdown";
+import { ROW_TRANSITION } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
   ROSTER_NAME_MAX_LENGTH,
@@ -125,20 +127,56 @@ export function RosterSheet({
           />
         ) : (
           <>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4">
-              {slots.length === 0 ? (
+            {/* `layoutScroll` is load-bearing, not a hint. Motion measures a
+                row's before and after in viewport coordinates and assumes an
+                ancestor's scroll offset is fixed unless told otherwise; on a
+                fifteen-player roster, which is exactly when this list is
+                scrolled, the unaccounted offset cancels the delta and every
+                row concludes it has not moved. A short roster animates fine
+                without this, which is precisely how it would have shipped
+                broken for the rosters that matter. */}
+            <motion.div
+              layoutScroll
+              className="min-h-0 flex-1 overflow-y-auto px-4"
+            >
+              {slots.length === 0 && (
                 <p className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
                   No players yet.
                   {locked ? "" : " Add the first one below."}
                 </p>
-              ) : (
-                <ul aria-label="Roster" className="space-y-2">
+              )}
+              {/* The list stays mounted through the empty state rather than
+                  swapping with the message, so the *first* player added is a
+                  row arriving into a list like every one after it, instead of
+                  a list appearing from nowhere. An empty `ul` occupies no
+                  space. `relative` gives the row `popLayout` lifts out of the
+                  flow something to be positioned against while it fades. */}
+              <ul aria-label="Roster" className="relative space-y-2">
+                {/* initial={false}: the players already on the roster when the
+                    sheet opens are not news — they arrive with the panel, and
+                    replaying fifteen entrances over it would read as a stutter.
+                    Only rows that show up while the captain is watching
+                    animate. That is also what keeps a bulk paste cheap: the
+                    confirm returns to a freshly mounted list, so thirty names
+                    land at once instead of playing thirty entrances, and the
+                    mirror's fifteen — which do land in a list already on
+                    screen — all fade together rather than in sequence.
+
+                    popLayout is what makes the gap *close* rather than snap,
+                    and it is not decoration. Left in the flow, a leaving row
+                    holds its space for the whole fade, and by the time it is
+                    finally dropped the survivors are re-rendered from cached
+                    elements — React skips them, so they never measure where
+                    they used to be and arrive with nothing to animate from.
+                    Popping the row out of the flow moves that layout change
+                    forward to the render that survivors do re-render on. */}
+                <AnimatePresence initial={false} mode="popLayout">
                   {slots.map((slot) => (
                     <SlotRow key={slot._id} slot={slot} locked={locked} />
                   ))}
-                </ul>
-              )}
-            </div>
+                </AnimatePresence>
+              </ul>
+            </motion.div>
 
             {!locked && (
               <SheetFooter className="border-t border-border">
@@ -450,10 +488,21 @@ function AddSlotRow({
   );
 }
 
+// A row's entire entrance and exit. Opacity only, on purpose — the reasoning
+// lives with `ROW_TRANSITION` in `lib/motion.ts`. Module constants rather than
+// object literals so the target identity is stable across renders.
+const ROW_HIDDEN = { opacity: 0 };
+const ROW_SHOWN = { opacity: 1 };
+
 function SlotRow({
+  ref,
   slot,
   locked,
 }: {
+  // `popLayout` measures the leaving row before it lifts it out of the flow,
+  // so it needs a handle on the real `li` — a row that swallowed the ref would
+  // be popped to a zero-size box and collapse mid-fade.
+  ref?: React.Ref<HTMLLIElement>;
   slot: RosterSheetSlot;
   locked: boolean;
 }) {
@@ -502,103 +551,125 @@ function SlotRow({
     }
   }
 
-  if (editing) {
-    return (
-      <li className="rounded-md border border-border bg-background p-2">
-        <div className="grid grid-cols-[1fr_5rem] gap-2">
-          <Input
-            value={name}
-            maxLength={ROSTER_NAME_MAX_LENGTH}
-            aria-label={`Edit name for ${label}`}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Input
-            value={number}
-            maxLength={ROSTER_NUMBER_MAX_LENGTH}
-            aria-label={`Edit number for ${label}`}
-            onChange={(e) => setNumber(e.target.value)}
-          />
-        </div>
-        <div className="mt-2 flex justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={busy}
-            onClick={() => {
-              setName(slot.name);
-              setNumber(slot.number ?? "");
-              setEditing(false);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button type="button" size="sm" disabled={busy} onClick={() => void onSave()}>
-            Save
-          </Button>
-        </div>
-      </li>
-    );
-  }
-
+  // One `li` across both states, rather than a return per state: it is the
+  // element `AnimatePresence` tracks, so a row that swapped its outer node on
+  // entering edit mode would read as one row leaving and another arriving.
   return (
-    <li
+    <motion.li
+      ref={ref}
+      // Position only. A removed row's neighbours have to slide up into the
+      // gap — that is the whole point — but animating a row's own *size* would
+      // scale-distort the name inside it every time the edit form opens.
+      layout="position"
       aria-label={label}
-      className="flex items-start justify-between gap-2 rounded-md border border-border/60 bg-background px-3 py-2"
-    >
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{label}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          {slot.total === 0 ? (
-            <Badge variant="secondary" className="bg-muted text-muted-foreground">
-              Not yet filled
-            </Badge>
-          ) : (
-            slot.sizes.map(({ size, qty }) => (
-              <Badge
-                key={size}
-                variant="secondary"
-                className="tabular-nums font-semibold"
-              >
-                {qty > 1 ? `${size} ×${qty}` : size}
-              </Badge>
-            ))
-          )}
-          {/* Surfaced, never resolved (PRD §6): the captain fixes it by
-              editing, so the flag just has to be legible. */}
-          {slot.collision && (
-            <Badge
-              variant="secondary"
-              className="bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"
-            >
-              Two people claimed this
-            </Badge>
-          )}
-        </div>
-      </div>
-      {!locked && (
-        <span className="flex shrink-0 items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Edit ${label}`}
-            onClick={() => setEditing(true)}
-          >
-            <PencilIcon />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            disabled={busy}
-            aria-label={`Remove ${label}`}
-            onClick={() => void onRemove()}
-          >
-            <XIcon />
-          </Button>
-        </span>
+      initial={ROW_HIDDEN}
+      animate={ROW_SHOWN}
+      exit={ROW_HIDDEN}
+      transition={ROW_TRANSITION}
+      className={cn(
+        "rounded-md border bg-background",
+        editing
+          ? "border-border p-2"
+          : "flex items-start justify-between gap-2 border-border/60 px-3 py-2",
       )}
-    </li>
+    >
+      {editing ? (
+        <>
+          <div className="grid grid-cols-[1fr_5rem] gap-2">
+            <Input
+              value={name}
+              maxLength={ROSTER_NAME_MAX_LENGTH}
+              aria-label={`Edit name for ${label}`}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Input
+              value={number}
+              maxLength={ROSTER_NUMBER_MAX_LENGTH}
+              aria-label={`Edit number for ${label}`}
+              onChange={(e) => setNumber(e.target.value)}
+            />
+          </div>
+          <div className="mt-2 flex justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                setName(slot.name);
+                setNumber(slot.number ?? "");
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" size="sm" disabled={busy} onClick={() => void onSave()}>
+              Save
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">
+              {label}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {slot.total === 0 ? (
+                <Badge
+                  variant="secondary"
+                  className="bg-muted text-muted-foreground"
+                >
+                  Not yet filled
+                </Badge>
+              ) : (
+                slot.sizes.map(({ size, qty }) => (
+                  <Badge
+                    key={size}
+                    variant="secondary"
+                    className="tabular-nums font-semibold"
+                  >
+                    {qty > 1 ? `${size} ×${qty}` : size}
+                  </Badge>
+                ))
+              )}
+              {/* Surfaced, never resolved (PRD §6): the captain fixes it by
+                  editing, so the flag just has to be legible. */}
+              {slot.collision && (
+                <Badge
+                  variant="secondary"
+                  className="bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"
+                >
+                  Two people claimed this
+                </Badge>
+              )}
+            </div>
+          </div>
+          {!locked && (
+            <span className="flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Edit ${label}`}
+                onClick={() => setEditing(true)}
+              >
+                <PencilIcon />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={busy}
+                aria-label={`Remove ${label}`}
+                onClick={() => void onRemove()}
+              >
+                <XIcon />
+              </Button>
+            </span>
+          )}
+        </>
+      )}
+    </motion.li>
   );
 }

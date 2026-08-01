@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { getFunctionName } from "convex/server";
@@ -57,10 +57,14 @@ function slot(overrides: Partial<RosterSheetSlot> = {}): RosterSheetSlot {
   };
 }
 
-function renderSheet(
+// Split from `renderSheet` so a test can re-render the same sheet with a
+// different roster — which is how a removal actually reaches this component:
+// the mutation resolves, Convex re-pushes the read, and `slots` comes back
+// one shorter.
+function sheetElement(
   props: Partial<React.ComponentProps<typeof RosterSheet>> = {},
 ) {
-  return render(
+  return (
     <RosterSheet
       runId={RUN_ID}
       designId={DESIGN_ID}
@@ -69,8 +73,14 @@ function renderSheet(
       otherDesigns={[{ designId: AWAY_ID, title: "Away kit" }]}
       locked={false}
       {...props}
-    />,
+    />
   );
+}
+
+function renderSheet(
+  props: Partial<React.ComponentProps<typeof RosterSheet>> = {},
+) {
+  return render(sheetElement(props));
 }
 
 async function openSheet(user: ReturnType<typeof userEvent.setup>) {
@@ -266,6 +276,81 @@ describe("RosterSheet — editing and removing", () => {
         description: "This slot has orders on it — remove those first.",
       }),
     );
+  });
+});
+
+// N-07: rows animate in and out, which means a removed row outlives the read
+// that dropped it. Every assertion here is about *which* row that is — the
+// rows are keyed on entry id, and an index key would leave the wrong one on
+// screen while the wrong one disappeared.
+describe("RosterSheet — rows across a re-read", () => {
+  const gretzky = slot();
+  const sosa = slot({
+    _id: "slot_sosa" as Id<"rosterEntries">,
+    name: "Sosa",
+    number: "25",
+  });
+  const bure = slot({
+    _id: "slot_bure" as Id<"rosterEntries">,
+    name: "Bure",
+    number: "10",
+  });
+
+  it("drops the row that was removed and leaves its siblings alone", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderSheet({ slots: [gretzky, sosa, bure] });
+    const sheet = await openSheet(user);
+
+    await user.click(sheet.getByRole("button", { name: /remove sosa/i }));
+    expect(remove).toHaveBeenCalledWith({ rosterEntryId: "slot_sosa" });
+
+    rerender(sheetElement({ slots: [gretzky, bure] }));
+
+    // `getAllBy`, not `getBy`: with index keys the row held back for its exit
+    // would be a *second* copy of the last survivor, so the count is the
+    // assertion — the survivors are each on screen exactly once.
+    expect(
+      sheet.getAllByRole("listitem", { name: /gretzky #99/i }),
+    ).toHaveLength(1);
+    expect(sheet.getAllByRole("listitem", { name: /bure #10/i })).toHaveLength(
+      1,
+    );
+    await waitFor(() =>
+      expect(sheet.queryByRole("listitem", { name: /sosa #25/i })).toBeNull(),
+    );
+  });
+
+  it("shows a newly created row beside the ones already there", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderSheet({ slots: [gretzky] });
+    const sheet = await openSheet(user);
+
+    await user.type(sheet.getByLabelText(/add player name/i), "Sosa");
+    await user.type(sheet.getByLabelText(/add player number/i), "25");
+    await user.click(sheet.getByRole("button", { name: /^add$/i }));
+
+    rerender(sheetElement({ slots: [gretzky, sosa] }));
+
+    expect(
+      sheet.getByRole("listitem", { name: /gretzky #99/i }),
+    ).toBeInTheDocument();
+    expect(
+      sheet.getByRole("listitem", { name: /sosa #25/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the first player once the empty roster is filled", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderSheet({ slots: [] });
+    const sheet = await openSheet(user);
+
+    expect(sheet.getByText(/no players yet/i)).toBeInTheDocument();
+    rerender(sheetElement({ slots: [gretzky] }));
+
+    expect(
+      sheet.getByRole("listitem", { name: /gretzky #99/i }),
+    ).toBeInTheDocument();
+    expect(sheet.queryByText(/no players yet/i)).toBeNull();
   });
 });
 

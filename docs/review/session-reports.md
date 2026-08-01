@@ -1906,3 +1906,76 @@ One entry per completed loop task. This is the human's fast path for UX critique
 - Follow-ups filed: N-09 — automate the reduced-motion check for the keyframe
   primitives (dialog/select/popover/dropdown/tooltip), which currently have no
   committed proof.
+
+## 2026-08-01 — N-07: Roster Row Add and Remove Animation
+
+- What shipped:
+  - **Roster rows fade in and out, and the survivors slide into the gap.**
+    `RosterSheet`'s list is now one `AnimatePresence mode="popLayout"` over
+    rows keyed on entry id, each a `motion.li` with `layout="position"`. Two
+    tokens in `lib/motion.ts` — `ROW_FADE_DURATION` and `ROW_TRANSITION`, the
+    latter giving the fade a short tween and the gap-closing a spring, because
+    the fade is a receipt and the slide is the part that carries the meaning.
+  - **`layoutScroll` on the list's scroll container**, which is what makes any
+    of this work on a real roster. See the veto list below — this is the one
+    finding worth reading.
+  - **`SlotRow` is one `li` across its display and edit states** instead of a
+    return per state, so entering edit mode is not read as one row leaving and
+    another arriving. It takes and forwards a `ref` for `popLayout` to measure.
+  - The list also stays mounted through the empty state, so the *first* player
+    added animates in like every one after it.
+  - Codified the whole shape as a rule in CLAUDE.md, since N-08 copies it.
+
+- UX surfaces to eyeball: `/portal/orders/<id>`, roster sheet open
+  (screenshots in `docs/review/N-07/`, 375/768/1280 light+dark).
+  - `roster-sheet-w*.png` — **the review surface**. Stills cannot show an
+    animation, so what to judge here is the resting state: rows unchanged,
+    footer intact, nothing clipped by the new `relative` on the list. The
+    animation itself was measured rather than eyeballed (below).
+  - `portal-orders-*.png` — the cards behind the sheet, unchanged by this slice.
+  - **Worth doing by hand**: open a roster, add a player, remove one from the
+    middle, and paste a list. The taste call I cannot make for you is whether
+    the removal reads well as *two* beats — the row fades over 0.15s, then the
+    gap closes over a spring — rather than one simultaneous collapse. A
+    simultaneous collapse is a `height: 0` exit; it is a two-line change to
+    `ROW_TRANSITION` and the exit target if you want it.
+
+- Decisions I made that a human may want to veto:
+  - **`layoutScroll`, and the reason it is worth a paragraph.** Without it the
+    animation is *silently* dead on any roster long enough to scroll — Motion
+    measures rows in viewport coordinates and assumes an ancestor's scroll
+    offset never moves, so the delta cancels to zero and every row snaps. It
+    passed by hand on a two-row design and failed on a fifteen-row one. Neither
+    the unit tests (jsdom has no layout) nor a screenshot can see this, which
+    is why the throwaway Playwright check below sampled the *long* list.
+  - **`popLayout` rather than leaving the row in the flow.** Left in flow, a
+    leaving row holds its space for the whole fade, and by the time it drops
+    `AnimatePresence` re-renders the survivors from cached elements — React
+    skips them, so they never measure where they were. I tried `LayoutGroup`
+    first on the theory that it forces a group-wide measure; it does not fix
+    this, and it is not in the shipped code.
+  - **Opacity only on the row itself — no rise, no collapse.** It keeps the
+    enter/exit clear of the layout projection running on the same element, and
+    it leaves reduced motion to one mechanism: `MotionConfig` suppresses the
+    slide, the fade survives, which is the split the preference asks for.
+  - **No stagger anywhere.** With `initial={false}`, rows already present when
+    the sheet opens do not animate, and a confirmed paste returns to a freshly
+    mounted list — so a 30-name paste plays nothing at all. The mirror's 15
+    rows land in a live list and all fade together. Measured: 30 rows landed
+    250ms after confirm with zero frames of residual fading.
+  - **Verified in a real browser with a throwaway Playwright script** (not
+    committed, same precedent as M-03/M-04 — `snap.mjs` navigates only and this
+    surface is two clicks deep; `snap.mjs` is untouched). It measured, against
+    the 15-row roster: a new row fading 0 → 1; the removed row fading out; the
+    row below travelling 70px through 9 in-flight frames under
+    `no-preference` and **0** under `reduce`; no duplicate or wrong-row
+    removal; and the paste settling. It planted and then removed its own rows —
+    the fixture's seeded players have orders on them and `remove` refuses those
+    — and confirmed zero left behind.
+  - **The new unit tests are regression gates, not red-first tests.** The rows
+    were already keyed on `slot._id`, so the sibling-identity assertions passed
+    before the change. They are worth having anyway: they are what fails if
+    anyone reaches for an index key, which is the one bug that makes the wrong
+    row disappear.
+
+- Follow-ups filed: none.

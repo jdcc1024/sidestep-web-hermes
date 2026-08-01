@@ -246,6 +246,17 @@ cannot do:**
   *other* CSS transition that moves something still needs its own
   `motion-reduce:`; hover and color transitions do not.
 - `AnimatePresence` children need stable `key`s — entity ids, never array index.
+- **A list whose items animate in *and* out wants three things together, not
+  one** (`RosterSheet` is the reference implementation, N-07). `AnimatePresence
+  mode="popLayout"` so a leaving item stops holding its space immediately —
+  otherwise the survivors are re-rendered from cached elements once it finally
+  drops, React skips them, and they arrive with nothing to animate from.
+  `layout` on the items so they slide into the gap. And `layoutScroll` on the
+  scrollable ancestor, if there is one: Motion measures in viewport coordinates
+  and assumes an ancestor's scroll offset never moves, so without it a *scrolled*
+  list computes a zero delta and every row snaps. A short list animates
+  correctly with none of this — verify against a list long enough to scroll, or
+  you will ship it broken for exactly the case that matters.
 - Test behavior, never animation state. jsdom has no layout, so Motion is inert
   under vitest by design; assert `data-*`, `aria-*`, and text.
 - A reveal must never leave content invisible in a still `snap.mjs` capture. If

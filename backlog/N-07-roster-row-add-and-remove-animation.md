@@ -1,6 +1,6 @@
 # Issue: Roster Row Add and Remove Animation
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 

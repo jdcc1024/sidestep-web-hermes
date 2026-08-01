@@ -1,4 +1,4 @@
-import type { Transition } from "motion/react";
+import type { Transition, ValueTransition } from "motion/react";
 
 /**
  * The site's motion vocabulary. Every Motion component draws its transition
@@ -18,7 +18,7 @@ import type { Transition } from "motion/react";
  * This replaces the hand-tuned `cubic-bezier(0.34, 1.4, 0.64, 1)` that the
  * spotlight used to carry inline.
  */
-export const SPRING_SPOTLIGHT: Transition = {
+export const SPRING_SPOTLIGHT: ValueTransition = {
   type: "spring",
   stiffness: 320,
   damping: 32,
@@ -26,10 +26,17 @@ export const SPRING_SPOTLIGHT: Transition = {
 };
 
 /**
- * Small UI state changes that should feel immediate — badges, chips, counters.
- * Stiffer and more damped than the spotlight: no overshoot at this size.
+ * Small UI state changes that should feel immediate — badges, chips, counters,
+ * a list row sliding up into the gap another one left. Stiffer and more damped
+ * than the spotlight: no overshoot at this size.
+ *
+ * Typed as a {@link ValueTransition} — the per-value shape — rather than as a
+ * whole-element `Transition`, because both springs are used in both positions:
+ * on their own as an element's transition, and nested under a single value's
+ * key (see {@link ROW_TRANSITION}). A `Transition` is not assignable to the
+ * latter; a `ValueTransition` is assignable to both.
  */
-export const SPRING_SNAPPY: Transition = {
+export const SPRING_SNAPPY: ValueTransition = {
   type: "spring",
   stiffness: 520,
   damping: 40,
@@ -61,13 +68,21 @@ export const STAGGER_OFFSET = 12;
 export const REVEAL_AMOUNT = 0.15;
 
 /**
+ * The site's one easing curve: fast out of the gate, long soft landing. Named
+ * here rather than repeated as four numbers wherever a tween is spelled out,
+ * so that "one easing curve for the whole site" stays a fact rather than a
+ * comment somebody has to keep true by hand.
+ */
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+
+/**
  * Fade-and-rise used by section reveals and staggered card entrances.
  * Eased rather than sprung: a reveal that overshoots reads as a glitch when a
  * dozen of them fire while the visitor scrolls.
  */
 export const REVEAL_TRANSITION: Transition = {
   duration: REVEAL_DURATION,
-  ease: [0.22, 1, 0.36, 1],
+  ease: EASE_OUT,
 };
 
 /**
@@ -117,3 +132,25 @@ export const HERO_TRANSITION: Transition = { ...REVEAL_TRANSITION, duration: 0.4
  */
 export const NO_SCRIPT_REVEAL_FALLBACK =
   "<style>[data-reveal]{opacity:1!important;transform:none!important}</style>";
+
+/**
+ * A row arriving in or leaving an editable list — the roster editor.
+ *
+ * Two jobs, deliberately given two different speeds. The row's *own* fade is
+ * confirmation that a click landed, so it is short enough to be over before
+ * anyone studies it. The other rows closing the gap is the part that carries
+ * the meaning — it is what tells the captain the list is one shorter — so it
+ * gets a spring and room to be seen.
+ *
+ * Nothing here moves the row itself. Fading in place keeps the enter/exit
+ * clear of the layout projection that {@link SPRING_SNAPPY} is driving on the
+ * same element, and it leaves the whole reduced-motion story to one mechanism:
+ * `MotionConfig` suppresses the layout animation and the fade survives, which
+ * is exactly the split the preference asks for.
+ */
+export const ROW_FADE_DURATION = 0.15;
+
+export const ROW_TRANSITION: Transition = {
+  layout: SPRING_SNAPPY,
+  opacity: { duration: ROW_FADE_DURATION, ease: EASE_OUT },
+};
