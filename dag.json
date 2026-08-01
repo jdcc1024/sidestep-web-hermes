@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T14:58:20.508Z",
+  "lastUpdated": "2026-08-01T15:44:37.810Z",
   "phases": [
     {
       "id": "phase-1",
@@ -531,9 +531,9 @@
       "phase": "3",
       "type": "improvement",
       "description": "Roster rows appear and vanish instantly and survivors snap up to fill the gap. Animate row entry and exit and let remaining rows slide into position, so a captain can see what just changed.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-01T14:58:20.507Z",
-      "completedAt": null,
+      "completedAt": "2026-08-01T15:44:37.810Z",
       "issueFile": "backlog/N-07-roster-row-add-and-remove-animation.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
       "acceptanceCriteria": [
@@ -1243,6 +1243,12 @@
       "event": "task_started",
       "nodeId": "N-07",
       "message": "Picked up: Roster Row Add and Remove Animation"
+    },
+    {
+      "timestamp": "2026-08-01T15:44:37.810Z",
+      "event": "task_completed",
+      "nodeId": "N-07",
+      "message": "Completed: Roster Row Add and Remove Animation"
     }
   ]
 }
