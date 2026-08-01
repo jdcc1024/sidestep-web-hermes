@@ -118,6 +118,26 @@ This is not specific to B-02. **No admin UI can be reviewed from the loop at all
 
 **Answer:** _(human fills in)_
 
+### [P-01] Portal Jersey Runs Index Section — 2026-08-01, ralph-loop
+**Question:** Do you want a top-level "Jersey Runs" section in the portal sidebar, or is reaching runs through their order enough?
+
+**Context:** B-08 was filed because the sidebar's third link pointed at `/portal/runs`, which has no page — it 404s. The issue allowed either resolution: build the section, or drop the link. **I dropped the link**, because building the section is new product scope rather than a bug fix, and because the content already exists elsewhere:
+
+- A run belongs to an order. `/portal/orders/[id]` already links to that order's `run/setup` and `run/responses`.
+- Runs the user has *responded to* (other captains' runs) are already listed on `/portal` under "Your jersey run responses" — visible in `docs/review/B-08/portal-w1280-dark.png`.
+- `docs/prd/sidestep-website-phase1.md` describes jersey runs only as a per-order capability. It never asks for a top-level section.
+
+So a `/portal/runs` index would mostly re-list the orders already on `/portal`, distinguished only by "has a run". That may still be worth it if captains run many teams at once — that's your call, not mine.
+
+**Options considered:**
+1. **Leave it removed (shipped).** Two-item nav, nothing 404s, no duplicate surface. Captains with several active runs have to go order-by-order.
+2. **Build `/portal/runs` as a run-centric index** — every run the user *owns*, across orders, with deadline and response count, linking to setup/responses. Genuinely useful for a multi-team captain; needs a new Convex query (`jerseyRuns.listForUser`) since runs are currently only read by order id.
+3. **Rename the section to something the orders list can't cover** — e.g. "Participation" for runs you responded to. Cheapest of the three, but that content is already a block on `/portal`.
+
+**Recommendation:** Option 1 for now, which is what shipped — it makes the 404 go away without guessing at scope. Take Option 2 if you know captains manage several concurrent runs; say the word and P-01 becomes eligible. The nav is a one-line restore either way, and the route-exists test will hold the new page to actually existing.
+
+**Answer:** _(human fills in)_
+
 ## Answered
 
 ### [2-14] Optional Intake Image Uploads — 2026-07-19, ralph-loop

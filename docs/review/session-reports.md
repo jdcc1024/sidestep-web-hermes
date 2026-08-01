@@ -1795,3 +1795,41 @@ One entry per completed loop task. This is the human's fast path for UX critique
 - Follow-ups filed: B-08 — the sidebar's "Jersey Runs" link points at
   `/portal/runs`, which has no page and 404s. Pre-existing, unrelated to motion,
   and out of scope here; the indicator correctly sits on it if you land there.
+
+## 2026-08-01 — B-08: Jersey Runs nav link has no route
+
+- What shipped:
+  - Removed the portal sidebar's "Jersey Runs" link. It pointed at
+    `/portal/runs`, which has no `page.tsx` — the link 404'd for every user.
+  - Added a test that holds the *whole* nav to the rule rather than pinning the
+    one bad href: `PortalShell.test.tsx` renders the nav, reads every `href`,
+    and asserts a matching `app/<path>/page.tsx` exists. A future section added
+    to `portalLinks` before its route fails there. (Nav hrefs are all static, so
+    no dynamic-segment resolution is needed.)
+  - Wrote the missing `backlog/B-08-*.md` — the DAG referenced a file that had
+    never been created.
+
+- UX surfaces to eyeball: `/portal` and `/portal/designs` at 375/768/1280
+  light+dark — screenshots in `docs/review/B-08/`. The only thing to look at is
+  the sidebar: it is a two-item nav now ("My Orders", "My Designs"), and the
+  N-05 pill still lands correctly on each. Worth deciding whether a two-item
+  sidebar earns its 256px, or whether the portal wants a different shell at this
+  size — that's a taste question I did not touch.
+  The clipped sidebar and the stray Clerk avatar mid-page in the 375px shots are
+  the documented `position: fixed` + `fullPage` artifact, not a regression.
+
+- Decisions I made that a human may want to veto:
+  - **Dropped the link rather than building the section.** The issue allowed
+    either. A run belongs to an order: `/portal/orders/[id]` already links to
+    `run/setup` and `run/responses`, `/portal` already lists runs the user
+    responded to, and the phase-1 PRD describes runs only as a per-order
+    capability. A `/portal/runs` index would have re-listed the orders already
+    on `/portal`, so building it was new product scope, not a bug fix. Filed as
+    P-01 (needs-human) with the full argument in `backlog/QUESTIONS.md` — if you
+    want the section, it's a one-line nav restore plus a `listForUser` query.
+  - **Closed out N-05 first.** Its work was implemented, committed (a2ee715) and
+    reported by the previous iteration, which exited before running `complete`,
+    leaving the node stuck `in-progress`. Verified the committed tree and marked
+    it complete; no code changed.
+
+- Follow-ups filed: P-01 (needs-human) — optional top-level Jersey Runs section.

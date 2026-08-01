@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -39,6 +41,15 @@ function renderAt(pathname: string) {
   return { ...view, nav: screen.getByRole("navigation", { name: "Portal navigation" }) };
 }
 
+/**
+ * Does the App Router actually serve this href? Nav hrefs are all static, so a
+ * `page.tsx` under the matching `app/` directory is the whole answer — no need
+ * to reason about dynamic segments.
+ */
+function routeExists(href: string) {
+  return existsSync(join(process.cwd(), "app", href.replace(/^\//, ""), "page.tsx"));
+}
+
 function currentLinks(nav: HTMLElement) {
   return within(nav)
     .getAllByRole("link")
@@ -49,6 +60,24 @@ describe("PortalShell navigation", () => {
   it("renders its children", () => {
     renderAt("/portal");
     expect(screen.getByText("Portal content")).toBeInTheDocument();
+  });
+
+  // B-08: the nav shipped a "Jersey Runs" link to /portal/runs, which has no
+  // page. Rather than pin the one dead href, hold the whole nav to the rule —
+  // a future section added to `portalLinks` before its route fails here.
+  it("points every nav link at a route that exists", () => {
+    const { nav } = renderAt("/portal");
+
+    const hrefs = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href") ?? "");
+
+    expect(hrefs.length).toBeGreaterThan(0);
+    for (const href of hrefs) {
+      expect(routeExists(href), `nav links to ${href}, which has no page`).toBe(
+        true,
+      );
+    }
   });
 
   it("marks exactly one link as the current page", () => {

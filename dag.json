@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T14:22:54.162Z",
+  "lastUpdated": "2026-08-01T14:36:59.733Z",
   "phases": [
     {
       "id": "phase-1",
@@ -493,9 +493,9 @@
       "phase": "3",
       "type": "improvement",
       "description": "PortalShell already marks the active nav link with aria-current but switches instantly. Add a sliding indicator on layoutId, reusing the primitive proven on the pricing spotlight.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-01T14:16:59.544Z",
-      "completedAt": null,
+      "completedAt": "2026-08-01T14:26:09.956Z",
       "issueFile": "backlog/N-05-portal-sidebar-active-indicator.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
       "acceptanceCriteria": [
@@ -569,8 +569,8 @@
       "phase": "1",
       "type": "bug",
       "description": "The portal sidebar links to /portal/runs, which has no page - the link 404s. Either build the section or drop the link.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-01T14:26:21.687Z",
       "completedAt": null,
       "issueFile": "backlog/B-08-jersey-runs-nav-link-has-no-route.md",
       "prdRef": "docs/prd/motion-adoption.md#5",
@@ -579,6 +579,26 @@
         "No portal nav link points at a route that does not exist",
         "PortalShell tests cover whichever resolution is chosen"
       ]
+    },
+    {
+      "id": "P-01",
+      "title": "Portal Jersey Runs Index Section",
+      "phase": "3",
+      "type": "feature",
+      "description": "Optional top-level /portal/runs section listing the captain's own jersey runs across orders. B-08 removed the nav link that pointed here; this node exists only if the human wants the section built.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/P-01-portal-jersey-runs-index-section.md",
+      "prdRef": "docs/prd/sidestep-website-phase1.md#4",
+      "acceptanceCriteria": [
+        "A /portal/runs page lists every run the signed-in user owns, across orders",
+        "Each row links to that run's setup and responses",
+        "The nav link is restored and PortalShell's route-exists test still passes",
+        "Empty state when the user owns no runs"
+      ],
+      "needsHuman": true,
+      "humanQuestion": "Do you want a top-level Jersey Runs section in the portal, or is per-order access enough? (B-08 removed the dead nav link)"
     }
   ],
   "edges": [
@@ -1146,6 +1166,30 @@
       "event": "nodes_added",
       "nodeId": "B-08",
       "message": "New task added: Jersey Runs nav link has no route"
+    },
+    {
+      "timestamp": "2026-08-01T14:26:09.957Z",
+      "event": "task_completed",
+      "nodeId": "N-05",
+      "message": "Completed: Portal Sidebar Active Indicator"
+    },
+    {
+      "timestamp": "2026-08-01T14:26:21.688Z",
+      "event": "task_started",
+      "nodeId": "B-08",
+      "message": "Picked up: Jersey Runs nav link has no route"
+    },
+    {
+      "timestamp": "2026-08-01T14:36:54.537Z",
+      "event": "nodes_added",
+      "nodeId": "P-01",
+      "message": "New task added: Portal Jersey Runs Index Section"
+    },
+    {
+      "timestamp": "2026-08-01T14:36:59.733Z",
+      "event": "needs_human",
+      "nodeId": "P-01",
+      "message": "Needs human: Portal Jersey Runs Index Section — Do you want a top-level Jersey Runs section in the portal, or is per-order access enough? (B-08 removed the dead nav link)"
     }
   ]
 }

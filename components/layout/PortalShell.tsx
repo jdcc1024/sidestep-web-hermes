@@ -27,10 +27,18 @@ type PortalLink = {
   exact?: boolean;
 };
 
+/**
+ * Every href here must resolve to a real page — `PortalShell.test.tsx` checks
+ * each one against `app/`.
+ *
+ * There is deliberately no "Jersey Runs" section: a run belongs to an order, so
+ * the captain reaches setup and responses from `/portal/orders/[id]`, and runs
+ * they have *responded* to are listed on `/portal` itself. A top-level section
+ * would only re-list orders.
+ */
 const portalLinks: PortalLink[] = [
   { href: "/portal", label: "My Orders", exact: true },
   { href: "/portal/designs", label: "My Designs" },
-  { href: "/portal/runs", label: "Jersey Runs" },
 ];
 
 const isActive = (link: PortalLink, pathname: string) =>
