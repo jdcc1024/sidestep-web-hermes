@@ -46,6 +46,14 @@ export const REVEAL_OFFSET = 24;
 export const STAGGER_STEP = 0.08;
 
 /**
+ * Pixels a staggered card rises through — half a section reveal's distance.
+ * The card sits inside a section that is already rising {@link REVEAL_OFFSET},
+ * and the two travels compose: matching them would read as one slow 48px slide
+ * rather than as a card arriving inside a section.
+ */
+export const STAGGER_OFFSET = 12;
+
+/**
  * Fraction of a revealing element that must be in view before it starts.
  * Deliberately small: a tall section whose trigger sat at half its height
  * would still be animating well after the visitor started reading it.

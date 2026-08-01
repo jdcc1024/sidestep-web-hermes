@@ -1689,3 +1689,56 @@ One entry per completed loop task. This is the human's fast path for UX critique
     check's output.
 
 - Follow-ups filed: none.
+
+## 2026-08-01 — N-04: Staggered Process and Pricing Card Entrances
+
+- What shipped:
+  - New `components/motion/Stagger.tsx` — `<StaggerGroup>` / `<StaggerItem>`,
+    the card-level counterpart to `<Reveal>`. The group owns the trigger
+    (`whileInView`) and the timing (`staggerChildren`); the item owns the
+    appearance (opacity + 12px rise) and takes its cue from the group through
+    variant propagation. `as` picks the tag, so a list of steps stays an `<ol>`
+    of `<li>`s.
+  - `ProcessSection`'s three step cards and `PricingSection`'s four tier cards
+    now arrive in sequence. Last card lands ~0.74s after the section enters
+    view (`STAGGER_STEP` 0.08s × 3 + `REVEAL_DURATION` 0.5s).
+  - New `STAGGER_OFFSET` (12px) token — half a section reveal's travel, because
+    the card is already inside a section rising 24px and the two compose.
+  - `scripts/check-reduced-motion.mjs` now covers a fourth animation: the last
+    process step card, proving the *inherited* variant path is suppressed and
+    not just the one set on the element. Passing run: card no-preference 15
+    frames in flight, card reduce 0, both settling at y 0 / opacity 1.
+
+- UX surfaces to eyeball: `/` (screenshots in `docs/review/N-04/`, 375/768/1280
+  light+dark, all cards settled). Scroll the Process and Pricing sections into
+  view at 1280 and watch the cards arrive left-to-right inside the section that
+  is itself rising. The taste call is whether two layers of motion on the same
+  content reads as considered or as fussy — the fallback if it is fussy is to
+  drop `STAGGER_OFFSET` to 0 and let the cards fade in place, which is a
+  one-token edit in `lib/motion.ts`. Second taste call: at 375px the cards are
+  stacked, so the same stagger plays as a top-to-bottom cascade over a taller
+  distance; check it does not feel slow on mobile.
+
+- Decisions I made that a human may want to veto:
+  - **`ProcessSection` stays a server component** — the issue recommended
+    converting it to `"use client"`. It does not need to. Variants reach a
+    child through React context, not through markup ownership, so handing each
+    server-rendered card to `<StaggerItem>` as `children` gets the per-card
+    stagger with the client boundary staying inside `components/motion/`. This
+    is the same architectural move `<Reveal>` already makes one level up, and
+    it resolves the PRD's Section 10 open question in the opposite direction to
+    the one the issue guessed: no landing section other than the hero needs to
+    leave RSC.
+  - **The spotlight/stagger sequencing risk turned out not to exist**, because
+    the spotlight frame is a child of the moving item rather than a sibling of
+    it — it rides the entrance transform instead of racing it. Verified rather
+    than assumed, with a throwaway Playwright script (deleted) that measured
+    the frame's box against its card's: 0px offset on all four edges both after
+    the entrance settles on the default 10–24 tier, and when the quantity is
+    driven to 100 mid-stagger. No ordering constraint was needed.
+  - **`PricingSection.test.tsx` is byte-identical** — the acceptance criterion
+    asked for that literally, so the new tier-card assertions live in
+    `Stagger.test.tsx` (the shared mechanism) rather than as an added `describe`
+    block in the pricing file.
+
+- Follow-ups filed: none.

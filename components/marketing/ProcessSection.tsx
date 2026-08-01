@@ -1,3 +1,4 @@
+import { StaggerGroup, StaggerItem } from "@/components/motion/Stagger";
 import { Card, CardContent } from "@/components/ui/card";
 
 const steps = [
@@ -41,9 +42,12 @@ export function ProcessSection() {
           </p>
         </div>
 
-        <ol className="mt-12 grid gap-6 md:grid-cols-3">
+        {/* This section stays a server component: the cards are handed to
+            <StaggerItem> as children, so the only client code on the page is
+            the wrapper that sequences them. */}
+        <StaggerGroup as="ol" className="mt-12 grid gap-6 md:grid-cols-3">
           {steps.map((step, idx) => (
-            <li key={step.number} className="relative">
+            <StaggerItem key={step.number} as="li" className="relative">
               <Card className="h-full gap-3 py-6 shadow-sm">
                 <CardContent className="flex flex-col gap-4">
                   <div className="flex items-center gap-3">
@@ -60,6 +64,8 @@ export function ProcessSection() {
                   <p className="text-muted-foreground">{step.description}</p>
                 </CardContent>
               </Card>
+              {/* Inside the item, not beside it: the connector is decoration
+                  belonging to its card and must arrive on the same turn. */}
               {idx < steps.length - 1 && (
                 <span
                   aria-hidden="true"
@@ -67,9 +73,9 @@ export function ProcessSection() {
                   style={{ right: "-1.75rem" }}
                 />
               )}
-            </li>
+            </StaggerItem>
           ))}
-        </ol>
+        </StaggerGroup>
       </div>
     </section>
   );

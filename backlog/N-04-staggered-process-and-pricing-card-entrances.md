@@ -1,6 +1,6 @@
 # Issue: Staggered Process and Pricing Card Entrances
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 

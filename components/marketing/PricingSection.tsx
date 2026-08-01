@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { useState } from "react";
 
+import { StaggerGroup, StaggerItem } from "@/components/motion/Stagger";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { SPRING_SPOTLIGHT } from "@/lib/motion";
@@ -99,15 +100,17 @@ export function PricingSection() {
           )}
         </p>
 
-        <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <StaggerGroup className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PRICING_TIERS.map((tier, index) => {
             const isSpotlit = index === spotlightIndex;
             const range = formatTierRange(tier);
             return (
               // The frame lives in this wrapper rather than inside the Card:
               // Card is overflow-hidden, which would clip a ring drawn on an
-              // inset child.
-              <div key={range} className="relative h-full">
+              // inset child. The wrapper is now also the entrance's item, which
+              // keeps the spotlight and the card it frames on one moving box —
+              // the frame can never be caught animating away from its card.
+              <StaggerItem key={range} className="relative h-full">
                 {isSpotlit && (
                   <motion.div
                     layoutId="tier-spotlight"
@@ -168,10 +171,10 @@ export function PricingSection() {
                     </div>
                   </CardContent>
                 </Card>
-              </div>
+              </StaggerItem>
             );
           })}
-        </div>
+        </StaggerGroup>
 
         <div className="mt-12">
           <PricingCalculator

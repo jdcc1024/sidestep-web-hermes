@@ -13,14 +13,19 @@
  * the end are, by definition, the animation in flight. There must be some under
  * no-preference and none under reduce.
  *
- * Three animations are covered, one per mechanism:
+ * Four animations are covered, one per mechanism:
  *   1. The pricing tier spotlight (`layoutId`), sampled by viewport x.
  *   2. A landing section reveal (`whileInView`), sampled by transform translateY
  *      — scroll-independent, unlike a viewport position. The reveal also gets an
  *      assertion the spotlight does not need: under `reduce` the section must
  *      still end up at **opacity 1**. Suppressing a reveal must mean "show it
  *      immediately", never "leave it invisible".
- *   3. The hero's staggered load entrance (`variants`), sampled the same way but
+ *   3. A staggered card inside a revealed section (`whileInView` + `variants`),
+ *      sampled the same way. Its own trigger is a scroll like the reveal's, but
+ *      the label reaches it through variant propagation rather than being set on
+ *      the element — a second path that has to be suppressed too, and the one
+ *      that fails silently if `MotionConfig` ever stops covering children.
+ *   4. The hero's staggered load entrance (`variants`), sampled the same way but
  *      recorded from document start, because its trigger is mount rather than
  *      anything this script can perform.
  *
@@ -42,6 +47,11 @@ const BASE = process.env.SNAP_BASE || 'http://localhost:8080';
 const SPOTLIGHT = '[data-testid="tier-spotlight"]';
 /** A section far enough down the landing page to be reliably below the fold. */
 const REVEALED_SECTION = '#faq';
+/**
+ * The last of the three process step cards — the one furthest into the stagger,
+ * so if any turn of the sequence escapes suppression it is the likeliest to.
+ */
+const STAGGERED_CARD = '#process li:last-child h3';
 /** The hero's headline — last-but-four in the entrance stagger, and the LCP. */
 const HERO_ELEMENT = '#top h1';
 /** Long enough to cover the spring's whole settle, short enough to stay quick. */
@@ -137,14 +147,19 @@ function intermediates({ start, end, samples }) {
 }
 
 /**
- * Scrolls a below-the-fold section into view and returns the translateY and
- * opacity it held on every frame on the way.
+ * Scrolls a below-the-fold element into view and returns the translateY and
+ * opacity its nearest `[data-reveal]` box held on every frame on the way.
  *
  * translateY rather than viewport position because the trigger for this
  * animation *is* a scroll — a viewport-relative sample could not tell the
  * reveal apart from the scrolling that caused it.
+ *
+ * `selector` is a landmark inside the animated box rather than the box itself:
+ * a section reveal and a staggered card both wear `data-reveal`, so pointing at
+ * stable page content and walking up covers both without this sampler needing
+ * to know which is which.
  */
-async function sampleRevealMotion(browser, reducedMotion) {
+async function sampleRevealMotion(browser, reducedMotion, selector) {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     reducedMotion,
@@ -160,7 +175,7 @@ async function sampleRevealMotion(browser, reducedMotion) {
   const page = await context.newPage();
   try {
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-    await page.waitForSelector(REVEALED_SECTION, { timeout: 15_000 });
+    await page.waitForSelector(selector, { timeout: 15_000 });
     // Hydration has to have run before Motion is holding anything back.
     await page.waitForTimeout(1000);
 
@@ -177,11 +192,11 @@ async function sampleRevealMotion(browser, reducedMotion) {
         window.__revealRaf = requestAnimationFrame(tick);
       };
       tick();
-    }, REVEALED_SECTION);
+    }, selector);
 
     await page.evaluate(
       sel => document.querySelector(sel).scrollIntoView({ block: 'center' }),
-      REVEALED_SECTION,
+      selector,
     );
 
     await page.waitForTimeout(SAMPLE_MS);
@@ -273,38 +288,47 @@ try {
     failures.push(`reduce: the spotlight animated through ${stillMid.length} intermediate positions — reducedMotion="user" is not suppressing the layout animation.`);
   }
 
-  const revealing = await sampleRevealMotion(browser, 'no-preference');
-  const revealStill = await sampleRevealMotion(browser, 'reduce');
+  // Both scroll-triggered entrances get the identical treatment: the section
+  // reveal sets the variant on the element, the step card inherits it from a
+  // parent's stagger. Same assertions, because the promise to the visitor is
+  // the same one and only the propagation path differs.
+  for (const [name, selector, noun] of [
+    ['reveal', REVEALED_SECTION, 'section'],
+    ['card  ', STAGGERED_CARD, 'step card'],
+  ]) {
+    const revealing = await sampleRevealMotion(browser, 'no-preference', selector);
+    const revealStill = await sampleRevealMotion(browser, 'reduce', selector);
 
-  // Recording starts before the scroll, so the opening frames legitimately sit
-  // at the armed offset under both preferences — that is a resting start state,
-  // not movement. What separates the two is whether the element is ever caught
-  // *between* the offset and rest.
-  const revealMids = {};
-  for (const [label, samples] of [['no-preference', revealing], ['reduce', revealStill]]) {
-    const settled = samples.at(-1);
-    const mid = intermediates({ start: samples[0].y, end: 0, samples: samples.map(s => s.y) });
-    revealMids[label] = mid;
-    console.log(`[reduced-motion] reveal ${label.padEnd(13)} ${samples.length} samples, ${mid.length} in flight, y ${samples[0].y.toFixed(0)} → ${settled.y.toFixed(0)}, settles at opacity ${settled.opacity.toFixed(2)}`);
+    // Recording starts before the scroll, so the opening frames legitimately sit
+    // at the armed offset under both preferences — that is a resting start state,
+    // not movement. What separates the two is whether the element is ever caught
+    // *between* the offset and rest.
+    const revealMids = {};
+    for (const [label, samples] of [['no-preference', revealing], ['reduce', revealStill]]) {
+      const settled = samples.at(-1);
+      const mid = intermediates({ start: samples[0].y, end: 0, samples: samples.map(s => s.y) });
+      revealMids[label] = mid;
+      console.log(`[reduced-motion] ${name} ${label.padEnd(13)} ${samples.length} samples, ${mid.length} in flight, y ${samples[0].y.toFixed(0)} → ${settled.y.toFixed(0)}, settles at opacity ${settled.opacity.toFixed(2)}`);
 
-    // The assertion that outranks every other one here: whatever the motion
-    // preference, the section is readable when the dust settles.
-    if (settled.opacity < 0.99) {
-      failures.push(`reveal/${label}: the section settled at opacity ${settled.opacity.toFixed(2)} — revealed content must never be left invisible.`);
+      // The assertion that outranks every other one here: whatever the motion
+      // preference, the content is readable when the dust settles.
+      if (settled.opacity < 0.99) {
+        failures.push(`${name.trim()}/${label}: the ${noun} settled at opacity ${settled.opacity.toFixed(2)} — revealed content must never be left invisible.`);
+      }
+      if (Math.abs(settled.y) > EPSILON) {
+        failures.push(`${name.trim()}/${label}: the ${noun} settled at translateY ${settled.y.toFixed(1)}px instead of its resting position — the entrance did not complete.`);
+      }
+      if (Math.abs(samples[0].y) < EPSILON) {
+        failures.push(`${name.trim()}/${label}: the ${noun} was already at rest before it scrolled into view — the entrance never armed, so this check proves nothing.`);
+      }
     }
-    if (Math.abs(settled.y) > EPSILON) {
-      failures.push(`reveal/${label}: the section settled at translateY ${settled.y.toFixed(1)}px instead of its resting position — the reveal did not complete.`);
-    }
-    if (Math.abs(samples[0].y) < EPSILON) {
-      failures.push(`reveal/${label}: the section was already at rest before it scrolled into view — the reveal never armed, so this check proves nothing.`);
-    }
-  }
 
-  if (revealMids['no-preference'].length === 0) {
-    failures.push('reveal/no-preference: the section snapped from its offset to rest — the reveal is not animating at all.');
-  }
-  if (revealMids['reduce'].length > 0) {
-    failures.push(`reveal/reduce: the section animated through ${revealMids['reduce'].length} intermediate positions — reducedMotion="user" is not suppressing the reveal's movement.`);
+    if (revealMids['no-preference'].length === 0) {
+      failures.push(`${name.trim()}/no-preference: the ${noun} snapped from its offset to rest — the entrance is not animating at all.`);
+    }
+    if (revealMids['reduce'].length > 0) {
+      failures.push(`${name.trim()}/reduce: the ${noun} animated through ${revealMids['reduce'].length} intermediate positions — reducedMotion="user" is not suppressing the movement.`);
+    }
   }
 
   const heroMoving = await sampleHeroEntrance(browser, 'no-preference');
