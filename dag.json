@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T15:44:37.810Z",
+  "lastUpdated": "2026-08-01T15:45:30.700Z",
   "phases": [
     {
       "id": "phase-1",
@@ -550,8 +550,8 @@
       "phase": "3",
       "type": "improvement",
       "description": "RemovedDesigns returns null until its Convex query resolves non-empty, so the section pops into the order page after everything else has settled. Animate its arrival, distinguishing loading from genuinely empty.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-01T15:45:30.699Z",
       "completedAt": null,
       "issueFile": "backlog/N-08-removed-designs-section-reveal.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
@@ -1249,6 +1249,12 @@
       "event": "task_completed",
       "nodeId": "N-07",
       "message": "Completed: Roster Row Add and Remove Animation"
+    },
+    {
+      "timestamp": "2026-08-01T15:45:30.700Z",
+      "event": "task_started",
+      "nodeId": "N-08",
+      "message": "Picked up: Removed Designs Section Reveal"
     }
   ]
 }

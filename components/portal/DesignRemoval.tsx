@@ -1,10 +1,12 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { AnimatePresence, motion } from "motion/react";
 import { TriangleAlert } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { describeSubmitters, jerseyCount } from "@/lib/designRemoval";
+import { REVEAL_TRANSITION } from "@/lib/motion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +57,19 @@ export function DesignRemovalWarning({
   );
 }
 
+// The section's whole travel is its own height (N-08). Fading in place would
+// still drop the page below it by the section's full height in one frame,
+// which is the layout glitch this animation exists to stop being — the
+// content underneath has to be pushed, so it may as well be pushed visibly.
+//
+// Module constants rather than inline literals so the target identity is
+// stable across renders, and `height` because Motion counts it as a
+// positional value: `MotionConfig reducedMotion="user"` snaps it while
+// leaving the fade alone, so reduced motion gets the section appearing with
+// no movement at all rather than a suppressed transform over a moving box.
+const SECTION_COLLAPSED = { height: 0, opacity: 0 };
+const SECTION_EXPANDED = { height: "auto", opacity: 1 };
+
 // Post-save: the durable "these designs were removed" section on the order
 // detail page. `runId` is nullable so the order page can hand over whatever
 // `jerseyRuns.getByOrder` returned — no run means nothing was ever
@@ -69,48 +84,74 @@ export function RemovedDesigns({
     runId ? { runId } : "skip",
   );
 
-  if (!runId || removed === undefined || removed.length === 0) return null;
+  // Loading is not emptiness, and the difference is the animation. Bailing
+  // here — rather than folding `undefined` in with `length === 0` below —
+  // means `AnimatePresence` first mounts on the render that already knows the
+  // answer, so `initial={false}` can suppress the entrance for a section that
+  // was removed long before this visit. A Convex query always resolves after
+  // first paint; without the split, every page load would play the reveal.
+  if (!runId || removed === undefined) return null;
 
   return (
-    <section aria-labelledby="removed-designs-heading" className="mt-10">
-      <h2
-        id="removed-designs-heading"
-        className="text-lg font-semibold text-foreground"
-      >
-        Removed designs
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        These are off the order, so they don&apos;t count toward production —
-        but the submissions are still here. Nothing was deleted.
-      </p>
+    <AnimatePresence initial={false}>
+      {removed.length > 0 && (
+        <motion.section
+          key="removed-designs"
+          aria-labelledby="removed-designs-heading"
+          initial={SECTION_COLLAPSED}
+          animate={SECTION_EXPANDED}
+          exit={SECTION_COLLAPSED}
+          transition={REVEAL_TRANSITION}
+          // `overflow-hidden` is what makes the height animation a reveal
+          // rather than a clipped-then-overflowing box, and it also contains
+          // the spacing: the gap above the heading is `pt-10` on the inner
+          // div, not a margin on the section, so it grows with the reveal
+          // instead of jumping to 40px on the first frame.
+          className="overflow-hidden"
+        >
+          <div className="pt-10">
+            <h2
+              id="removed-designs-heading"
+              className="text-lg font-semibold text-foreground"
+            >
+              Removed designs
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              These are off the order, so they don&apos;t count toward
+              production — but the submissions are still here. Nothing was
+              deleted.
+            </p>
 
-      <div className="mt-4 space-y-4">
-        {removed.map((design) => (
-          <Card
-            key={design.designId}
-            aria-label={`Removed design: ${design.title}`}
-            className="border-dashed py-5"
-          >
-            <CardHeader className="gap-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base text-muted-foreground line-through">
-                  {design.title}
-                </CardTitle>
-                <Badge
-                  className="border-transparent bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"
+            <div className="mt-4 space-y-4">
+              {removed.map((design) => (
+                <Card
+                  key={design.designId}
+                  aria-label={`Removed design: ${design.title}`}
+                  className="border-dashed py-5"
                 >
-                  Removed
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              {describeSubmitters(design.submitters)} ordered this —{" "}
-              {jerseyCount(design.total)} no longer counted. Link the design
-              again from Edit order to bring them back in.
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </section>
+                  <CardHeader className="gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle className="text-base text-muted-foreground line-through">
+                        {design.title}
+                      </CardTitle>
+                      <Badge
+                        className="border-transparent bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"
+                      >
+                        Removed
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground">
+                    {describeSubmitters(design.submitters)} ordered this —{" "}
+                    {jerseyCount(design.total)} no longer counted. Link the
+                    design again from Edit order to bring them back in.
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </motion.section>
+      )}
+    </AnimatePresence>
   );
 }

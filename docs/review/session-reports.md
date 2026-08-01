@@ -1979,3 +1979,65 @@ One entry per completed loop task. This is the human's fast path for UX critique
     row disappear.
 
 - Follow-ups filed: none.
+
+## 2026-08-01 — N-08: Removed Designs Section Reveal
+
+- What shipped:
+  - `RemovedDesigns` now splits *loading* from *empty*. The old single guard
+    (`removed === undefined || removed.length === 0`) collapsed the two; only
+    the second can turn populated in front of a captain who is watching, and
+    keeping them apart is what lets `AnimatePresence initial={false}` mount on
+    the render that already knows the answer. Without the split every page
+    load would replay the reveal, because a Convex query always resolves after
+    first paint.
+  - The section animates its own **height** (plus opacity), not a fade or a
+    rise. Fading in place would still drop everything below it by the
+    section's full height in one frame — which is the layout glitch the issue
+    describes, not a fix for it. `overflow-hidden` on the section and `pt-10`
+    on an inner div instead of `mt-10` on the section, so the 40px gap grows
+    with the reveal rather than appearing on frame one.
+  - Transition is `REVEAL_TRANSITION` from `lib/motion.ts` — this is a section
+    reveal, so it takes the site's section-reveal token rather than a new one.
+    No new motion constants.
+
+- UX surfaces to eyeball: `/portal/orders/jh70c9faf0z6hckes2eafx1ymd8bc6x0`
+  - `docs/review/N-08/` — **with** a removed design (Away Kit, Riley Tran's 3
+    jerseys). Check the gap above "Removed designs" reads as deliberate
+    section spacing and that the dashed card sits right against the Collect
+    card below it.
+  - `docs/review/N-08-empty/` — the same order **without** one, i.e. the
+    section absent. The two sets should differ by exactly this section.
+  - Both are captured at rest: `initial={false}` means a page load renders the
+    section at full height, so nothing here can be caught mid-reveal.
+
+- Decisions I made that a human may want to veto:
+  - **A new dev-seed toggle, `_devSeed:setFixtureDesignRemoved`.** A design
+    counts as removed only when order entries still point at it but the order
+    no longer lists it — reachable only by unchecking a design in the edit
+    form, which a headless capture cannot click. The toggle patches one
+    order's `designIds` and is its own undo (`removed: false`); it creates and
+    deletes nothing, so the round trip is lossless. Same precedent as
+    `seedLargeRoster`. **The dev deployment is back in its original state** —
+    the away kit is relinked; verify with the order page if you like.
+  - `docs/review/N-08-empty/` as a second directory rather than one folder:
+    snap names files after the route, so the two states would overwrite each
+    other in a single directory. The issue's own AC asks for both.
+  - **Verified in a real browser with a throwaway Playwright script** (not
+    committed; same precedent as M-03/M-04/N-07 — jsdom has no layout, so the
+    reveal cannot be proven under vitest). It opened the order page with the
+    away kit linked, unlinked it from the CLI while the page was open, and
+    sampled the section's height every frame: **no-preference** went absent →
+    23 distinct in-flight heights, 7.4px → 208px; **reduce** went absent →
+    208px on the first frame with **0** in-flight frames. That is the
+    acceptance criterion "under reduced motion the section appears without
+    movement", and it works because Motion counts `height` as a positional
+    value — `MotionConfig reducedMotion="user"` snaps it while leaving the
+    fade alone. No `motion-reduce:` variant was added, per CLAUDE.md.
+  - `node scripts/check-reduced-motion.mjs` re-run and still PASS.
+  - **The new unit tests are regression gates, not red-first tests** — the
+    issue's TDD step 1 asks them to pin the loading-vs-empty distinction, which
+    the old code already satisfied. They fail if anyone folds `undefined` back
+    in with `[]`, or if the section stops leaving the accessibility tree when
+    the last removed design is linked back.
+
+- Follow-ups filed: none.

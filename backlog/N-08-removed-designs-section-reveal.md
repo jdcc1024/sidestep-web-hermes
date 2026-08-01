@@ -1,6 +1,6 @@
 # Issue: Removed Designs Section Reveal
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 

@@ -227,6 +227,63 @@ export const seedLargeRoster = internalMutation({
   },
 });
 
+/**
+ * Unlink (or relink) the fixture order's away kit, so the O-08 removed-designs
+ * receipt on `/portal/orders/<id>` can be photographed (N-08).
+ *
+ * A design counts as *removed* when order entries still point at it but the
+ * order no longer lists it — a state only reachable through the edit form,
+ * which a headless capture cannot click. The away kit is the right one to drop:
+ * Riley Tran's three jerseys are on it, so the section renders with real
+ * submitters rather than an empty shell, and the home kit keeps its roster and
+ * entries so the rest of the page is unchanged between the two captures.
+ *
+ * Run against the dev deployment with:
+ *   npx convex run _devSeed:setFixtureDesignRemoved '{"email":"jcc@sidestep.design","removed":true}'
+ *   npx convex run _devSeed:setFixtureDesignRemoved '{"email":"jcc@sidestep.design","removed":false}'
+ *
+ * Idempotent and its own undo — `removed: false` puts the away kit back. It
+ * only ever edits one order's `designIds`; no design, roster slot or order
+ * entry is created or deleted, which is what makes the round trip lossless.
+ */
+export const setFixtureDesignRemoved = internalMutation({
+  args: { email: v.string(), removed: v.boolean() },
+  handler: async (ctx, { email, removed }) => {
+    const user = await findUserByEmail(ctx, email);
+    if (!user)
+      throw new ConvexError(
+        `Found no user with email "${email}". Run seedPortalFixtures first.`,
+      );
+
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_captain", (q) => q.eq("captainId", user._id))
+      .collect();
+    const order = orders.find((o) => o.teamName === ORDER_WITH_RUN_TEAM);
+    if (!order)
+      throw new ConvexError(
+        `Found no "${ORDER_WITH_RUN_TEAM}" order. Run seedPortalFixtures first.`,
+      );
+
+    const awayKit = (
+      await ctx.db
+        .query("designs")
+        .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
+        .collect()
+    ).find((d) => d.title === AWAY_KIT_TITLE);
+    if (!awayKit)
+      throw new ConvexError(
+        `Found no "${AWAY_KIT_TITLE}" design. Run seedPortalFixtures first.`,
+      );
+
+    const others = order.designIds.filter((id) => id !== awayKit._id);
+    const designIds = removed ? others : [...others, awayKit._id];
+    await ctx.db.patch(order._id, { designIds, updatedAt: Date.now() });
+
+    return { orderId: order._id, designId: awayKit._id, designIds, removed };
+  },
+});
+
 async function findUserByEmail(
   ctx: MutationCtx,
   email: string,
