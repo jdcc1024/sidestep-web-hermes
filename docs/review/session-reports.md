@@ -1572,6 +1572,14 @@ One entry per completed loop task. This is the human's fast path for UX critique
 
 ## 2026-08-01 — N-02: Reveal Wrapper and Landing Section Reveals
 
+> Closeout note (separate iteration): the implementation below was committed in
+> `72f0812` but the DAG node was left `in-progress` — the `complete` call never
+> ran. Re-verified against the committed tree (typecheck + lint + 1162 tests
+> green, `check-reduced-motion.mjs` PASS), re-read the `docs/review/N-02/`
+> stills to confirm every section is settled and readable rather than caught
+> mid-reveal, then marked the node completed. No code changed. N-04 is now
+> unblocked.
+
 - What shipped:
   - `components/motion/Reveal.tsx` — a client wrapper that fades and rises its
     `children` on first scroll into view (`whileInView`, `viewport.once`). All
