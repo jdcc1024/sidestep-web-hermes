@@ -1569,3 +1569,59 @@ One entry per completed loop task. This is the human's fast path for UX critique
     script needs a stable handle on a decorative, `aria-hidden` element.
 
 - Follow-ups filed: none.
+
+## 2026-08-01 — N-02: Reveal Wrapper and Landing Section Reveals
+
+- What shipped:
+  - `components/motion/Reveal.tsx` — a client wrapper that fades and rises its
+    `children` on first scroll into view (`whileInView`, `viewport.once`). All
+    six landing sections are wrapped in `app/page.tsx`; none of them became a
+    client component.
+  - `lib/motion.ts` gained `REVEAL_AMOUNT`, `revealTransition(delay)` (the shape
+    N-04's stagger needs) and `INSTANT`. No timing literal lives in `Reveal`.
+  - `scripts/check-reduced-motion.mjs` now covers a section reveal alongside the
+    spotlight, sampling transform translateY rather than viewport position —
+    the trigger for this animation *is* a scroll, so a viewport-relative sample
+    could not separate the reveal from the scrolling that caused it.
+
+- UX surfaces to eyeball: `/` at 375/768/1280, light and dark
+  (`docs/review/N-02/`). Screenshots are the *settled* state by design — the
+  feel has to be judged in a real browser: scroll top to bottom, then back up
+  (nothing should replay). **This is the first look at the site's animation
+  feel; `REVEAL_DURATION` (0.5s), `REVEAL_OFFSET` (24px) and the easing curve
+  are a starting guess, and tuning them is a one-line edit to `lib/motion.ts`.**
+  Whole-section reveals are the coarsest possible grain — N-04 adds per-card
+  stagger inside Process and Pricing, which may be where the effect earns its
+  keep.
+
+- Decisions I made that a human may want to veto:
+  - **`<Reveal>` settles instantly when `navigator.webdriver` is true.** This is
+    the one that deserves scrutiny. Playwright takes `fullPage` screenshots by
+    painting the whole document without ever scrolling it, so
+    IntersectionObserver never fires below the fold — the first `snap.mjs` run
+    filed five blank sections as the review artifact. `snap.mjs` is off-limits
+    to me, and no timer fits inside its 1s settle budget, so the fix had to live
+    in `Reveal`. `navigator.webdriver` means "nothing here is going to scroll",
+    which is exactly when holding content back buys nothing. Cost: a line of
+    automation-awareness in shipped code, and stills that show the end state
+    rather than the animation. `check-reduced-motion.mjs` opts back out of it
+    via `addInitScript` and asserts the movement frame by frame, so the
+    animation itself is still covered by something automated.
+  - **A per-instance `<noscript>` stylesheet forces `[data-reveal]` visible.**
+    Motion serializes `initial` into the server HTML as inline `opacity: 0`, so
+    without this the page is six invisible sections for anyone without JS. Six
+    inert copies in the no-JS path beat one copy somewhere else that can be
+    deleted without anyone connecting it to `Reveal`.
+  - **Under reduced motion the section still starts 24px offset and snaps to
+    rest.** `MotionConfig reducedMotion="user"` suppresses the *animation* but
+    not the `initial` transform, and removing the offset would need a
+    client-only read that disagrees with the server's HTML. The check asserts
+    what actually matters: zero intermediate positions, and opacity 1 when it
+    settles. Revealed content is never left invisible.
+  - **`vitest.setup.ts` stubs `IntersectionObserver`** (jsdom has none, and
+    Motion throws constructing one). It never reports an intersection, which is
+    the honest jsdom behaviour — nothing is ever on screen.
+  - **Hero is wrapped too**, per the acceptance criteria. N-03 replaces it with
+    a load-triggered entrance.
+
+- Follow-ups filed: none.

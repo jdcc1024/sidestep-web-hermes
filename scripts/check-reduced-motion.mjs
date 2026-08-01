@@ -7,11 +7,19 @@
  * made in one place on behalf of every animation on the site, so it gets an
  * automated check rather than a code review.
  *
- * Method: drive the pricing tier spotlight from one card to another in two
- * browser contexts — `reducedMotion: "no-preference"` and `"reduce"` — while a
- * requestAnimationFrame recorder samples the frame's viewport x. Positions that
- * are neither the start nor the end are, by definition, the animation in
- * flight. There must be some under no-preference and none under reduce.
+ * Method: drive an animation in two browser contexts —
+ * `reducedMotion: "no-preference"` and `"reduce"` — while a requestAnimationFrame
+ * recorder samples the moving element. Positions that are neither the start nor
+ * the end are, by definition, the animation in flight. There must be some under
+ * no-preference and none under reduce.
+ *
+ * Two animations are covered, one per mechanism:
+ *   1. The pricing tier spotlight (`layoutId`), sampled by viewport x.
+ *   2. A landing section reveal (`whileInView`), sampled by transform translateY
+ *      — scroll-independent, unlike a viewport position. The reveal also gets an
+ *      assertion the spotlight does not need: under `reduce` the section must
+ *      still end up at **opacity 1**. Suppressing a reveal must mean "show it
+ *      immediately", never "leave it invisible".
  *
  * Usage:
  *   node scripts/check-reduced-motion.mjs
@@ -29,8 +37,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.SNAP_BASE || 'http://localhost:8080';
 const SPOTLIGHT = '[data-testid="tier-spotlight"]';
+/** A section far enough down the landing page to be reliably below the fold. */
+const REVEALED_SECTION = '#faq';
 /** Long enough to cover the spring's whole settle, short enough to stay quick. */
 const SAMPLE_MS = 900;
+/** Sub-pixel jitter that should not count as movement. */
+const EPSILON = 0.5;
 
 let chromium;
 try {
@@ -115,8 +127,66 @@ async function sampleSpotlightMotion(browser, reducedMotion) {
 
 /** Samples that are neither where it started nor where it ended = animation. */
 function intermediates({ start, end, samples }) {
-  const near = (a, b) => Math.abs(a - b) < 0.5;
+  const near = (a, b) => Math.abs(a - b) < EPSILON;
   return samples.filter(x => !near(x, start) && !near(x, end));
+}
+
+/**
+ * Scrolls a below-the-fold section into view and returns the translateY and
+ * opacity it held on every frame on the way.
+ *
+ * translateY rather than viewport position because the trigger for this
+ * animation *is* a scroll — a viewport-relative sample could not tell the
+ * reveal apart from the scrolling that caused it.
+ */
+async function sampleRevealMotion(browser, reducedMotion) {
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    reducedMotion,
+  });
+  // <Reveal> settles instantly for `navigator.webdriver` renderers, because a
+  // fullPage screenshot never scrolls and would otherwise capture blank
+  // sections. This check is the one automated caller that wants the human path,
+  // so it says it is human. Without this the reveal would arrive already at
+  // rest and the assertions below would be measuring nothing.
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForSelector(REVEALED_SECTION, { timeout: 15_000 });
+    // Hydration has to have run before Motion is holding anything back.
+    await page.waitForTimeout(1000);
+
+    await page.evaluate(sel => {
+      const el = document.querySelector(sel).closest('[data-reveal]');
+      if (!el) throw new Error(`${sel} is not inside a [data-reveal] wrapper`);
+      window.__revealSamples = [];
+      const tick = () => {
+        const style = getComputedStyle(el);
+        const matrix = new DOMMatrixReadOnly(
+          style.transform === 'none' ? '' : style.transform,
+        );
+        window.__revealSamples.push({ y: matrix.m42, opacity: Number(style.opacity) });
+        window.__revealRaf = requestAnimationFrame(tick);
+      };
+      tick();
+    }, REVEALED_SECTION);
+
+    await page.evaluate(
+      sel => document.querySelector(sel).scrollIntoView({ block: 'center' }),
+      REVEALED_SECTION,
+    );
+
+    await page.waitForTimeout(SAMPLE_MS);
+    return await page.evaluate(() => {
+      cancelAnimationFrame(window.__revealRaf);
+      return window.__revealSamples;
+    });
+  } finally {
+    await context.close();
+  }
 }
 
 const server = await ensureServer();
@@ -143,6 +213,40 @@ try {
   }
   if (stillMid.length > 0) {
     failures.push(`reduce: the spotlight animated through ${stillMid.length} intermediate positions — reducedMotion="user" is not suppressing the layout animation.`);
+  }
+
+  const revealing = await sampleRevealMotion(browser, 'no-preference');
+  const revealStill = await sampleRevealMotion(browser, 'reduce');
+
+  // Recording starts before the scroll, so the opening frames legitimately sit
+  // at the armed offset under both preferences — that is a resting start state,
+  // not movement. What separates the two is whether the element is ever caught
+  // *between* the offset and rest.
+  const revealMids = {};
+  for (const [label, samples] of [['no-preference', revealing], ['reduce', revealStill]]) {
+    const settled = samples.at(-1);
+    const mid = intermediates({ start: samples[0].y, end: 0, samples: samples.map(s => s.y) });
+    revealMids[label] = mid;
+    console.log(`[reduced-motion] reveal ${label.padEnd(13)} ${samples.length} samples, ${mid.length} in flight, y ${samples[0].y.toFixed(0)} → ${settled.y.toFixed(0)}, settles at opacity ${settled.opacity.toFixed(2)}`);
+
+    // The assertion that outranks every other one here: whatever the motion
+    // preference, the section is readable when the dust settles.
+    if (settled.opacity < 0.99) {
+      failures.push(`reveal/${label}: the section settled at opacity ${settled.opacity.toFixed(2)} — revealed content must never be left invisible.`);
+    }
+    if (Math.abs(settled.y) > EPSILON) {
+      failures.push(`reveal/${label}: the section settled at translateY ${settled.y.toFixed(1)}px instead of its resting position — the reveal did not complete.`);
+    }
+    if (Math.abs(samples[0].y) < EPSILON) {
+      failures.push(`reveal/${label}: the section was already at rest before it scrolled into view — the reveal never armed, so this check proves nothing.`);
+    }
+  }
+
+  if (revealMids['no-preference'].length === 0) {
+    failures.push('reveal/no-preference: the section snapped from its offset to rest — the reveal is not animating at all.');
+  }
+  if (revealMids['reduce'].length > 0) {
+    failures.push(`reveal/reduce: the section animated through ${revealMids['reduce'].length} intermediate positions — reducedMotion="user" is not suppressing the reveal's movement.`);
   }
 } finally {
   await browser.close();

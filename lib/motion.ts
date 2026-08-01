@@ -46,6 +46,13 @@ export const REVEAL_OFFSET = 24;
 export const STAGGER_STEP = 0.08;
 
 /**
+ * Fraction of a revealing element that must be in view before it starts.
+ * Deliberately small: a tall section whose trigger sat at half its height
+ * would still be animating well after the visitor started reading it.
+ */
+export const REVEAL_AMOUNT = 0.15;
+
+/**
  * Fade-and-rise used by section reveals and staggered card entrances.
  * Eased rather than sprung: a reveal that overshoots reads as a glitch when a
  * dozen of them fire while the visitor scrolls.
@@ -54,3 +61,19 @@ export const REVEAL_TRANSITION: Transition = {
   duration: REVEAL_DURATION,
   ease: [0.22, 1, 0.36, 1],
 };
+
+/**
+ * `REVEAL_TRANSITION` held back by `delay` seconds — the shape staggered
+ * entrances need. Lives here so that a component staggering its children still
+ * never spells out a duration or an easing curve of its own.
+ */
+export function revealTransition(delay = 0): Transition {
+  return delay ? { ...REVEAL_TRANSITION, delay } : REVEAL_TRANSITION;
+}
+
+/**
+ * Jump straight to the end state. For the cases where an animation has no
+ * audience — a headless screenshot, a restored state — and playing it would
+ * only risk being caught half-finished.
+ */
+export const INSTANT: Transition = { duration: 0 };

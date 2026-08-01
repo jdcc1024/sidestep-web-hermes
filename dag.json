@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T08:38:17.493Z",
+  "lastUpdated": "2026-08-01T08:40:49.341Z",
   "phases": [
     {
       "id": "phase-1",
@@ -436,8 +436,8 @@
       "phase": "3",
       "type": "improvement",
       "description": "Add a client Reveal component that fades and rises its children on scroll into view, and wrap the six landing sections in it. Children are passed as props so the sections stay server components.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-01T08:40:49.340Z",
       "completedAt": null,
       "issueFile": "backlog/N-02-reveal-wrapper-and-landing-section-reveals.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
@@ -1081,6 +1081,12 @@
       "event": "task_completed",
       "nodeId": "N-01",
       "message": "Completed: Adopt Motion and Convert the Pricing Spotlight"
+    },
+    {
+      "timestamp": "2026-08-01T08:40:49.341Z",
+      "event": "task_started",
+      "nodeId": "N-02",
+      "message": "Picked up: Reveal Wrapper and Landing Section Reveals"
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Issue: Reveal Wrapper and Landing Section Reveals
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 
