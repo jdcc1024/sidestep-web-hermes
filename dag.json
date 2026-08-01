@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T09:07:54.145Z",
+  "lastUpdated": "2026-08-01T09:15:40.788Z",
   "phases": [
     {
       "id": "phase-1",
@@ -474,9 +474,9 @@
       "phase": "3",
       "type": "improvement",
       "description": "Second layer on top of the section reveal: the three process step cards and four pricing tier cards arrive in sequence rather than all at once. Resolves the PRD open question by converting ProcessSection to a client component.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-01T09:07:54.144Z",
-      "completedAt": null,
+      "completedAt": "2026-08-01T09:15:40.787Z",
       "issueFile": "backlog/N-04-staggered-process-and-pricing-card-entrances.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
       "acceptanceCriteria": [
@@ -1111,6 +1111,12 @@
       "event": "task_started",
       "nodeId": "N-04",
       "message": "Picked up: Staggered Process and Pricing Card Entrances"
+    },
+    {
+      "timestamp": "2026-08-01T09:15:40.788Z",
+      "event": "task_completed",
+      "nodeId": "N-04",
+      "message": "Completed: Staggered Process and Pricing Card Entrances"
     }
   ]
 }
