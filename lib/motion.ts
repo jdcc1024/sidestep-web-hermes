@@ -77,3 +77,35 @@ export function revealTransition(delay = 0): Transition {
  * only risk being caught half-finished.
  */
 export const INSTANT: Transition = { duration: 0 };
+
+/**
+ * The hero's load entrance. Separate tokens from the scroll reveal because the
+ * constraint is different: the visitor is already looking at this content and a
+ * scroll reveal's job — announcing something that just arrived — does not
+ * apply. So the rise is shorter, the stagger tighter, and the settle quicker.
+ * With six staggered elements the last one is at rest inside 0.8s of paint,
+ * which is the budget: nobody waits to read the headline.
+ */
+
+/** Pixels a hero element rises through on load. Half a reveal's distance. */
+export const HERO_OFFSET = 12;
+
+/** Delay (seconds) between hero siblings. Tighter than {@link STAGGER_STEP}. */
+export const HERO_STAGGER_STEP = 0.06;
+
+/** Seconds held before the first hero element starts, covering the paint. */
+export const HERO_DELAY = 0.05;
+
+/** Same curve as a reveal, shortened. One easing curve for the whole site. */
+export const HERO_TRANSITION: Transition = { ...REVEAL_TRANSITION, duration: 0.45 };
+
+/**
+ * Undoes the `opacity: 0` that Motion serializes into the server HTML for any
+ * armed entrance. With scripting off there is no hydration left to turn it back
+ * on, so without this the page renders as invisible sections and an invisible
+ * hero. It lives here, next to the offsets it counteracts, because both the
+ * scroll reveal and the hero entrance have to agree on the `[data-reveal]`
+ * marker for one rule to cover them all.
+ */
+export const NO_SCRIPT_REVEAL_FALLBACK =
+  "<style>[data-reveal]{opacity:1!important;transform:none!important}</style>";

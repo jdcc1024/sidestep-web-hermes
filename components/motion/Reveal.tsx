@@ -5,6 +5,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
 
 import {
   INSTANT,
+  NO_SCRIPT_REVEAL_FALLBACK,
   REVEAL_AMOUNT,
   REVEAL_OFFSET,
   revealTransition,
@@ -22,27 +23,32 @@ import {
  */
 
 /**
- * Motion serializes `initial` into the server HTML as an inline `opacity: 0`,
- * so with scripting off there is nothing left to ever turn it back on — the
- * page would render as six invisible sections. This stylesheet is parsed only
- * in that case and undoes it. It is emitted per instance; six inert copies in
- * the no-JS path is a cheaper guarantee than one that lives somewhere else and
- * can be deleted without anyone connecting it to this file.
+ * Emits the scripting-off rule that turns armed content back on. Every entrance
+ * on the site renders one next to itself rather than relying on a single copy
+ * somewhere central: inert duplicates in the no-JS path cost nothing, and a
+ * guarantee you can see from the component it protects is one nobody deletes by
+ * accident.
  */
-const NO_SCRIPT_FALLBACK =
-  "<style>[data-reveal]{opacity:1!important;transform:none!important}</style>";
+export function NoScriptRevealFallback() {
+  return (
+    <noscript dangerouslySetInnerHTML={{ __html: NO_SCRIPT_REVEAL_FALLBACK }} />
+  );
+}
 
 /**
- * The other way a scroll reveal strands content: a renderer that never scrolls.
+ * The other way an entrance strands content: a renderer with no audience.
  *
  * Playwright takes `fullPage` screenshots by painting the whole document at
  * once rather than scrolling through it, so IntersectionObserver never fires
  * for anything below the fold and `node scripts/snap.mjs` files five blank
- * sections as the review artifact. `navigator.webdriver` is the signal for
- * "nothing here is going to scroll", which is exactly the condition under which
- * holding content back buys nothing. The reveal *animation* stays covered —
- * `scripts/check-reduced-motion.mjs` opts back out of this and asserts the
- * movement frame by frame.
+ * sections as the review artifact. The hero fails differently but for the same
+ * reason — its entrance is on mount, so it does fire, and the review artifact
+ * is then a race between the settle and snap's fixed wait.
+ *
+ * `navigator.webdriver` is the signal for "nobody is watching this play", which
+ * is exactly the condition under which holding content back buys nothing.
+ * Entrances stay covered elsewhere — `scripts/check-reduced-motion.mjs` opts
+ * back out of this and asserts the movement frame by frame.
  *
  * Read through `useSyncExternalStore` because the server cannot know the answer:
  * it renders the server snapshot, hydrates against it, then re-renders with the
@@ -54,7 +60,7 @@ const neverChanges = () => () => {};
 const readWebdriver = () => navigator.webdriver;
 const assumeHuman = () => false;
 
-function useUnscrolledRenderer() {
+export function useUnscrolledRenderer() {
   return useSyncExternalStore(neverChanges, readWebdriver, assumeHuman);
 }
 
@@ -77,7 +83,7 @@ export function Reveal({
 
   return (
     <>
-      <noscript dangerouslySetInnerHTML={{ __html: NO_SCRIPT_FALLBACK }} />
+      <NoScriptRevealFallback />
       <motion.div
         data-reveal
         className={className}

@@ -1633,3 +1633,59 @@ One entry per completed loop task. This is the human's fast path for UX critique
     a load-triggered entrance.
 
 - Follow-ups filed: none.
+
+## 2026-08-01 — N-03: Hero Entrance on Load
+
+- What shipped:
+  - `HeroSection` is now a client component with a variants parent staggering
+    six children (eyebrow, headline, subcopy, CTA row, footnote, carousel) on
+    mount. Opacity and `y` only — the hero holds the LCP, so nothing that
+    reflows is animated.
+  - New hero tokens in `lib/motion.ts` (`HERO_OFFSET` 12px, `HERO_STAGGER_STEP`
+    0.06s, `HERO_DELAY` 0.05s, `HERO_TRANSITION` 0.45s on the site's one easing
+    curve). Last element is at rest ~0.80s after paint.
+  - `scripts/check-reduced-motion.mjs` now covers a third animation: the hero
+    entrance, recorded from document start via `addInitScript` because its
+    trigger is mount and cannot be performed by the script. Passing run:
+    hero no-preference 12 frames in flight, hero reduce 0, both settling at
+    y 0 / opacity 1.
+
+- UX surfaces to eyeball: `/` (screenshots in `docs/review/N-03/`, 375/768/1280
+  light+dark). Hard-reload the landing page and watch the hero settle top-to-
+  bottom with the jersey carousel arriving last — the taste call is whether that
+  order and the 12px rise read as "considered" or as "slow". Then scroll down
+  and back up: the hero must not re-animate, and the section below it (Process)
+  should still reveal on its own. The stray dark circle at the left edge just
+  under the hero in the 1280 captures is the Next dev-tools indicator, a
+  fixed-element artifact of `fullPage` capture — zero-sized in a real viewport.
+
+- Decisions I made that a human may want to veto:
+  - **The hero no longer sits inside `<Reveal>` in `app/page.tsx`.** Keeping it
+    would double-animate: a whole-section 24px fade plus a per-element stagger
+    fighting over the same content. The load entrance replaces it, which is what
+    the issue asked for; `page.tsx` now carries a comment explaining the
+    exception.
+  - **The two hero CTAs were `<Button><Link/></Button>`** — literally
+    `<button><a/></button>`, invalid HTML and a hydration error that the
+    `"use client"` conversion would have started surfacing. Rewrote them as
+    `buttonVariants` on `<Link>`, the pattern CLAUDE.md documents. Same pixels
+    (compare against N-02's captures), correct semantics: screen readers now
+    announce "link", not "button". Out of the literal scope of N-03; I judged
+    shipping a known hydration error into a freshly-client component worse.
+  - **The hero settles instantly for `navigator.webdriver` renderers**, reusing
+    `Reveal`'s escape hatch rather than inventing a second one. `snap.mjs` waits
+    a fixed 1000ms after `domcontentloaded`; the entrance finishes ~800ms after
+    *hydration*, so without this the review artifact is a race. The animation
+    stays covered — `check-reduced-motion.mjs` opts back out and asserts it
+    frame by frame.
+  - **`useUnscrolledRenderer` and the no-JS fallback are now shared.**
+    `Reveal.tsx` exports the hook and a `<NoScriptRevealFallback/>` component;
+    the fallback stylesheet moved to `lib/motion.ts`. Both entrances mark their
+    elements `data-reveal`, so one CSS rule covers the whole site's armed
+    content. The alternative was a third file for two exports.
+  - **Reduced motion still arms the 12px offset in the server HTML** and snaps
+    to rest on hydration, same as the section reveals — unchanged behaviour,
+    noted here only because the new hero assertions make it visible in the
+    check's output.
+
+- Follow-ups filed: none.

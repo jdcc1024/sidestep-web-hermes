@@ -1,6 +1,6 @@
 # Issue: Hero Entrance on Load
 
-## Status: pending
+## Status: done
 
 ## Phase: 3
 

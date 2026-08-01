@@ -13,13 +13,16 @@
  * the end are, by definition, the animation in flight. There must be some under
  * no-preference and none under reduce.
  *
- * Two animations are covered, one per mechanism:
+ * Three animations are covered, one per mechanism:
  *   1. The pricing tier spotlight (`layoutId`), sampled by viewport x.
  *   2. A landing section reveal (`whileInView`), sampled by transform translateY
  *      — scroll-independent, unlike a viewport position. The reveal also gets an
  *      assertion the spotlight does not need: under `reduce` the section must
  *      still end up at **opacity 1**. Suppressing a reveal must mean "show it
  *      immediately", never "leave it invisible".
+ *   3. The hero's staggered load entrance (`variants`), sampled the same way but
+ *      recorded from document start, because its trigger is mount rather than
+ *      anything this script can perform.
  *
  * Usage:
  *   node scripts/check-reduced-motion.mjs
@@ -39,6 +42,8 @@ const BASE = process.env.SNAP_BASE || 'http://localhost:8080';
 const SPOTLIGHT = '[data-testid="tier-spotlight"]';
 /** A section far enough down the landing page to be reliably below the fold. */
 const REVEALED_SECTION = '#faq';
+/** The hero's headline — last-but-four in the entrance stagger, and the LCP. */
+const HERO_ELEMENT = '#top h1';
 /** Long enough to cover the spring's whole settle, short enough to stay quick. */
 const SAMPLE_MS = 900;
 /** Sub-pixel jitter that should not count as movement. */
@@ -189,6 +194,59 @@ async function sampleRevealMotion(browser, reducedMotion) {
   }
 }
 
+/**
+ * Records the hero headline's translateY and opacity across its load entrance.
+ *
+ * The other two samplers can arm a recorder and *then* trigger the animation.
+ * This one cannot: the trigger is mount, so by the time `page.goto` resolves the
+ * entrance is already underway. The recorder therefore goes in via
+ * `addInitScript`, which runs before any page script, and polls for the element
+ * — the armed `translateY` is in the server HTML, so it is being sampled from
+ * the first frame the headline exists.
+ */
+async function sampleHeroEntrance(browser, reducedMotion) {
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    reducedMotion,
+  });
+  // Same reasoning as the reveal sampler: the hero settles instantly for
+  // `navigator.webdriver` renderers so that screenshots are not a race against
+  // it. This check is the one automated caller that wants the animation to play.
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+  });
+  await context.addInitScript(sel => {
+    window.__heroSamples = [];
+    const tick = () => {
+      const el = document.querySelector(sel);
+      if (el) {
+        const style = getComputedStyle(el);
+        const matrix = new DOMMatrixReadOnly(
+          style.transform === 'none' ? '' : style.transform,
+        );
+        window.__heroSamples.push({ y: matrix.m42, opacity: Number(style.opacity) });
+      }
+      window.__heroRaf = requestAnimationFrame(tick);
+    };
+    tick();
+  }, HERO_ELEMENT);
+
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForSelector(HERO_ELEMENT, { timeout: 15_000 });
+    // Long enough to cover hydration plus the whole stagger, which is budgeted
+    // to be at rest inside 0.8s of paint.
+    await page.waitForTimeout(2000);
+    return await page.evaluate(() => {
+      cancelAnimationFrame(window.__heroRaf);
+      return window.__heroSamples;
+    });
+  } finally {
+    await context.close();
+  }
+}
+
 const server = await ensureServer();
 const browser = await chromium.launch();
 const failures = [];
@@ -247,6 +305,39 @@ try {
   }
   if (revealMids['reduce'].length > 0) {
     failures.push(`reveal/reduce: the section animated through ${revealMids['reduce'].length} intermediate positions — reducedMotion="user" is not suppressing the reveal's movement.`);
+  }
+
+  const heroMoving = await sampleHeroEntrance(browser, 'no-preference');
+  const heroStill = await sampleHeroEntrance(browser, 'reduce');
+
+  const heroMids = {};
+  for (const [label, samples] of [['no-preference', heroMoving], ['reduce', heroStill]]) {
+    if (samples.length === 0) {
+      failures.push(`hero/${label}: no samples — the recorder never found ${HERO_ELEMENT}.`);
+      heroMids[label] = [];
+      continue;
+    }
+    const settled = samples.at(-1);
+    const mid = intermediates({ start: samples[0].y, end: 0, samples: samples.map(s => s.y) });
+    heroMids[label] = mid;
+    console.log(`[reduced-motion] hero   ${label.padEnd(13)} ${samples.length} samples, ${mid.length} in flight, y ${samples[0].y.toFixed(0)} → ${settled.y.toFixed(0)}, settles at opacity ${settled.opacity.toFixed(2)}`);
+
+    if (settled.opacity < 0.99) {
+      failures.push(`hero/${label}: the headline settled at opacity ${settled.opacity.toFixed(2)} — the hero must never be left invisible.`);
+    }
+    if (Math.abs(settled.y) > EPSILON) {
+      failures.push(`hero/${label}: the headline settled at translateY ${settled.y.toFixed(1)}px instead of its resting position — the entrance did not complete.`);
+    }
+    if (Math.abs(samples[0].y) < EPSILON) {
+      failures.push(`hero/${label}: the headline was already at rest in the server HTML — the entrance never armed, so this check proves nothing.`);
+    }
+  }
+
+  if (heroMids['no-preference'].length === 0) {
+    failures.push('hero/no-preference: the headline snapped from its offset to rest — the load entrance is not animating at all.');
+  }
+  if (heroMids['reduce'].length > 0) {
+    failures.push(`hero/reduce: the headline animated through ${heroMids['reduce'].length} intermediate positions — reducedMotion="user" is not suppressing the load entrance.`);
   }
 } finally {
   await browser.close();

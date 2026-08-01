@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T08:55:19.681Z",
+  "lastUpdated": "2026-08-01T08:56:20.067Z",
   "phases": [
     {
       "id": "phase-1",
@@ -455,8 +455,8 @@
       "phase": "3",
       "type": "improvement",
       "description": "The hero is above the fold so a scroll trigger never fires. Give its heading, subcopy, and CTA a short staggered settle on mount, animating opacity and transform only.",
-      "status": "pending",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-01T08:56:20.066Z",
       "completedAt": null,
       "issueFile": "backlog/N-03-hero-entrance-on-load.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
@@ -1093,6 +1093,12 @@
       "event": "task_completed",
       "nodeId": "N-02",
       "message": "Completed: Reveal Wrapper and Landing Section Reveals"
+    },
+    {
+      "timestamp": "2026-08-01T08:56:20.067Z",
+      "event": "task_started",
+      "nodeId": "N-03",
+      "message": "Picked up: Hero Entrance on Load"
     }
   ]
 }
