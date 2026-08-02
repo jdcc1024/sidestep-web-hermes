@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-02T16:34:40.636Z",
+  "lastUpdated": "2026-08-02T16:47:29.326Z",
   "phases": [
     {
       "id": "phase-1",
@@ -665,9 +665,9 @@
       "phase": "3",
       "type": "improvement",
       "description": "Drop the +N more cap on the order page roster and lay every entry out in responsive columns; rebuild the roster sheet's rows as single dense lines with hover-revealed actions, so managing a 15-player roster is not a scroll.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-02T16:34:40.635Z",
-      "completedAt": null,
+      "completedAt": "2026-08-02T16:47:29.326Z",
       "issueFile": "backlog/M-06-show-the-whole-roster-densely.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
       "acceptanceCriteria": [
@@ -1376,6 +1376,12 @@
       "event": "task_started",
       "nodeId": "M-06",
       "message": "Picked up: Show The Whole Roster, Densely"
+    },
+    {
+      "timestamp": "2026-08-02T16:47:29.326Z",
+      "event": "task_completed",
+      "nodeId": "M-06",
+      "message": "Completed: Show The Whole Roster, Densely"
     }
   ]
 }
