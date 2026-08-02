@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-02T16:53:04.166Z",
+  "lastUpdated": "2026-08-02T16:56:52.997Z",
   "phases": [
     {
       "id": "phase-1",
@@ -686,9 +686,9 @@
       "phase": "3",
       "type": "improvement",
       "description": "Human review of M-06: keep the row's edit/remove buttons visible at all times rather than on hover, and put the words Not yet filled back on both roster surfaces.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-02T16:53:04.166Z",
-      "completedAt": null,
+      "completedAt": "2026-08-02T16:56:52.997Z",
       "issueFile": "backlog/M-07-roster-row-review-fixes.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
       "acceptanceCriteria": [
@@ -1416,6 +1416,12 @@
       "event": "task_started",
       "nodeId": "M-07",
       "message": "Picked up: Roster Row Review Fixes"
+    },
+    {
+      "timestamp": "2026-08-02T16:56:52.997Z",
+      "event": "task_completed",
+      "nodeId": "M-07",
+      "message": "Completed: Roster Row Review Fixes"
     }
   ]
 }
