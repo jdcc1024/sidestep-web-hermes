@@ -2301,3 +2301,51 @@ values were otherwise unreachable from a headless capture.
 
 - Screenshots: `docs/review/D-10/` (375/768/1280, light + dark) — the design
   page and, since the form changed, `/portal/designs/new`.
+
+## 2026-08-02 — D-11: Click A Thumbnail To See It Full Size
+
+Human-requested, interactive session (not a loop iteration).
+
+Design artwork was only ever shown small: the order page's Design card renders
+it as a 56px square, and a gallery block crops every image to a square tile.
+Neither could be enlarged. Both now open a lightbox on click.
+
+`components/design/ImageLightbox.tsx` is the shared piece. The thumbnail
+*becomes* the trigger button rather than being wrapped in one — the caller
+passes its box classes as `triggerClassName` — so sizing still describes the
+clickable area and no extra layout node appears in a flex row or grid cell.
+
+Two decisions worth flagging for review:
+
+- **Zoom is opt-in on `DesignThumbnail`, defaulting off.** The component is
+  shared by four surfaces, and two of them (the portal dashboard card, the
+  designs list card) wrap the entire card in a `<Link>`. A button inside an
+  anchor is invalid HTML and would hijack the card's own click target, so
+  turning zoom on globally was not available. Only the order page's Design
+  card passes `zoomable`. There is a test asserting the default stays
+  non-interactive, so this can't regress silently.
+- **A placeholder never offers zoom.** Missing files, a print template chosen
+  as the main image, and a stale storage URL all render the same icon
+  placeholder, and none of them has a full-size version to open.
+
+The gallery lightbox comes along for free inside the block *editor*, which
+reuses `DesignBlockBody` for its read-only preview — being able to check the
+full image while writing the brief is what you'd want there anyway. The
+trigger wraps only the image, so the filename caption stays selectable text.
+
+Trigger buttons carry an explicit `aria-label` ("View crest.png full size")
+rather than inheriting the image's alt, so the action is announced instead of
+the filename twice.
+
+Judgement call: **the roster breakdown's design thumbnail was left alone.**
+It sits on the order page too and isn't inside a link, so it could take
+`zoomable` — but the ask was the Design card and gallery images, and a
+roster's 40px thumbnail is a row label rather than something you study. Easy
+to add later if it reads as an inconsistency.
+
+- No screenshots: the change is invisible in a still capture. The closed state
+  is pixel-identical apart from a zoom cursor, and `snap.mjs` captures routes
+  rather than post-click state, so it cannot photograph the open dialog.
+  Behaviour is covered by tests instead (open on click, open from the
+  keyboard, close on Escape).
+- `node scripts/verify.mjs` — typecheck, lint, 1243 tests, all pass.
