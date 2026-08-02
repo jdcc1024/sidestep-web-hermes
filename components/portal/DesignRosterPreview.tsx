@@ -73,13 +73,12 @@ function PreviewRow({ row }: { row: RosterRow }) {
         {row.label}
       </span>
       {row.total === 0 ? (
-        // A column is too narrow for "Not yet filled" beside a name, and in a
-        // half-seeded roster that phrase repeated down every row is the
-        // loudest thing on the card. The dash carries it visually — a row
-        // with nothing in the size column is a slot nobody has ordered — and
-        // the words stay for anyone listening to the page.
-        <span aria-hidden className="shrink-0 text-muted-foreground/60">
-          —
+        // The words, not a dash (M-07). Even the narrowest column — a third
+        // of the card at 1280 — has room for them beside a truncating name,
+        // and "nobody has ordered this one yet" is worth saying rather than
+        // leaving a captain to infer it from an empty size column.
+        <span className="shrink-0 text-xs text-muted-foreground">
+          Not yet filled
         </span>
       ) : (
         <span className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -95,7 +94,6 @@ function PreviewRow({ row }: { row: RosterRow }) {
           ))}
         </span>
       )}
-      {row.total === 0 && <span className="sr-only">Not yet filled</span>}
     </li>
   );
 }

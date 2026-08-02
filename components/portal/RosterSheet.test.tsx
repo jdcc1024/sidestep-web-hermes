@@ -260,11 +260,10 @@ describe("RosterSheet — editing and removing", () => {
     expect(remove).toHaveBeenCalledWith({ rosterEntryId: "slot_gretzky" });
   });
 
-  // M-06 dims the row's actions until the row is hovered or focused. That has
-  // to stay a paint-level choice: rendering them conditionally would take them
-  // out of the accessibility tree and off every touch device, which is the one
-  // place where "on hover" means "never".
-  it("keeps edit and remove in the accessibility tree without hovering first", async () => {
+  // M-06 tried dimming these until the row was hovered; M-07 reverted it on
+  // review. They belong on the row at rest, on every device — a phone is
+  // where a captain actually seeds a roster, and it has no hover at all.
+  it("shows edit and remove on the row without hovering first", async () => {
     const user = userEvent.setup();
     renderSheet();
 

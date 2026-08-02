@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-02T16:47:29.326Z",
+  "lastUpdated": "2026-08-02T16:53:04.166Z",
   "phases": [
     {
       "id": "phase-1",
@@ -679,6 +679,24 @@
         "Not yet filled and collision states stay available to screen readers",
         "RosterSheet.test.tsx and DesignRosterPreview.test.tsx pass"
       ]
+    },
+    {
+      "id": "M-07",
+      "title": "Roster Row Review Fixes",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Human review of M-06: keep the row's edit/remove buttons visible at all times rather than on hover, and put the words Not yet filled back on both roster surfaces.",
+      "status": "in-progress",
+      "startedAt": "2026-08-02T16:53:04.166Z",
+      "completedAt": null,
+      "issueFile": "backlog/M-07-roster-row-review-fixes.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
+      "acceptanceCriteria": [
+        "Edit and remove are visible at rest on every roster row, on every device",
+        "Not yet filled reads as text again on the design card and in the sheet",
+        "Rows stay one line each - the density M-06 bought is not given back",
+        "Tests pass"
+      ]
     }
   ],
   "edges": [
@@ -793,6 +811,10 @@
     {
       "from": "M-05",
       "to": "M-06"
+    },
+    {
+      "from": "M-06",
+      "to": "M-07"
     }
   ],
   "log": [
@@ -1382,6 +1404,18 @@
       "event": "task_completed",
       "nodeId": "M-06",
       "message": "Completed: Show The Whole Roster, Densely"
+    },
+    {
+      "timestamp": "2026-08-02T16:53:04.044Z",
+      "event": "nodes_added",
+      "nodeId": "M-07",
+      "message": "New task added: Roster Row Review Fixes"
+    },
+    {
+      "timestamp": "2026-08-02T16:53:04.166Z",
+      "event": "task_started",
+      "nodeId": "M-07",
+      "message": "Picked up: Roster Row Review Fixes"
     }
   ]
 }

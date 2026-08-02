@@ -2214,3 +2214,30 @@ One entry per completed loop task. This is the human's fast path for UX critique
   - **`max-h-80`.** Chosen so three columns almost never scroll and a phone
     scrolls a little. If the card should never scroll internally at all, this
     is a one-value edit.
+
+## 2026-08-02 — M-07: Roster Row Review Fixes
+
+Human review of M-06, both calls answered against the shipped version:
+
+- **Row actions are visible at rest again.** The `[@media(hover:hover)]`
+  dimming is gone, along with the `group` it needed. The reasoning that
+  overrules M-06's: the row is dense enough to carry two icon buttons without
+  looking busy, and a control you have to find is the wrong trade on a phone —
+  which is where a captain actually seeds a roster, and where hover does not
+  exist at all. The M-06 test that pinned the buttons in the accessibility tree
+  survives as a plain "they are on the row" assertion.
+- **"Not yet filled" is words again**, on both the card and the sheet. What
+  made it loud in the first place was the *badge* — a filled pill on its own
+  line under every unfilled player — not the phrase. As muted `text-xs` at the
+  end of a one-line row it costs nothing to scan past, and it fits the
+  narrowest column the card ever has (a third of the card at 1280) without
+  squeezing the name beside it. The `sr-only` duplicate is gone with it.
+
+Neither change gives back the density M-06 bought: rows are still one line, the
+full fifteen-player roster still fits a 375 sheet without scrolling, and the
+card still shows every entry in five rows at 1280.
+
+- Screenshots: `docs/review/M-07/` (375/768/1280, light + dark) — card and
+  sheet. M-06's `roster-sheet-*.png` were superseded and moved here rather than
+  left showing a state that no longer exists; the hover variants are deleted,
+  since there is no longer a hover state to review.

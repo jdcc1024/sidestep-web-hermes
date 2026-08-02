@@ -587,11 +587,9 @@ function SlotRow({
         "rounded-md",
         editing
           ? "border border-border bg-background p-2"
-          : // One line, and `group` so the row is what the actions react to
-            // rather than each button hovering on its own. No border at rest:
-            // fifteen outlined cards read as fifteen things to deal with,
-            // where fifteen lines read as a roster.
-            "group flex h-9 items-center gap-2 px-2 transition-colors hover:bg-muted/60",
+          : // One line, and no border: fifteen outlined cards read as fifteen
+            // things to deal with, where fifteen lines read as a roster.
+            "flex h-9 items-center gap-2 px-2 transition-colors hover:bg-muted/60",
       )}
     >
       {editing ? (
@@ -659,15 +657,14 @@ function SlotRow({
           )}
 
           {slot.total === 0 ? (
-            // See `DesignRosterPreview` — a half-seeded roster is mostly
-            // unfilled slots, and the badge repeated down every row was the
-            // loudest thing in the sheet.
-            <>
-              <span aria-hidden className="shrink-0 text-muted-foreground/60">
-                —
-              </span>
-              <span className="sr-only">Not yet filled</span>
-            </>
+            // The words, not a dash (M-07). What made this loud was the
+            // *badge* — a filled pill on its own line under every unfilled
+            // player. As plain muted text at the end of a one-line row it
+            // costs nothing to scan past, and a captain checking who still
+            // needs a size shouldn't have to infer it from an empty column.
+            <span className="shrink-0 text-xs text-muted-foreground">
+              Not yet filled
+            </span>
           ) : (
             <span className="flex shrink-0 items-center gap-1">
               {slot.sizes.map(({ size, qty }) => (
@@ -682,15 +679,12 @@ function SlotRow({
           )}
 
           {!locked && (
-            // Paint-level hiding, never conditional rendering: the buttons
-            // stay focusable and hit-testable the whole time, so the keyboard
-            // reaches them (and `group-focus-within` then shows what it
-            // reached). The `hover:hover` guard is the load-bearing half — on
-            // a touch screen nothing matches it, no rule ever sets opacity,
-            // and the actions simply stay visible. Hiding them unconditionally
-            // would make them unreachable on exactly the device where a
-            // captain seeds a roster from the rink.
-            <span className="flex shrink-0 items-center gap-0.5 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:opacity-0">
+            // Always visible, on every device (M-07). Hover-revealed actions
+            // were tried and rejected in review: the row is already dense
+            // enough to carry them, and a control that only exists once you
+            // find it is the wrong trade on a phone, which is where a captain
+            // actually seeds a roster.
+            <span className="flex shrink-0 items-center gap-0.5">
               <Button
                 type="button"
                 variant="ghost"
