@@ -76,6 +76,13 @@ export const REVEAL_AMOUNT = 0.15;
 const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 
 /**
+ * {@link EASE_OUT} spelled the way CSS and the Web Animations API want it.
+ * Derived from the same four numbers rather than written out again, so the
+ * site's one easing curve cannot drift into two.
+ */
+export const EASE_OUT_CSS = `cubic-bezier(${EASE_OUT.join(", ")})`;
+
+/**
  * Fade-and-rise used by section reveals and staggered card entrances.
  * Eased rather than sprung: a reveal that overshoots reads as a glitch when a
  * dozen of them fire while the visitor scrolls.
@@ -154,3 +161,20 @@ export const ROW_TRANSITION: Transition = {
   layout: SPRING_SNAPPY,
   opacity: { duration: ROW_FADE_DURATION, ease: EASE_OUT },
 };
+
+/**
+ * The light/dark swap — see `lib/theme-transition.ts`.
+ *
+ * Milliseconds rather than the seconds every token above uses, because these
+ * two are the only ones handed to the Web Animations API instead of to Motion.
+ * The unit is in the name so the difference cannot be read past.
+ *
+ * The crossfade is longer than a UI state change (a whole page is changing, and
+ * rushing it reads as a flicker) and shorter than a section reveal (nothing is
+ * arriving — the visitor is already looking at this content and wants it back).
+ * The circular reveal gets longer still: it has to travel the diagonal of the
+ * viewport, so matching the crossfade's duration would make it feel flung.
+ */
+export const THEME_CROSSFADE_MS = 320;
+
+export const THEME_REVEAL_MS = 450;

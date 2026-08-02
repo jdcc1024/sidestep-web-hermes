@@ -17,7 +17,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggleCompare } from "@/components/theme-toggle-compare";
 import { Logo } from "./Logo";
 
 const navLinks = [
@@ -99,7 +99,7 @@ export function MarketingNav() {
               <UserButton />
             </div>
           </Authenticated>
-          <ThemeToggle />
+          <ThemeToggleCompare />
         </nav>
 
         <div className="flex items-center gap-1 sm:hidden">
@@ -168,7 +168,7 @@ export function MarketingNav() {
                 <Unauthenticated>
                   <span className="text-sm text-muted-foreground">Theme</span>
                 </Unauthenticated>
-                <ThemeToggle />
+                <ThemeToggleCompare />
               </div>
             </SheetContent>
           </Sheet>

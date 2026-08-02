@@ -169,6 +169,30 @@
   }
 }
 
+/*
+ * Light/dark swap — the CSS half of `lib/theme-transition.ts`.
+ *
+ * Scoped to `[data-theme-transition]`, which that module sets for the duration
+ * of a swap and removes afterwards, so this claims nothing about any other view
+ * transition the site might grow later.
+ *
+ * `animation: none` hands both snapshots over to the Web Animations API calls
+ * in that module: the browser's default is a crossfade, which would otherwise
+ * run *underneath* the circular reveal and fade the old page out from behind
+ * the growing circle. Killing it leaves the old snapshot holding still at full
+ * opacity while the new one arrives on top — the shape both variants share.
+ *
+ * `mix-blend-mode: normal` because the default, `plus-lighter`, is built for
+ * fading between two near-identical images. Light and dark are as far from that
+ * as two snapshots get, and adding them together blows the midpoint of the
+ * crossfade out to white.
+ */
+html[data-theme-transition]::view-transition-old(root),
+html[data-theme-transition]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

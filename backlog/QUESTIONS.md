@@ -11,6 +11,23 @@ Agents: when you restart a previously-parked task, read its Answered entry FIRST
 
 ## Open
 
+### [N-11] Choose the Theme Swap Transition — 2026-08-02, interactive
+**Question:** Which transition should the light/dark swap keep — the whole-page **crossfade**, or the **circular reveal** that grows from the toggle?
+
+**Context:** You asked for both so the call could be made by looking rather than reading. N-10 shipped them side by side: every page's toggle is now a dashed pill holding two buttons, labelled `fade` and `circle`. Click either — the theme changes the same way, only the animation differs. Try it on a dense page (`/portal`, or the pricing section) as well as the landing hero, since the two variants diverge most where there is a lot on screen.
+
+Nothing is blocked on this. It is a taste call, and the scaffolding is harmless until you make it.
+
+**Options considered:**
+1. **Crossfade** (320ms) — the whole page dissolves. Quiet, identical on every page and at every viewport, and the origin of the click is irrelevant. Downside: at a glance it can read as "the screen flickered" rather than as a deliberate change.
+2. **Circular reveal** (450ms) — the new theme wipes in from the button. Ties the change to the thing you clicked, which is the more satisfying first impression. Downsides: it is a *lot* of motion for something people toggle repeatedly; it is longest exactly where the toggle is furthest from the content (the portal sidebar's toggle is top-left, so the sweep crosses the entire page); and it is the more noticeable of the two on the tenth toggle, which is when noticeable stops being a virtue.
+
+**Recommendation:** **Crossfade.** A theme toggle is a utility control, not a moment — the circle is more impressive once and more intrusive thereafter. But this is exactly the judgment you asked to make by eye, so I would rather you looked than took this.
+
+**Whichever wins:** N-11 also deletes `components/theme-toggle-compare.tsx`, points the six call sites back at `<ThemeToggle />`, and adds a theme-swap case to `scripts/check-reduced-motion.mjs`. That check was deliberately left out of N-10 — automating a gate on code with a 50% chance of deletion is waste. Reduced-motion behaviour *is* verified for both variants (see the N-10 session report), just not yet automated.
+
+**Answer:** _(human fills in)_
+
 <!-- template — copy this block
 ### [nodeId] Task Title — YYYY-MM-DD, agent-id
 **Question:** One clear, answerable question.

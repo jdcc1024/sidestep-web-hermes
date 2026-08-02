@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-01T15:56:29.858Z",
+  "lastUpdated": "2026-08-02T07:57:31.193Z",
   "phases": [
     {
       "id": "phase-1",
@@ -618,6 +618,46 @@
         "The check needs no seeded fixture data, or documents the seed it needs",
         "node scripts/check-reduced-motion.mjs stays green"
       ]
+    },
+    {
+      "id": "N-10",
+      "title": "Theme Swap Transition (A/B)",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Animate the light/dark swap with the View Transitions API. Ships BOTH candidates behind two side-by-side toggles - a whole-page crossfade and a circular reveal from the button - so the human can compare them in the running app before one is deleted.",
+      "status": "in-progress",
+      "startedAt": "2026-08-02T07:35:42.426Z",
+      "completedAt": null,
+      "issueFile": "backlog/N-10-theme-swap-transition-a-b-.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "Swapping theme crossfades or reveals instead of snapping, on every page",
+        "Both variants reachable from one temporary compare control in all three shells",
+        "No global transition rule leaks onto every element (disableTransitionOnChange stays on)",
+        "Browsers without startViewTransition fall back to today's instant swap",
+        "Reduced motion gets the fade, never the expanding circle",
+        "Timings come from lib/motion.ts"
+      ]
+    },
+    {
+      "id": "N-11",
+      "title": "Choose the Theme Swap Transition",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Pick crossfade or circular reveal from the N-10 A/B, delete the losing variant and the temporary compare control, and add a theme-swap case to check-reduced-motion.mjs now that there is one variant worth gating.",
+      "status": "blocked",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/N-11-choose-the-theme-swap-transition.md",
+      "prdRef": "docs/prd/motion-adoption.md#5-scope",
+      "acceptanceCriteria": [
+        "One variant remains; ThemeToggle defaults to it",
+        "components/theme-toggle-compare.tsx deleted and all six call sites back to <ThemeToggle />",
+        "scripts/check-reduced-motion.mjs gains a theme-swap case and still passes",
+        "No data-theme-transition CSS left for a variant that no longer exists"
+      ],
+      "needsHuman": true,
+      "humanQuestion": "Crossfade or circular reveal for the light/dark swap? Both are live behind the 'fade' and 'circle' toggles."
     }
   ],
   "edges": [
@@ -720,6 +760,14 @@
     {
       "from": "N-06",
       "to": "N-09"
+    },
+    {
+      "from": "N-01",
+      "to": "N-10"
+    },
+    {
+      "from": "N-10",
+      "to": "N-11"
     }
   ],
   "log": [
@@ -1261,6 +1309,30 @@
       "event": "task_completed",
       "nodeId": "N-08",
       "message": "Completed: Removed Designs Section Reveal"
+    },
+    {
+      "timestamp": "2026-08-02T07:35:40.097Z",
+      "event": "nodes_added",
+      "nodeId": "N-10",
+      "message": "New task added: Theme Swap Transition (A/B)"
+    },
+    {
+      "timestamp": "2026-08-02T07:35:42.426Z",
+      "event": "task_started",
+      "nodeId": "N-10",
+      "message": "Picked up: Theme Swap Transition (A/B)"
+    },
+    {
+      "timestamp": "2026-08-02T07:57:31.091Z",
+      "event": "nodes_added",
+      "nodeId": "N-11",
+      "message": "New task added: Choose the Theme Swap Transition"
+    },
+    {
+      "timestamp": "2026-08-02T07:57:31.193Z",
+      "event": "needs_human",
+      "nodeId": "N-11",
+      "message": "Needs human: Choose the Theme Swap Transition — Crossfade or circular reveal for the light/dark swap? Both are live behind the 'fade' and 'circle' toggles."
     }
   ]
 }

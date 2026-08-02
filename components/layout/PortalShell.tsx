@@ -19,7 +19,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggleCompare } from "@/components/theme-toggle-compare";
 
 type PortalLink = {
   href: string;
@@ -154,7 +154,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             <Separator />
             <div className="flex items-center justify-between gap-3 p-4">
               {accountFooter}
-              <ThemeToggle />
+              <ThemeToggleCompare />
             </div>
           </SheetContent>
         </Sheet>
@@ -166,7 +166,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       >
         <div className="flex h-16 items-center justify-between gap-2 px-4">
           <Logo />
-          <ThemeToggle />
+          <ThemeToggleCompare />
         </div>
         <Separator />
         <nav

@@ -2041,3 +2041,88 @@ One entry per completed loop task. This is the human's fast path for UX critique
     the last removed design is linked back.
 
 - Follow-ups filed: none.
+
+---
+
+## N-10 — Theme Swap Transition (A/B)
+
+- What I built: the light/dark swap animates instead of cutting, on every page.
+  **Two candidates shipped side by side** at the human's request, because this
+  reads differently in motion than in a description: a whole-page **crossfade**
+  and a **circular reveal** growing from the toggle. `components/theme-toggle-compare.tsx`
+  renders both, labelled `fade` and `circle`, and replaces `<ThemeToggle/>` at
+  all six call sites (MarketingNav, PortalShell, AdminShell — desktop bar and
+  mobile sheet each).
+
+- The mechanism is the **View Transitions API**, not CSS transitions on
+  elements. The obvious-looking alternative — drop `disableTransitionOnChange`
+  and let colours transition — is a trap: there are ~80 unrelated `transition-*`
+  classes in this codebase and each would animate its own property at its own
+  duration, so the page would smear rather than change. `disableTransitionOnChange`
+  stays exactly as it was, and **no global `transition` rule was added.**
+
+- Decisions I made that a human may want to veto:
+  - **The update callback awaits the DOM instead of calling `flushSync`.** The
+    canonical recipe is `startViewTransition(() => flushSync(() => setTheme(next)))`.
+    It does not hold here: next-themes applies the class from a *passive* effect
+    (`useEffect(() => applyTheme(theme), [theme])` — see
+    `node_modules/next-themes/dist/index.mjs`), and `flushSync` does not promise
+    passive effects have run by the time it returns. Losing that race means both
+    snapshots show the old theme and the transition plays as a no-op,
+    *intermittently*. So `themeApplied()` resolves on a `MutationObserver` when
+    `<html>` actually carries the new class, with a 300ms timeout so a swap can
+    never hang the page. next-themes stays the only writer of that class —
+    nothing reimplements its internals.
+  - **The circle is drawn with WAAPI, not a CSS keyframe.** Whether custom
+    properties on `:root` inherit into the `::view-transition-*` pseudo tree is
+    engine-dependent, and the geometry is per-click anyway. `root.animate(...,
+    { pseudoElement: "::view-transition-new(root)" })` takes the numbers
+    directly. `app/globals.css` only kills the browser's default crossfade
+    (which would otherwise fade the old page out from *behind* the growing
+    circle) and forces `mix-blend-mode: normal` — the default `plus-lighter` is
+    built for near-identical images and blows a light↔dark midpoint out to white.
+  - **Both variants share one shape**: the old snapshot holds still, the new one
+    arrives on top. They differ only in whether "arrives" means opacity or
+    clip-path. That is what lets a half-drawn circle show the old theme around it.
+  - **Reduced motion gets the fade, not a hard cut.** A crossfade is not
+    movement, and cutting between light and dark is the harsher outcome for
+    someone who asked for less motion — so only the circle's geometry is
+    suppressed, in JS (`newSnapshotKeyframes`) rather than in the globals.css
+    block, because JS is already orchestrating this one.
+  - Timings live in `lib/motion.ts` (`THEME_CROSSFADE_MS` 320,
+    `THEME_REVEAL_MS` 450) per CLAUDE.md. They are named `_MS` because they are
+    the only tokens in that file handed to WAAPI rather than to Motion. Added
+    `EASE_OUT_CSS`, derived from the existing `EASE_OUT` tuple so the site's one
+    easing curve cannot drift into two.
+
+- **Verified in a real browser with a throwaway Playwright script** (not
+  committed; same precedent as N-07/N-08 — jsdom has no layout or View
+  Transitions, so this cannot be proven under vitest). At 1280×900, clicking
+  each toggle:
+  - **crossfade** → one animation on `::view-transition-new(root)`,
+    `opacity 0 → 1`, duration **320ms**, easing `cubic-bezier(0.22, 1, 0.36, 1)`,
+    `mix-blend-mode: normal`, **15 distinct progress values** across 17 frames
+    (0.000 → 1.000). It interpolates over real time; it does not jump.
+  - **circle** → `clip-path: circle(0px at 1138.8px 32px) → circle(1431.88px at
+    1138.8px 32px)` — centred on the toggle, radius reaching the far corner —
+    duration **450ms**, **24 distinct progress values** across 27 frames.
+  - **circle under `reducedMotion: "reduce"`** → falls back to `opacity 0 → 1`
+    at 320ms, and the document marker reads `crossfade`. The geometry is gone;
+    the fade survives.
+  - In all three the theme actually changed (`light` → `dark`, `colorScheme=dark`)
+    and `data-theme-transition` was cleaned off the document afterwards.
+
+- **Screenshots caveat:** `docs/review/N-10/` holds the ordinary settled
+  captures (`/` and `/portal`, 375/768/1280, light+dark) showing the compare
+  control in the marketing nav and the portal sidebar — it fits beside the logo
+  in the 256px sidebar without wrapping. Mid-transition frame grabs were
+  attempted and **deleted**: Playwright's screenshot is slower than a 320ms
+  animation, so every frame came back already settled and would have been
+  misleading evidence. The `getAnimations()` sampling above is the real proof.
+
+- Follow-ups filed: **N-11** (parked, `needs-human`) — pick a variant, delete
+  the loser and `theme-toggle-compare.tsx`, and add a theme-swap case to
+  `scripts/check-reduced-motion.mjs`. That check is deliberately **not** added
+  yet: it would be a permanent automated gate on code that is 50% likely to be
+  deleted. The reduced-motion behaviour is verified above, just not yet
+  automated — that gap closes with N-11.

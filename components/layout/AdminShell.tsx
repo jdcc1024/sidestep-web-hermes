@@ -17,7 +17,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggleCompare } from "@/components/theme-toggle-compare";
 
 type AdminLink = {
   href: string;
@@ -118,7 +118,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <Separator />
             <div className="flex items-center justify-between gap-3 p-4">
               {accountFooter}
-              <ThemeToggle />
+              <ThemeToggleCompare />
             </div>
           </SheetContent>
         </Sheet>
@@ -133,7 +133,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <Logo />
             {adminBadge}
           </div>
-          <ThemeToggle />
+          <ThemeToggleCompare />
         </div>
         <Separator />
         <nav
