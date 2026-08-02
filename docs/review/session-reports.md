@@ -2126,3 +2126,91 @@ One entry per completed loop task. This is the human's fast path for UX critique
   yet: it would be a permanent automated gate on code that is 50% likely to be
   deleted. The reduced-motion behaviour is verified above, just not yet
   automated — that gap closes with N-11.
+
+## 2026-08-02 — M-06: Show The Whole Roster, Densely
+
+- **Human-directed, not loop-picked.** The ask: kill "+ N more" on the order
+  page and show every roster entry, and make managing a roster less bulky —
+  "minimize the amount of scrolling a user may need to do." Two product calls
+  were put to the human before any code, and both were answered:
+  - Order page → **multi-column, then scroll**. Not a "Show all" toggle, not
+    unbounded card growth.
+  - Sheet → **one line per player, actions on hover/focus**. Not a wider
+    two-column panel.
+
+- **`DesignRosterPreview` no longer caps.** `ROSTER_PREVIEW_CAP` and the
+  "+ N more" tail are gone. A cap always hides the same thing — the end of the
+  roster — and the end is where the captain looks, because that is where the
+  player they just added landed. The list is now a responsive grid: 1 column on
+  a phone, 2 from `sm`, 3 from `lg`. Fifteen players are **five rows at 1280
+  and eight at 768**, which is shorter than the six-row capped list it
+  replaced. Showing more made the card smaller.
+  - **Grid lines without nth-child arithmetic:** `gap-px` between cells, and
+    each cell paints its own `shadow-[0_0_0_1px_var(--border)]` into that gap,
+    so neighbours share a hairline and both the row and the column rules fall
+    out at 1, 2, or 3 columns. Per-cell `border-r` would need a different rule
+    per breakpoint.
+  - **The ring is on the cells, not the container**, and that is the second
+    draft. Colouring the *container* `bg-border` is the usual version of this
+    trick and it drew correctly — until a roster whose length isn't a multiple
+    of the column count, which is most of them. The Away Kit's two entries left
+    the third cell of the row as a bare grey block. Caught in the 1280
+    screenshot, not by a test.
+  - **The height cap is one `max-h-80`, not a count.** The same value
+    self-adjusts across breakpoints: three columns swallow ~30 entries before
+    it binds, a phone's single column starts scrolling around thirteen. A
+    count-based cap would need a different count per breakpoint — something CSS
+    can see and a component reading `rows.length` cannot.
+
+- **`RosterSheet` rows are one line each**, roughly half their previous height:
+  name, ordered sizes, actions, all on a 36px row with a hover surface instead
+  of a border. The full fifteen-player roster now fits a 1280 sheet **with no
+  scroll at all** (it was ten rows of fifteen before), and about fourteen fit a
+  375 phone.
+  - "Not yet filled" is a muted dash plus `sr-only` text, and the collision
+    flag is an amber triangle with a `title` and `sr-only` text. Both were
+    full-width badges on a second line, which meant a half-seeded roster's
+    loudest element was the same three words fifteen times. The existing tests
+    assert on that text and still pass — they are asserting the right thing.
+  - **Row actions hide at paint level, never conditionally.**
+    `[@media(hover:hover)]:opacity-0` plus `group-hover` / `group-focus-within`
+    back to full. The `hover:hover` guard is the load-bearing half: on a touch
+    screen nothing matches, no rule sets opacity, and the buttons simply stay
+    visible — hiding them unconditionally would make them unreachable on
+    exactly the device where a captain seeds a roster from the rink. Opacity
+    also leaves them focusable and hit-testable throughout, so the keyboard
+    still reaches them and focus then reveals what it reached. There is a test
+    pinning them in the accessibility tree with no hover.
+
+- **One pre-existing bug the redesign exposed.** Base UI's dialog focuses the
+  first tabbable element on open, which here was the first player's **Edit**
+  button — so Enter-on-open started editing Avery Quinn. Invisible before;
+  visible the moment focus started revealing a row's actions, as row one
+  appeared singled out in the resting screenshot. Fixed with `initialFocus` on
+  the scroll container (`tabIndex={-1}`), which also gives the keyboard
+  something to scroll a long roster with. In paste mode the ref is empty and
+  Base UI falls back to focusing the textarea, which is correct there.
+
+- N-07's animation contract is untouched: `AnimatePresence mode="popLayout"`,
+  `layout="position"` on the rows, `layoutScroll` on the container. Row spacing
+  went `space-y-2` → `space-y-0.5`; the rows carry their own hover surface now,
+  so the gap was only pushing player fifteen off screen.
+
+- UX surfaces to eyeball: `docs/review/M-06/`, 375/768/1280, light + dark.
+  - `portal-orders-*.png` — the card. Judge the column count per width and
+    whether the hairline grid reads as a roster rather than a table. At 375 the
+    list clips mid-row, which is the scroll affordance doing its job.
+  - `roster-sheet-*.png` — the sheet at rest (no row shows its actions).
+  - `roster-sheet-hover-*.png` — one row hovered, actions surfaced. This is the
+    call worth a human eye: whether hover-revealed edit/remove is discoverable
+    enough for a captain who has never opened this sheet before. The fallback,
+    if not, is one line — drop the `[@media(hover:hover)]:opacity-0`.
+
+- Decisions a human may want to veto:
+  - **The dash.** "Not yet filled" as a word is gone from the visual layer on
+    both surfaces. It is still announced. If a captain scanning a half-seeded
+    roster needs the phrase rather than an empty size column, the dash is the
+    thing to change.
+  - **`max-h-80`.** Chosen so three columns almost never scroll and a phone
+    scrolls a little. If the card should never scroll internally at all, this
+    is a one-value edit.

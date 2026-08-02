@@ -2,10 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 
-import {
-  DesignRosterPreview,
-  ROSTER_PREVIEW_CAP,
-} from "./DesignRosterPreview";
+import { DesignRosterPreview } from "./DesignRosterPreview";
 import type { RosterRow } from "@/lib/jerseyBreakdown";
 
 function row(overrides: Partial<RosterRow> = {}): RosterRow {
@@ -75,29 +72,42 @@ describe("DesignRosterPreview", () => {
     ).toHaveTextContent("XL ×4");
   });
 
-  it("caps the list and counts what it left out", () => {
-    const rows = Array.from({ length: ROSTER_PREVIEW_CAP + 4 }, (_, i) =>
+  // M-06: the card used to stop at six and close with "+ 9 more", which hid
+  // exactly the player a captain scrolls down to check. Columns, not a cap.
+  it("lists every entry of a long roster", () => {
+    const rows = Array.from({ length: 20 }, (_, i) =>
       unfilled(`Player ${i}`, `slot_${i}`),
     );
     render(<DesignRosterPreview rows={rows} />);
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(
-      ROSTER_PREVIEW_CAP + 1,
-    );
-    expect(screen.getByText(/\+ 4 more/)).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(20);
     expect(
-      screen.queryByRole("listitem", { name: `Player ${ROSTER_PREVIEW_CAP}` }),
-    ).toBeNull();
+      screen.getByRole("listitem", { name: "Player 19" }),
+    ).toBeInTheDocument();
   });
 
-  it("shows no overflow line when the roster fits exactly", () => {
-    const rows = Array.from({ length: ROSTER_PREVIEW_CAP }, (_, i) =>
+  it("never summarises the roster as a count of what it left out", () => {
+    const rows = Array.from({ length: 30 }, (_, i) =>
       unfilled(`Player ${i}`, `slot_${i}`),
     );
     render(<DesignRosterPreview rows={rows} />);
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(ROSTER_PREVIEW_CAP);
-    expect(screen.queryByText(/more$/)).toBeNull();
+    expect(screen.queryByText(/\bmore\b/i)).toBeNull();
+  });
+
+  it("keeps a long roster inside its own scroll rather than stretching the card", () => {
+    // The one structural assertion worth making: the list is the scroll
+    // container. Whether it *has* scrolled depends on layout, which jsdom
+    // doesn't do — but the block owning its own overflow is what stops a
+    // 30-player roster from pushing the rest of the order off the page.
+    const rows = Array.from({ length: 30 }, (_, i) =>
+      unfilled(`Player ${i}`, `slot_${i}`),
+    );
+    render(<DesignRosterPreview rows={rows} />);
+
+    const list = screen.getByRole("list", { name: "Roster" });
+    expect(list.className).toMatch(/overflow-y-auto/);
+    expect(list.className).toMatch(/max-h-/);
   });
 
   it("renders nothing at all for a design with no roster yet", () => {

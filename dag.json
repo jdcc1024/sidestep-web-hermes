@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-02T07:59:15.549Z",
+  "lastUpdated": "2026-08-02T16:34:40.636Z",
   "phases": [
     {
       "id": "phase-1",
@@ -658,6 +658,27 @@
       ],
       "needsHuman": true,
       "humanQuestion": "Crossfade or circular reveal for the light/dark swap? Both are live behind the 'fade' and 'circle' toggles."
+    },
+    {
+      "id": "M-06",
+      "title": "Show The Whole Roster, Densely",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Drop the +N more cap on the order page roster and lay every entry out in responsive columns; rebuild the roster sheet's rows as single dense lines with hover-revealed actions, so managing a 15-player roster is not a scroll.",
+      "status": "in-progress",
+      "startedAt": "2026-08-02T16:34:40.635Z",
+      "completedAt": null,
+      "issueFile": "backlog/M-06-show-the-whole-roster-densely.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
+      "acceptanceCriteria": [
+        "The order page shows every roster entry, with no + N more line",
+        "Entries wrap into 2 columns from sm and 3 from lg so 15 players read as ~5 rows",
+        "A very long roster caps its height and scrolls inside its own block rather than stretching the card",
+        "Sheet rows are one line each: name, sizes, actions",
+        "Edit and remove appear on hover or keyboard focus on pointer devices, and stay visible on touch",
+        "Not yet filled and collision states stay available to screen readers",
+        "RosterSheet.test.tsx and DesignRosterPreview.test.tsx pass"
+      ]
     }
   ],
   "edges": [
@@ -768,6 +789,10 @@
     {
       "from": "N-10",
       "to": "N-11"
+    },
+    {
+      "from": "M-05",
+      "to": "M-06"
     }
   ],
   "log": [
@@ -1339,6 +1364,18 @@
       "event": "task_completed",
       "nodeId": "N-10",
       "message": "Completed: Theme Swap Transition (A/B)"
+    },
+    {
+      "timestamp": "2026-08-02T16:34:35.848Z",
+      "event": "nodes_added",
+      "nodeId": "M-06",
+      "message": "New task added: Show The Whole Roster, Densely"
+    },
+    {
+      "timestamp": "2026-08-02T16:34:40.635Z",
+      "event": "task_started",
+      "nodeId": "M-06",
+      "message": "Picked up: Show The Whole Roster, Densely"
     }
   ]
 }

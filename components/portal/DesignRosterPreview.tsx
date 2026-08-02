@@ -9,43 +9,47 @@ import { cn } from "@/lib/utils";
 // same read the roster editor uses, so the card and the editor can't drift.
 //
 // UI-only, no query of its own — the page owns the read and hands rows down.
-
-// Six rows: enough of a 15-player roster to recognise it as yours and read
-// the first few names, without the card growing taller than the order it
-// summarises. The card is a summary; the sheet (M-02) is where the whole
-// roster lives.
-export const ROSTER_PREVIEW_CAP = 6;
+//
+// M-06 removed the six-row cap and its "+ N more" tail. A cap always hides
+// the same thing — the end of the roster — and the end is where the captain
+// looks, because that is where the person they just added landed. Columns
+// buy back the height instead: fifteen players are five rows at desktop
+// width, which is shorter than the capped list they replaced.
 
 export function DesignRosterPreview({
   rows,
-  cap = ROSTER_PREVIEW_CAP,
   className,
 }: {
   rows: readonly RosterRow[];
-  cap?: number;
   className?: string;
 }) {
   if (rows.length === 0) return null;
-
-  const shown = rows.slice(0, cap);
-  const hidden = rows.length - shown.length;
 
   return (
     <ul
       aria-label="Roster"
       className={cn(
-        "divide-y divide-border overflow-hidden rounded-md border border-border",
+        // Each cell paints its own 1px ring into the `gap-px` around it, so
+        // adjacent cells share a hairline and the grid draws both its row and
+        // its column rules at any column count — no per-breakpoint nth-child
+        // arithmetic, which is what borders on the cells would need. The ring
+        // rather than a `bg-border` container because the last row is usually
+        // short: colouring the container would leave the unfilled cells of
+        // that row as a stray block of border colour. `overflow-hidden` clips
+        // the outermost rings against the container's own border.
+        "grid gap-px overflow-hidden rounded-md border border-border sm:grid-cols-2 lg:grid-cols-3",
+        // One height for every breakpoint, and it self-adjusts: three columns
+        // swallow ~30 entries before this binds, a phone's single column
+        // starts scrolling around thirteen. A count-based cap would have to
+        // be a different count per breakpoint — something CSS can express and
+        // a component reading `rows.length` cannot see.
+        "max-h-80 overflow-y-auto",
         className,
       )}
     >
-      {shown.map((row) => (
+      {rows.map((row) => (
         <PreviewRow key={row.key} row={row} />
       ))}
-      {hidden > 0 && (
-        <li className="px-4 py-2 text-xs text-muted-foreground">
-          + {hidden} more
-        </li>
-      )}
     </ul>
   );
 }
@@ -54,7 +58,7 @@ function PreviewRow({ row }: { row: RosterRow }) {
   return (
     <li
       aria-label={row.label}
-      className="flex items-center gap-3 px-4 py-2 text-sm"
+      className="flex items-center gap-2 px-3 py-1.5 text-sm shadow-[0_0_0_1px_var(--border)]"
     >
       <span
         className={cn(
@@ -69,15 +73,20 @@ function PreviewRow({ row }: { row: RosterRow }) {
         {row.label}
       </span>
       {row.total === 0 ? (
-        <span className="shrink-0 text-xs text-muted-foreground">
-          Not yet filled
+        // A column is too narrow for "Not yet filled" beside a name, and in a
+        // half-seeded roster that phrase repeated down every row is the
+        // loudest thing on the card. The dash carries it visually — a row
+        // with nothing in the size column is a slot nobody has ordered — and
+        // the words stay for anyone listening to the page.
+        <span aria-hidden className="shrink-0 text-muted-foreground/60">
+          —
         </span>
       ) : (
         <span className="flex shrink-0 flex-wrap justify-end gap-1">
           {row.sizes.map(({ size, qty }) => (
             <span
               key={size}
-              className="rounded bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-foreground"
+              className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums text-foreground"
             >
               {/* A quantity only earns space when it isn't 1 — most slots are
                   one jersey, and "×1" on every chip is noise. */}
@@ -86,6 +95,7 @@ function PreviewRow({ row }: { row: RosterRow }) {
           ))}
         </span>
       )}
+      {row.total === 0 && <span className="sr-only">Not yet filled</span>}
     </li>
   );
 }

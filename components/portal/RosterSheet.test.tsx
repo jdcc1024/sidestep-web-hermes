@@ -260,6 +260,24 @@ describe("RosterSheet — editing and removing", () => {
     expect(remove).toHaveBeenCalledWith({ rosterEntryId: "slot_gretzky" });
   });
 
+  // M-06 dims the row's actions until the row is hovered or focused. That has
+  // to stay a paint-level choice: rendering them conditionally would take them
+  // out of the accessibility tree and off every touch device, which is the one
+  // place where "on hover" means "never".
+  it("keeps edit and remove in the accessibility tree without hovering first", async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    const sheet = await openSheet(user);
+    const row = sheet.getByRole("listitem", { name: /gretzky #99/i });
+    expect(
+      within(row).getByRole("button", { name: /edit gretzky/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: /remove gretzky/i }),
+    ).toBeInTheDocument();
+  });
+
   it("surfaces the server's 'slot has orders on it' rejection as a toast", async () => {
     const user = userEvent.setup();
     remove.mockRejectedValueOnce(

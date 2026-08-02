@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -9,6 +9,7 @@ import {
   CopyIcon,
   PencilIcon,
   PlusIcon,
+  TriangleAlertIcon,
   UsersIcon,
   XIcon,
 } from "lucide-react";
@@ -89,6 +90,13 @@ export function RosterSheet({
   // textarea plus fifteen preview rows plus the roster underneath is a
   // scroll nobody reads.
   const [pasting, setPasting] = useState(false);
+  // Where focus lands when the sheet opens. Base UI would otherwise take the
+  // first tabbable element, which is the first player's Edit button — so the
+  // sheet opened aimed at one arbitrary row, and (since M-06 reveals a row's
+  // actions on focus) it opened *looking* like that row was singled out.
+  // Null in paste mode, where the first tabbable is the textarea and that is
+  // exactly right; Base UI falls back to its default when the ref is empty.
+  const rosterRef = useRef<HTMLDivElement>(null);
 
   return (
     <Sheet onOpenChange={(open) => !open && setPasting(false)}>
@@ -105,6 +113,7 @@ export function RosterSheet({
           overrides a class when the variants match. */}
       <SheetContent
         side="right"
+        initialFocus={rosterRef}
         className="data-[side=right]:w-full data-[side=right]:sm:max-w-md"
       >
         <SheetHeader className="pr-12">
@@ -136,8 +145,13 @@ export function RosterSheet({
                 without this, which is precisely how it would have shipped
                 broken for the rosters that matter. */}
             <motion.div
+              ref={rosterRef}
+              // Focusable only programmatically: it takes the sheet's opening
+              // focus (so no row is), and gives the keyboard something to
+              // scroll a fifteen-player roster with.
+              tabIndex={-1}
               layoutScroll
-              className="min-h-0 flex-1 overflow-y-auto px-4"
+              className="min-h-0 flex-1 overflow-y-auto px-4 outline-none"
             >
               {slots.length === 0 && (
                 <p className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
@@ -150,8 +164,11 @@ export function RosterSheet({
                   row arriving into a list like every one after it, instead of
                   a list appearing from nowhere. An empty `ul` occupies no
                   space. `relative` gives the row `popLayout` lifts out of the
-                  flow something to be positioned against while it fades. */}
-              <ul aria-label="Roster" className="relative space-y-2">
+                  flow something to be positioned against while it fades.
+                  M-06 tightened the gap to hairline: the rows carry their own
+                  hover surface now, so the space between them was doing
+                  nothing but pushing player fifteen off the screen. */}
+              <ul aria-label="Roster" className="relative space-y-0.5">
                 {/* initial={false}: the players already on the roster when the
                     sheet opens are not news — they arrive with the panel, and
                     replaying fifteen entrances over it would read as a stutter.
@@ -567,10 +584,14 @@ function SlotRow({
       exit={ROW_HIDDEN}
       transition={ROW_TRANSITION}
       className={cn(
-        "rounded-md border bg-background",
+        "rounded-md",
         editing
-          ? "border-border p-2"
-          : "flex items-start justify-between gap-2 border-border/60 px-3 py-2",
+          ? "border border-border bg-background p-2"
+          : // One line, and `group` so the row is what the actions react to
+            // rather than each button hovering on its own. No border at rest:
+            // fifteen outlined cards read as fifteen things to deal with,
+            // where fifteen lines read as a roster.
+            "group flex h-9 items-center gap-2 px-2 transition-colors hover:bg-muted/60",
       )}
     >
       {editing ? (
@@ -610,47 +631,70 @@ function SlotRow({
         </>
       ) : (
         <>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
-              {label}
-            </p>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              {slot.total === 0 ? (
-                <Badge
-                  variant="secondary"
-                  className="bg-muted text-muted-foreground"
-                >
-                  Not yet filled
-                </Badge>
-              ) : (
-                slot.sizes.map(({ size, qty }) => (
-                  <Badge
-                    key={size}
-                    variant="secondary"
-                    className="tabular-nums font-semibold"
-                  >
-                    {qty > 1 ? `${size} ×${qty}` : size}
-                  </Badge>
-                ))
-              )}
-              {/* Surfaced, never resolved (PRD §6): the captain fixes it by
-                  editing, so the flag just has to be legible. */}
-              {slot.collision && (
-                <Badge
-                  variant="secondary"
-                  className="bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"
-                >
-                  Two people claimed this
-                </Badge>
-              )}
-            </div>
-          </div>
-          {!locked && (
+          <p
+            className={cn(
+              "min-w-0 flex-1 truncate text-sm",
+              slot.total === 0
+                ? "text-muted-foreground"
+                : "font-medium text-foreground",
+            )}
+          >
+            {label}
+          </p>
+
+          {/* Surfaced, never resolved (PRD §6): the captain fixes it by
+              editing, so the flag just has to be noticeable. A whole sentence
+              doesn't fit a one-line row at 375px, and collisions are rare
+              enough that paying for them on every row is the wrong trade —
+              the glyph draws the eye, the title and the sr-only text say what
+              it means. */}
+          {slot.collision && (
+            <span
+              title="Two people claimed this"
+              className="shrink-0 text-amber-600 dark:text-amber-400"
+            >
+              <TriangleAlertIcon aria-hidden className="size-3.5" />
+              <span className="sr-only">Two people claimed this</span>
+            </span>
+          )}
+
+          {slot.total === 0 ? (
+            // See `DesignRosterPreview` — a half-seeded roster is mostly
+            // unfilled slots, and the badge repeated down every row was the
+            // loudest thing in the sheet.
+            <>
+              <span aria-hidden className="shrink-0 text-muted-foreground/60">
+                —
+              </span>
+              <span className="sr-only">Not yet filled</span>
+            </>
+          ) : (
             <span className="flex shrink-0 items-center gap-1">
+              {slot.sizes.map(({ size, qty }) => (
+                <span
+                  key={size}
+                  className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums text-foreground"
+                >
+                  {qty > 1 ? `${size} ×${qty}` : size}
+                </span>
+              ))}
+            </span>
+          )}
+
+          {!locked && (
+            // Paint-level hiding, never conditional rendering: the buttons
+            // stay focusable and hit-testable the whole time, so the keyboard
+            // reaches them (and `group-focus-within` then shows what it
+            // reached). The `hover:hover` guard is the load-bearing half — on
+            // a touch screen nothing matches it, no rule ever sets opacity,
+            // and the actions simply stay visible. Hiding them unconditionally
+            // would make them unreachable on exactly the device where a
+            // captain seeds a roster from the rink.
+            <span className="flex shrink-0 items-center gap-0.5 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:opacity-0">
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs"
                 aria-label={`Edit ${label}`}
                 onClick={() => setEditing(true)}
               >
@@ -659,7 +703,7 @@ function SlotRow({
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs"
                 disabled={busy}
                 aria-label={`Remove ${label}`}
                 onClick={() => void onRemove()}

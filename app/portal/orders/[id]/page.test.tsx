@@ -525,7 +525,7 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
     ).toHaveTextContent("S ×2");
   });
 
-  it("caps a long roster and says how many it left out", async () => {
+  it("shows a fifteen-player roster in full (M-06)", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
     countsResult = {
@@ -552,9 +552,13 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
-    expect(home.getByText(/\+ 9 more/)).toBeInTheDocument();
+    // The last player is the one a captain scrolls down to check, so it is
+    // the one the old six-row cap always hid.
     expect(home.getByRole("listitem", { name: /player 0 #0/i })).toBeInTheDocument();
-    expect(home.queryByRole("listitem", { name: /player 14 #14/i })).toBeNull();
+    expect(
+      home.getByRole("listitem", { name: /player 14 #14/i }),
+    ).toBeInTheDocument();
+    expect(home.queryByText(/\bmore\b/i)).toBeNull();
   });
 
   it("renders no roster before a run exists", async () => {
