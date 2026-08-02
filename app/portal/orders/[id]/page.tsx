@@ -350,6 +350,7 @@ function DesignSection({
               title={design.title}
               mainImage={design.mainImage}
               className="size-14 shrink-0"
+              zoomable
             />
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-base">{design.title}</CardTitle>

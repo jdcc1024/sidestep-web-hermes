@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-02T17:41:21.702Z",
+  "lastUpdated": "2026-08-02T18:09:34.985Z",
   "phases": [
     {
       "id": "phase-1",
@@ -716,6 +716,26 @@
         "DesignForm is create-only and no longer carries an edit mode",
         "Tests pass"
       ]
+    },
+    {
+      "id": "D-11",
+      "title": "Click A Thumbnail To See It Full Size",
+      "phase": "phase-2",
+      "type": "improvement",
+      "description": "Design thumbnails on the order page and images inside gallery blocks open a full-size lightbox on click, so a captain can actually read the artwork instead of squinting at a 56px square.",
+      "status": "in-progress",
+      "startedAt": "2026-08-02T18:09:34.984Z",
+      "completedAt": null,
+      "issueFile": "backlog/D-11-click-a-thumbnail-to-see-it-full-size.md",
+      "prdRef": "docs/prd/design-page-blocks.md#5-scope",
+      "acceptanceCriteria": [
+        "Clicking the design thumbnail in an order page Design card opens the image full size",
+        "Clicking an image in a gallery block opens it full size",
+        "The lightbox is keyboard reachable and closes on Escape",
+        "Thumbnails with no renderable image stay non-interactive",
+        "Thumbnails inside a card-wide link (dashboard, designs list) do not become nested buttons",
+        "Tests pass"
+      ]
     }
   ],
   "edges": [
@@ -837,20 +857,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T08:27:10.834Z",
-      "event": "task_started",
-      "nodeId": "D-06",
-      "agent": "ralph-loop",
-      "message": "Ralph Loop picked up: Admin Design Page Uses Shared Editor"
-    },
-    {
-      "timestamp": "2026-07-26T08:35:46.869Z",
-      "event": "task_completed",
-      "nodeId": "D-06",
-      "agent": "ralph-loop",
-      "message": "Completed: Admin Design Page Uses Shared Editor"
-    },
     {
       "timestamp": "2026-07-26T16:23:48.536Z",
       "event": "agent_joined",
@@ -1445,6 +1451,18 @@
       "event": "task_completed",
       "nodeId": "D-10",
       "message": "Completed: Consolidate Edit Design Into The Design Page"
+    },
+    {
+      "timestamp": "2026-08-02T18:09:30.470Z",
+      "event": "nodes_added",
+      "nodeId": "D-11",
+      "message": "New task added: Click A Thumbnail To See It Full Size"
+    },
+    {
+      "timestamp": "2026-08-02T18:09:34.985Z",
+      "event": "task_started",
+      "nodeId": "D-11",
+      "message": "Picked up: Click A Thumbnail To See It Full Size"
     }
   ]
 }

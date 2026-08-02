@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { DesignBlock } from "@/lib/designBlock";
 import { DesignBlocks, type BlockAsset } from "./DesignBlocks";
 
@@ -69,6 +70,25 @@ describe("DesignBlocks", () => {
     ).toBeInTheDocument();
     const image = screen.getByRole("img", { name: /crest\.png/i });
     expect(image).toHaveAttribute("src", png.url);
+  });
+
+  it("opens a gallery image full size when it is clicked", async () => {
+    const user = userEvent.setup();
+    renderBlocks([{ id: "g1", kind: "gallery", assetIds: ["a-png"] }]);
+
+    await user.click(
+      screen.getByRole("button", { name: /view crest\.png full size/i }),
+    );
+
+    expect(await screen.findByTestId("lightbox-image")).toHaveAttribute(
+      "src",
+      png.url,
+    );
+  });
+
+  it("offers no zoom for a file that can't be rendered inline", () => {
+    renderBlocks([{ id: "g1", kind: "gallery", assetIds: ["a-pdf", "a-gone"] }]);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("falls back to a generic heading when a gallery has no caption", () => {

@@ -9,6 +9,7 @@ import {
   type PaletteBlock,
   type TextBlock,
 } from "@/lib/designBlock";
+import { ImageLightbox } from "./ImageLightbox";
 
 // Read-only rendering of a design's structured brief (D-02), shared by the
 // portal and admin design pages so both read the same brief the same way.
@@ -127,15 +128,25 @@ function GalleryItem({ asset }: { asset: BlockAsset }) {
   if (asset.url && isWebSafeImage(asset.contentType)) {
     return (
       <figure className="overflow-hidden rounded-lg border border-border bg-card">
-        {/* Convex storage serves short-lived signed URLs from a host that
-            changes per deployment, so next/image optimization doesn't apply. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        {/* The tile is a square crop, so the picture is never fully visible
+            here — clicking opens it uncropped (D-11). Only the image is the
+            trigger; the caption stays selectable text. */}
+        <ImageLightbox
           src={asset.url}
           alt={asset.filename}
-          className="aspect-square w-full object-cover"
-          loading="lazy"
-        />
+          triggerLabel={`View ${asset.filename} full size`}
+          triggerClassName="block w-full"
+        >
+          {/* Convex storage serves short-lived signed URLs from a host that
+              changes per deployment, so next/image optimization doesn't apply. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={asset.url}
+            alt={asset.filename}
+            className="aspect-square w-full object-cover"
+            loading="lazy"
+          />
+        </ImageLightbox>
         <figcaption className="truncate px-3 py-2 text-xs text-muted-foreground">
           {asset.filename}
         </figcaption>

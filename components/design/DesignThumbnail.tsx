@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { isWebSafeImage, type DesignMainImage } from "@/lib/designAsset";
 import { cn } from "@/lib/utils";
+import { ImageLightbox } from "./ImageLightbox";
 
 // The picture that stands in for a design on a summary surface (D-07) — the
 // order page's design section, and the cards on the portal dashboard and the
@@ -19,6 +20,7 @@ export function DesignThumbnail({
   mainImage,
   className,
   iconClassName,
+  zoomable = false,
 }: {
   title: string;
   mainImage: DesignMainImage | null;
@@ -26,6 +28,10 @@ export function DesignThumbnail({
   // page a small square beside the title.
   className?: string;
   iconClassName?: string;
+  // Opt-in, not the default (D-11): the dashboard and designs-list cards wrap
+  // the whole card in a <Link>, and a button inside an anchor is invalid HTML.
+  // Only a thumbnail standing on its own may become a lightbox trigger.
+  zoomable?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const src =
@@ -33,33 +39,44 @@ export function DesignThumbnail({
       ? mainImage.url
       : null;
 
-  return (
+  const boxClassName = cn(
+    "overflow-hidden rounded-md border border-border bg-muted/50",
+    className,
+  );
+
+  const picture = src ? (
+    // Convex storage serves short-lived signed URLs from a per-deployment
+    // host, so next/image optimization doesn't apply.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={`${title} main image`}
+      className="size-full object-cover"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  ) : (
     <div
-      className={cn(
-        "overflow-hidden rounded-md border border-border bg-muted/50",
-        className,
-      )}
+      role="img"
+      aria-label={`No image yet for ${title}`}
+      className="flex size-full items-center justify-center text-muted-foreground"
     >
-      {src ? (
-        // Convex storage serves short-lived signed URLs from a per-deployment
-        // host, so next/image optimization doesn't apply.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt={`${title} main image`}
-          className="size-full object-cover"
-          loading="lazy"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <div
-          role="img"
-          aria-label={`No image yet for ${title}`}
-          className="flex size-full items-center justify-center text-muted-foreground"
-        >
-          <ImageIcon className={cn("size-5", iconClassName)} aria-hidden />
-        </div>
-      )}
+      <ImageIcon className={cn("size-5", iconClassName)} aria-hidden />
     </div>
+  );
+
+  // No `src` means the placeholder is showing, and a placeholder has no
+  // full-size version to open.
+  if (!zoomable || !src) return <div className={boxClassName}>{picture}</div>;
+
+  return (
+    <ImageLightbox
+      src={src}
+      alt={`${title} main image`}
+      triggerLabel={`View ${title} full size`}
+      triggerClassName={boxClassName}
+    >
+      {picture}
+    </ImageLightbox>
   );
 }
