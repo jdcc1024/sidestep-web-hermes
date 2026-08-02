@@ -8,14 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-// The admin record-editing primitive (issue 2-13). A field reads as plain
-// text with a pencil; clicking it swaps in an input with Save/Cancel. Every
-// admin detail surface — customer, order, design — is built from these, so
-// correcting a record never means a separate "edit mode" for a whole page.
+// The record-editing primitive (issue 2-13). A field reads as plain text with
+// a pencil; clicking it swaps in an input with Save/Cancel. Every detail
+// surface — admin customer, order and design pages, and the captain's own
+// design page since D-10 — is built from these, so correcting a record never
+// means a separate "edit mode" for a whole page.
 //
 // `onSave` receives the trimmed value and owns the mutation call. Validation
 // is injected the same way, so this component knows nothing about which field
 // it's editing — the rules live in lib/adminRecords next to the server's.
+//
+// The `heading` variant is the same control worn as a page title: the label
+// becomes the accessible name of the pencil rather than a caption above it,
+// so a page can edit its title in place instead of repeating it in a field
+// underneath (D-10).
 export function InlineEditField({
   label,
   value,
@@ -24,6 +30,8 @@ export function InlineEditField({
   multiline = false,
   type = "text",
   placeholder = "Not set",
+  variant = "field",
+  headingLevel = 2,
 }: {
   label: string;
   value: string;
@@ -32,6 +40,8 @@ export function InlineEditField({
   multiline?: boolean;
   type?: "text" | "number" | "email";
   placeholder?: string;
+  variant?: "field" | "heading";
+  headingLevel?: 1 | 2 | 3;
 }) {
   const fieldId = useId();
   const [editing, setEditing] = useState(false);
@@ -74,31 +84,49 @@ export function InlineEditField({
     }
   };
 
+  const isHeading = variant === "heading";
+  const Heading = `h${headingLevel}` as "h1" | "h2" | "h3";
+
   if (!editing) {
     return (
       <div>
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <div className="mt-0.5 flex items-start gap-2">
-          <p
-            className={
-              value
-                ? "min-w-0 break-words text-foreground"
-                : "min-w-0 break-words text-muted-foreground italic"
-            }
-          >
-            {value || placeholder}
+        {!isHeading && (
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            {label}
           </p>
+        )}
+        <div
+          className={
+            isHeading ? "flex items-start gap-2" : "mt-0.5 flex items-start gap-2"
+          }
+        >
+          {isHeading ? (
+            <Heading className="min-w-0 break-words text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              {value || placeholder}
+            </Heading>
+          ) : (
+            <p
+              className={
+                value
+                  ? "min-w-0 break-words text-foreground"
+                  : "min-w-0 break-words text-muted-foreground italic"
+              }
+            >
+              {value || placeholder}
+            </p>
+          )}
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="size-6 shrink-0"
+            className={isHeading ? "mt-1.5 size-8 shrink-0" : "size-6 shrink-0"}
             aria-label={`Edit ${label.toLowerCase()}`}
             onClick={startEditing}
           >
-            <PencilIcon className="size-3.5" aria-hidden />
+            <PencilIcon
+              className={isHeading ? "size-4" : "size-3.5"}
+              aria-hidden
+            />
           </Button>
         </div>
       </div>
@@ -111,13 +139,22 @@ export function InlineEditField({
     <div>
       <label
         htmlFor={fieldId}
-        className="text-xs uppercase tracking-wide text-muted-foreground"
+        className={
+          isHeading
+            ? "sr-only"
+            : "text-xs uppercase tracking-wide text-muted-foreground"
+        }
       >
         {label}
       </label>
-      <div className="mt-1 space-y-2">
+      <div className={isHeading ? "space-y-2" : "mt-1 space-y-2"}>
         <Field
           id={fieldId}
+          className={
+            isHeading
+              ? "h-auto py-2 text-3xl font-bold tracking-tight sm:text-4xl"
+              : undefined
+          }
           value={draft}
           type={multiline ? undefined : type}
           aria-invalid={error ? true : undefined}

@@ -44,23 +44,15 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
-// Create authors the Overview here because a design can't exist without one
-// (PRD §10); edit doesn't, because the brief belongs to the block editor on the
-// design page from D-03 on. So the edit form is title, cut, Canva and files —
-// and it never sends `blocks`, which means saving it can't overwrite a section
-// the editor just changed.
-type Mode =
-  | { kind: "create" }
-  | {
-      kind: "edit";
-      designId: Id<"designs">;
-      initialTitle: string;
-      initialCanvaLink: string;
-      initialJerseyStyle: string;
-      initialNeckline: string;
-      initialSleeveStyle: string;
-      existingFileCount: number;
-    };
+// The new-design form, and only that (D-10). Everything it collects is
+// editable on the design page afterwards — the brief through the block
+// editor, the files through the asset pool, the title/cut/Canva link in
+// place — so there is no edit mode here any more, and no second way to write
+// a design that could disagree with the first.
+//
+// What survives is the one thing the design page can't do: bring a design
+// into existence. That's why the Overview is authored here — a design can't
+// be stored without one (PRD §10) — and why at least one file is required.
 
 type UploadStatus = "pending" | "uploading" | "done" | "failed";
 
@@ -144,42 +136,22 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// Edit mode doesn't render an Overview field, so relaxing the check keeps the
-// unrendered value from failing a save. Both schemas infer the same
-// FormValues, so the form stays one shape.
-const editSchema = formSchema.extend({ overview: z.string() });
-
-export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
+export function DesignForm() {
   const router = useRouter();
   const generateUploadUrl = useMutation(api.designs.generateUploadUrl);
   const createDesign = useMutation(api.designs.createDesign);
-  const updateDesign = useMutation(api.designs.updateDesign);
-
-  const existingFileCount =
-    mode.kind === "edit" ? mode.existingFileCount : 0;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(mode.kind === "edit" ? editSchema : formSchema),
-    defaultValues:
-      mode.kind === "edit"
-        ? {
-            title: mode.initialTitle,
-            overview: "",
-            canvaLink: mode.initialCanvaLink,
-            jerseyStyle: mode.initialJerseyStyle,
-            neckline: mode.initialNeckline,
-            sleeveStyle: mode.initialSleeveStyle,
-            fileCount: mode.existingFileCount,
-          }
-        : {
-            title: "",
-            overview: "",
-            canvaLink: "",
-            jerseyStyle: "",
-            neckline: "",
-            sleeveStyle: "",
-            fileCount: 0,
-          },
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: "",
+      overview: "",
+      canvaLink: "",
+      jerseyStyle: "",
+      neckline: "",
+      sleeveStyle: "",
+      fileCount: 0,
+    },
   });
 
   // Pending uploads stay in local state — each entry has live upload
@@ -190,7 +162,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const attachedCount = existingFileCount + pending.length;
+  const attachedCount = pending.length;
 
   useEffect(() => {
     form.setValue("fileCount", attachedCount, {
@@ -290,37 +262,21 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
         fileCount: values.fileCount,
       });
 
-      if (mode.kind === "edit") {
-        // No `blocks`: the design page's block editor owns the brief, and a
-        // metadata save must leave it exactly as the editor left it.
-        await updateDesign({
-          designId: mode.designId,
-          title: payload.title,
-          canvaLink: payload.canvaLink,
-          jerseyStyle: payload.jerseyStyle,
-          neckline: payload.neckline,
-          sleeveStyle: payload.sleeveStyle,
-          addFiles: files,
-        });
-        toast.success("Design updated");
-        router.push(`/portal/designs/${mode.designId}`);
-      } else {
-        const designId = await createDesign({
-          title: payload.title,
-          // A brand-new design's brief is just its Overview; every other
-          // section is added on the design page afterwards.
-          blocks: overviewBlocks(payload.overview),
-          canvaLink: payload.canvaLink,
-          jerseyStyle: payload.jerseyStyle,
-          neckline: payload.neckline,
-          sleeveStyle: payload.sleeveStyle,
-          files,
-        });
-        toast.success("Design saved", {
-          description: "Sidestep will see it next time they review your account.",
-        });
-        router.push(`/portal/designs/${designId}`);
-      }
+      const designId = await createDesign({
+        title: payload.title,
+        // A brand-new design's brief is just its Overview; every other
+        // section is added on the design page afterwards.
+        blocks: overviewBlocks(payload.overview),
+        canvaLink: payload.canvaLink,
+        jerseyStyle: payload.jerseyStyle,
+        neckline: payload.neckline,
+        sleeveStyle: payload.sleeveStyle,
+        files,
+      });
+      toast.success("Design saved", {
+        description: "Sidestep will see it next time they review your account.",
+      });
+      router.push(`/portal/designs/${designId}`);
     } catch (err) {
       const message =
         err instanceof Error
@@ -332,12 +288,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
   }
 
   const isSubmitting = form.formState.isSubmitting;
-  const submitLabel =
-    isSubmitting
-      ? "Saving…"
-      : mode.kind === "edit"
-        ? "Save changes"
-        : "Save design";
+  const submitLabel = isSubmitting ? "Saving…" : "Save design";
   const fileError = form.formState.errors.fileCount?.message;
 
   return (
@@ -351,11 +302,7 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
         <FieldSection
           eyebrow="01"
           title="About this design"
-          description={
-            mode.kind === "edit"
-              ? "The brief itself — overview, concept, galleries, palette — is edited on the design page."
-              : "A clear title and overview make it easier for Sidestep to nail your vibe on the first pass."
-          }
+          description="A clear title and overview make it easier for Sidestep to nail your vibe on the first pass."
         >
           <FormField
             control={form.control}
@@ -375,41 +322,39 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
             )}
           />
 
-          {/* Create only: the Overview is the one block authored here, because
-              a design can't be stored without one. Editing it — and every
-              other section — happens in the block editor on the design page. */}
-          {mode.kind === "create" && (
-            <FormField
-              control={form.control}
-              name="overview"
-              render={({ field }) => {
-                const remaining = TEXT_BODY_MAX_LENGTH - field.value.length;
-                return (
-                  <FormItem>
-                    <FormLabel>Overview</FormLabel>
-                    <FormDescription>
-                      The design&apos;s description — it heads the brief and is
-                      what your other surfaces summarize.
-                    </FormDescription>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Theme, colors, references, anything we should know."
-                        maxLength={TEXT_BODY_MAX_LENGTH}
-                        rows={6}
-                        {...field}
-                      />
-                    </FormControl>
-                    <div className="flex items-center justify-between">
-                      <FormMessage />
-                      <p className="ml-auto text-[0.75rem] text-muted-foreground">
-                        {remaining} characters left
-                      </p>
-                    </div>
-                  </FormItem>
-                );
-              }}
-            />
-          )}
+          {/* The Overview is the one block authored here, because a design
+              can't be stored without one. Editing it — and adding every other
+              section — happens in the block editor on the design page. */}
+          <FormField
+            control={form.control}
+            name="overview"
+            render={({ field }) => {
+              const remaining = TEXT_BODY_MAX_LENGTH - field.value.length;
+              return (
+                <FormItem>
+                  <FormLabel>Overview</FormLabel>
+                  <FormDescription>
+                    The design&apos;s description — it heads the brief and is
+                    what your other surfaces summarize.
+                  </FormDescription>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Theme, colors, references, anything we should know."
+                      maxLength={TEXT_BODY_MAX_LENGTH}
+                      rows={6}
+                      {...field}
+                    />
+                  </FormControl>
+                  <div className="flex items-center justify-between">
+                    <FormMessage />
+                    <p className="ml-auto text-[0.75rem] text-muted-foreground">
+                      {remaining} characters left
+                    </p>
+                  </div>
+                </FormItem>
+              );
+            }}
+          />
 
           <FormField
             control={form.control}
@@ -524,13 +469,6 @@ export function DesignForm({ mode = { kind: "create" } }: { mode?: Mode }) {
           title="Files"
           description="Logos, mood boards, reference photos, sketches — any file type works."
         >
-          {mode.kind === "edit" && existingFileCount > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {existingFileCount} file{existingFileCount === 1 ? "" : "s"} already
-              attached. Add more below.
-            </p>
-          )}
-
           <FileDropzone
             inputRef={fileInputRef}
             onPicked={onFilesPicked}

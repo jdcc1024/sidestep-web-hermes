@@ -1,20 +1,35 @@
 "use client";
 
-import { use, useState } from "react";
+import { use } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useOwnedResource } from "@/lib/ownedResource";
-import { DesignForm } from "@/components/portal/DesignForm";
+import {
+  CANVA_LINK_MAX_LENGTH,
+  JERSEY_STYLE_MAX_LENGTH,
+  NECKLINES,
+  SLEEVE_STYLES,
+  TITLE_MAX_LENGTH,
+  isHttpUrl,
+} from "@/lib/design";
+import { InlineEditField } from "@/components/InlineEditField";
 import { DesignBlockEditor } from "@/components/design/DesignBlockEditor";
+import { DesignSpecPicker } from "@/components/design/DesignSpecPicker";
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
 
+// The captain's design page. Since D-10 it has one mode: the brief is written
+// through the block editor, the files through the asset pool, and the title,
+// the cut and the Canva link are edited where they're shown. There is no edit
+// form to open — `designs.updateDesign` takes one field at a time, so each
+// save is exactly the change that was made and can't clobber anything else on
+// the design.
 export default function DesignDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const designId = id as Id<"designs">;
@@ -23,7 +38,7 @@ export default function DesignDetailPage({ params }: PageProps) {
   const result = useOwnedResource(
     useQuery(api.designs.getMyDesign, { designId }),
   );
-  const [editing, setEditing] = useState(false);
+  const updateDesign = useMutation(api.designs.updateDesign);
 
   if (result.status === "loading") {
     return <Loading />;
@@ -35,45 +50,6 @@ export default function DesignDetailPage({ params }: PageProps) {
 
   const design = result.data;
 
-  if (editing) {
-    return (
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <Link
-          href={`/portal/designs/${design._id}`}
-          onClick={(e) => {
-            e.preventDefault();
-            setEditing(false);
-          }}
-          className="text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"
-        >
-          ← Cancel edit
-        </Link>
-        <header className="mt-3">
-          <p className="text-sm font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
-            Edit design
-          </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            {design.title}
-          </h1>
-        </header>
-        <div className="mt-10">
-          <DesignForm
-            mode={{
-              kind: "edit",
-              designId: design._id,
-              initialTitle: design.title,
-              initialCanvaLink: design.canvaLink ?? "",
-              initialJerseyStyle: design.jerseyStyle ?? "",
-              initialNeckline: design.neckline ?? "",
-              initialSleeveStyle: design.sleeveStyle ?? "",
-              existingFileCount: design.assets.length,
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       <Link
@@ -83,34 +59,28 @@ export default function DesignDetailPage({ params }: PageProps) {
         ← Back to dashboard
       </Link>
 
-      <header className="mt-3 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
-            Design
-          </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            {design.title}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Created {formatDate(design.createdAt)}
-            {design.updatedAt !== design.createdAt && (
-              <span> · Updated {formatDate(design.updatedAt)}</span>
-            )}
-          </p>
+      <header className="mt-3">
+        <p className="text-sm font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
+          Design
+        </p>
+        <div className="mt-2">
+          <InlineEditField
+            label="Title"
+            variant="heading"
+            headingLevel={1}
+            value={design.title}
+            validate={validateTitle}
+            onSave={(title) => updateDesign({ designId, title })}
+          />
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="inline-flex items-center gap-1 rounded-md border border-teal-600 px-4 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-950/40"
-        >
-          Edit design
-        </button>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Created {formatDate(design.createdAt)}
+          {design.updatedAt !== design.createdAt && (
+            <span> · Updated {formatDate(design.updatedAt)}</span>
+          )}
+        </p>
       </header>
 
-      {/* The brief and the files are both edited in place (D-03, D-05) — this
-          is the owner's own design page, so there's no reason to make them
-          open a form to write in it. "Edit design" still covers the title,
-          the cut and the Canva link. */}
       <div className="mt-10">
         <DesignBlockEditor
           designId={design._id}
@@ -120,51 +90,100 @@ export default function DesignDetailPage({ params }: PageProps) {
         />
       </div>
 
-      <section className="mt-8">
-        <h2 className="text-base font-semibold text-foreground">The cut</h2>
-        {design.jerseyStyle || design.neckline || design.sleeveStyle ? (
-          <dl className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <SpecItem label="Jersey style" value={design.jerseyStyle} />
-            <SpecItem label="Neckline" value={design.neckline} />
-            <SpecItem label="Sleeve style" value={design.sleeveStyle} />
-          </dl>
-        ) : (
-          <p className="mt-2 text-sm text-muted-foreground">
-            The silhouette isn&apos;t decided yet — Sidestep will help you choose.
-          </p>
-        )}
+      {/* Specs and the Canva link stay fixed sections rather than blocks
+          (PRD §5) — they're the same three questions on every design, so
+          there's nothing to add or reorder. Blank is a legitimate answer:
+          Sidestep helps decide the cut when the captain hasn't. */}
+      <section className="mt-10" aria-labelledby="design-cut-heading">
+        <h2
+          id="design-cut-heading"
+          className="text-base font-semibold text-foreground"
+        >
+          The cut
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The silhouette this artwork lives on. Leave anything undecided and
+          Sidestep will help you choose.
+        </p>
+        <div className="mt-4 grid gap-5 rounded-lg border border-border bg-card px-4 py-4 sm:grid-cols-3">
+          <InlineEditField
+            label="Jersey style"
+            value={design.jerseyStyle ?? ""}
+            placeholder="Not decided"
+            validate={validateJerseyStyle}
+            onSave={(jerseyStyle) => updateDesign({ designId, jerseyStyle })}
+          />
+          <DesignSpecPicker
+            label="Neckline"
+            value={design.neckline ?? ""}
+            options={NECKLINES}
+            onSave={(neckline) => updateDesign({ designId, neckline })}
+          />
+          <DesignSpecPicker
+            label="Sleeve style"
+            value={design.sleeveStyle ?? ""}
+            options={SLEEVE_STYLES}
+            onSave={(sleeveStyle) => updateDesign({ designId, sleeveStyle })}
+          />
+        </div>
       </section>
 
-      {design.canvaLink && (
-        <section className="mt-8">
-          <h2 className="text-base font-semibold text-foreground">Canva</h2>
-          <a
-            href={design.canvaLink}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="mt-2 inline-flex items-center gap-1 break-all text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"
-          >
-            {design.canvaLink}
-            <span aria-hidden>↗</span>
-          </a>
-        </section>
-      )}
-
+      <section className="mt-8" aria-labelledby="design-canva-heading">
+        <h2
+          id="design-canva-heading"
+          className="text-base font-semibold text-foreground"
+        >
+          Canva
+        </h2>
+        <div className="mt-3 rounded-lg border border-border bg-card px-4 py-4">
+          <InlineEditField
+            label="Canva link"
+            type="text"
+            value={design.canvaLink ?? ""}
+            placeholder="No link yet"
+            validate={validateCanvaLink}
+            onSave={(canvaLink) => updateDesign({ designId, canvaLink })}
+          />
+          {design.canvaLink && (
+            <a
+              href={design.canvaLink}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"
+            >
+              Open in Canva
+              <span aria-hidden>↗</span>
+            </a>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
 
-function SpecItem({ label, value }: { label: string; value?: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3">
-      <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm text-foreground/90">
-        {value || <span className="text-muted-foreground">Not set</span>}
-      </dd>
-    </div>
-  );
+// Client-side copies of what `designs.updateDesign` will re-run, so a
+// rejected value is caught under the field rather than in a toast.
+function validateTitle(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return "Give your design a title.";
+  if (trimmed.length > TITLE_MAX_LENGTH)
+    return `Please keep the title under ${TITLE_MAX_LENGTH} characters.`;
+  return null;
+}
+
+function validateJerseyStyle(value: string): string | null {
+  if (value.trim().length > JERSEY_STYLE_MAX_LENGTH)
+    return `Please keep the jersey style under ${JERSEY_STYLE_MAX_LENGTH} characters.`;
+  return null;
+}
+
+function validateCanvaLink(value: string): string | null {
+  const trimmed = value.trim();
+  // Blank clears the link — a design doesn't have to have one.
+  if (!trimmed) return null;
+  if (trimmed.length > CANVA_LINK_MAX_LENGTH) return "That link is too long.";
+  if (!isHttpUrl(trimmed)) return "Paste a full link starting with https://";
+  return null;
 }
 
 function Loading() {

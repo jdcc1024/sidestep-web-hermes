@@ -7,7 +7,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { InlineEditField } from "@/components/admin/InlineEditField";
+import { InlineEditField } from "@/components/InlineEditField";
 import { DesignBlockEditor } from "@/components/design/DesignBlockEditor";
 import {
   validateOptionalText,

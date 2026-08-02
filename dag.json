@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-02T16:56:52.997Z",
+  "lastUpdated": "2026-08-02T17:26:47.731Z",
   "phases": [
     {
       "id": "phase-1",
@@ -697,6 +697,25 @@
         "Rows stay one line each - the density M-06 bought is not given back",
         "Tests pass"
       ]
+    },
+    {
+      "id": "D-10",
+      "title": "Consolidate Edit Design Into The Design Page",
+      "phase": "phase-2",
+      "type": "improvement",
+      "description": "Delete the separate edit-design surface. The design page already edits the brief and the files inline; make the title, the cut and the Canva link editable in place too, and reduce DesignForm to the create form it now is.",
+      "status": "in-progress",
+      "startedAt": "2026-08-02T17:26:47.730Z",
+      "completedAt": null,
+      "issueFile": "backlog/D-10-consolidate-edit-design-into-the-design-page.md",
+      "prdRef": "docs/prd/design-page-blocks.md#5-scope",
+      "acceptanceCriteria": [
+        "The design page has no edit mode - every field is editable where it is displayed",
+        "Title, jersey style, neckline, sleeve style and Canva link save one field at a time",
+        "Neckline and sleeve style stay allowlisted pickers, and a spec can be cleared back to undecided",
+        "DesignForm is create-only and no longer carries an edit mode",
+        "Tests pass"
+      ]
     }
   ],
   "edges": [
@@ -818,13 +837,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T08:26:32.717Z",
-      "event": "task_completed",
-      "nodeId": "D-05",
-      "agent": "ralph-loop",
-      "message": "Completed: Gallery Blocks and Asset Pool"
-    },
     {
       "timestamp": "2026-07-26T08:26:54.783Z",
       "event": "agent_joined",
@@ -1422,6 +1434,18 @@
       "event": "task_completed",
       "nodeId": "M-07",
       "message": "Completed: Roster Row Review Fixes"
+    },
+    {
+      "timestamp": "2026-08-02T17:26:43.409Z",
+      "event": "nodes_added",
+      "nodeId": "D-10",
+      "message": "New task added: Consolidate Edit Design Into The Design Page"
+    },
+    {
+      "timestamp": "2026-08-02T17:26:47.731Z",
+      "event": "task_started",
+      "nodeId": "D-10",
+      "message": "Picked up: Consolidate Edit Design Into The Design Page"
     }
   ]
 }

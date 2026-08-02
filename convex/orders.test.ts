@@ -404,7 +404,6 @@ describe("orders.updateOrder", () => {
     await asUser.mutation(api.designs.updateDesign, {
       designId,
       title: "Home kit v2",
-      addFiles: [],
     });
 
     expect((await t.run((ctx) => ctx.db.get(designId)))?.title).toBe(

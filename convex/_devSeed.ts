@@ -284,6 +284,48 @@ export const setFixtureDesignRemoved = internalMutation({
   },
 });
 
+/**
+ * Bring the fixture designs' silhouette specs back onto the allowlists
+ * (D-10), so the design page's spec pickers photograph with a real answer
+ * checked.
+ *
+ * `ensureDesign` deliberately never touches a design it adopted — a human may
+ * have edited the fixture on purpose — which means designs seeded before the
+ * allowlists settled still carry values like "Crew" and "Short sleeve". The
+ * pickers render those honestly, as an off-list option, but that isn't the
+ * state a reviewer wants to look at.
+ *
+ * Run against the dev deployment with:
+ *   npx convex run _devSeed:resetFixtureDesignSpecs '{"email":"jcc@sidestep.design"}'
+ *
+ * Idempotent, and only ever writes the three spec fields.
+ */
+export const resetFixtureDesignSpecs = internalMutation({
+  args: { email: v.string() },
+  handler: async (ctx, { email }) => {
+    const user = await findUserByEmail(ctx, email);
+    if (!user)
+      throw new ConvexError(
+        `Found no user with email "${email}". Run seedPortalFixtures first.`,
+      );
+
+    const designs = await ctx.db
+      .query("designs")
+      .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
+      .collect();
+
+    for (const design of designs)
+      await ctx.db.patch(design._id, {
+        jerseyStyle: "Soccer jersey",
+        neckline: "Crew Neck",
+        sleeveStyle: "Regular",
+        updatedAt: Date.now(),
+      });
+
+    return { patched: designs.map((d) => d._id) };
+  },
+});
+
 async function findUserByEmail(
   ctx: MutationCtx,
   email: string,
@@ -315,9 +357,12 @@ async function ensureDesign(
     ownerId,
     title,
     blocks: prepareBlocks(overviewBlocks(overview)),
-    jerseyStyle: "Jersey",
-    neckline: "Crew",
-    sleeveStyle: "Short sleeve",
+    // Necklines and sleeve styles are allowlists (lib/design/rules) — the
+    // fixture has to use legal values or the design page's spec pickers
+    // render an off-list answer and the captures lie about the real UI.
+    jerseyStyle: "Soccer jersey",
+    neckline: "Crew Neck",
+    sleeveStyle: "Regular",
     createdAt: now,
     updatedAt: now,
   });

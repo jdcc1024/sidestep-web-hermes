@@ -104,4 +104,51 @@ describe("InlineEditField", () => {
       "TEXTAREA",
     );
   });
+
+  // The heading variant (D-10): the design page edits its title where the
+  // title is, rather than repeating it in a labelled field below.
+  describe("heading variant", () => {
+    it("renders the value as the given heading with no visible label", () => {
+      render(
+        <InlineEditField
+          label="Title"
+          value="Home kit"
+          onSave={vi.fn()}
+          variant="heading"
+          headingLevel={1}
+        />,
+      );
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Home kit" }),
+      ).toBeInTheDocument();
+      // The label is still the accessible name of the edit control, it just
+      // isn't printed above the heading.
+      expect(screen.queryByText("Title")).toBeNull();
+      expect(
+        screen.getByRole("button", { name: /edit title/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("still edits and saves like any other field", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn().mockResolvedValue(undefined);
+      render(
+        <InlineEditField
+          label="Title"
+          value="Home kit"
+          onSave={onSave}
+          variant="heading"
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /edit title/i }));
+      const input = screen.getByRole("textbox", { name: "Title" });
+      await user.clear(input);
+      await user.type(input, "Away kit");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledWith("Away kit");
+    });
+  });
 });

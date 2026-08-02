@@ -156,8 +156,8 @@ export async function insertDesignAssets(
 }
 
 // --- Pool management (D-05) -------------------------------------------------
-// Upload, set-main and delete are run from the design page rather than the
-// edit form, so each needs its own gate. The rules themselves are the pure
+// Upload, set-main and delete are each run on their own from the design
+// page, so each needs its own gate. The rules themselves are the pure
 // predicates in lib/designAsset; these three functions are where they meet
 // the database.
 

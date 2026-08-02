@@ -15,7 +15,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-import type { Id } from "@/convex/_generated/dataModel";
 import { DesignForm } from "./DesignForm";
 
 describe("DesignForm", () => {
@@ -101,51 +100,15 @@ describe("DesignForm", () => {
     vi.unstubAllGlobals();
   });
 
-  // The brief moved to the block editor on the design page (D-03). The edit
-  // form keeps title/cut/Canva/files, and — critically — sends no `blocks`, so
-  // saving it can't overwrite a section the editor just changed.
-  describe("edit mode", () => {
-    function renderEdit() {
-      return render(
-        <DesignForm
-          mode={{
-            kind: "edit",
-            designId: "design_1" as Id<"designs">,
-            initialTitle: "Home kit",
-            initialCanvaLink: "",
-            initialJerseyStyle: "",
-            initialNeckline: "",
-            initialSleeveStyle: "",
-            existingFileCount: 1,
-          }}
-        />,
-      );
-    }
+  // D-10 removed the edit mode: the design page edits every one of these
+  // fields in place, so this form only ever creates.
+  it("is a create form — it never renders a 'save changes' submit", () => {
+    render(<DesignForm />);
 
-    it("does not offer an Overview field — the block editor owns the brief", () => {
-      renderEdit();
-      expect(screen.queryByLabelText(/overview/i)).toBeNull();
-      expect(screen.getByLabelText(/^title$/i)).toBeInTheDocument();
-    });
-
-    it("saves without sending blocks, and without complaining about the missing overview", async () => {
-      const user = userEvent.setup();
-      renderEdit();
-
-      await user.clear(screen.getByLabelText(/^title$/i));
-      await user.type(screen.getByLabelText(/^title$/i), "Home kit v2");
-      await user.click(screen.getByRole("button", { name: /save changes/i }));
-
-      await vi.waitFor(() => expect(mutationStub).toHaveBeenCalled());
-      const [args] = mutationStub.mock.calls.at(-1) as unknown as [
-        Record<string, unknown>,
-      ];
-      expect(args.title).toBe("Home kit v2");
-      expect(args).not.toHaveProperty("blocks");
-      expect(
-        screen.queryByText(/add an overview so sidestep knows/i),
-      ).toBeNull();
-    });
+    expect(
+      screen.getByRole("button", { name: /save design/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save changes/i })).toBeNull();
   });
 
   it("flags an invalid canva link", async () => {

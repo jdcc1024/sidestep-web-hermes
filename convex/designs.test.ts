@@ -264,106 +264,116 @@ describe("designs.createDesign", () => {
   });
 });
 
+// The design page's metadata write path (D-10). One field at a time: the page
+// has no form to submit, so every argument but the id is optional. Omitted
+// means "leave it alone", supplied-but-blank means "clear it". Blocks and
+// files have owned their own mutations since D-03/D-05 and this one no longer
+// touches either.
 describe("designs.updateDesign", () => {
-  it("updates metadata for a design the caller owns", async () => {
-    const t = convexTest(schema, modules);
-    const { asUser } = await seedOwner(t);
-
-    const designId = await asUser.mutation(api.designs.createDesign, {
+  async function seedDesign(t: Test, asUser: Awaited<ReturnType<typeof seedOwner>>["asUser"]) {
+    return asUser.mutation(api.designs.createDesign, {
       title: "First pass",
       blocks: overviewBlocks("Initial brief."),
       files: [await fakeFile(t)],
+      jerseyStyle: "Soccer jersey",
+      neckline: "Crew Neck",
+      sleeveStyle: "Regular",
     });
+  }
+
+  it("updates one field and leaves the rest of the design alone", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const designId = await seedDesign(t, asUser);
 
     await asUser.mutation(api.designs.updateDesign, {
       designId,
       title: "Revised pass",
-      blocks: overviewBlocks("Updated brief."),
-      addFiles: [],
-    });
-
-    const row = await t.run((ctx) => ctx.db.get(designId));
-    expect(row).toMatchObject({ title: "Revised pass" });
-    expect(overviewOf(row!.blocks)).toBe("Updated brief.");
-    expect(await assetsOf(t, designId)).toHaveLength(1);
-  });
-
-  it("appends asset rows for newly uploaded files", async () => {
-    const t = convexTest(schema, modules);
-    const { asUser } = await seedOwner(t);
-
-    const designId = await asUser.mutation(api.designs.createDesign, {
-      title: "Growing design",
-      blocks: overviewBlocks("Brief."),
-      files: [await fakeFile(t, { filename: "first.png" })],
-    });
-
-    await asUser.mutation(api.designs.updateDesign, {
-      designId,
-      title: "Growing design",
-      blocks: overviewBlocks("Brief."),
-      addFiles: [await fakeFile(t, { filename: "second.jpg", contentType: "image/jpeg" })],
-    });
-
-    const assets = await assetsOf(t, designId);
-    expect(assets.map((a) => a.filename)).toEqual(["first.png", "second.jpg"]);
-  });
-
-  it("rejects an update that would leave the design with no files", async () => {
-    const t = convexTest(schema, modules);
-    const { asUser } = await seedOwner(t);
-
-    const designId = await asUser.mutation(api.designs.createDesign, {
-      title: "Only file",
-      blocks: overviewBlocks("Brief."),
-      files: [await fakeFile(t)],
-    });
-    // Simulate the pre-D-05 state where a design somehow has no assets — the
-    // guard has to hold on the asset rows, not on the submitted array.
-    await t.run(async (ctx) => {
-      for (const asset of await ctx.db
-        .query("designAssets")
-        .withIndex("by_design", (q) => q.eq("designId", designId))
-        .collect())
-        await ctx.db.delete(asset._id);
-    });
-
-    await expect(
-      asUser.mutation(api.designs.updateDesign, {
-        designId,
-        title: "Only file",
-        blocks: overviewBlocks("Brief."),
-        addFiles: [],
-      }),
-    ).rejects.toThrow(/At least one file/);
-  });
-
-  it("updates silhouette specs when supplied", async () => {
-    const t = convexTest(schema, modules);
-    const { asUser } = await seedOwner(t);
-
-    const designId = await asUser.mutation(api.designs.createDesign, {
-      title: "Spec edit",
-      blocks: overviewBlocks("Initial."),
-      files: [await fakeFile(t)],
-    });
-
-    await asUser.mutation(api.designs.updateDesign, {
-      designId,
-      title: "Spec edit",
-      blocks: overviewBlocks("Initial."),
-      addFiles: [],
-      jerseyStyle: "Hockey jersey",
-      neckline: "V-Neck",
-      sleeveStyle: "Regular",
     });
 
     const row = await t.run((ctx) => ctx.db.get(designId));
     expect(row).toMatchObject({
-      jerseyStyle: "Hockey jersey",
-      neckline: "V-Neck",
+      title: "Revised pass",
+      jerseyStyle: "Soccer jersey",
+      neckline: "Crew Neck",
       sleeveStyle: "Regular",
     });
+    // The brief and the files belong to the other mutations — a title edit
+    // can't disturb what the block editor and the asset pool just wrote.
+    expect(overviewOf(row!.blocks)).toBe("Initial brief.");
+    expect(await assetsOf(t, designId)).toHaveLength(1);
+  });
+
+  it("clears a spec when it is supplied blank", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const designId = await seedDesign(t, asUser);
+
+    await asUser.mutation(api.designs.updateDesign, {
+      designId,
+      neckline: "",
+      jerseyStyle: "   ",
+    });
+
+    const row = await t.run((ctx) => ctx.db.get(designId));
+    expect(row!.neckline).toBeUndefined();
+    expect(row!.jerseyStyle).toBeUndefined();
+    // Untouched — a cleared neckline says nothing about the sleeves.
+    expect(row!.sleeveStyle).toBe("Regular");
+  });
+
+  it("sets and clears the Canva link", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const designId = await seedDesign(t, asUser);
+
+    await asUser.mutation(api.designs.updateDesign, {
+      designId,
+      canvaLink: "https://www.canva.com/design/abc",
+    });
+    expect(await t.run((ctx) => ctx.db.get(designId))).toMatchObject({
+      canvaLink: "https://www.canva.com/design/abc",
+    });
+
+    await asUser.mutation(api.designs.updateDesign, { designId, canvaLink: "" });
+    const row = await t.run((ctx) => ctx.db.get(designId));
+    expect(row!.canvaLink).toBeUndefined();
+  });
+
+  it("rejects a blank title — every design keeps a name", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const designId = await seedDesign(t, asUser);
+
+    await expect(
+      asUser.mutation(api.designs.updateDesign, { designId, title: "  " }),
+    ).rejects.toThrow(/title is required/i);
+  });
+
+  it("rejects a spec that isn't on the allowlist", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const designId = await seedDesign(t, asUser);
+
+    await expect(
+      asUser.mutation(api.designs.updateDesign, {
+        designId,
+        sleeveStyle: "Sleeveless",
+      }),
+    ).rejects.toThrow(/sleeve/i);
+  });
+
+  it("rejects a Canva link that isn't a URL", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser } = await seedOwner(t);
+    const designId = await seedDesign(t, asUser);
+
+    await expect(
+      asUser.mutation(api.designs.updateDesign, {
+        designId,
+        canvaLink: "canva.com/design/abc",
+      }),
+    ).rejects.toThrow(/valid URL/i);
   });
 
   it("rejects updateDesign when the caller doesn't own the design", async () => {
@@ -395,8 +405,6 @@ describe("designs.updateDesign", () => {
       asIntruder.mutation(api.designs.updateDesign, {
         designId,
         title: "Hijacked",
-        blocks: overviewBlocks("Hijack."),
-        addFiles: [],
       }),
     ).rejects.toThrow(/don't have access/);
   });
@@ -705,28 +713,6 @@ describe("design blocks", () => {
     ).rejects.toThrow(/notes/i);
   });
 
-  it("persists a reordered block array on update", async () => {
-    const t = convexTest(schema, modules);
-    const { asUser } = await seedOwner(t);
-    const gallery = { id: "g1", kind: "gallery" as const, assetIds: [] };
-
-    const designId = await asUser.mutation(api.designs.createDesign, {
-      title: "Away kit",
-      blocks: [overview, gallery],
-      files: [await fakeFile(t)],
-    });
-
-    await asUser.mutation(api.designs.updateDesign, {
-      designId,
-      title: "Away kit",
-      blocks: [gallery, overview],
-      addFiles: [],
-    });
-
-    const row = await t.run((ctx) => ctx.db.get(designId));
-    expect(row!.blocks.map((b) => b.id)).toEqual(["g1", "b-overview"]);
-  });
-
   it("returns blocks alongside resolved assets from getMyDesign", async () => {
     const t = convexTest(schema, modules);
     const { asUser } = await seedOwner(t);
@@ -743,7 +729,7 @@ describe("design blocks", () => {
     expect(design!.assets).toHaveLength(1);
   });
 
-  it("leaves blocks untouched when updateDesign omits them", async () => {
+  it("leaves blocks untouched when the metadata mutation runs", async () => {
     const t = convexTest(schema, modules);
     const { asUser } = await seedOwner(t);
 
@@ -753,12 +739,11 @@ describe("design blocks", () => {
       files: [await fakeFile(t)],
     });
 
-    // The edit form owns title/specs/files; the block editor owns blocks. A
-    // form submit must not clobber a brief the editor just changed.
+    // The design page owns title/specs/Canva; the block editor owns the brief.
+    // Renaming a design must not clobber a section the editor just changed.
     await asUser.mutation(api.designs.updateDesign, {
       designId,
       title: "Away kit v2",
-      addFiles: [],
     });
 
     const row = await t.run((ctx) => ctx.db.get(designId));
@@ -1276,7 +1261,7 @@ describe("design block mutations", () => {
 
 // ─── D-05 Asset pool ───────────────────────────────────────────────────
 // The pool is managed from the design page itself (upload, set main, delete)
-// rather than through the edit form, so each operation is its own mutation
+// rather than through a form submit, so each operation is its own mutation
 // answering the permission questions lib/designAsset defines.
 describe("design asset pool", () => {
   const overview = {

@@ -68,37 +68,48 @@ function normalizeCanvaLink(value: string | undefined): string | undefined {
 // Silhouette specs are optional per design — a design can be saved before
 // its cut is decided. Each spec is validated independently when present:
 // jerseyStyle is free text (length-capped), neckline and sleeve style must
-// match the allowlists in lib/design/rules. Returns only the specs that
-// were supplied so we never write an empty string for an omitted field.
-function normalizeSpecs(args: {
-  jerseyStyle?: string;
-  neckline?: string;
-  sleeveStyle?: string;
-}): { jerseyStyle?: string; neckline?: string; sleeveStyle?: string } {
-  const specs: { jerseyStyle?: string; neckline?: string; sleeveStyle?: string } =
-    {};
+// match the allowlists in lib/design/rules.
+//
+// The result is patch-shaped: a key appears only if the caller supplied that
+// spec, and its value is `undefined` when they supplied a blank one. Convex
+// reads `undefined` in a patch as "remove this field", which is exactly what
+// clearing a spec back to undecided means (D-10).
+const SPEC_KEYS = ["jerseyStyle", "neckline", "sleeveStyle"] as const;
+type SpecKey = (typeof SPEC_KEYS)[number];
+type SpecArgs = Partial<Record<SpecKey, string>>;
+type SpecPatch = Partial<Record<SpecKey, string | undefined>>;
 
-  if (args.jerseyStyle !== undefined) {
-    const trimmed = args.jerseyStyle.trim();
-    if (trimmed) {
-      if (trimmed.length > JERSEY_STYLE_MAX_LENGTH)
-        throw new ConvexError("Jersey style is too long.");
-      specs.jerseyStyle = trimmed;
+function normalizeSpecPatch(args: SpecArgs): SpecPatch {
+  const patch: SpecPatch = {};
+
+  for (const key of SPEC_KEYS) {
+    const value = args[key];
+    if (value === undefined) continue;
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      patch[key] = undefined;
+      continue;
     }
-  }
-
-  if (args.neckline !== undefined && args.neckline.trim()) {
-    if (!isNeckline(args.neckline)) throw new ConvexError("Invalid neckline.");
-    specs.neckline = args.neckline;
-  }
-
-  if (args.sleeveStyle !== undefined && args.sleeveStyle.trim()) {
-    if (!isSleeveStyle(args.sleeveStyle))
+    if (key === "jerseyStyle" && trimmed.length > JERSEY_STYLE_MAX_LENGTH)
+      throw new ConvexError("Jersey style is too long.");
+    if (key === "neckline" && !isNeckline(trimmed))
+      throw new ConvexError("Invalid neckline.");
+    if (key === "sleeveStyle" && !isSleeveStyle(trimmed))
       throw new ConvexError("Invalid sleeve style.");
-    specs.sleeveStyle = args.sleeveStyle;
+
+    patch[key] = trimmed;
   }
 
-  return specs;
+  return patch;
+}
+
+// Insert's view of the same rules. There's no stored field to remove on a
+// brand-new design, so an undecided spec is simply not written.
+function normalizeSpecs(args: SpecArgs): SpecPatch {
+  const patch = normalizeSpecPatch(args);
+  for (const key of SPEC_KEYS) if (patch[key] === undefined) delete patch[key];
+  return patch;
 }
 
 // Captain's own designs, newest first. Mirrors the auth/scoping shape of
@@ -222,67 +233,56 @@ export const createDesign = mutation({
   },
 });
 
-// Edit mode. Updates the metadata fields and appends any newly uploaded
-// files. Pass an empty addFileIds array to update metadata only.
+// The design page's metadata write path (D-10). There is no edit form any
+// more — the page saves each field as the captain finishes it — so every
+// argument but the id is optional: omitted means "leave it alone", and
+// supplied-but-blank means "clear it" for the fields that may be empty.
+//
+// Nothing here touches the brief or the files. Those have owned their own
+// mutations since D-03/D-05, which is what lets a rename land safely while
+// the block editor is mid-write on the same design.
 export const updateDesign = mutation({
   args: {
     designId: v.id("designs"),
-    title: v.string(),
-    // Optional, and normally omitted: the brief is edited block-by-block
-    // through the mutations below (D-03), so a form submit that only changed
-    // the title must not carry a stale array over the editor's work. Create
-    // still sends blocks — that's where the required Overview is authored.
-    blocks: v.optional(designBlocksValidator),
+    title: v.optional(v.string()),
     canvaLink: v.optional(v.string()),
-    addFiles: v.array(uploadedFileValidator),
     jerseyStyle: v.optional(v.string()),
     neckline: v.optional(v.string()),
     sleeveStyle: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, { designId, title, canvaLink, ...specArgs }) => {
     const user = await requireCurrentUser(ctx);
-    const design = await ctx.db.get(args.designId);
+    const design = await ctx.db.get(designId);
     if (!design) throw new ConvexError("Design not found.");
     if (design.ownerId !== user._id)
       throw new ConvexError("You don't have access to this design.");
 
-    const title = normalizeTitle(args.title);
-    const blocks = args.blocks ? prepareBlocks(args.blocks) : undefined;
-    const canvaLink = normalizeCanvaLink(args.canvaLink);
-    const specs = normalizeSpecs(args);
+    // `undefined` values are meaningful here (Convex reads them in a patch as
+    // "remove this field"), so presence of the key is what decides whether a
+    // field is written — never whether its value is defined.
+    const patch: SpecPatch & { title?: string; canvaLink?: string } = {};
 
-    // The guard reads the stored rows, not the submitted array: a metadata-only
-    // edit sends no files, and the design still has to end up with at least one.
-    const existingCount = await countDesignAssets(ctx, args.designId);
-    if (existingCount + args.addFiles.length < 1)
-      throw new ConvexError("At least one file is required.");
+    if (title !== undefined) patch.title = normalizeTitle(title);
+    // normalizeCanvaLink already answers `undefined` for a blank link, which
+    // is the clear.
+    if (canvaLink !== undefined) patch.canvaLink = normalizeCanvaLink(canvaLink);
+    Object.assign(patch, normalizeSpecPatch(specArgs));
 
-    await insertDesignAssets(ctx, args.designId, args.addFiles, user);
+    if (Object.keys(patch).length > 0)
+      await ctx.db.patch(designId, { ...patch, updatedAt: Date.now() });
 
-    await ctx.db.patch(args.designId, {
-      title,
-      ...(blocks ? { blocks } : {}),
-      // Convex `patch` doesn't accept undefined for optional fields — pass
-      // an explicit string (possibly empty) and let the schema/optional do
-      // the rest. We use the normalized value or fall back to clearing.
-      ...(canvaLink ? { canvaLink } : { canvaLink: undefined }),
-      // Apply any supplied silhouette specs; omitted specs are left as-is.
-      ...specs,
-      updatedAt: Date.now(),
-    });
-
-    return args.designId;
+    return designId;
   },
 });
 
 // ---------------------------------------------------------------------------
 // The asset pool's write path (D-05).
 //
-// The design page manages its own files now — upload more, pick the main
-// image, delete one — so these three sit alongside the block mutations rather
-// than inside the edit form's `updateDesign`. All three are owner-or-admin,
-// because the portal and the admin page mount the same editor (PRD §5);
-// delete asks the narrower question on top of that.
+// The design page manages its own files — upload more, pick the main image,
+// delete one — so these three sit alongside the block mutations rather than
+// inside a form submit. All three are owner-or-admin, because the portal and
+// the admin page mount the same editor (PRD §5); delete asks the narrower
+// question on top of that.
 // ---------------------------------------------------------------------------
 
 export const addAssets = mutation({
@@ -319,9 +319,9 @@ export const removeAsset = mutation({
         "Sidestep uploaded this file, so only Sidestep can remove it.",
       );
 
-    // Every design keeps at least one file — createDesign and updateDesign
-    // both insist on it, and a design that deleted its way to zero could no
-    // longer be saved from the edit form at all.
+    // Every design keeps at least one file — createDesign insists on it, and
+    // this is the only path that could take one back below that, so it's the
+    // only other place the rule has to hold.
     if ((await countDesignAssets(ctx, asset.designId)) <= 1)
       throw new ConvexError(
         "A design keeps at least one file — upload another before removing this one.",

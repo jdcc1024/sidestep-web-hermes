@@ -1,4 +1,4 @@
-// Form adapter for the portal design creation / edit form. Wraps the
+// Form adapter for the portal's new-design form. Wraps the
 // atomic rules in ./rules into a DesignErrors record keyed by form field,
 // plus a toDesignPayload helper that converts validated input into the
 // shape the Convex mutation accepts. The Convex side imports the same
@@ -31,10 +31,9 @@ export type DesignInput = {
   jerseyStyle: string;
   neckline: string;
   sleeveStyle: string;
-  // Number of files attached to this design after the pending submit —
-  // existing files (edit mode) plus newly selected files. Validated as a
-  // single count so the rule "at least one file" reads the same in both
-  // create and edit flows.
+  // Number of files selected for this design. Validated as a count rather
+  // than a list so "at least one file" is one rule, wherever it's checked —
+  // the server re-runs it against the stored rows.
   fileCount: number;
 };
 

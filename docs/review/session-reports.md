@@ -2241,3 +2241,63 @@ card still shows every entry in five rows at 1280.
   sheet. M-06's `roster-sheet-*.png` were superseded and moved here rather than
   left showing a state that no longer exists; the hover variants are deleted,
   since there is no longer a hover state to review.
+
+## 2026-08-02 — D-10: Consolidate Edit Design Into The Design Page
+
+The design page had two ways to change a design. The brief and the files were
+edited in place (D-03/D-05); the title, the cut and the Canva link needed
+"Edit design", which swapped the whole screen for a form that then duplicated
+the page — its own Files step uploading alongside the pool, its own Canva
+field, its own "The cut" heading. The edit surface is gone. Every field is now
+edited where it is shown.
+
+- **`designs.updateDesign` is a per-field patch.** It was shaped for a whole
+  form submit: required `title`, required `addFiles`, optional `blocks`. It
+  now takes the same shape `admin.updateDesign` already had — every field
+  optional, omitted means "leave it alone", supplied-but-blank means "clear
+  it". Files and blocks have had their own mutations since D-05, so it stopped
+  carrying them, and the "at least one file" guard now lives only in
+  `createDesign` and `removeAsset`, the two paths that can actually violate it.
+  `normalizeSpecs` split into a patch-shaped validator plus the insert's view
+  of it, which is what makes a spec clearable — Convex reads `undefined` in a
+  patch as "remove this field".
+- **`InlineEditField` moved out of `components/admin/`.** Three admin pages
+  and now the captain's design page mount it; leaving it under `admin/` would
+  have told the next reader it was staff-only. It grew a `heading` variant so
+  the page edits its title *as* the `<h1>` rather than repeating the title in
+  a labelled field underneath, which is the duplication this issue is about.
+- **Allowlisted specs are a picker, not a text field** (`DesignSpecPicker`).
+  Neckline and sleeve style have two legal answers each — too few to hide
+  behind a pencil and a Save button, so the options are always on screen and
+  clicking one *is* the edit. "Not decided" is a real option rather than an
+  empty state, because undecided is a legitimate answer (PRD §6) and going
+  back to it has to be as easy as choosing.
+- **An off-allowlist stored value is carried as its own checked option.** Found
+  this from the screenshots: the fixture designs hold `"Crew"` and
+  `"Short sleeve"` from before the allowlists settled, and the first version of
+  the picker showed *nothing* checked for them — a design that has chosen
+  reading as one that hasn't, with the next click silently overwriting an
+  answer the captain never saw.
+- **`DesignForm` is create-only.** The `Mode` union, the relaxed edit schema,
+  the existing-file count and the `updateDesign` call are all gone. What's left
+  is the one thing the design page can't do: bring a design into existence,
+  which is why the Overview is still authored there.
+
+Judgement calls, both mine:
+
+- **The admin design page is untouched.** It already edits these fields
+  inline, so it has nothing to consolidate; giving it the new spec picker (its
+  neckline/sleeve are still free text, and so still able to write a value the
+  captain's page can't show as chosen) is a real improvement but a separate
+  one. Worth picking up.
+- **Specs and the Canva link stayed fixed sections rather than becoming
+  blocks**, per PRD §5 — they're the same three questions on every design, so
+  there is nothing to add or reorder.
+
+Also fixed `_devSeed`'s design fixture to use allowlisted spec values, and
+added `resetFixtureDesignSpecs` to bring already-seeded designs onto them —
+`ensureDesign` deliberately never touches a design it adopted, so the stale
+values were otherwise unreachable from a headless capture.
+
+- Screenshots: `docs/review/D-10/` (375/768/1280, light + dark) — the design
+  page and, since the form changed, `/portal/designs/new`.

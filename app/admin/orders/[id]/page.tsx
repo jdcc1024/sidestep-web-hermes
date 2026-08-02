@@ -8,7 +8,7 @@ import { ArrowLeft, FileDown } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { ExportOrderButton } from "@/components/admin/ExportOrderButton";
-import { InlineEditField } from "@/components/admin/InlineEditField";
+import { InlineEditField } from "@/components/InlineEditField";
 import { OrderStageChecklist } from "@/components/admin/OrderStageChecklist";
 import { validateQuantity, validateRequiredText } from "@/lib/adminRecords";
 import { overviewOf } from "@/lib/designBlock";
