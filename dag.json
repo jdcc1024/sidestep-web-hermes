@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-02T07:57:31.193Z",
+  "lastUpdated": "2026-08-02T07:59:15.549Z",
   "phases": [
     {
       "id": "phase-1",
@@ -625,9 +625,9 @@
       "phase": "3",
       "type": "improvement",
       "description": "Animate the light/dark swap with the View Transitions API. Ships BOTH candidates behind two side-by-side toggles - a whole-page crossfade and a circular reveal from the button - so the human can compare them in the running app before one is deleted.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-02T07:35:42.426Z",
-      "completedAt": null,
+      "completedAt": "2026-08-02T07:59:15.548Z",
       "issueFile": "backlog/N-10-theme-swap-transition-a-b-.md",
       "prdRef": "docs/prd/motion-adoption.md#5-scope",
       "acceptanceCriteria": [
@@ -1333,6 +1333,12 @@
       "event": "needs_human",
       "nodeId": "N-11",
       "message": "Needs human: Choose the Theme Swap Transition — Crossfade or circular reveal for the light/dark swap? Both are live behind the 'fade' and 'circle' toggles."
+    },
+    {
+      "timestamp": "2026-08-02T07:59:15.549Z",
+      "event": "task_completed",
+      "nodeId": "N-10",
+      "message": "Completed: Theme Swap Transition (A/B)"
     }
   ]
 }
