@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-03T08:29:42.375Z",
+  "lastUpdated": "2026-08-03T08:48:48.790Z",
   "phases": [
     {
       "id": "phase-1",
@@ -763,9 +763,9 @@
       "phase": "3",
       "type": "feature",
       "description": "A roster slot can carry an optional C (captain) or A (assistant captain). Shown on the card, the roster sheet and the by-roster view; carried by the mirror; exported in both the captain's roster CSV and the admin order CSV.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-03T08:29:42.374Z",
-      "completedAt": null,
+      "completedAt": "2026-08-03T08:48:48.789Z",
       "issueFile": "backlog/M-09-captain-and-assistant-captain-designation.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
       "acceptanceCriteria": [
@@ -906,13 +906,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T16:43:00.611Z",
-      "event": "task_completed",
-      "nodeId": "O-06",
-      "agent": "ralph-loop",
-      "message": "Completed: Freeze Order When Roster Locked"
-    },
     {
       "timestamp": "2026-07-26T22:09:28.615Z",
       "event": "nodes_added",
@@ -1506,6 +1499,12 @@
       "event": "task_started",
       "nodeId": "M-09",
       "message": "Picked up: Captain And Assistant Captain Designation"
+    },
+    {
+      "timestamp": "2026-08-03T08:48:48.790Z",
+      "event": "task_completed",
+      "nodeId": "M-09",
+      "message": "Completed: Captain And Assistant Captain Designation"
     }
   ]
 }
