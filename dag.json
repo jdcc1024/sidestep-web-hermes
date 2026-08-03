@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-03T16:07:53.756Z",
+  "lastUpdated": "2026-08-03T22:10:18.718Z",
   "phases": [
     {
       "id": "phase-1",
@@ -797,6 +797,46 @@
         "CLAUDE.md, ralph-prompt.md and the CLI agree on every command's arguments",
         "No remaining reference to agent-join, agent-leave, or an agentId argument"
       ]
+    },
+    {
+      "id": "B-11",
+      "title": "DAG Viewer Server Shells Out Unsanitized Input",
+      "phase": "3",
+      "type": "bug",
+      "description": "serve-dag.js POST /api/node-status interpolates nodeId into a shell string and runs it with execSync, escapes only double quotes in the reason, binds 0.0.0.0, and sets CORS to *. Any device on the network or website in the browser can run commands as the developer while the viewer is up.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-11-dag-viewer-server-shells-out-unsanitized-input.md",
+      "prdRef": "CLAUDE.md#dag-state-management-required",
+      "acceptanceCriteria": [
+        "No shell: execFileSync with an argument array, never an interpolated command string",
+        "nodeId validated against an allowlist pattern and 400 otherwise",
+        "Reason/question text passes as one argv element with no escaping logic",
+        "The server binds 127.0.0.1",
+        "Access-Control-Allow-Origin is not * for the POST route",
+        "An injected nodeId such as 'x & echo pwned' is proven rejected, not executed"
+      ]
+    },
+    {
+      "id": "B-12",
+      "title": "DAG Issue Links Have Rotted",
+      "phase": "3",
+      "type": "improvement",
+      "description": "25 node issueFile paths point at files that do not exist (12 renamed, 13 never written) and 11 completed nodes left their issue file marked pending. The viewer's detail panel is the human review surface, so these are dead links in the middle of it.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-12-dag-issue-links-have-rotted.md",
+      "prdRef": "CLAUDE.md#working-with-the-backlog",
+      "acceptanceCriteria": [
+        "Every issueFile in dag.json and dag-archive.json resolves to a real file",
+        "Renamed files are pointed at their real filename",
+        "Nodes with no file get one written or have issueFile removed",
+        "The 11 completed-but-pending issue files read done",
+        "A check script fails on a missing issueFile or a completed node not marked done",
+        "That check runs in verify.mjs"
+      ]
     }
   ],
   "edges": [
@@ -922,18 +962,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T22:30:06.302Z",
-      "event": "task_started",
-      "nodeId": "R-07",
-      "message": "Picked up: Migrate Remaining Surfaces + Retire Old Tables"
-    },
-    {
-      "timestamp": "2026-07-26T22:51:12.996Z",
-      "event": "task_completed",
-      "nodeId": "R-07",
-      "message": "Completed: Migrate Remaining Surfaces + Retire Old Tables"
-    },
     {
       "timestamp": "2026-07-26T23:26:20.770Z",
       "event": "task_started",
@@ -1521,6 +1549,18 @@
       "event": "questions_answered",
       "nodeId": "D-09,P-01,B-05,B-06,N-11",
       "message": "Human answered the needs-human queue: D-09 deleted, P-01 and B-05 declined, B-06 and N-11 deferred."
+    },
+    {
+      "timestamp": "2026-08-03T22:10:18.646Z",
+      "event": "nodes_added",
+      "nodeId": "B-11",
+      "message": "New task added: DAG Viewer Server Shells Out Unsanitized Input"
+    },
+    {
+      "timestamp": "2026-08-03T22:10:18.717Z",
+      "event": "nodes_added",
+      "nodeId": "B-12",
+      "message": "New task added: DAG Issue Links Have Rotted"
     }
   ]
 }
