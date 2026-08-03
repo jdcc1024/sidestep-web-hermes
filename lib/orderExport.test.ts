@@ -1,39 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildOrderCsv,
-  exportFilename,
-  toCsv,
-  type OrderExport,
-} from "./orderExport";
+import { buildOrderCsv, exportFilename, type OrderExport } from "./orderExport";
 
-describe("toCsv", () => {
-  it("should join cells with commas and rows with CRLF", () => {
-    expect(toCsv([["a", "b"], ["c", "d"]])).toBe("a,b\r\nc,d");
-  });
-
-  it("should quote a value containing a comma", () => {
-    expect(toCsv([["Ruiz, Ana"]])).toBe('"Ruiz, Ana"');
-  });
-
-  it("should quote and double up embedded quotes", () => {
-    expect(toCsv([['He said "hi"']])).toBe('"He said ""hi"""');
-  });
-
-  it("should quote a value containing a newline", () => {
-    expect(toCsv([["line one\nline two"]])).toBe('"line one\nline two"');
-  });
-
-  it("should leave a plain value unquoted", () => {
-    expect(toCsv([["Falcons"]])).toBe("Falcons");
-  });
-
-  it("should neutralize a value that a spreadsheet would read as a formula", () => {
-    // Supplier handoff opens in Excel/Sheets; a name field starting with =
-    // must not execute. Prefixed with ' and quoted, so the text survives.
-    expect(toCsv([["=SUM(A1:A9)"]])).toBe("\"'=SUM(A1:A9)\"");
-    expect(toCsv([["+1 555 0100"]])).toBe("\"'+1 555 0100\"");
-  });
-});
+// `toCsv` itself is exercised in csv.test.ts, alongside the module it moved
+// to when the roster export (M-08) became its second caller.
 
 describe("exportFilename", () => {
   it("should slugify the team name and date-stamp the file", () => {

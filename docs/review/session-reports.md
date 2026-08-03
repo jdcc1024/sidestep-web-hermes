@@ -2349,3 +2349,62 @@ to add later if it reads as an inconsistency.
   Behaviour is covered by tests instead (open on click, open from the
   keyboard, close on Escape).
 - `node scripts/verify.mjs` — typecheck, lint, 1243 tests, all pass.
+
+## 2026-08-02 — M-08: Export A Design's Roster To CSV
+
+**Export CSV** now sits beside **Manage roster** on every design card that has
+a run. It downloads that design's roster as Name / Number / Size, and the one
+real transformation is **expansion**: the card collapses repeats into a chip
+(`L ×3`) because a captain reading a screen wants the roster short, and the
+file goes the other way — three identical rows, because every row of a CSV is
+one garment to make.
+
+Three product decisions came from the requirements conversation rather than
+from me:
+
+- **Unfilled slots are in the file**, with an empty Size cell. That makes the
+  export double as the list of people who still owe a size — a missing row
+  can't say that.
+- **Blank/bulk jerseys** export with empty Name and Number rather than the word
+  "Blank", so the columns stay data.
+- **Two orderings, not one**, which is why the control is a small menu:
+  *By name (A–Z)* is the default a captain checks against a team list, and
+  *By size (S, M, L…)* is the cut list for whoever pulls stock. Under size
+  grouping the sizeless (unfilled) rows trail every group, and blanks sort last
+  within their own size group rather than to the very bottom — all the XLs stay
+  together, which is the whole point of that ordering.
+
+Architecture notes:
+
+- **No new Convex query.** The order page has already read this design's roster
+  for the card preview (M-01), so the export is built from the exact `rows` on
+  screen. Same rule the roster sheet follows, and for the same reason: the file
+  cannot describe a different team than the captain is looking at.
+- **`lib/csv.ts` is new, and it is an extraction, not an addition.** The
+  serializer, the filename slug, the ISO date, the UTF-8 BOM and the Blob
+  download all lived in the admin export (3-03). The roster export is their
+  second caller, and the formula-injection guard is a *security* control —
+  a security control with two copies eventually has one copy that's wrong. So
+  `orderExport.ts` and `ExportOrderButton.tsx` now import them, `toCsv`'s tests
+  moved to `csv.test.ts` alongside the code, and the admin export's own tests
+  pass untouched.
+- **`RosterRow` now carries `name` and `number` beside `label`.** Re-splitting
+  "Ruiz #7" back into columns is guesswork the moment a player's name contains
+  a "#", so the row type keeps both halves. Optional fields — a blank row has
+  neither.
+
+Judgement calls:
+
+- **The export stays enabled on a locked run.** Reading the roster out is the
+  one thing a frozen run should never stop a captain doing.
+- **Disabled, not hidden, on an empty roster.** A header-only file looks like a
+  broken export; a button that appears and disappears as the first player is
+  added is worse than one that is visibly not-yet-usable.
+- **Per-design, not per-order.** The ask was the design card, and each card's
+  roster is what a supplier quote is cut from. An order-wide export already
+  exists on the admin side.
+
+- Screenshots: `docs/review/M-08/` — the order page at 375/768/1280, light and
+  dark. The button is captured in place on both design cards; the *open* menu
+  is not, since `snap.mjs` captures routes rather than post-click state.
+- `node scripts/verify.mjs` — typecheck, lint, 1278 tests, all pass.

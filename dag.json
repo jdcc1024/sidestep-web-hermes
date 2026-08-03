@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-02T18:13:29.176Z",
+  "lastUpdated": "2026-08-03T05:02:39.097Z",
   "phases": [
     {
       "id": "phase-1",
@@ -736,6 +736,26 @@
         "Thumbnails inside a card-wide link (dashboard, designs list) do not become nested buttons",
         "Tests pass"
       ]
+    },
+    {
+      "id": "M-08",
+      "title": "Export A Design's Roster To CSV",
+      "phase": "3",
+      "type": "feature",
+      "description": "Export CSV beside Manage roster on each design card: one row per garment (a size ordered 3 times is 3 rows), columns Name/Number/Size, alphabetical or grouped by size.",
+      "status": "in-progress",
+      "startedAt": "2026-08-03T05:02:39.096Z",
+      "completedAt": null,
+      "issueFile": "backlog/M-08-export-a-design-s-roster-to-csv.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
+      "acceptanceCriteria": [
+        "Export CSV sits next to Manage roster on every design card with a run",
+        "A size ordered N times produces N identical rows",
+        "Unfilled slots export with a blank size; blanks export with empty name/number last",
+        "Captain can choose alphabetical or grouped-by-size",
+        "Opens in Excel with accents intact and formulas neutralized",
+        "Tests pass"
+      ]
     }
   ],
   "edges": [
@@ -854,23 +874,13 @@
     {
       "from": "M-06",
       "to": "M-07"
+    },
+    {
+      "from": "M-07",
+      "to": "M-08"
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T16:27:25.596Z",
-      "event": "task_started",
-      "nodeId": "D-07",
-      "agent": "ralph-loop",
-      "message": "Ralph Loop picked up: Order Page Design Main Image"
-    },
-    {
-      "timestamp": "2026-07-26T16:33:01.895Z",
-      "event": "task_completed",
-      "nodeId": "D-07",
-      "agent": "ralph-loop",
-      "message": "Completed: Order Page Design Main Image"
-    },
     {
       "timestamp": "2026-07-26T16:33:21.124Z",
       "event": "agent_joined",
@@ -1462,6 +1472,18 @@
       "event": "task_completed",
       "nodeId": "D-11",
       "message": "Completed: Click A Thumbnail To See It Full Size"
+    },
+    {
+      "timestamp": "2026-08-03T05:02:32.735Z",
+      "event": "nodes_added",
+      "nodeId": "M-08",
+      "message": "New task added: Export A Design's Roster To CSV"
+    },
+    {
+      "timestamp": "2026-08-03T05:02:39.097Z",
+      "event": "task_started",
+      "nodeId": "M-08",
+      "message": "Picked up: Export A Design's Roster To CSV"
     }
   ]
 }

@@ -229,6 +229,12 @@ export type DesignRosterRead = {
 export type RosterRow = {
   key: string;
   label: string;
+  // The label's two halves, kept apart as well as joined. The card only ever
+  // renders `label`, but the CSV export (M-08) needs Name and Number as their
+  // own columns — and re-splitting "Ruiz #7" back out is guesswork the moment
+  // a player's name legitimately contains a "#". Both absent on a blank row.
+  name?: string;
+  number?: string;
   blank: boolean;
   filled: boolean;
   collision: boolean;
@@ -258,6 +264,8 @@ export function rosterRowsByDesign(
     const rows: RosterRow[] = design.entries.map((slot) => ({
       key: slot._id,
       label: jerseyLabel(slot.name, slot.number),
+      name: slot.name,
+      number: slot.number,
       blank: false,
       filled: slot.filled,
       collision: slot.collision,

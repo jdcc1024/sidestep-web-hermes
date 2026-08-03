@@ -1,6 +1,7 @@
 // CSV generation for the admin order export (3-03). Pure — the data comes
 // from convex/admin.ts `exportOrder`, this module only shapes it into the
-// file a supplier opens.
+// file a supplier opens. Serialization, slugging and dates come from
+// `lib/csv.ts`, shared with the captain's roster export (M-08).
 //
 // Two column sets, because the two cases carry different information: an
 // order with a jersey run exports one row per jersey to produce, while an
@@ -35,43 +36,10 @@ export type OrderExport = {
   rows: OrderExportRow[];
 };
 
-// Leading characters a spreadsheet treats as the start of a formula. A team
-// name or custom answer is attacker-controllable (the public fan form is
-// open to the internet), and this file is opened in Excel/Sheets by someone
-// who trusts it — so neutralize with a leading apostrophe, which spreadsheets
-// strip on display but which stops evaluation.
-const FORMULA_PREFIXES = ["=", "+", "-", "@", "\t", "\r"];
-
-function escapeCell(value: string): string {
-  const guarded = FORMULA_PREFIXES.some((p) => value.startsWith(p))
-    ? `'${value}`
-    : value;
-  return /[",\r\n']/.test(guarded)
-    ? `"${guarded.replace(/"/g, '""')}"`
-    : guarded;
-}
-
-// RFC 4180: CRLF row terminators, quotes doubled inside quoted fields.
-export function toCsv(rows: string[][]): string {
-  return rows.map((row) => row.map(escapeCell).join(",")).join("\r\n");
-}
-
-// ISO date, not a locale format — the file crosses machines and a supplier
-// reading 07/08 has no way to know which half is the month.
-function isoDate(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
+import { csvSlug, isoDate, toCsv } from "./csv";
 
 export function exportFilename(teamName: string, date: number): string {
-  const slug =
-    teamName
-      .toLowerCase()
-      // Apostrophes vanish rather than becoming separators, so "O'Brien's"
-      // reads as one word instead of three.
-      .replace(/['’]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "order";
-  return `sidestep-order-${slug}-${isoDate(date)}.csv`;
+  return `sidestep-order-${csvSlug(teamName) || "order"}-${isoDate(date)}.csv`;
 }
 
 const RUN_HEADERS = [

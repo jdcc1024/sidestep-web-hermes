@@ -654,6 +654,82 @@ describe("/portal/orders/[id] — roster sheet on the design card (M-02)", () =>
   });
 });
 
+// M-08: the roster the card is showing, downloadable as a CSV. Only the wiring
+// is asserted here — the file's own shape is `lib/rosterExport.test.ts`, and
+// the download plumbing is `RosterExportButton.test.tsx`.
+describe("/portal/orders/[id] — export a design's roster (M-08)", () => {
+  const RUN = {
+    _id: "run_1" as Id<"jerseyRuns">,
+    deadline: Date.parse("2026-04-01T12:00:00Z"),
+    status: "open",
+    effectiveStatus: "open" as const,
+  };
+
+  const GRETZKY = {
+    _id: "slot_gretzky",
+    name: "Gretzky",
+    number: "99",
+    source: "captain",
+    filled: true,
+    collision: false,
+    sizes: [{ size: "L", qty: 1 }],
+    total: 1,
+  };
+
+  function rosterWith(entries: Record<string, unknown>[]) {
+    return {
+      runId: RUN._id,
+      designs: [
+        { designId: "design_home", title: "Home kit", entries, blankSizes: [] },
+      ],
+    };
+  }
+
+  it("puts Export CSV beside Manage roster on the design card", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    rosterResult = rosterWith([GRETZKY]);
+    await renderPage();
+
+    const home = within(sectionFor("Home kit"));
+    expect(home.getByRole("button", { name: /manage roster/i })).toBeInTheDocument();
+    expect(home.getByRole("button", { name: /export csv/i })).toBeEnabled();
+  });
+
+  it("still offers the export once the run has locked", async () => {
+    orderResult = orderWith([design()], { locked: true });
+    runResult = { ...RUN, status: "open", effectiveStatus: "locked" };
+    rosterResult = rosterWith([GRETZKY]);
+    await renderPage();
+
+    expect(
+      within(sectionFor("Home kit")).getByRole("button", { name: /export csv/i }),
+    ).toBeEnabled();
+  });
+
+  it("has nothing to export before a run exists", async () => {
+    orderResult = orderWith([design()]);
+    runResult = null;
+    rosterResult = undefined;
+    await renderPage();
+
+    expect(
+      within(sectionFor("Home kit")).queryByRole("button", { name: /export csv/i }),
+    ).toBeNull();
+  });
+
+  it("disables the export on a design whose roster is still empty", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    rosterResult = rosterWith([]);
+    await renderPage();
+
+    expect(
+      within(sectionFor("Home kit")).getByRole("button", { name: /export csv/i }),
+    ).toBeDisabled();
+  });
+});
+
 // M-05: the run is created here, from a deadline and nothing else, and the
 // names-mode switch sits beside the designs whose rosters it governs.
 describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {

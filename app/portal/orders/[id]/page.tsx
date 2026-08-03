@@ -13,6 +13,7 @@ import { RemovedDesigns } from "@/components/portal/DesignRemoval";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
 import { DesignRosterPreview } from "@/components/portal/DesignRosterPreview";
 import { NamesModeControl } from "@/components/portal/NamesModeControl";
+import { RosterExportButton } from "@/components/portal/RosterExportButton";
 import { StartCollecting } from "@/components/portal/StartCollecting";
 import {
   RosterSheet,
@@ -281,6 +282,7 @@ export default function OrderDetailPage({ params }: PageProps) {
               <DesignSection
                 key={design._id}
                 design={design}
+                teamName={order.teamName}
                 count={countByDesign.get(design._id) ?? 0}
                 rows={rowsByDesign.get(design._id) ?? []}
                 runId={run?._id ?? null}
@@ -323,6 +325,7 @@ export default function OrderDetailPage({ params }: PageProps) {
 // longer means hunting for Run Setup.
 function DesignSection({
   design,
+  teamName,
   count,
   rows,
   runId,
@@ -332,6 +335,10 @@ function DesignSection({
   locked,
 }: {
   design: OrderDesign;
+  // Only the CSV export needs it — the exported file is named for the team as
+  // well as the design, since "home-kit.csv" collides the moment a captain
+  // runs two teams.
+  teamName: string;
   count: number;
   rows: RosterRow[];
   runId: Id<"jerseyRuns"> | null;
@@ -419,14 +426,25 @@ function DesignSection({
             one exists — the card sends the captain to Collect rather than
             opening an editor whose every write would reject. */}
         {runId ? (
-          <RosterSheet
-            runId={runId}
-            designId={design._id}
-            designTitle={design.title}
-            slots={slots}
-            otherDesigns={otherDesigns}
-            locked={locked}
-          />
+          <div className="flex flex-wrap gap-2">
+            <RosterSheet
+              runId={runId}
+              designId={design._id}
+              designTitle={design.title}
+              slots={slots}
+              otherDesigns={otherDesigns}
+              locked={locked}
+            />
+            {/* Export sits beside the editor and stays available on a locked
+                run — reading the roster out is the one thing a frozen run
+                should never stop the captain doing. Fed the same `rows` the
+                preview above renders (M-08). */}
+            <RosterExportButton
+              teamName={teamName}
+              designTitle={design.title}
+              rows={rows}
+            />
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">
             Start collecting below to start building this design&apos;s roster.
