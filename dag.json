@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-03T08:48:48.790Z",
+  "lastUpdated": "2026-08-03T16:00:40.762Z",
   "phases": [
     {
       "id": "phase-1",
@@ -777,6 +777,43 @@
         "A locked run shows the letter and offers no way to change it",
         "Tests pass"
       ]
+    },
+    {
+      "id": "B-09",
+      "title": "Archived Dependencies Strand Their Dependents As Blocked",
+      "phase": "3",
+      "type": "bug",
+      "description": "dag-prune keeps edges from archived nodes, and updateBlockedStatus reads a missing dependency as incomplete — so a node whose deps were completed then pruned is blocked forever. R-08 is stranded today. HUMAN TASK: touches scripts/dag-update.js, which the loop must not modify.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-09-archived-dependencies-strand-their-dependents-as-blocked.md",
+      "prdRef": "CLAUDE.md#dag-state-management-required",
+      "acceptanceCriteria": [
+        "A node whose dependencies are all completed-and-archived reads pending",
+        "R-08 specifically comes back to pending",
+        "A node with a live unfinished dependency still reads blocked",
+        "A needsHuman node still reads blocked regardless of its dependencies",
+        "Running dag-prune twice changes nothing the second time",
+        "No edge in the viewer points at a node absent from dag.json"
+      ]
+    },
+    {
+      "id": "B-10",
+      "title": "CLAUDE.md Documents The Removed agentId Argument",
+      "phase": "3",
+      "type": "improvement",
+      "description": "Three dag-update examples in CLAUDE.md still pass an agentId. start and complete ignore it; fail folds it into the reason string, so the logged reason reads 'agent-1 env broken'.",
+      "status": "pending",
+      "startedAt": null,
+      "completedAt": null,
+      "issueFile": "backlog/B-10-claude-md-documents-the-removed-agentid-argument.md",
+      "prdRef": "CLAUDE.md#dag-state-management-required",
+      "acceptanceCriteria": [
+        "The three CLAUDE.md examples match the current CLI signatures",
+        "CLAUDE.md, ralph-prompt.md and the CLI agree on every command's arguments",
+        "No remaining reference to agent-join, agent-leave, or an agentId argument"
+      ]
     }
   ],
   "edges": [
@@ -906,18 +943,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T22:09:28.615Z",
-      "event": "nodes_added",
-      "nodeId": "A-08",
-      "message": "New task added: Extract Qty-By-Design Rollup Helper"
-    },
-    {
-      "timestamp": "2026-07-26T22:16:27.416Z",
-      "event": "task_started",
-      "nodeId": "O-07",
-      "message": "Picked up: Order Total Derived From Roster"
-    },
     {
       "timestamp": "2026-07-26T22:20:09.417Z",
       "event": "task_completed",
@@ -1505,6 +1530,18 @@
       "event": "task_completed",
       "nodeId": "M-09",
       "message": "Completed: Captain And Assistant Captain Designation"
+    },
+    {
+      "timestamp": "2026-08-03T16:00:40.671Z",
+      "event": "nodes_added",
+      "nodeId": "B-09",
+      "message": "New task added: Archived Dependencies Strand Their Dependents As Blocked"
+    },
+    {
+      "timestamp": "2026-08-03T16:00:40.761Z",
+      "event": "nodes_added",
+      "nodeId": "B-10",
+      "message": "New task added: CLAUDE.md Documents The Removed agentId Argument"
     }
   ]
 }
