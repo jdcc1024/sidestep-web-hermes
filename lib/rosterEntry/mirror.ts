@@ -9,16 +9,21 @@
 // plan only ever *adds*, so there is no path here that touches an existing
 // target slot or the jerseys hanging off it.
 
-import { rosterSlotKey } from "./rules";
+import { rosterSlotKey, type RosterDesignation } from "./rules";
 
 export type RosterCopySlot = {
   name: string;
   number?: string;
+  designation?: RosterDesignation;
 };
 
 export type RosterCopyPlan = {
   // Exactly what to insert on the target, in source order.
-  additions: { name: string; number: string | undefined }[];
+  additions: {
+    name: string;
+    number: string | undefined;
+    designation: RosterDesignation | undefined;
+  }[];
   copied: number;
   // Source slots the target already had — silently skipped, but counted so
   // the captain hears about them.
@@ -49,7 +54,14 @@ export function planRosterCopy(
       continue;
     }
     taken.add(key);
-    additions.push({ name: slot.name, number: slot.number });
+    // The letter travels with the player (M-09) — the captain of the home kit
+    // is the captain of the away kit, and re-picking it per design is exactly
+    // the retyping this exists to remove.
+    additions.push({
+      name: slot.name,
+      number: slot.number,
+      designation: slot.designation,
+    });
   }
 
   return { additions, copied: additions.length, skipped };

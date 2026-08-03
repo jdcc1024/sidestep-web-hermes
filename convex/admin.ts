@@ -15,6 +15,7 @@ import {
   validateQuantity,
   validateRequiredText,
 } from "../lib/adminRecords";
+import { ROSTER_DESIGNATION_LABEL } from "../lib/rosterEntry/rules";
 
 const INTERNAL_STAGE_NAMES = new Set<string>(INTERNAL_STAGES);
 
@@ -218,6 +219,7 @@ export const exportOrder = query({
           ...specsOf(designs.get(designId)),
           nameOnJersey: "",
           numberOnJersey: "",
+          roleOnJersey: "",
           size: "",
           qty: 0,
           submitterName: "",
@@ -253,6 +255,11 @@ export const exportOrder = query({
           ...specsOf(designs.get(entry.designId)),
           nameOnJersey: slot?.name ?? "",
           numberOnJersey: slot?.number ?? "",
+          // In words, not the stored letter (M-09): whoever reads this file is
+          // making the garment and has no key to a one-character code.
+          roleOnJersey: slot?.designation
+            ? ROSTER_DESIGNATION_LABEL[slot.designation]
+            : "",
           size: entry.size,
           qty: entry.qty,
           submitterName: entry.submitterName,

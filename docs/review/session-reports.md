@@ -2408,3 +2408,63 @@ Judgement calls:
   dark. The button is captured in place on both design cards; the *open* menu
   is not, since `snap.mjs` captures routes rather than post-click state.
 - `node scripts/verify.mjs` — typecheck, lint, 1278 tests, all pass.
+
+## 2026-08-03 — M-09: Captain And Assistant Captain Designation
+
+A roster slot can now carry a letter — **C** for the captain, **A** for an
+assistant captain — because that letter is an extra thing to apply to the
+garment and until now it reached production by email or not at all. It is
+optional and usually absent; a team has one C and maybe two As out of fifteen.
+
+Where it shows up: the design card's roster preview, the roster sheet, the
+responses page's *By roster* view, the captain's per-design CSV (a **Role**
+column), and the admin order CSV (same column, so production sees it on the
+file they already open).
+
+Product decisions I made rather than parked:
+
+- **Stored as the letter, not the word.** `rosterEntries.source` is already
+  valued `"captain"`, and a second field on the same document valued
+  `"captain"` too would make `slot.source === "captain"` and
+  `slot.designation === "captain"` interchangeable to the type checker. `"C"`
+  belongs to exactly one of the two fields, so a mistyped field name is a
+  compile error rather than a silent bug.
+- **No "one captain per design" rule.** Co-captains exist, and a validation
+  error thrown at someone seeding a roster costs more than a second C ever
+  would.
+- **Set from the sheet's edit row, not the add row.** The add row is a
+  three-column grid at 375px; a fourth control there would be paid for by every
+  player to serve one. "No letter" is a real radio option beside C and A, so
+  taking a letter off is as reachable as putting one on.
+- **Fans can't set it.** The public form creates roster slots in open-names
+  mode; who wears the C is the captain's call, so the mutation accepts the
+  field but nothing on the fan path sends it.
+- **The mirror carries it.** The captain of the home kit is the captain of the
+  away kit — re-picking it per design is exactly the retyping M-04 exists to
+  remove.
+- **Bulk paste ignores it.** A third column would collide with the "more than
+  two cells is an invalid row" rule the parser leans on, and one player in
+  fifteen is an edit, not a paste.
+
+Two things worth flagging in the code:
+
+- **A letter is not part of a player's identity.** `rosterSlotKey` is
+  unchanged, so paste dedupe (M-03) and mirror skip (M-04) still match on name
+  + number. Pinning a C on someone must not make them a second person.
+- **But it *is* part of a production line's identity.** `rosterLinesByDesign`
+  merges entries on `label\0size`; two slots can share a name and a number and
+  differ only in the letter, and merging those would have made one of the two
+  garments wrong. The designation is now in that key.
+- **`update` always names `designation` in the patch.** Convex only drops a
+  field when the patch mentions it, so a conditional patch would have made
+  "take the C off" a silent no-op. The test asserts both directions.
+
+- Screenshots: `docs/review/M-09/` — the order page and the responses page at
+  375/768/1280, light and dark. The badges are visible on the home kit's roster
+  (Avery Quinn C, Sam Okafor A) at every width. The edit-row picker and the
+  *By roster* tab are post-click state, which `snap.mjs` cannot reach; both are
+  covered by component tests instead.
+- Fixtures: `_devSeed` now seeds one C and one A, and back-fills them onto a
+  deployment seeded before this issue, so future captures of any roster surface
+  have a letter in them.
+- `node scripts/verify.mjs` — typecheck, lint, 1306 tests, all pass.

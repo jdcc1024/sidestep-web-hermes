@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_ROSTER_ENTRY,
+  ROSTER_DESIGNATION_LABEL,
   ROSTER_NAME_MAX_LENGTH,
   ROSTER_NUMBER_MAX_LENGTH,
   ROSTER_PASTE_MAX_ROWS,
+  checkRosterDesignation,
   checkRosterName,
   checkRosterNumber,
   describeRosterCopy,
+  isRosterDesignation,
   isRosterSource,
   parseRosterPaste,
   planRosterCopy,
@@ -60,6 +63,47 @@ describe("checkRosterNumber", () => {
     expect(checkRosterNumber("9".repeat(ROSTER_NUMBER_MAX_LENGTH + 1)).ok).toBe(
       false,
     );
+  });
+});
+
+// M-09. The letter a player wears — stored as "C"/"A" rather than as words,
+// because `source` on the same document is already valued "captain" and two
+// same-valued fields make a mistyped field name type-check clean.
+describe("checkRosterDesignation", () => {
+  it("accepts the two letters", () => {
+    expect(checkRosterDesignation("C")).toEqual({ ok: true, value: "C" });
+    expect(checkRosterDesignation("A")).toEqual({ ok: true, value: "A" });
+  });
+
+  it("treats blank/undefined as no designation, the common case", () => {
+    expect(checkRosterDesignation(undefined)).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    expect(checkRosterDesignation("")).toEqual({ ok: true, value: undefined });
+    expect(checkRosterDesignation("  ")).toEqual({ ok: true, value: undefined });
+  });
+
+  it("rejects a letter nobody wears", () => {
+    expect(checkRosterDesignation("Z").ok).toBe(false);
+    expect(checkRosterDesignation("captain").ok).toBe(false);
+  });
+
+  // A captain typing into a spreadsheet or a future paste column writes "c",
+  // and refusing that would be pedantry.
+  it("takes a lowercase letter and normalizes it", () => {
+    expect(checkRosterDesignation(" c ")).toEqual({ ok: true, value: "C" });
+  });
+
+  it("guards the same set", () => {
+    expect(isRosterDesignation("C")).toBe(true);
+    expect(isRosterDesignation("A")).toBe(true);
+    expect(isRosterDesignation("captain")).toBe(false);
+  });
+
+  it("names both letters in words for the surfaces that need them", () => {
+    expect(ROSTER_DESIGNATION_LABEL.C).toMatch(/captain/i);
+    expect(ROSTER_DESIGNATION_LABEL.A).toMatch(/assistant/i);
   });
 });
 
@@ -352,6 +396,32 @@ describe("planRosterCopy", () => {
     const plan = planRosterCopy([], [{ name: "Gretzky", number: "99" }]);
     expect(plan).toMatchObject({ additions: [], copied: 0, skipped: 0 });
   });
+
+  // M-09: the same person on the away kit wears the same letter, and
+  // re-picking it per design is the kind of chore the mirror exists to remove.
+  it("carries a designation across to the target", () => {
+    const plan = planRosterCopy(
+      [
+        { name: "Gretzky", number: "99", designation: "C" as const },
+        { name: "Bo" },
+      ],
+      [],
+    );
+    expect(plan.additions).toEqual([
+      { name: "Gretzky", number: "99", designation: "C" },
+      { name: "Bo", number: undefined, designation: undefined },
+    ]);
+  });
+
+  // A letter is a role, not an identity: the same player is already there.
+  it("still skips a player the target has, whatever letter either wears", () => {
+    const plan = planRosterCopy(
+      [{ name: "Gretzky", number: "99", designation: "C" as const }],
+      [{ name: "Gretzky", number: "99" }],
+    );
+    expect(plan.copied).toBe(0);
+    expect(plan.skipped).toBe(1);
+  });
 });
 
 describe("describeRosterCopy", () => {
@@ -395,6 +465,22 @@ describe("validateRosterEntry", () => {
       validateRosterEntry({ name: "Bo", number: "" }).number,
     ).toBeUndefined();
   });
+
+  it("allows a valid designation and none at all", () => {
+    expect(
+      validateRosterEntry({ name: "Bo", number: "", designation: "C" }),
+    ).toEqual({});
+    expect(
+      validateRosterEntry({ name: "Bo", number: "", designation: "" }),
+    ).toEqual({});
+  });
+
+  it("flags a designation that isn't a letter anyone wears", () => {
+    expect(
+      validateRosterEntry({ name: "Bo", number: "", designation: "Z" })
+        .designation,
+    ).toBeTruthy();
+  });
 });
 
 describe("toRosterEntryPayload", () => {
@@ -402,7 +488,14 @@ describe("toRosterEntryPayload", () => {
     expect(toRosterEntryPayload({ name: "  Bo  ", number: "  " })).toEqual({
       name: "Bo",
       number: undefined,
+      designation: undefined,
     });
+  });
+
+  it("carries a designation through, and normalizes none of one", () => {
+    expect(
+      toRosterEntryPayload({ name: "Gretzky", number: "99", designation: "c" }),
+    ).toEqual({ name: "Gretzky", number: "99", designation: "C" });
   });
 
   it("throws on an invalid (empty) name", () => {

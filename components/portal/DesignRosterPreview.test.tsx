@@ -51,6 +51,34 @@ describe("DesignRosterPreview", () => {
     expect(within(slot).getByText(/not yet filled/i)).toBeInTheDocument();
   });
 
+  // M-09: the letter is an extra thing to apply to the garment, so the card
+  // that answers "who is on this design" has to answer "and who wears a C".
+  it("marks the captain and the assistant captain on their rows", () => {
+    render(
+      <DesignRosterPreview
+        rows={[
+          row({ designation: "C" }),
+          row({ key: "slot_2", label: "Bure #10", designation: "A" }),
+          row({ key: "slot_3", label: "Sosa #25" }),
+        ]}
+      />,
+    );
+
+    const captain = screen.getByRole("listitem", { name: "Gretzky #99" });
+    expect(within(captain).getByText("C")).toBeInTheDocument();
+    // The letter alone is a glyph; the word is what a screen reader says.
+    expect(within(captain).getByText("Captain")).toBeInTheDocument();
+
+    const assistant = screen.getByRole("listitem", { name: "Bure #10" });
+    expect(within(assistant).getByText("A")).toBeInTheDocument();
+    expect(within(assistant).getByText("Assistant captain")).toBeInTheDocument();
+
+    // Most of a roster wears nothing, and nothing is what those rows show.
+    const ordinary = screen.getByRole("listitem", { name: "Sosa #25" });
+    expect(within(ordinary).queryByText("C")).toBeNull();
+    expect(within(ordinary).queryByText("A")).toBeNull();
+  });
+
   it("labels the design's bulk jerseys as a blank line", () => {
     render(
       <DesignRosterPreview

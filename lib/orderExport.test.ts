@@ -77,6 +77,7 @@ describe("buildOrderCsv — order with a jersey run", () => {
         sleeveStyle: "Short",
         nameOnJersey: "Gretzky",
         numberOnJersey: "99",
+        roleOnJersey: "Captain",
         size: "L",
         qty: 2,
         submitterName: "Ben Chu",
@@ -91,6 +92,7 @@ describe("buildOrderCsv — order with a jersey run", () => {
         sleeveStyle: "Long",
         nameOnJersey: "",
         numberOnJersey: "",
+        roleOnJersey: "",
         size: "M",
         qty: 3,
         submitterName: "Cy Okafor",
@@ -112,6 +114,7 @@ describe("buildOrderCsv — order with a jersey run", () => {
       "Sleeve style",
       "Name on jersey",
       "Number on jersey",
+      "Role",
       "Size",
       "Quantity",
       "Submitted by",
@@ -134,6 +137,7 @@ describe("buildOrderCsv — order with a jersey run", () => {
       "Short",
       "Gretzky",
       "99",
+      "Captain",
       "L",
       "2",
       "Ben Chu",
@@ -148,8 +152,9 @@ describe("buildOrderCsv — order with a jersey run", () => {
     const rows = parse(buildOrderCsv(withRun));
     expect(rows[2][6]).toBe(""); // name on jersey
     expect(rows[2][7]).toBe(""); // number on jersey
-    expect(rows[2][13]).toBe(""); // q1
-    expect(rows[2][14]).toBe(""); // q2
+    expect(rows[2][8]).toBe(""); // role
+    expect(rows[2][14]).toBe(""); // q1
+    expect(rows[2][15]).toBe(""); // q2
   });
 
   it("should emit a header-only file when the run has no submissions", () => {
@@ -205,6 +210,7 @@ describe("buildOrderCsv — order without a jersey run", () => {
             sleeveStyle: "Short",
             nameOnJersey: "",
             numberOnJersey: "",
+            roleOnJersey: "",
             size: "",
             qty: 0,
             submitterName: "",
@@ -219,6 +225,7 @@ describe("buildOrderCsv — order without a jersey run", () => {
             sleeveStyle: "",
             nameOnJersey: "",
             numberOnJersey: "",
+            roleOnJersey: "",
             size: "",
             qty: 0,
             submitterName: "",

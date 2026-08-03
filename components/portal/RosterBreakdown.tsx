@@ -7,6 +7,7 @@ import {
 } from "@/lib/jerseyBreakdown";
 import { cn } from "@/lib/utils";
 import { DesignThumbnail } from "@/components/design/DesignThumbnail";
+import { DesignationBadge } from "./RosterDesignation";
 
 // The collected roster, read as jerseys rather than as submissions (C-01).
 // The responses table answers "who sent what, when"; this answers the
@@ -52,6 +53,9 @@ export function RosterLines({
           >
             {line.label}
           </span>
+          {/* The letter is a second thing to apply to this garment, so it
+              belongs on the line that says what the garment is (M-09). */}
+          <DesignationBadge designation={line.designation} />
           <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-foreground">
             {line.size}
           </span>

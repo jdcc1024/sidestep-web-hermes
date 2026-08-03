@@ -10,12 +10,14 @@ function slot(
   name: string,
   number: string,
   sizes: Array<{ size: string; qty: number }>,
+  designation?: "C" | "A",
 ): RosterRow {
   return {
     key: `slot_${name}`,
     label: `${name} #${number}`,
     name,
     number,
+    designation,
     blank: false,
     filled: sizes.length > 0,
     collision: false,
@@ -25,7 +27,7 @@ function slot(
 }
 
 const rows: RosterRow[] = [
-  slot("Ruiz", "7", [{ size: "L", qty: 2 }]),
+  slot("Ruiz", "7", [{ size: "L", qty: 2 }], "C"),
   slot("Abbot", "4", [{ size: "S", qty: 1 }]),
 ];
 
@@ -85,7 +87,7 @@ describe("RosterExportButton", () => {
     const text = await exportWith(/by name/i);
 
     expect(text).toBe(
-      "Name,Number,Size\r\nAbbot,4,S\r\nRuiz,7,L\r\nRuiz,7,L",
+      "Name,Number,Role,Size\r\nAbbot,4,,S\r\nRuiz,7,Captain,L\r\nRuiz,7,Captain,L",
     );
   });
 
@@ -97,7 +99,7 @@ describe("RosterExportButton", () => {
     const text = await exportWith(/by size/i);
 
     expect(text).toBe(
-      "Name,Number,Size\r\nAbbot,4,S\r\nRuiz,7,L\r\nRuiz,7,L",
+      "Name,Number,Role,Size\r\nAbbot,4,,S\r\nRuiz,7,Captain,L\r\nRuiz,7,Captain,L",
     );
   });
 

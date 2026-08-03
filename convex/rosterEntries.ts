@@ -5,6 +5,7 @@ import {
   requireOrderOwnership,
 } from "./_auth";
 import {
+  checkRosterDesignation,
   checkRosterName,
   checkRosterNumber,
 } from "../lib/rosterEntry/rules";
@@ -25,6 +26,9 @@ export const create = mutation({
     designId: v.id("designs"),
     name: v.string(),
     number: v.optional(v.string()),
+    // M-09. Optional everywhere: most players wear no letter, and the public
+    // form never sends one — who wears the C is the captain's call.
+    designation: v.optional(v.string()),
     source: v.optional(v.union(v.literal("captain"), v.literal("fan"))),
   },
   handler: async (ctx, args) => {
@@ -46,12 +50,16 @@ export const create = mutation({
     const numberCheck = checkRosterNumber(args.number);
     if (!numberCheck.ok) throw new ConvexError(numberCheck.error);
 
+    const designationCheck = checkRosterDesignation(args.designation);
+    if (!designationCheck.ok) throw new ConvexError(designationCheck.error);
+
     return ctx.db.insert("rosterEntries", {
       runId: args.runId,
       orderId: run.orderId,
       designId: args.designId,
       name: nameCheck.value,
       number: numberCheck.value,
+      designation: designationCheck.value,
       source: args.source ?? "captain",
       createdAt: Date.now(),
     });
@@ -180,6 +188,9 @@ export const copyToDesign = mutation({
         designId: args.targetDesignId,
         name: player.name,
         number: player.number,
+        // The letter travels with the player (M-09): the same person on the
+        // away kit is the same captain.
+        designation: player.designation,
         source: "captain",
         createdAt,
       });
@@ -200,6 +211,7 @@ export const update = mutation({
     rosterEntryId: v.id("rosterEntries"),
     name: v.string(),
     number: v.optional(v.string()),
+    designation: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const entry = await ctx.db.get(args.rosterEntryId);
@@ -215,10 +227,16 @@ export const update = mutation({
     if (!nameCheck.ok) throw new ConvexError(nameCheck.error);
     const numberCheck = checkRosterNumber(args.number);
     if (!numberCheck.ok) throw new ConvexError(numberCheck.error);
+    const designationCheck = checkRosterDesignation(args.designation);
+    if (!designationCheck.ok) throw new ConvexError(designationCheck.error);
 
+    // Always named in the patch, never conditionally: an omitted designation
+    // is the captain taking the letter *off* someone, and a patch that skips
+    // the field would leave it on.
     await ctx.db.patch(args.rosterEntryId, {
       name: nameCheck.value,
       number: numberCheck.value,
+      designation: designationCheck.value,
     });
     return args.rosterEntryId;
   },
@@ -374,6 +392,7 @@ export const listForRun = query({
               _id: e._id,
               name: e.name,
               number: e.number,
+              designation: e.designation,
               source: e.source,
               filled: filledSlotIds.has(e._id),
               collision: isCollision(e._id),

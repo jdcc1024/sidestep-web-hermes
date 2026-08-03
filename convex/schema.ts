@@ -124,6 +124,12 @@ export default defineSchema({
     designId: v.id("designs"),
     name: v.string(),
     number: v.optional(v.string()),
+    // The letter this player wears — "C" for the captain, "A" for an assistant
+    // captain (M-09). Optional and usually absent; it's an extra thing to apply
+    // to the garment, which is why it reaches the exports. Stored as the letter
+    // rather than as a word so it can't be confused with `source` below, whose
+    // values also include "captain".
+    designation: v.optional(v.union(v.literal("C"), v.literal("A"))),
     source: v.union(v.literal("captain"), v.literal("fan")),
     createdAt: v.number(),
   })

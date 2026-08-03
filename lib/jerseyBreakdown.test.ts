@@ -114,6 +114,22 @@ describe("rosterLinesByDesign", () => {
     expect(blank).toMatchObject({ size: "XL", qty: 4 });
   });
 
+  // M-09: the letter comes off the slot the entry points at, so a production
+  // line carries it the same way it carries the name.
+  it("carries a designation onto the production line", () => {
+    const groups = rosterLinesByDesign(
+      [entry({ designation: "C" }), entry({ name: "Bure", number: "10" })],
+      [HOME],
+    );
+
+    expect(
+      groups[0].lines.find((l) => l.label === "Gretzky #99")?.designation,
+    ).toBe("C");
+    expect(
+      groups[0].lines.find((l) => l.label === "Bure #10")?.designation,
+    ).toBeUndefined();
+  });
+
   it("sums the qty of jerseys that are the same slot in the same size", () => {
     // Two fans each ordered #99 Gretzky in L — that's two jerseys to make,
     // one production line. Σ qty is what has to reconcile, not row count.
@@ -334,6 +350,27 @@ describe("rosterRowsByDesign", () => {
       expect(view.total).toBe(byDesign.get(view.designId));
       expect(view.rows.reduce((sum, r) => sum + r.total, 0)).toBe(view.total);
     }
+  });
+
+  // M-09: the letter is a property of the slot, so it rides the same read the
+  // card and the sheet already share — neither can show a C the other doesn't.
+  it("carries a slot's designation onto its row, and leaves the rest without one", () => {
+    const [home] = rosterRowsByDesign([
+      designRead({
+        entries: [
+          slot({ designation: "C" }),
+          slot({ _id: "s2", name: "Bure", number: "10" }),
+        ],
+        blankSizes: [{ size: "M", qty: 1 }],
+      }),
+    ]);
+
+    expect(home.rows.map((r) => r.designation)).toEqual([
+      "C",
+      undefined,
+      // A blank jersey has nobody to wear a letter.
+      undefined,
+    ]);
   });
 
   it("gives every row a key that is stable and unique within the design", () => {

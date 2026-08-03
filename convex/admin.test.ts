@@ -328,6 +328,7 @@ describe("admin.exportOrder", () => {
         designId,
         name: "Gretzky",
         number: "99",
+        designation: "C",
         source: "fan",
         createdAt: now,
       }),
@@ -360,6 +361,8 @@ describe("admin.exportOrder", () => {
       sleeveStyle: "Short",
       nameOnJersey: "Gretzky",
       numberOnJersey: "99",
+      // M-09: production reads this file, so the letter arrives in words.
+      roleOnJersey: "Captain",
       size: "L",
       qty: 2,
       submitterName: "Ben Chu",
@@ -394,6 +397,7 @@ describe("admin.exportOrder", () => {
     expect(data!.rows[0]).toMatchObject({
       nameOnJersey: "",
       numberOnJersey: "",
+      roleOnJersey: "",
       customAnswers: {},
       qty: 3,
     });

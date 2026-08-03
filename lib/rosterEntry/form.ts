@@ -5,29 +5,37 @@
 // mutation imports the same rules directly so the two can't drift.
 
 import {
+  checkRosterDesignation,
   checkRosterName,
   checkRosterNumber,
+  type RosterDesignation,
   type RosterSource,
 } from "./rules";
 
 export type RosterEntryInput = {
   name: string;
   number: string;
+  // The letter, as the control holds it: "" for the players who wear none,
+  // which is most of them (M-09).
+  designation?: string;
 };
 
 export type RosterEntryErrors = {
   name?: string;
   number?: string;
+  designation?: string;
 };
 
 export type RosterEntryPayload = {
   name: string;
   number: string | undefined;
+  designation: RosterDesignation | undefined;
 };
 
 export const EMPTY_ROSTER_ENTRY: RosterEntryInput = {
   name: "",
   number: "",
+  designation: "",
 };
 
 export function validateRosterEntry(
@@ -40,6 +48,9 @@ export function validateRosterEntry(
 
   const numberCheck = checkRosterNumber(input.number);
   if (!numberCheck.ok) errors.number = numberCheck.error;
+
+  const designationCheck = checkRosterDesignation(input.designation);
+  if (!designationCheck.ok) errors.designation = designationCheck.error;
 
   return errors;
 }
@@ -55,7 +66,13 @@ export function toRosterEntryPayload(
   if (!nameCheck.ok) throw new Error(nameCheck.error);
   const numberCheck = checkRosterNumber(input.number);
   if (!numberCheck.ok) throw new Error(numberCheck.error);
-  return { name: nameCheck.value, number: numberCheck.value };
+  const designationCheck = checkRosterDesignation(input.designation);
+  if (!designationCheck.ok) throw new Error(designationCheck.error);
+  return {
+    name: nameCheck.value,
+    number: numberCheck.value,
+    designation: designationCheck.value,
+  };
 }
 
-export type { RosterSource };
+export type { RosterDesignation, RosterSource };

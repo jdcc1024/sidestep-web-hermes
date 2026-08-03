@@ -392,6 +392,9 @@ export const listOrderEntries = query({
           designTitle: designTitles.get(e.designId) ?? "Untitled design",
           name: slot?.name,
           number: slot?.number,
+          // The letter, off the same slot the name comes from (M-09) — the
+          // by-roster view renders it beside the name.
+          designation: slot?.designation,
           size: e.size,
           qty: e.qty,
           source: e.source,

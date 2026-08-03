@@ -29,6 +29,7 @@ const payload = {
       sleeveStyle: "Short",
       nameOnJersey: "Gretzky",
       numberOnJersey: "99",
+      roleOnJersey: "Captain",
       size: "L",
       qty: 2,
       submitterName: "Ben Chu",
@@ -91,6 +92,9 @@ describe("ExportOrderButton", () => {
     await waitFor(() => expect(lastBlob).not.toBeNull());
     const text = await lastBlob!.text();
     expect(text).toContain("Name on jersey");
+    // M-09: the letter a player wears reaches production through this file.
+    expect(text).toContain("Role");
+    expect(text).toContain("Captain");
     expect(text).toContain("Pickup location");
     expect(text).toContain("Gretzky");
     expect(text).toContain("Gym");

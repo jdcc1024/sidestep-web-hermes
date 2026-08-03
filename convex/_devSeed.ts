@@ -435,9 +435,12 @@ async function ensureRun(
 
 // Player slots across both designs, so the responses page's "By roster" view
 // has more than one group to draw.
+// One captain and one assistant among the three, so every roster surface has
+// a letter to photograph (M-09) — and two of the three have none, which is the
+// ratio a real team has.
 const ROSTER_FIXTURE = [
-  { name: "Avery Quinn", number: "7", designIndex: 0 },
-  { name: "Sam Okafor", number: "12", designIndex: 0 },
+  { name: "Avery Quinn", number: "7", designIndex: 0, designation: "C" as const },
+  { name: "Sam Okafor", number: "12", designIndex: 0, designation: "A" as const },
   { name: "Riley Tran", number: "23", designIndex: 1 },
 ];
 
@@ -454,13 +457,26 @@ async function ensureRoster(
     .collect();
   // All-or-nothing on the run: partially topping up a roster a human has been
   // editing would be worse than leaving it alone.
-  if (existing.length > 0)
+  if (existing.length > 0) {
+    // The one exception, and it is deliberately narrow: a deployment seeded
+    // before M-09 has these exact three players with no letter on any of them,
+    // so the surfaces that render one have nothing to photograph. Matched by
+    // fixture name and applied only where the field is absent, so it never
+    // overwrites a letter a human moved.
+    for (const slot of ROSTER_FIXTURE) {
+      const row = existing.find(
+        (e) => e.name === slot.name && e.designation === undefined,
+      );
+      if (row && slot.designation)
+        await ctx.db.patch(row._id, { designation: slot.designation });
+    }
     return {
       value: existing
         .sort((a, b) => a.createdAt - b.createdAt)
         .map((e) => e._id),
       inserted: false,
     };
+  }
 
   const value: Id<"rosterEntries">[] = [];
   for (const [i, slot] of ROSTER_FIXTURE.entries()) {
@@ -471,6 +487,7 @@ async function ensureRoster(
         designId: designIds[slot.designIndex] ?? designIds[0],
         name: slot.name,
         number: slot.number,
+        designation: slot.designation,
         source: "captain",
         createdAt: now + i,
       }),

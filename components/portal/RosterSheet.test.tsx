@@ -599,6 +599,106 @@ describe("RosterSheet — mirror", () => {
   });
 });
 
+// M-09. The letter is set from the edit row rather than the add row: the add
+// row is a three-column grid at 375px, and fourteen of fifteen players want
+// nothing in a fourth column.
+describe("RosterSheet — captain designations", () => {
+  async function editSlot(
+    sheet: ReturnType<typeof within>,
+    user: ReturnType<typeof userEvent.setup>,
+  ) {
+    await user.click(sheet.getByRole("button", { name: /edit gretzky/i }));
+  }
+
+  it("marks the players who wear a letter, and leaves the rest unmarked", async () => {
+    const user = userEvent.setup();
+    renderSheet({
+      slots: [
+        slot({ designation: "C" }),
+        slot({
+          _id: "slot_bure" as Id<"rosterEntries">,
+          name: "Bure",
+          number: "10",
+        }),
+      ],
+    });
+
+    const sheet = await openSheet(user);
+    const captain = sheet.getByRole("listitem", { name: /gretzky #99/i });
+    expect(within(captain).getByText("C")).toBeInTheDocument();
+    expect(within(captain).getByText("Captain")).toBeInTheDocument();
+    expect(
+      within(sheet.getByRole("listitem", { name: /bure #10/i })).queryByText(
+        "C",
+      ),
+    ).toBeNull();
+  });
+
+  it("pins the captain's C on a player from the edit row", async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    const sheet = await openSheet(user);
+    await editSlot(sheet, user);
+    await user.click(sheet.getByRole("radio", { name: /captain \(c\)/i }));
+    await user.click(sheet.getByRole("button", { name: /^save$/i }));
+
+    expect(update).toHaveBeenCalledWith({
+      rosterEntryId: "slot_gretzky",
+      name: "Gretzky",
+      number: "99",
+      designation: "C",
+    });
+  });
+
+  it("takes a letter back off", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [slot({ designation: "A" })] });
+
+    const sheet = await openSheet(user);
+    await editSlot(sheet, user);
+    // The picker opens on what the player already wears, so removing it is a
+    // visible choice rather than a blank the captain has to guess at.
+    expect(
+      sheet.getByRole("radio", { name: /assistant captain \(a\)/i }),
+    ).toBeChecked();
+
+    await user.click(sheet.getByRole("radio", { name: /no letter/i }));
+    await user.click(sheet.getByRole("button", { name: /^save$/i }));
+
+    expect(update).toHaveBeenCalledWith({
+      rosterEntryId: "slot_gretzky",
+      name: "Gretzky",
+      number: "99",
+      designation: undefined,
+    });
+  });
+
+  it("forgets a letter picked and then cancelled", async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    const sheet = await openSheet(user);
+    await editSlot(sheet, user);
+    await user.click(sheet.getByRole("radio", { name: /captain \(c\)/i }));
+    await user.click(sheet.getByRole("button", { name: /^cancel$/i }));
+    await editSlot(sheet, user);
+
+    expect(update).not.toHaveBeenCalled();
+    expect(sheet.getByRole("radio", { name: /no letter/i })).toBeChecked();
+  });
+
+  it("shows the letter but offers no picker on a locked run", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [slot({ designation: "C" })], locked: true });
+
+    const sheet = await openSheet(user);
+    const row = sheet.getByRole("listitem", { name: /gretzky #99/i });
+    expect(within(row).getByText("C")).toBeInTheDocument();
+    expect(sheet.queryByRole("radio")).toBeNull();
+  });
+});
+
 describe("RosterSheet — collisions", () => {
   it("flags a slot two different people both claimed", async () => {
     const user = userEvent.setup();

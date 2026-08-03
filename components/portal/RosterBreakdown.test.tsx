@@ -21,6 +21,31 @@ function entry(overrides: Partial<BreakdownEntry> = {}): BreakdownEntry {
   };
 }
 
+// M-09: this view is "what are we making", which is exactly where a C on a
+// jersey has to be visible.
+describe("RosterBreakdown — designations", () => {
+  it("marks the line for a player who wears a letter", () => {
+    render(
+      <RosterBreakdown
+        entries={[
+          entry({ designation: "C" }),
+          entry({ name: "Sosa", number: "25" }),
+        ]}
+        designs={[HOME]}
+      />,
+    );
+
+    const line = screen.getByRole("listitem", { name: "Gretzky #99" });
+    expect(within(line).getByText("C")).toBeInTheDocument();
+    expect(within(line).getByText("Captain")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("listitem", { name: "Sosa #25" })).queryByText(
+        "C",
+      ),
+    ).toBeNull();
+  });
+});
+
 // The standalone view (the one the responses page mounts in C-01's wake) —
 // same lines the order detail shows per section, but under their own
 // design headings because there are no sections to sit inside.

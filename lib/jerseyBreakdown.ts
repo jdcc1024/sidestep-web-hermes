@@ -9,6 +9,7 @@
 // `orderEntries.countsByRun`.
 
 import { sortSizes } from "./jerseyRun";
+import type { RosterDesignation } from "./rosterEntry/rules";
 import type { DesignMainImage } from "./designAsset";
 
 // The slice of a `listOrderEntries` row these derivations need. Structural,
@@ -18,6 +19,8 @@ export type BreakdownEntry = {
   designTitle: string;
   name?: string;
   number?: string;
+  // The letter the player wears, off the slot behind this jersey (M-09).
+  designation?: RosterDesignation;
   size: string;
   qty: number;
 };
@@ -40,6 +43,7 @@ export type RosterLine = {
   key: string;
   name?: string;
   number?: string;
+  designation?: RosterDesignation;
   label: string;
   size: string;
   qty: number;
@@ -139,7 +143,12 @@ export function rosterLinesByDesign(
       // NUL separator: a label can't contain one, so "Ann M" + "L" can't
       // collide with "Ann" + "M L". Written as an escape, not a raw control
       // character — a literal NUL makes git treat this whole file as binary.
-      const key = `${label}\u0000${entry.size}`;
+      //
+      // The designation is part of the key rather than inherited from whichever
+      // entry arrived first: two slots can share a name and a number and differ
+      // only in the letter, and merging those would make one of the two garments
+      // wrong.
+      const key = `${label}\u0000${entry.designation ?? ""}\u0000${entry.size}`;
       const existing = lines.get(key);
       if (existing) {
         existing.qty += entry.qty;
@@ -149,6 +158,7 @@ export function rosterLinesByDesign(
         key,
         name: entry.name,
         number: entry.number,
+        designation: entry.designation,
         label,
         size: entry.size,
         qty: entry.qty,
@@ -207,6 +217,7 @@ export type RosterSlotRead = {
   _id: string;
   name: string;
   number?: string;
+  designation?: RosterDesignation;
   source: "captain" | "fan";
   filled: boolean;
   collision: boolean;
@@ -235,6 +246,9 @@ export type RosterRow = {
   // a player's name legitimately contains a "#". Both absent on a blank row.
   name?: string;
   number?: string;
+  // The letter the player wears (M-09) — never on a blank row, which has
+  // nobody to wear it.
+  designation?: RosterDesignation;
   blank: boolean;
   filled: boolean;
   collision: boolean;
@@ -266,6 +280,7 @@ export function rosterRowsByDesign(
       label: jerseyLabel(slot.name, slot.number),
       name: slot.name,
       number: slot.number,
+      designation: slot.designation,
       blank: false,
       filled: slot.filled,
       collision: slot.collision,

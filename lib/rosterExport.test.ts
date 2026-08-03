@@ -10,12 +10,14 @@ function slot(
   name: string,
   number: string | undefined,
   sizes: Array<{ size: string; qty: number }>,
+  designation?: "C" | "A",
 ): RosterRow {
   return {
     key: `slot_${name}`,
     label: number ? `${name} #${number}` : name,
     name,
     number,
+    designation,
     blank: false,
     filled: sizes.length > 0,
     collision: false,
@@ -43,20 +45,20 @@ function body(rows: readonly RosterRow[], order: "name" | "size" = "name") {
 
 describe("rosterExportRows", () => {
   it("should label the columns Name, Number and Size", () => {
-    expect(rosterExportRows([], "name")[0]).toEqual(["Name", "Number", "Size"]);
+    expect(rosterExportRows([], "name")[0]).toEqual(["Name", "Number", "Role", "Size"]);
   });
 
   it("should split a slot's joined label back into name and number columns", () => {
     expect(body([slot("Gretzky", "99", [{ size: "L", qty: 1 }])])).toEqual([
-      ["Gretzky", "99", "L"],
+      ["Gretzky", "99", "", "L"],
     ]);
   });
 
   it("should repeat a row once per jersey when a size is ordered more than once", () => {
     expect(body([slot("Ruiz", "7", [{ size: "L", qty: 3 }])])).toEqual([
-      ["Ruiz", "7", "L"],
-      ["Ruiz", "7", "L"],
-      ["Ruiz", "7", "L"],
+      ["Ruiz", "7", "", "L"],
+      ["Ruiz", "7", "", "L"],
+      ["Ruiz", "7", "", "L"],
     ]);
   });
 
@@ -69,26 +71,26 @@ describe("rosterExportRows", () => {
         ]),
       ]),
     ).toEqual([
-      ["Ruiz", "7", "S"],
-      ["Ruiz", "7", "S"],
-      ["Ruiz", "7", "XL"],
+      ["Ruiz", "7", "", "S"],
+      ["Ruiz", "7", "", "S"],
+      ["Ruiz", "7", "", "XL"],
     ]);
   });
 
   it("should export an unfilled slot once with an empty size", () => {
-    expect(body([slot("Cole", "7", [])])).toEqual([["Cole", "7", ""]]);
+    expect(body([slot("Cole", "7", [])])).toEqual([["Cole", "7", "", ""]]);
   });
 
   it("should leave the number empty for a slot that has none", () => {
     expect(body([slot("Cole", undefined, [{ size: "M", qty: 1 }])])).toEqual([
-      ["Cole", "", "M"],
+      ["Cole", "", "", "M"],
     ]);
   });
 
   it("should export blank jerseys with no name or number", () => {
     expect(body([blank([{ size: "XL", qty: 2 }])])).toEqual([
-      ["", "", "XL"],
-      ["", "", "XL"],
+      ["", "", "", "XL"],
+      ["", "", "", "XL"],
     ]);
   });
 
@@ -118,8 +120,8 @@ describe("rosterExportRows", () => {
     ]);
 
     expect(rows).toEqual([
-      ["Zeta", "1", "M"],
-      ["", "", "S"],
+      ["Zeta", "1", "", "M"],
+      ["", "", "", "S"],
     ]);
   });
 
@@ -134,10 +136,10 @@ describe("rosterExportRows", () => {
     );
 
     expect(rows).toEqual([
-      ["Cole", "4", "S"],
-      ["Diaz", "9", "M"],
-      ["Diaz", "9", "M"],
-      ["Ruiz", "7", "XL"],
+      ["Cole", "4", "", "S"],
+      ["Diaz", "9", "", "M"],
+      ["Diaz", "9", "", "M"],
+      ["Ruiz", "7", "", "XL"],
     ]);
   });
 
@@ -166,9 +168,37 @@ describe("rosterExportRows", () => {
     );
 
     expect(rows).toEqual([
-      ["", "", "S"],
-      ["Zeta", "1", "M"],
-      ["", "", "M"],
+      ["", "", "", "S"],
+      ["Zeta", "1", "", "M"],
+      ["", "", "", "M"],
+    ]);
+  });
+
+  // M-09. The file is read by whoever makes the garments, and a C is one more
+  // thing to apply — so the letter is spelled out rather than left as a code
+  // nobody outside the app has the key to.
+  it("should spell a designation out in words in the Role column", () => {
+    expect(
+      body([
+        slot("Gretzky", "99", [{ size: "L", qty: 1 }], "C"),
+        slot("Bure", "10", [{ size: "M", qty: 1 }], "A"),
+      ]),
+    ).toEqual([
+      ["Bure", "10", "Assistant captain", "M"],
+      ["Gretzky", "99", "Captain", "L"],
+    ]);
+  });
+
+  it("should repeat the role on every one of a player's jerseys", () => {
+    expect(body([slot("Ruiz", "7", [{ size: "L", qty: 2 }], "C")])).toEqual([
+      ["Ruiz", "7", "Captain", "L"],
+      ["Ruiz", "7", "Captain", "L"],
+    ]);
+  });
+
+  it("should leave Role empty for the players who wear no letter", () => {
+    expect(body([slot("Cole", "4", [{ size: "S", qty: 1 }])])).toEqual([
+      ["Cole", "4", "", "S"],
     ]);
   });
 
@@ -183,9 +213,9 @@ describe("rosterExportRows", () => {
     );
 
     expect(rows).toEqual([
-      ["Ruiz", "7", "S"],
-      ["Abbot", "2", ""],
-      ["Cole", "4", ""],
+      ["Ruiz", "7", "", "S"],
+      ["Abbot", "2", "", ""],
+      ["Cole", "4", "", ""],
     ]);
   });
 });
@@ -193,7 +223,7 @@ describe("rosterExportRows", () => {
 describe("buildRosterCsv", () => {
   it("should emit a header and CRLF-terminated rows", () => {
     expect(buildRosterCsv([slot("Ruiz", "7", [{ size: "L", qty: 2 }])], "name"))
-      .toBe("Name,Number,Size\r\nRuiz,7,L\r\nRuiz,7,L");
+      .toBe("Name,Number,Role,Size\r\nRuiz,7,,L\r\nRuiz,7,,L");
   });
 
   it("should neutralize a name a spreadsheet would evaluate as a formula", () => {
@@ -215,7 +245,7 @@ describe("buildRosterCsv", () => {
   });
 
   it("should still emit the header for a design with no roster", () => {
-    expect(buildRosterCsv([], "name")).toBe("Name,Number,Size");
+    expect(buildRosterCsv([], "name")).toBe("Name,Number,Role,Size");
   });
 });
 

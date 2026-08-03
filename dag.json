@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-03T05:02:39.097Z",
+  "lastUpdated": "2026-08-03T08:29:42.375Z",
   "phases": [
     {
       "id": "phase-1",
@@ -743,9 +743,9 @@
       "phase": "3",
       "type": "feature",
       "description": "Export CSV beside Manage roster on each design card: one row per garment (a size ordered 3 times is 3 rows), columns Name/Number/Size, alphabetical or grouped by size.",
-      "status": "in-progress",
+      "status": "completed",
       "startedAt": "2026-08-03T05:02:39.096Z",
-      "completedAt": null,
+      "completedAt": "2026-08-03T05:11:44.947Z",
       "issueFile": "backlog/M-08-export-a-design-s-roster-to-csv.md",
       "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
       "acceptanceCriteria": [
@@ -754,6 +754,27 @@
         "Unfilled slots export with a blank size; blanks export with empty name/number last",
         "Captain can choose alphabetical or grouped-by-size",
         "Opens in Excel with accents intact and formulas neutralized",
+        "Tests pass"
+      ]
+    },
+    {
+      "id": "M-09",
+      "title": "Captain And Assistant Captain Designation",
+      "phase": "3",
+      "type": "feature",
+      "description": "A roster slot can carry an optional C (captain) or A (assistant captain). Shown on the card, the roster sheet and the by-roster view; carried by the mirror; exported in both the captain's roster CSV and the admin order CSV.",
+      "status": "in-progress",
+      "startedAt": "2026-08-03T08:29:42.374Z",
+      "completedAt": null,
+      "issueFile": "backlog/M-09-captain-and-assistant-captain-designation.md",
+      "prdRef": "docs/prd/roster-on-design-cards.md#5-scope",
+      "acceptanceCriteria": [
+        "A roster slot can carry a Captain or Assistant captain designation, or none",
+        "The captain sets and clears it from the roster sheet's edit row",
+        "The letter shows on the design card preview, the roster sheet and the by-roster view",
+        "The mirror copies a designation to the other design",
+        "Both the captain's roster CSV and the admin order CSV carry a Role column",
+        "A locked run shows the letter and offers no way to change it",
         "Tests pass"
       ]
     }
@@ -878,30 +899,13 @@
     {
       "from": "M-07",
       "to": "M-08"
+    },
+    {
+      "from": "M-08",
+      "to": "M-09"
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T16:33:21.124Z",
-      "event": "agent_joined",
-      "nodeId": null,
-      "agent": "ralph-loop",
-      "message": "Ralph Loop joined the workforce"
-    },
-    {
-      "timestamp": "2026-07-26T16:34:03.212Z",
-      "event": "task_started",
-      "nodeId": "O-06",
-      "agent": "ralph-loop",
-      "message": "Ralph Loop picked up: Freeze Order When Roster Locked"
-    },
-    {
-      "timestamp": "2026-07-26T16:40:50.180Z",
-      "event": "nodes_added",
-      "nodeId": "R-08",
-      "agent": null,
-      "message": "New task added: Run Surface Lock Controls"
-    },
     {
       "timestamp": "2026-07-26T16:43:00.611Z",
       "event": "task_completed",
@@ -1484,6 +1488,24 @@
       "event": "task_started",
       "nodeId": "M-08",
       "message": "Picked up: Export A Design's Roster To CSV"
+    },
+    {
+      "timestamp": "2026-08-03T05:11:44.947Z",
+      "event": "task_completed",
+      "nodeId": "M-08",
+      "message": "Completed: Export A Design's Roster To CSV"
+    },
+    {
+      "timestamp": "2026-08-03T08:29:36.016Z",
+      "event": "nodes_added",
+      "nodeId": "M-09",
+      "message": "New task added: Captain And Assistant Captain Designation"
+    },
+    {
+      "timestamp": "2026-08-03T08:29:42.375Z",
+      "event": "task_started",
+      "nodeId": "M-09",
+      "message": "Picked up: Captain And Assistant Captain Designation"
     }
   ]
 }

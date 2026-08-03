@@ -12,6 +12,7 @@
 import { toCsv, csvSlug, isoDate } from "./csv";
 import type { RosterRow } from "./jerseyBreakdown";
 import { sortSizes } from "./jerseyRun";
+import { ROSTER_DESIGNATION_LABEL } from "./rosterEntry/rules";
 
 // Alphabetical is the default — a captain checking the file against the team
 // list scans for names. By size is the cut list: the same rows regrouped for
@@ -24,7 +25,7 @@ export const ROSTER_EXPORT_ORDER_LABEL: Record<RosterExportOrder, string> = {
   size: "Grouped by size",
 };
 
-const HEADERS = ["Name", "Number", "Size"];
+const HEADERS = ["Name", "Number", "Role", "Size"];
 
 // One garment (or one unfilled slot). `size` is "" for a seeded player nobody
 // has ordered for yet — they stay in the file, because a captain uses it to
@@ -32,6 +33,10 @@ const HEADERS = ["Name", "Number", "Size"];
 type ExportRecord = {
   name: string;
   number: string;
+  // "Captain" / "Assistant captain" / "" (M-09). Spelled out rather than left
+  // as the stored letter: this file is read by whoever makes the garments, and
+  // they have no key to a one-character code.
+  role: string;
   size: string;
   label: string;
   blank: boolean;
@@ -44,6 +49,7 @@ function expand(rows: readonly RosterRow[]): ExportRecord[] {
     const base = {
       name: row.blank ? "" : (row.name ?? ""),
       number: row.blank ? "" : (row.number ?? ""),
+      role: row.designation ? ROSTER_DESIGNATION_LABEL[row.designation] : "",
       label: row.label,
       blank: row.blank,
     };
@@ -115,7 +121,12 @@ export function rosterExportRows(
 ): string[][] {
   return [
     HEADERS,
-    ...sortRecords(expand(rows), order).map((r) => [r.name, r.number, r.size]),
+    ...sortRecords(expand(rows), order).map((r) => [
+      r.name,
+      r.number,
+      r.role,
+      r.size,
+    ]),
   ];
 }
 

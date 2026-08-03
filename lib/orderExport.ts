@@ -16,6 +16,9 @@ export type OrderExportRow = {
   sleeveStyle: string;
   nameOnJersey: string;
   numberOnJersey: string;
+  // "Captain" / "Assistant captain" / "" (M-09) — already in words when it
+  // gets here, since production reads this file and has no key to a letter.
+  roleOnJersey: string;
   size: string;
   qty: number;
   submitterName: string;
@@ -51,6 +54,7 @@ const RUN_HEADERS = [
   "Sleeve style",
   "Name on jersey",
   "Number on jersey",
+  "Role",
   "Size",
   "Quantity",
   "Submitted by",
@@ -86,6 +90,7 @@ function runRows(data: OrderExport): string[][] {
     row.sleeveStyle,
     row.nameOnJersey,
     row.numberOnJersey,
+    row.roleOnJersey,
     row.size,
     String(row.qty),
     row.submitterName,
@@ -118,6 +123,7 @@ function orderRows(data: OrderExport): string[][] {
             sleeveStyle: "",
             nameOnJersey: "",
             numberOnJersey: "",
+            roleOnJersey: "",
             size: "",
             qty: 0,
             submitterName: "",

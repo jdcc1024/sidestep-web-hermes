@@ -26,8 +26,13 @@ import {
   describeRosterCopy,
   parseRosterPaste,
   validateRosterEntry,
+  type RosterDesignation,
   type RosterPasteRow,
 } from "@/lib/rosterEntry";
+import {
+  DesignationBadge,
+  DesignationPicker,
+} from "@/components/portal/RosterDesignation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -528,13 +533,18 @@ function SlotRow({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(slot.name);
   const [number, setNumber] = useState(slot.number ?? "");
+  // The letter, as the picker holds it (M-09) — `undefined` for the players
+  // who wear none, which is most of them.
+  const [designation, setDesignation] = useState<RosterDesignation | undefined>(
+    slot.designation,
+  );
   const [busy, setBusy] = useState(false);
   const label = jerseyLabel(slot.name, slot.number);
 
   async function onSave() {
-    const errors = validateRosterEntry({ name, number });
-    if (errors.name || errors.number) {
-      toast.error(errors.name ?? errors.number);
+    const errors = validateRosterEntry({ name, number, designation });
+    if (errors.name || errors.number || errors.designation) {
+      toast.error(errors.name ?? errors.number ?? errors.designation);
       return;
     }
     setBusy(true);
@@ -543,6 +553,7 @@ function SlotRow({
         rosterEntryId: slot._id,
         name: name.trim(),
         number: number.trim() || undefined,
+        designation,
       });
       setEditing(false);
     } catch (err) {
@@ -608,6 +619,15 @@ function SlotRow({
               onChange={(e) => setNumber(e.target.value)}
             />
           </div>
+          {/* Under the two inputs rather than beside them: a third control on
+              that row would have to fit between a name and a number at 375px,
+              and the letter is the rarest of the three edits. */}
+          <DesignationPicker
+            value={designation}
+            onChange={setDesignation}
+            disabled={busy}
+            label={`Letter for ${label}`}
+          />
           <div className="mt-2 flex justify-end gap-2">
             <Button
               type="button"
@@ -617,6 +637,7 @@ function SlotRow({
               onClick={() => {
                 setName(slot.name);
                 setNumber(slot.number ?? "");
+                setDesignation(slot.designation);
                 setEditing(false);
               }}
             >
@@ -639,6 +660,8 @@ function SlotRow({
           >
             {label}
           </p>
+
+          <DesignationBadge designation={slot.designation} />
 
           {/* Surfaced, never resolved (PRD §6): the captain fixes it by
               editing, so the flag just has to be noticeable. A whole sentence

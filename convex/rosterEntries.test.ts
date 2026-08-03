@@ -129,6 +129,45 @@ describe("rosterEntries.create", () => {
     expect(entry?.number).toBeUndefined();
   });
 
+  // M-09: the letter a player wears. Optional, and absent on most slots.
+  it("stores a designation when one is given, and none when it isn't", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+
+    const captain = await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Gretzky",
+      number: "99",
+      designation: "C",
+    });
+    const ordinary = await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Bure",
+      number: "10",
+    });
+
+    expect((await t.run((ctx) => ctx.db.get(captain)))?.designation).toBe("C");
+    expect(
+      (await t.run((ctx) => ctx.db.get(ordinary)))?.designation,
+    ).toBeUndefined();
+  });
+
+  it("rejects a letter nobody wears", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+
+    await expect(
+      asCaptain.mutation(api.rosterEntries.create, {
+        runId,
+        designId,
+        name: "Gretzky",
+        designation: "Z",
+      }),
+    ).rejects.toThrow();
+  });
+
   it("rejects a blank name", async () => {
     const t = convexTest(schema, modules);
     const { runId, designId, asCaptain } = await seedRun(t);
@@ -426,6 +465,30 @@ describe("rosterEntries.copyToDesign", () => {
     expect(target?.entries.every((e) => !e.filled && e.total === 0)).toBe(true);
   });
 
+  // M-09: the captain of the home kit is the captain of the away kit.
+  it("carries a designation onto the copied slot", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, sourceDesignId, targetDesignId, asCaptain } =
+      await seedMirror(t);
+    await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId: sourceDesignId,
+      name: "Yzerman",
+      number: "19",
+      designation: "C",
+    });
+
+    await asCaptain.mutation(api.rosterEntries.copyToDesign, {
+      runId,
+      sourceDesignId,
+      targetDesignId,
+    });
+
+    const slots = await slotsOn(t, targetDesignId);
+    expect(slots.find((s) => s.name === "Yzerman")?.designation).toBe("C");
+    expect(slots.find((s) => s.name === "Bo")?.designation).toBeUndefined();
+  });
+
   it("copies nothing on a re-run and reports every slot as already there", async () => {
     const t = convexTest(schema, modules);
     const { runId, sourceDesignId, targetDesignId, asCaptain } =
@@ -651,6 +714,36 @@ describe("rosterEntries.update", () => {
     expect(entry?.number).toBe("99");
   });
 
+  // M-09. Both directions in one test, because clearing is the half that can
+  // silently no-op: Convex only drops a field when the patch names it.
+  it("pins a letter on a player and takes it off again", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    const id = await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Gretzky",
+      number: "99",
+    });
+
+    await asCaptain.mutation(api.rosterEntries.update, {
+      rosterEntryId: id,
+      name: "Gretzky",
+      number: "99",
+      designation: "C",
+    });
+    expect((await t.run((ctx) => ctx.db.get(id)))?.designation).toBe("C");
+
+    await asCaptain.mutation(api.rosterEntries.update, {
+      rosterEntryId: id,
+      name: "Gretzky",
+      number: "99",
+    });
+    expect(
+      (await t.run((ctx) => ctx.db.get(id)))?.designation,
+    ).toBeUndefined();
+  });
+
   it("clears the number when edited to blank", async () => {
     const t = convexTest(schema, modules);
     const { runId, designId, asCaptain } = await seedRun(t);
@@ -835,6 +928,35 @@ describe("rosterEntries.listForRun", () => {
       runId,
     });
     expect(result?.designs[0].entries[0].filled).toBe(true);
+  });
+
+  // M-09: the card and the sheet both render off this read, so the letter has
+  // to ride it — otherwise one of the two surfaces would have to fetch it
+  // separately, which is the drift M-01 existed to end.
+  it("hands each slot's designation to the surfaces that render it", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, designId, asCaptain } = await seedRun(t);
+    await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Gretzky",
+      number: "99",
+      designation: "C",
+    });
+    await asCaptain.mutation(api.rosterEntries.create, {
+      runId,
+      designId,
+      name: "Bure",
+      number: "10",
+    });
+
+    const result = await asCaptain.query(api.rosterEntries.listForRun, {
+      runId,
+    });
+    expect(result?.designs[0].entries.map((e) => e.designation)).toEqual([
+      "C",
+      undefined,
+    ]);
   });
 
   it("does not let a blank/bulk order entry fill an unrelated slot", async () => {

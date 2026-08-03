@@ -1,5 +1,6 @@
 import type { RosterRow } from "@/lib/jerseyBreakdown";
 import { cn } from "@/lib/utils";
+import { DesignationBadge } from "./RosterDesignation";
 
 // The design card's roster (M-01). Unlike `RosterLines` — which only ever
 // showed jerseys somebody ordered — this renders the design's *roster*: a
@@ -72,6 +73,10 @@ function PreviewRow({ row }: { row: RosterRow }) {
       >
         {row.label}
       </span>
+      {/* After the name, not before it: the column is scanned for names, and
+          a letter in front of one would push every name off a shared left
+          edge for the sake of the one or two rows that have one. */}
+      <DesignationBadge designation={row.designation} />
       {row.total === 0 ? (
         // The words, not a dash (M-07). Even the narrowest column — a third
         // of the card at 1280 — has room for them beside a truncating name,
