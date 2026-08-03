@@ -24,9 +24,11 @@ Nothing is blocked on this. It is a taste call, and the scaffolding is harmless 
 
 **Recommendation:** **Crossfade.** A theme toggle is a utility control, not a moment — the circle is more impressive once and more intrusive thereafter. But this is exactly the judgment you asked to make by eye, so I would rather you looked than took this.
 
+**Deferred (2026-08-03, human):** "Leave both dark mode swaps in place for now. I will decide on my own time." Both variants stay live behind the `fade` / `circle` pill; the node stays parked. Nothing is blocked by this — do **not** re-ask, and do not delete `components/theme-toggle-compare.tsx` or collapse the six call sites until the call is made.
+
 **Whichever wins:** N-11 also deletes `components/theme-toggle-compare.tsx`, points the six call sites back at `<ThemeToggle />`, and adds a theme-swap case to `scripts/check-reduced-motion.mjs`. That check was deliberately left out of N-10 — automating a gate on code with a 50% chance of deletion is waste. Reduced-motion behaviour *is* verified for both variants (see the N-10 session report), just not yet automated.
 
-**Answer:** _(human fills in)_
+**Answer:** deferred — see the Deferred note above. Still genuinely open; the human is deciding by eye.
 
 <!-- template — copy this block
 ### [nodeId] Task Title — YYYY-MM-DD, agent-id
@@ -38,6 +40,26 @@ Nothing is blocked on this. It is a taste call, and the scaffolding is harmless 
 **Recommendation:** which option and why (human may veto).
 **Answer:** _(human fills in)_
 -->
+
+### [B-06] Snap user cannot reach any /admin route — 2026-07-28, ralph-loop
+**Question:** Should the screenshot account (`SNAP_UID` = jcc@sidestep.design) be granted admin, or would you rather admin surfaces never be screenshotted by the loop?
+
+**Context:** Verifying B-02's admin-surface criterion, `snap.mjs` logged in cleanly and captured `/admin/orders`, `/admin/designs`, `/admin/jersey-runs` and `/admin/customers` — all four returned **"403 — Access Denied"** at every viewport. The account's `users` row has `isAdmin: false`; only jdcc1024@gmail.com is an admin. I deleted the captures rather than file 24 pictures of an error page, and verified B-02 at the data layer instead.
+
+This is not specific to B-02. **No admin UI can be reviewed from the loop at all** until it's resolved — including `/admin/designs/<id>`, which D-09 is waiting to photograph.
+
+`isAdmin` is written only by the Clerk webhook from `privateMetadata.is_admin`, so this is a Clerk dashboard change, and granting admin is a privilege decision I shouldn't make unilaterally.
+
+**Options considered:**
+1. **Set `privateMetadata.is_admin = true` on jcc@sidestep.design in Clerk.** Unblocks every admin screenshot. It is a real account with real admin power in dev; if that account is only ever used for screenshots, the blast radius is the dev deployment.
+2. **Point `SNAP_UID` at a dedicated `snapbot@sidestep.design` admin user.** Same effect, keeps a human's account out of it, costs one new Clerk user and a password in `.env.local`.
+3. **Accept that admin surfaces are never screenshotted** and review them by running the app yourself. Zero setup; the loop keeps shipping admin UI blind.
+
+**Recommendation:** Option 2 if you plan to keep the loop running on admin surfaces — a purpose-built account is cleaner than promoting one you use. Option 1 is fine if jcc@sidestep.design is already just a test identity.
+
+**Deferred (2026-08-03, human):** "Leave B-06 as is for now. We can create an admin user later when we want to do admin workflows." So Option 3 *for now*, revisitable: admin surfaces go unscreenshotted, and an agent shipping admin UI should say so in its session report rather than filing 403 captures. The node stays parked — do not re-ask.
+
+## Answered
 
 ### [D-09] Wipe the pre-D-01 dev design so the schema can push — 2026-07-25, ralph-loop
 **Question:** May we delete the one remaining old-shape design document on the **dev** deployment (`benevolent-starling-766`), or would you rather delete it yourself?
@@ -83,7 +105,7 @@ Once that's re-run, D-09 can capture D-01/D-02/D-03/D-04 in one pass — and no 
 
 **Update (2026-07-27, ralph-loop, from C-02):** re-confirmed once more — `node scripts/snap.mjs C-02 /portal/orders/jh7ad7376r9ffvkz1vhs0s5b458b9v0e/run/responses` returned six more photographs of the sign-in wall, deleted. C-02 added an **All responses / By roster / By fan** tab switcher plus a size-breakdown chip row to `/portal/orders/<id>/run/responses`, so the pass now also owes that route **in each of its three views** (a captain session is enough). The same "Westerns Test" order above is the one to shoot — its run has the five entries; every other run is empty and shows only the share-link empty state.
 
-**Answer:** _(human fills in — or just re-run `--login` and unpark D-09 with `node scripts/dag-update.js answer D-09`)_
+**Answer (2026-08-03, human):** "Delete D-09, and we do not need screenshots for it." The node is deleted (archived as `obsolete`) and its `D-09 → D-08` edge removed with it. Track D ships without review screenshots; the schema-push half of this question had already been solved by the `_migrations.ts` backfill, and the session half by `snap.mjs` auto-login. The admin-route half is B-06's problem and is deferred there.
 
 **Update (2026-07-28, ralph-loop, from B-02):** the expired-session diagnosis
 above is now **out of date, and the admin half of D-09 has a different cause**.
@@ -115,25 +137,9 @@ The second command prints `{ scanned, patched, missing }`. `missing` counts user
 
 **Recommendation:** Option 1. Note that even without the backfill, the env var alone is required — without it `hydrateProfileFromClerk` logs a warning and no-ops, so new sign-ups on prod would keep landing blank.
 
-**Answer:** _(human fills in)_
+**Answer (2026-08-03, human):** "We will not backfill on prod convex when we release." Node marked `obsolete`. Existing rows self-heal on next sign-in via `UserSync`.
 
-### [B-06] Snap user cannot reach any /admin route — 2026-07-28, ralph-loop
-**Question:** Should the screenshot account (`SNAP_UID` = jcc@sidestep.design) be granted admin, or would you rather admin surfaces never be screenshotted by the loop?
-
-**Context:** Verifying B-02's admin-surface criterion, `snap.mjs` logged in cleanly and captured `/admin/orders`, `/admin/designs`, `/admin/jersey-runs` and `/admin/customers` — all four returned **"403 — Access Denied"** at every viewport. The account's `users` row has `isAdmin: false`; only jdcc1024@gmail.com is an admin. I deleted the captures rather than file 24 pictures of an error page, and verified B-02 at the data layer instead.
-
-This is not specific to B-02. **No admin UI can be reviewed from the loop at all** until it's resolved — including `/admin/designs/<id>`, which D-09 is waiting to photograph.
-
-`isAdmin` is written only by the Clerk webhook from `privateMetadata.is_admin`, so this is a Clerk dashboard change, and granting admin is a privilege decision I shouldn't make unilaterally.
-
-**Options considered:**
-1. **Set `privateMetadata.is_admin = true` on jcc@sidestep.design in Clerk.** Unblocks every admin screenshot. It is a real account with real admin power in dev; if that account is only ever used for screenshots, the blast radius is the dev deployment.
-2. **Point `SNAP_UID` at a dedicated `snapbot@sidestep.design` admin user.** Same effect, keeps a human's account out of it, costs one new Clerk user and a password in `.env.local`.
-3. **Accept that admin surfaces are never screenshotted** and review them by running the app yourself. Zero setup; the loop keeps shipping admin UI blind.
-
-**Recommendation:** Option 2 if you plan to keep the loop running on admin surfaces — a purpose-built account is cleaner than promoting one you use. Option 1 is fine if jcc@sidestep.design is already just a test identity.
-
-**Answer:** _(human fills in)_
+**Caveat worth keeping in view:** the backfill and the env var are separate things. Without `CLERK_SECRET_KEY` set on the production deployment, `hydrateProfileFromClerk` no-ops entirely — so self-healing never happens either, and *new* prod sign-ups keep landing with blank names. If the intent was "no bulk repair, but new users are fine", the env var still needs setting once at release. No node filed for it; raise one if that reading is wrong.
 
 ### [P-01] Portal Jersey Runs Index Section — 2026-08-01, ralph-loop
 **Question:** Do you want a top-level "Jersey Runs" section in the portal sidebar, or is reaching runs through their order enough?
@@ -153,9 +159,7 @@ So a `/portal/runs` index would mostly re-list the orders already on `/portal`, 
 
 **Recommendation:** Option 1 for now, which is what shipped — it makes the 404 go away without guessing at scope. Take Option 2 if you know captains manage several concurrent runs; say the word and P-01 becomes eligible. The nav is a one-line restore either way, and the route-exists test will hold the new page to actually existing.
 
-**Answer:** _(human fills in)_
-
-## Answered
+**Answer (2026-08-03, human):** "Per order access of jersey runs is good. A run is a child of an order." Option 1 — the removal that shipped in B-08 stands. Node marked `obsolete`; `/portal/runs` will not be built, and the two-item portal nav is the intended shape.
 
 ### [2-14] Optional Intake Image Uploads — 2026-07-19, ralph-loop
 **Question:** What abuse-control mechanism should gate anonymous file uploads on the public, unauthenticated intake form, before we build the upload feature?

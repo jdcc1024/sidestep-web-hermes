@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "lastUpdated": "2026-08-03T16:00:40.762Z",
+  "lastUpdated": "2026-08-03T16:07:53.756Z",
   "phases": [
     {
       "id": "phase-1",
@@ -120,27 +120,6 @@
         "Motion/hover/transition polish applied; respects reduced-motion",
         "No functional regressions"
       ]
-    },
-    {
-      "id": "D-09",
-      "title": "Wipe Stale Dev Design and Capture Track D Screenshots",
-      "phase": "phase-1",
-      "type": "infrastructure",
-      "description": "One pre-D-01 design blocks the schema push, so snap.mjs has no backend: D-01/D-02/D-03 all shipped without screenshots. Wipe it, push, re-snap all three.",
-      "status": "blocked",
-      "agent": null,
-      "startedAt": null,
-      "completedAt": null,
-      "issueFile": "backlog/D-09-wipe-stale-dev-design-and-capture-track-d-screenshots.md",
-      "prdRef": "docs/prd/design-page-blocks.md#6-implementation-decisions",
-      "acceptanceCriteria": [
-        "Stale designs row removed (human-approved) and npx convex dev --once pushes clean",
-        "snap.mjs captures /portal/designs/[id] and /admin/designs/[id] for D-01, D-02 and D-03",
-        "Obvious visual breakage found in those screenshots fixed or filed",
-        "docs/review/<nodeId>/ populated at 375/768/1280 light+dark"
-      ],
-      "needsHuman": true,
-      "humanQuestion": "May we delete the one pre-D-01 design on the dev deployment so the schema can push (screenshots are blocked for all of Track D)?"
     },
     {
       "id": "R-08",
@@ -362,9 +341,9 @@
       "phase": "3",
       "type": "infrastructure",
       "description": "Set CLERK_SECRET_KEY on the production Convex deployment and run the one-off users:backfillProfilesFromClerk so prod rows get real names, same as dev did in B-02.",
-      "status": "blocked",
+      "status": "obsolete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-03T16:07:53.756Z",
       "issueFile": "backlog/B-05-populate-user-profiles-on-production-convex.md",
       "prdRef": "backlog/B-02-blank-user-name-email-in-admin-surfaces.md#fix",
       "acceptanceCriteria": [
@@ -372,8 +351,9 @@
         "npx convex run --prod users:backfillProfilesFromClerk reports 0 remaining blank rows",
         "Admin surfaces on production show real captain/owner names"
       ],
-      "needsHuman": true,
-      "humanQuestion": "Set CLERK_SECRET_KEY on prod Convex and run users:backfillProfilesFromClerk"
+      "needsHuman": false,
+      "humanQuestion": "Set CLERK_SECRET_KEY on prod Convex and run users:backfillProfilesFromClerk",
+      "resolution": "Declined 2026-08-03: no profile backfill on production Convex at release."
     },
     {
       "id": "B-06",
@@ -391,7 +371,8 @@
         "node scripts/snap.mjs on an admin route produces a real page capture"
       ],
       "needsHuman": true,
-      "humanQuestion": "Grant the snap account admin (or point SNAP_UID at an admin) so /admin/* can be screenshotted"
+      "humanQuestion": "Grant the snap account admin (or point SNAP_UID at an admin) so /admin/* can be screenshotted",
+      "deferredNote": "Deferred 2026-08-03: revisit when admin workflows are built. Admin surfaces go unscreenshotted until then."
     },
     {
       "id": "B-07",
@@ -586,9 +567,9 @@
       "phase": "3",
       "type": "feature",
       "description": "Optional top-level /portal/runs section listing the captain's own jersey runs across orders. B-08 removed the nav link that pointed here; this node exists only if the human wants the section built.",
-      "status": "blocked",
+      "status": "obsolete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-03T16:07:53.756Z",
       "issueFile": "backlog/P-01-portal-jersey-runs-index-section.md",
       "prdRef": "docs/prd/sidestep-website-phase1.md#4",
       "acceptanceCriteria": [
@@ -597,8 +578,9 @@
         "The nav link is restored and PortalShell's route-exists test still passes",
         "Empty state when the user owns no runs"
       ],
-      "needsHuman": true,
-      "humanQuestion": "Do you want a top-level Jersey Runs section in the portal, or is per-order access enough? (B-08 removed the dead nav link)"
+      "needsHuman": false,
+      "humanQuestion": "Do you want a top-level Jersey Runs section in the portal, or is per-order access enough? (B-08 removed the dead nav link)",
+      "resolution": "Declined 2026-08-03: per-order access is enough — a run is a child of an order."
     },
     {
       "id": "N-09",
@@ -657,7 +639,8 @@
         "No data-theme-transition CSS left for a variant that no longer exists"
       ],
       "needsHuman": true,
-      "humanQuestion": "Crossfade or circular reveal for the light/dark swap? Both are live behind the 'fade' and 'circle' toggles."
+      "humanQuestion": "Crossfade or circular reveal for the light/dark swap? Both are live behind the 'fade' and 'circle' toggles.",
+      "deferredNote": "Deferred 2026-08-03: both transitions stay live; human will decide by eye."
     },
     {
       "id": "M-06",
@@ -783,7 +766,7 @@
       "title": "Archived Dependencies Strand Their Dependents As Blocked",
       "phase": "3",
       "type": "bug",
-      "description": "dag-prune keeps edges from archived nodes, and updateBlockedStatus reads a missing dependency as incomplete — so a node whose deps were completed then pruned is blocked forever. R-08 is stranded today. HUMAN TASK: touches scripts/dag-update.js, which the loop must not modify.",
+      "description": "dag-prune keeps edges from archived nodes, and updateBlockedStatus reads a missing dependency as incomplete — so a node whose deps were completed then pruned is blocked forever. R-08 and D-08 are stranded today. HUMAN TASK: touches scripts/dag-update.js, which the loop must not modify.",
       "status": "pending",
       "startedAt": null,
       "completedAt": null,
@@ -791,7 +774,7 @@
       "prdRef": "CLAUDE.md#dag-state-management-required",
       "acceptanceCriteria": [
         "A node whose dependencies are all completed-and-archived reads pending",
-        "R-08 specifically comes back to pending",
+        "R-08 and D-08 specifically come back to pending",
         "A node with a live unfinished dependency still reads blocked",
         "A needsHuman node still reads blocked regardless of its dependencies",
         "Running dag-prune twice changes nothing the second time",
@@ -847,10 +830,6 @@
     },
     {
       "from": "D-07",
-      "to": "D-08"
-    },
-    {
-      "from": "D-09",
       "to": "D-08"
     },
     {
@@ -943,12 +922,6 @@
     }
   ],
   "log": [
-    {
-      "timestamp": "2026-07-26T22:20:09.417Z",
-      "event": "task_completed",
-      "nodeId": "O-07",
-      "message": "Completed: Order Total Derived From Roster"
-    },
     {
       "timestamp": "2026-07-26T22:30:06.302Z",
       "event": "task_started",
@@ -1542,6 +1515,12 @@
       "event": "nodes_added",
       "nodeId": "B-10",
       "message": "New task added: CLAUDE.md Documents The Removed agentId Argument"
+    },
+    {
+      "timestamp": "2026-08-03T16:07:53.756Z",
+      "event": "questions_answered",
+      "nodeId": "D-09,P-01,B-05,B-06,N-11",
+      "message": "Human answered the needs-human queue: D-09 deleted, P-01 and B-05 declined, B-06 and N-11 deferred."
     }
   ]
 }

@@ -28,20 +28,25 @@ never picked up again — and nothing in the viewer explains why.
 Found in the `/review-batch` pass over `5f04377`. Pruning itself is working as
 intended and is staying; this is the one interaction to fix.
 
-**Live impact:** `R-08` (Run Surface Lock Controls) is `blocked` even though both
-its dependencies (`R-06`, `O-06`) are completed — they are just archived. It
-should be `pending`. Every future node inherits this the moment its dependencies
-are pruned.
+**Live impact:** two nodes are `blocked` with nothing actually blocking them.
+
+- `R-08` (Run Surface Lock Controls) — deps `R-06` and `O-06`, both completed
+  and archived.
+- `D-08` (Design Page Motion and Polish) — deps `D-06` and `D-07`, both
+  completed and archived. It was legitimately waiting on `D-09` until the human
+  deleted that node on 2026-08-03; now nothing real holds it.
+
+Both should read `pending`. Every future node inherits this the moment its
+dependencies are pruned.
 
 Not affected, and must stay blocked: nodes flagged `needsHuman` (`3-05`, `3-07`,
-`A-05`, `D-09`, `B-05`, `B-06`, `P-01`, `N-11`) and nodes whose live
-dependencies genuinely are not done (`A-07` waits on `A-05`, `D-08` on `D-09`).
-A fix that unblocks those has gone too far.
+`A-05`, `B-06`, `N-11`) and nodes whose live dependencies genuinely are not done
+(`A-07` waits on `A-05`). A fix that unblocks those has gone too far.
 
 ## Acceptance Criteria
 
 - [ ] A node whose dependencies are all completed-and-archived reads `pending`
-- [ ] `R-08` specifically comes back to `pending`
+- [ ] `R-08` and `D-08` specifically come back to `pending`
 - [ ] A node with a live, unfinished dependency still reads `blocked`
 - [ ] A `needsHuman` node still reads `blocked` regardless of its dependencies
 - [ ] Running `dag-prune.js` twice in a row changes nothing the second time
@@ -68,6 +73,9 @@ A fix that unblocks those has gone too far.
   Doing both is fine; doing only (1) leaves today's stranded R-08 stranded.
 - Nine dangling edges exist right now: `2-13→3-05`, `1-03→3-07`, `3-06→3-07`,
   `A-03→A-05`, `A-04→A-07`, `D-06→D-08`, `D-07→D-08`, `R-06→R-08`, `O-06→R-08`.
+  (`D-09→D-08` was a tenth until D-09 was deleted on 2026-08-03; removing that
+  edge by hand at the same time is what kept D-08 from acquiring a *second*
+  phantom dependency.)
 - There is no test harness for `scripts/`. A small fixture-driven node script
   asserting the four status cases above is worth more here than a manual check,
   since the failure mode is silent.

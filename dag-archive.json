@@ -1,6 +1,6 @@
 {
   "project": "Sidestep Website",
-  "archivedAt": "2026-07-27T06:59:42.440Z",
+  "archivedAt": "2026-08-03T16:07:53.756Z",
   "nodes": [
     {
       "id": "1-01",
@@ -1389,6 +1389,28 @@
         "Lock snapshot equals the live count (one source)",
         "No behavior change; all tests pass"
       ]
+    },
+    {
+      "id": "D-09",
+      "title": "Wipe Stale Dev Design and Capture Track D Screenshots",
+      "phase": "phase-1",
+      "type": "infrastructure",
+      "description": "One pre-D-01 design blocks the schema push, so snap.mjs has no backend: D-01/D-02/D-03 all shipped without screenshots. Wipe it, push, re-snap all three.",
+      "status": "obsolete",
+      "agent": null,
+      "startedAt": null,
+      "completedAt": "2026-08-03T16:07:53.756Z",
+      "issueFile": "backlog/D-09-wipe-stale-dev-design-and-capture-track-d-screenshots.md",
+      "prdRef": "docs/prd/design-page-blocks.md#6-implementation-decisions",
+      "acceptanceCriteria": [
+        "Stale designs row removed (human-approved) and npx convex dev --once pushes clean",
+        "snap.mjs captures /portal/designs/[id] and /admin/designs/[id] for D-01, D-02 and D-03",
+        "Obvious visual breakage found in those screenshots fixed or filed",
+        "docs/review/<nodeId>/ populated at 375/768/1280 light+dark"
+      ],
+      "needsHuman": false,
+      "humanQuestion": "May we delete the one pre-D-01 design on the dev deployment so the schema can push (screenshots are blocked for all of Track D)?",
+      "resolution": "Deleted 2026-08-03 by human decision: Track D does not need screenshots."
     }
   ],
   "edges": [
@@ -1719,6 +1741,10 @@
     {
       "from": "R-07",
       "to": "A-08"
+    },
+    {
+      "from": "D-09",
+      "to": "D-08"
     }
   ],
   "log": []
