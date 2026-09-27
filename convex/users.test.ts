@@ -41,7 +41,7 @@ describe("users.syncCurrentUser", () => {
 
   it("should leave a populated row alone when the token carries no name or email", async () => {
     // The real Convex session token has neither claim (see lib/clerkProfile),
-    // so an unconditional patch here wipes whatever the webhook wrote.
+    // so an unconditional patch here wipes whatever the refresh wrote.
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {
       await ctx.db.insert("users", {
@@ -234,6 +234,30 @@ describe("users.refreshFromClerk", () => {
       isAdmin: false,
       name: "Dana Reyes",
       email: "dana@example.com",
+    });
+  });
+
+  it("should keep a stored name and email rather than overwrite them", async () => {
+    // admin.updateUser corrections live only in Convex; a per-session
+    // refresh must not undo them.
+    vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
+    stubClerkUser({
+      first_name: "Dana",
+      last_name: "Typo",
+      private_metadata: { isAdmin: true },
+    });
+
+    const t = convexTest(schema, modules);
+    const userId = await seedPopulatedUser(t, false);
+
+    await t
+      .withIdentity({ subject: "user_dana_clerk" })
+      .action(api.users.refreshFromClerk, {});
+
+    expect(await t.run(async (ctx) => ctx.db.get(userId))).toMatchObject({
+      name: "Dana Reyes",
+      email: "dana@example.com",
+      isAdmin: true,
     });
   });
 

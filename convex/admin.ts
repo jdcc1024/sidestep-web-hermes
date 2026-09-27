@@ -371,9 +371,9 @@ export const getCustomer = query({
 // arg is left alone, so the inline-edit UI can save one field at a time.
 //
 // Note this writes only the Convex row — Clerk remains the source of truth
-// for the identity behind it, and the webhook can overwrite these values on
-// the customer's next profile change. That's an accepted limitation for
-// phase 2 (see 3-07, User Sync Architecture Revisit).
+// for the identity behind it. users.refreshFromClerk only fills blank
+// name/email, so a correction made here sticks, but a later name change in
+// Clerk won't propagate over it (see 3-07, User Sync Architecture Revisit).
 export const updateUser = mutation({
   args: {
     userId: v.id("users"),

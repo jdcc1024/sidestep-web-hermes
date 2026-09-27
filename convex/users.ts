@@ -65,8 +65,9 @@ export const syncCurrentUser = mutation({
 // a value derived by isAdminFromClerk from a server-side Backend API fetch —
 // the Convex row is a cache of Clerk private metadata, never a source.
 //
-// Name/email are no-clobber: a blank value from Clerk leaves the stored one.
-// isAdmin always lands, so a revocation in Clerk takes effect here too.
+// Name/email are fill-only: they land only where the row is blank, so neither
+// a blank value from Clerk nor a stale one can undo an admin.updateUser
+// correction. isAdmin always lands, so a revocation in Clerk takes effect too.
 //
 // The explicit return types on this and the two below are load-bearing: the
 // actions that call them live in the same module, so `internal.users.*` is
@@ -89,8 +90,8 @@ export const applyClerkUser = internalMutation({
     if (!existing) return null;
 
     const patch: { name?: string; email?: string; isAdmin?: boolean } = {};
-    if (name && name !== existing.name) patch.name = name;
-    if (email && email !== existing.email) patch.email = email;
+    if (name && !existing.name) patch.name = name;
+    if (email && !existing.email) patch.email = email;
     if (isAdmin !== existing.isAdmin) patch.isAdmin = isAdmin;
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(existing._id, patch);
