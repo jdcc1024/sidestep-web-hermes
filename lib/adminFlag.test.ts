@@ -6,7 +6,7 @@ describe("isAdminFromClerk", () => {
     expect(isAdminFromClerk({ isAdmin: true })).toBe(true);
   });
 
-  it("should deny admin when the flag is snake_case is_admin", () => {
+  it("should deny admin when the key is spelled snake_case", () => {
     expect(isAdminFromClerk({ is_admin: true })).toBe(false);
   });
 

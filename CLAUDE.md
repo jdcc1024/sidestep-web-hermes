@@ -167,6 +167,7 @@ Status lives on the orchestrator's board, not in the file.
 - Use dependency injection for testability
 - Separate business logic from framework/IO concerns
 - Each module should be independently testable
+- Admin status comes only from Clerk private metadata `isAdmin === true`, read via `isAdminFromClerk` in `lib/adminFlag.ts`. Convex `users.isAdmin` is a cache written only by internal functions (from a server-side Clerk fetch); no public Convex function may accept `isAdmin`.
 
 ### shadcn primitives with `render` prop
 

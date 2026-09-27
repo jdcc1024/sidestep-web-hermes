@@ -36,7 +36,8 @@ export async function requireCurrentUser(
 
 // Admin gate. Defense in depth — even if a Next.js route check is
 // bypassed, Convex will refuse unless the calling user's row has
-// isAdmin === true (kept in sync by the Clerk webhook).
+// isAdmin === true. That field caches Clerk private metadata (see
+// lib/adminFlag) and is written only by users.applyClerkUser (internal).
 export async function requireAdmin(ctx: AuthCtx): Promise<Doc<"users">> {
   const user = await requireCurrentUser(ctx);
   if (!user.isAdmin) throw new ConvexError("Admin access required.");

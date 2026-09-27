@@ -74,8 +74,9 @@ Nine tables. Read `schema.ts` directly — it's short and authoritative.
 Field-level mental model:
 
 - **`users`** — One row per Clerk user. `clerkId` is the join key.
-  `isAdmin` is mirrored from Clerk `privateMetadata` by the webhook,
-  never written from the browser.
+  `isAdmin` is a cache of Clerk private metadata `isAdmin === true`
+  (`lib/adminFlag.ts`), written only by internal functions from a
+  server-side Clerk fetch — never from the browser or the webhook.
 - **`designs`** — Owned by a user. Files live in `designAssets`, not on
   the design doc.
 - **`designAssets`** — One row per uploaded file, `by_design`. Carries
@@ -114,7 +115,7 @@ The App Router uses three top-level surfaces. Each has its own layout:
 | `/run/[id]`          | Public         | (none)                | Jersey-run submission form.      |
 | `/portal/*`          | Authenticated  | `PortalShell`         | Customer area.                   |
 | `/admin/*`           | Admin only     | `AdminShell`          | Staff area.                      |
-| `/api/webhooks/clerk`| Server-to-server | (no layout)          | Clerk user sync + admin flag.    |
+| `/api/webhooks/clerk`| Server-to-server | (no layout)          | New-registration email only.     |
 
 Portal subroutes worth knowing:
 
@@ -149,7 +150,7 @@ One file per domain, plus shared infrastructure:
 |-------------------------|---------------------------------------------------------------|
 | `schema.ts`             | All tables and indexes.                                       |
 | `auth.config.ts`        | Tells Convex how to verify Clerk JWTs (`CLERK_FRONTEND_API_URL`). |
-| `users.ts`              | `syncCurrentUser` (browser), `syncUser` (webhook), `getCurrentUser`. |
+| `users.ts`              | `syncCurrentUser` + `refreshFromClerk` (browser), `getCurrentUser`. |
 | `designs.ts`            | Design CRUD + file upload URL generation.                     |
 | `orders.ts`             | Order CRUD, link designs, derive customer-facing stage.       |
 | `jerseyRuns.ts`         | Run create/get, response submission, captain dashboard query. |
@@ -241,16 +242,23 @@ single file in isolation will confuse you:
 
 ### a. Clerk → Convex user sync
 
-1. User signs up via Clerk.
-2. Clerk POSTs `user.created` to `/api/webhooks/clerk/route.ts`,
-   verified with Svix.
-3. The route calls `internal.users.syncUser` with `isAdmin` derived
-   from Clerk `privateMetadata.isAdmin`.
-4. *Also*, on every authenticated page load, `Providers > UserSync` in
-   `app/providers.tsx` runs `getCurrentUser`; if it returns `null`, it
-   fires `syncCurrentUser` as a fallback (covers the case where the
-   webhook hasn't landed yet). This per-page query is the known
-   wart that issue **3-07** revisits.
+1. User signs up via Clerk. Clerk POSTs `user.created` to
+   `/api/webhooks/clerk/route.ts` (verified with Svix), which only
+   sends the new-registration email — it writes nothing to Convex.
+2. On every authenticated page load, `UserSync`
+   (`components/layout/UserSync.tsx`, mounted in `app/providers.tsx`)
+   runs `getCurrentUser`; if it returns `null`, it fires
+   `syncCurrentUser`, which creates the row with `isAdmin: false`.
+3. Once per browser session per signed-in user, `UserSync` calls
+   `users.refreshFromClerk`. That action fetches the caller's own Clerk
+   user server-side and applies name/email (fill-only) and `isAdmin`
+   (from `lib/adminFlag.ts` — grants *and* revocations) through the
+   internal `applyClerkUser`.
+4. The `/admin` layout checks Clerk directly through the same helper.
+   If Convex's cached flag disagrees, its `AdminFlagReconciler` asks
+   for one more refresh, so an admin change lands on reload.
+   The per-page `getCurrentUser` query is the known wart that issue
+   **3-07** revisits.
 
 ### b. Invite link → pre-filled order
 
