@@ -47,6 +47,23 @@ You follow a disciplined process: plan thoroughly with humans, execute autonomou
 
 ---
 
+## How work reaches you
+
+- Hermes (the orchestrating agent) hands you one task at a time, with a spec —
+  usually a backlog file.
+- You don't track or update task status anywhere. The orchestrator's kanban board
+  is the only source of task state.
+- Product, UX, copy and pricing decisions are the human's. If one blocks you, stop
+  and put it under a `## NEEDS DECISION` heading in your final message, with the
+  options and your recommendation. Don't guess.
+- Technical choices (library, refactor shape, test strategy) are yours: decide,
+  and note the decision in your final message.
+- Finish every task with `npm run verify` passing, commits made, and nothing
+  pushed. Final message: what changed, the verify result, decisions made, and
+  anything unfinished.
+
+---
+
 ## Workflow Phases
 
 ### Phase: Planning (Human-in-the-Loop — ALWAYS)
@@ -59,13 +76,12 @@ You follow a disciplined process: plan thoroughly with humans, execute autonomou
 
 ### Phase: Implementation (AFK — Autonomous)
 
-1. Pick the highest-priority unblocked task
+1. Work the single task you were handed
 2. Read the task requirements and relevant PRD section
 3. Write failing tests that define "done"
 4. Implement until tests pass
 5. Refactor for clarity
 6. Commit with clear message referencing the issue
-7. Move to next task
 
 ### Phase: Review & QA (Human-in-the-Loop)
 
@@ -82,30 +98,32 @@ You follow a disciplined process: plan thoroughly with humans, execute autonomou
 project-root/
 ├── CLAUDE.md              ← You are here (AI instructions)
 ├── README.md              ← Human-facing project docs
-├── dag.json               ← DAG state file (you MUST update this)
-├── dag-viewer.html        ← Human watches this in browser
+├── app/                   ← Next.js App Router routes
+├── components/            ← React components (ui/ = shadcn primitives)
+├── convex/                ← Convex schema + server functions
+├── lib/                   ← Shared business logic (framework-free, unit-tested)
 ├── scripts/
-│   ├── serve-dag.js       ← Local server for DAG viewer
-│   └── dag-update.js      ← CLI tool you call to update DAG state
+│   ├── verify.mjs         ← typecheck + lint + tests gate (`npm run verify`)
+│   └── snap.mjs           ← UI screenshots for review
 ├── docs/
 │   ├── prd/               ← Product Requirements Documents
-│   └── architecture/      ← Architecture Decision Records
-├── backlog/               ← Markdown issue files for AI agent
-├── src/                   ← Source code
-├── tests/                 ← Test files
-└── claude-skills/         ← Custom AI skills/commands
+│   ├── architecture/      ← Architecture Decision Records
+│   └── review/            ← Screenshots + historical session reports
+├── backlog/               ← Markdown issue specs (no status — see below)
+└── .claude/skills/        ← Custom AI skills/commands
 ```
+
+Tests live next to the code they cover (`*.test.ts` / `*.test.tsx`).
 
 ---
 
 ## Working with the Backlog
 
-Issues live in `/backlog/` as markdown files. Each file represents one task:
+Issues live in `/backlog/` as markdown files. Each file is the spec for one task.
+Status lives on the orchestrator's board, not in the file.
 
 ```markdown
 # Issue: [Title]
-
-## Status: pending | in-progress | done
 
 ## Phase: 1 | 2 | 3
 
@@ -280,59 +298,6 @@ cannot do:**
 
 ---
 
-## DAG State Management (REQUIRED)
-
-The project uses a `dag.json` file as a real-time state tracker. A human may be watching the DAG viewer dashboard. **You MUST update the DAG whenever you change task state.**
-
-### When starting a task:
-
-```bash
-node scripts/dag-update.js start <nodeId> <agentId> "<agentName>"
-```
-
-### When completing a task:
-
-```bash
-node scripts/dag-update.js complete <nodeId> <agentId>
-```
-
-### When a task fails or gets blocked:
-
-```bash
-node scripts/dag-update.js fail <nodeId> <agentId> "reason for failure"
-```
-
-### When creating new tasks during implementation:
-
-```bash
-node scripts/dag-update.js add-node <id> "<title>" <phase> <type> \
-  --desc "<short description>" \
-  --prd "<docs/prd/filename.md#section>" \
-  --criteria "<criterion 1|criterion 2|criterion 3>"
-node scripts/dag-update.js add-edge <fromId> <toId>
-```
-
-Always include `--desc`, `--prd`, and `--criteria` when adding nodes — the human uses these in the detail panel to understand each task at a glance.
-
-### When a task needs a HUMAN decision (product/UX taste, scope, pricing, copy):
-
-```bash
-node scripts/dag-update.js needs-human <nodeId> "<one-line question>"
-```
-
-Also append the full question (context, options, your recommendation) to `backlog/QUESTIONS.md` using the template there. The node turns purple in the viewer and is skipped by agents until the human answers and runs `node scripts/dag-update.js answer <nodeId>`. When you pick up a previously-parked task, read its Answered entry in QUESTIONS.md first.
-
-Only park questions a human must answer. Technical choices (library, refactor shape, test strategy) are yours — decide, note it in the session report, move on.
-
-**Rules:**
-
-- Always call `start` BEFORE beginning implementation of a task
-- Always call `complete` AFTER all tests pass and code is committed. `complete` is gated: it requires a `.verify-receipt.json` from `node scripts/verify.mjs` (typecheck + lint + tests) that matches the current file state. Any file change after verify invalidates the receipt — re-run verify. `SKIP_VERIFY=1` is a human-only escape hatch; its use is logged and flagged in review.
-- If you discover new tasks during implementation, `add-node` them to the DAG
-- The human watches this in real-time — keep it accurate
-
----
-
 ## Commands & Skills
 
 Use these skills by invoking them in conversation:
@@ -344,20 +309,26 @@ Use these skills by invoking them in conversation:
 | `/create-prd`           | Generate a structured PRD from grilling session output |
 | `/create-issues`        | Break a PRD into vertical-slice backlog issues         |
 | `/review`               | Fresh-context code review of recent changes            |
-| `/review-batch`         | Catch human review up to master, chunk by chunk        |
+| `/review-batch`         | Review commits on main since `last-human-review`       |
 | `/improve-architecture` | Identify modules that need deeper structure            |
 
 
 ---
 
-## Autonomous Loop (Ralph)
+## Screenshots
 
-The project can build itself via `node scripts/ralph-loop.mjs`: each iteration spawns a fresh `claude -p` session (fresh context = smart zone) that completes exactly ONE eligible DAG task per `scripts/ralph-prompt.md`, then exits. The loop stops when no eligible tasks remain, on 2 stalled iterations, at `--max-iterations`, or when a `STOP` file exists in the repo root.
+For UI work, capture the changed routes so the human can critique UX without
+running the app:
 
-Division of labor:
+```
+node scripts/snap.mjs <issueId> <route> [route...]
+```
 
-- **The loop builds.** TDD, screenshots for UI work (`node scripts/snap.mjs <nodeId> <routes...>` → `docs/review/<nodeId>/` at 375/768/1280, light+dark), verify (`node scripts/verify.mjs` — mandatory, gates `complete`), commit, update DAG, append to `docs/review/session-reports.md`.
-- **The human decides and critiques.** Product/UX questions land in `backlog/QUESTIONS.md` (see needs-human above); code review happens in batches via `/review-batch` against the `last-human-review` branch, using the screenshots and session reports as the UX review surface. Never push or advance `last-human-review` autonomously.
+This writes `docs/review/<issueId>/` at 375/768/1280 wide, light and dark.
+Screenshots are gitignored local review artifacts. Code review happens in
+batches via `/review-batch` against the `last-human-review` branch, with the
+screenshots as the UX review surface. Never push or advance
+`last-human-review` yourself.
 
 ### Screenshotting authenticated routes (`/portal`, `/admin`)
 
@@ -392,8 +363,6 @@ viewport height. So on tall pages the sidebar looks cut off, and a stray Clerk
 avatar can appear mid-page on mobile. Both have zero-sized boxes in a real
 viewport — don't "fix" them.
 
-If you are running as a loop iteration, `scripts/ralph-prompt.md` is your contract — one task, then exit.
-
 ---
 
 ## Context Management Rules
@@ -401,7 +370,6 @@ If you are running as a loop iteration, `scripts/ralph-prompt.md` is your contra
 - If you notice your responses degrading in quality, suggest clearing context
 - Always reference written documents (PRD, issues) rather than relying on conversation memory
 - When starting a new task, re-read the relevant issue file and PRD section
-- After completing a task, update the issue status before moving on
 - Keep the CLAUDE.md up to date as the project evolves
 
 ---

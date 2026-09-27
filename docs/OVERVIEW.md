@@ -58,10 +58,8 @@ sidestep-website/
 ├── lib/                Framework-free domain logic + Vitest tests
 ├── middleware.ts       Clerk auth middleware + invite-link handler
 ├── docs/               PRD, this overview, architecture notes
-├── backlog/            Vertical-slice issue files (the AI workflow)
-├── dag.json            Live task-graph state (see CLAUDE.md)
-├── dag-viewer.html     Browser dashboard for the DAG
-└── scripts/            DAG CLI tools
+├── backlog/            Vertical-slice issue specs (the AI workflow)
+└── scripts/            verify.mjs (quality gate), snap.mjs (screenshots)
 ```
 
 The split that matters most: **`convex/` is the backend, `app/` and
@@ -319,47 +317,31 @@ into the codebase or into chat.
 
 ---
 
-## 11. The AI workflow (CLAUDE.md, dag.json, backlog/)
+## 11. The AI workflow (CLAUDE.md, backlog/)
 
 This repo is built using a structured AI-assisted workflow — read
 `CLAUDE.md` for the full system prompt. The short version:
 
-- **`backlog/`** has one markdown issue per vertical slice.
+- **Hermes**, an orchestrating agent, owns planning and task state.
+  Status, dependencies and open questions for the human live on its
+  kanban board, outside this repo.
+- **`backlog/`** has one markdown issue spec per vertical slice.
   Each one is end-to-end (DB → API → UI), small enough to ship in a
-  single focused session, and has acceptance criteria.
-- **`dag.json`** is a live state file. Agents call
-  `scripts/dag-update.js` to mark tasks as started / completed /
-  blocked. The human watches `dag-viewer.html` (served via
-  `node scripts/serve-dag.js` on `http://localhost:3100`) in the
-  browser.
+  single focused session, and has acceptance criteria. The files carry
+  no status — check the board for that.
+- **Claude Code** implements one task at a time from its spec, and
+  `npm run verify` (typecheck + lint + tests) gates every commit.
 - **`docs/prd/sidestep-website-phase1.md`** is the source-of-truth
   spec the backlog was derived from.
 
 You don't have to use the AI workflow to contribute — but if you see
 references to "stages", "DAG nodes", or `/grill-me` in commits or
-issues, this is where they come from.
+issues, this is where they come from. (The DAG was the repo's earlier
+in-tree task tracker; it has been retired in favour of the board.)
 
 ---
 
-## 12. Status snapshot (as of this writing)
-
-Tracked in `dag.json` — check there for the live view. Roughly:
-
-- **Phase 1 (Foundation):** scaffolding, schema, auth, app shell — all
-  done except **1-05** (Tailwind v4 mobile hamburger bug, in progress).
-- **Phase 2 (Core features):** marketing, pricing, intake, portal
-  dashboard, designs, orders, order tracking, jersey runs (create,
-  public form, captain dashboard), admin order overview — all done.
-  **2-12** (admin stage checklist) and **2-13** (admin customer
-  management) are still pending. **2-14** (optional intake image
-  uploads) is queued behind an abuse-control decision.
-- **Phase 3 (Polish):** deadline-enforcement cron + admin oversight
-  done. CSV export, participation history, SEO/Lighthouse, registration
-  email, and the user-sync architecture revisit are still pending.
-
----
-
-## 13. Where to start reading
+## 12. Where to start reading
 
 In this order:
 

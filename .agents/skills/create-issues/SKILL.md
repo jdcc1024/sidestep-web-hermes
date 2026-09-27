@@ -48,8 +48,6 @@ Example: `1-01-user-registration.md`, `2-03-order-checkout.md`
 ```markdown
 # Issue: [Descriptive Title]
 
-## Status: pending
-
 ## Phase: [1|2|3]
 
 ## Type: [feature|infrastructure|bug|improvement]
@@ -116,25 +114,19 @@ Generate a `backlog/PLAN.md` overview:
 - Phase 2 issues [A, B] can run in parallel after Phase 1 completes
 ```
 
-## Step 6: Populate the DAG
+### Step 6: List the Created Issues
 
-After creating all issue files, you MUST update `dag.json` so the DAG viewer reflects the new plan. For each issue created, run:
+Issue files are specs only: they carry no status. Task state lives on the
+orchestrator's kanban board, outside the repo. After writing the issue files,
+end your output with a table of every issue you created so the orchestrator can
+create board tasks from it:
 
-```bash
-node scripts/dag-update.js add-node "<id>" "<title>" "<phase-id>" "<type>" \
-  --desc "<2-3 sentence description from the issue>" \
-  --prd "<docs/prd/filename.md#relevant-section>" \
-  --criteria "<criterion 1|criterion 2|criterion 3>"
+```markdown
+| ID | Title | File | Blocked by |
+|----|-------|------|------------|
+| 1-01 | [title] | backlog/1-01-[short-name].md | none |
+| 1-02 | [title] | backlog/1-02-[short-name].md | 1-01 |
 ```
-
-Then for each dependency between issues:
-```bash
-node scripts/dag-update.js add-edge "<fromId>" "<toId>"
-```
-
-**Important:** Always include `--desc`, `--prd`, and `--criteria` flags. These populate the detail panel that the human sees when clicking a node in the DAG viewer. Without them, the detail panel shows empty fields and the human loses visibility into what each task involves.
-
-This ensures the human can immediately see the full plan in the DAG viewer dashboard, click any node for details, and navigate dependencies.
 
 ## Rules
 - Each issue must be completable in a single focused AI session (smart zone)
@@ -145,4 +137,4 @@ This ensures the human can immediately see the full plan in the DAG viewer dashb
 - Always reference the source PRD section
 - Flag any issues that require human-in-the-loop decisions
 - Start with the simplest possible first slice — get feedback early
-- ALWAYS populate the DAG after creating issues — the human watches this in real-time
+- ALWAYS end with the created-issues table — it is how the work reaches the board

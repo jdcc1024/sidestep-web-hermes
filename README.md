@@ -43,8 +43,10 @@ npm run dev      # terminal 2 — Next.js
 
 ### Quality checks
 ```powershell
+npm run verify      # typecheck + lint + tests; writes .verify-receipt.json on pass
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
+npm test            # vitest
 npm run build       # production build (also typechecks)
 ```
 
@@ -65,20 +67,28 @@ npx convex run users:backfillProfilesFromClerk '{}'      # add --prod for produc
 ```
 sidestep-website/
 ├── app/                    Next.js App Router routes
+├── components/             React components (ui/ = shadcn primitives)
+├── convex/                 Convex schema + functions
+├── lib/                    Shared business logic
 ├── public/                 Static assets
-├── convex/                 Convex schema + functions (created in issue 1-02)
-├── backlog/                Vertical-slice issue files
-├── docs/prd/               Product Requirements Documents
-├── scripts/                DAG dashboard CLI tools
-├── dag.json                Live DAG state (agents write here)
-└── dag-viewer.html         Open in browser to watch progress
+├── backlog/                Vertical-slice issue specs
+├── docs/                   PRDs, architecture records, review artifacts
+├── scripts/                verify.mjs (quality gate), snap.mjs (screenshots)
+└── .claude/skills/         AI skills (/grill-me, /create-issues, /review, ...)
 ```
 
 ---
 
-## AI Workflow
+## Workflow
 
-This repo uses a structured AI-assisted development workflow. See `CLAUDE.md` for the full system prompt and `dag-viewer.html` (served via `node scripts/serve-dag.js`) for the live task DAG.
+- **Hermes**, an orchestrating agent, owns planning and task state. Tasks, status,
+  dependencies and open questions for the human live on its kanban board, outside
+  this repo.
+- **Claude Code** implements one task at a time from a spec (usually a
+  `backlog/*.md` file), test-first. See `CLAUDE.md` for its instructions.
+- **`npm run verify`** gates every commit: typecheck, lint and tests must pass.
+
+The steps below are the planning and review skills used along the way.
 
 ### 1. Start with the Grill
 Open your AI coding tool (Claude Code, Cursor, etc.) and invoke:
@@ -102,11 +112,11 @@ With your PRD finalized, invoke:
 This creates vertical-slice backlog items in `backlog/` — each one a small, testable, end-to-end feature.
 
 ### 5. Implement with TDD
-Pick the first unblocked issue and implement using test-driven development:
+Each issue handed to Claude Code is implemented test-first:
 - Write a failing test
 - Implement until it passes
 - Refactor
-- Commit and move to next issue
+- `npm run verify`, then commit
 
 ### 6. Review
 After implementation, invoke:
@@ -114,97 +124,6 @@ After implementation, invoke:
 /review
 ```
 Fresh-context code review before merging.
-
----
-
-## DAG Viewer (Real-Time Pipeline Dashboard)
-
-This template includes a **live DAG visualization system** so you can watch agents work in real-time. As agents pick up tasks, complete them, or discover new work, the DAG updates live on a local webpage.
-
-### Start the Dashboard
-```bash
-node scripts/serve-dag.js
-# → Opens at http://localhost:3100
-```
-
-### What You'll See
-- **Task nodes** colored by status (green = done, amber = in-progress, grey = pending, red = blocked)
-- **SVG arrows** between dependent nodes showing the full dependency graph (color-coded: green = satisfied, amber = in-progress upstream, red = blocking)
-- **Click any node** to open a detail panel with: description, acceptance criteria, dependency links, PRD reference, and timeline
-- **Active agents** panel showing who's working on what
-- **Activity log** with timestamped events
-- **Auto-refresh** every 2 seconds — no manual reload needed
-
-### How It Works
-```
-┌──────────────┐       writes to        ┌──────────┐       serves        ┌─────────────┐
-│  AI Agents   │  ───────────────────→  │ dag.json │  ←─────────────── │ dag-viewer  │
-│  (Claude)    │   via dag-update.js    │  (state) │    polls every 2s  │  (browser)  │
-└──────────────┘                        └──────────┘                    └─────────────┘
-```
-
-1. **`dag.json`** — Single source of truth. JSON file in project root tracking all nodes, edges, agents, and history.
-2. **`scripts/dag-update.js`** — CLI tool agents call to update state (start task, complete task, add nodes, etc.)
-3. **`dag-viewer.html`** — Browser dashboard that polls `dag.json` and renders the graph.
-4. **`scripts/serve-dag.js`** — Tiny local server so the browser can read the JSON file.
-
-### Manual DAG Commands
-You can also manually update the DAG from terminal:
-```bash
-# Check current status
-node scripts/dag-update.js status
-
-# Add a new task (basic)
-node scripts/dag-update.js add-node 2-04 "Email Notifications" phase-2 feature
-
-# Add a task with full metadata (shown in detail panel)
-node scripts/dag-update.js add-node 2-04 "Email Notifications" phase-2 feature \
-  --desc "Send transactional emails for order confirmations and password resets" \
-  --prd "docs/prd/mvp.md#notifications" \
-  --criteria "Order confirmation sent on purchase|Password reset email delivered|Unsubscribe link works"
-
-# Add a dependency (arrow drawn from 1-01 → 2-04)
-node scripts/dag-update.js add-edge 1-01 2-04
-
-# Manually mark something complete
-node scripts/dag-update.js complete 1-02 agent-1
-```
-
-### Node Detail Panel
-Click any node in the viewer to see:
-- **Description** — what this task does end-to-end
-- **Acceptance criteria** — checklist of testable requirements
-- **Dependencies** — clickable upstream/downstream nodes (navigate between them)
-- **Links** — direct links to the issue file (`backlog/*.md`) and PRD section
-- **Timeline** — when started, completed, and duration
-
----
-
-## Template Structure
-
-```
-ai-project-template/
-├── README.md                    ← You are here
-├── CLAUDE.md                    ← AI system prompt (instructions for your AI agent)
-├── dag.json                     ← DAG state file (agents write here)
-├── dag-viewer.html              ← Open this in browser to watch progress
-├── scripts/
-│   ├── serve-dag.js             ← Local server for the viewer
-│   ├── dag-update.js            ← CLI tool for updating DAG state
-│   └── dag-reset.js             ← Initialize fresh DAG for new project
-├── claude-skills/               ← Custom AI skills/commands
-│   ├── grill-me.md             ← Stress-test requirements
-│   ├── create-prd.md           ← Generate PRD from grilling output
-│   ├── create-issues.md        ← Break PRD into vertical-slice issues
-│   ├── review.md               ← Fresh-context code review
-│   └── improve-architecture.md ← Find modules needing restructure
-├── docs/
-│   ├── workflow-modules.md      ← Full methodology reference (5 modules)
-│   ├── prd/                     ← Your PRDs live here
-│   └── architecture/            ← Architecture Decision Records
-├── backlog/                     ← Issue files for AI agent backlog
-└── src/                         ← Your source code (add as needed)
-```
 
 ---
 
@@ -277,8 +196,8 @@ Simple public interfaces hiding rich internals. Easy to test, easy for AI to wor
 ### Human-in-the-Loop vs. AFK
 Planning and review = always human. Implementation of well-defined tasks = delegate to AI. Know when you're needed.
 
-### Parallelization via DAG
-Tasks within a phase are independent. Multiple AI sessions can work simultaneously on different issues without conflicts.
+### Parallelization
+Tasks within a phase are independent. The orchestrator can run several AI sessions on different issues at once without conflicts.
 
 ---
 
@@ -300,13 +219,7 @@ Each team member can work on different backlog issues in parallel. The PRD and P
 
 ## Setup for Claude Code
 
-To use the skills with Claude Code, copy the skill files to your Claude configuration:
-
-```bash
-# Copy skills to Claude Code's expected location
-mkdir -p .claude/skills
-cp claude-skills/*.md .claude/skills/
-```
+The skills live in `.claude/skills/`, where Claude Code picks them up automatically.
 
 The `CLAUDE.md` file in the project root is automatically picked up by Claude Code as context.
 
