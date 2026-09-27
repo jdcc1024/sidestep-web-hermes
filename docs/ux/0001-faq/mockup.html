@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0001 FAQ mockup: site FAQ + copy answer</title>
+<!--
+  UX mockup for initiative 0001 (docs/ux/0001-faq.md). Static, no build, no network.
+  Open this file in a browser. Try: mockup.html#faq-timeline (deep link opens that item).
+  Visual tokens copied from the live site: Inter, teal-600/700, muted section bg,
+  card radius, shadcn accordion rows (components/marketing/FaqSection.tsx).
+  Yellow highlights = [CONFIRM] placeholders that must be resolved by JCC before shipping.
+-->
+<style>
+  :root {
+    --bg: #ffffff; --muted: #f7f7f7; --fg: #0a0a0a; --muted-fg: #737373;
+    --border: #e5e5e5; --card: #ffffff; --teal-50: #f0fdfa; --teal-600: #0d9488;
+    --teal-700: #0f766e; --ring: #0d9488; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         color: var(--fg); background: #e9eef0; line-height: 1.5; }
+  a { color: var(--teal-700); }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
+
+  /* ---- review chrome (not part of the design) ---- */
+  .review { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+  .review h1 { font-size: 20px; margin: 0 0 4px; }
+  .review > p { margin: 0 0 4px; color: #444; font-size: 14px; }
+  .legend { display: inline-block; background: #fef08a; padding: 0 4px; border-radius: 3px; }
+  .frames { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 20px; align-items: flex-start; }
+  .frame-wrap { flex: 0 1 375px; min-width: 0; }
+  .frame-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #555; margin: 0 0 8px; }
+  .phone { width: 100%; max-width: 375px; background: var(--bg); border: 1px solid #cfd6d9; border-radius: 28px;
+           overflow: hidden; box-shadow: 0 12px 30px rgba(0,0,0,.12); }
+  .note { font-size: 13px; color: #444; margin-top: 10px; max-width: 375px; }
+
+  /* ---- site: nav ---- */
+  .nav { position: sticky; top: 0; z-index: 2; height: 56px; display: flex; align-items: center; justify-content: space-between;
+         padding: 0 16px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.92); backdrop-filter: blur(6px); }
+  .logo { font-family: "Bebas Neue", Impact, "Arial Narrow", sans-serif; font-size: 24px; letter-spacing: .04em; color: var(--fg); text-decoration: none; }
+  .nav-links { display: flex; gap: 14px; font-size: 13px; font-weight: 500; }
+  .nav-links a { color: #3f3f46; text-decoration: none; }
+  .nav-links a.new { color: var(--teal-700); font-weight: 700; }
+  .nav-links a.new::after { content: "NEW"; font-size: 9px; margin-left: 3px; vertical-align: super; color: #b45309; }
+
+  /* ---- site: FAQ section (mirrors FaqSection.tsx) ---- */
+  .faq { background: var(--muted); border-bottom: 1px solid var(--border); padding: 48px 16px 40px; }
+  .eyebrow { text-align: center; font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--teal-700); margin: 0; }
+  .faq h2 { text-align: center; font-size: 32px; line-height: 1.1; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 8px; }
+  .faq .sub { text-align: center; color: var(--muted-fg); font-size: 15px; margin: 0 0 28px; }
+  .acc { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 0 18px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .item { border-bottom: 1px solid var(--border); scroll-margin-top: 72px; transition: box-shadow .3s; }
+  .item:last-child { border-bottom: 0; }
+  .item.flash { box-shadow: -18px 0 0 -14px var(--teal-600); }
+  .trigger { all: unset; box-sizing: border-box; width: 100%; min-height: 52px; display: flex; align-items: center; justify-content: space-between;
+             gap: 12px; padding: 14px 0; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .trigger:hover span:first-child { text-decoration: underline; }
+  .trigger:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .chev { flex: none; width: 16px; height: 16px; transition: transform .2s; color: #525252; }
+  .item.open .chev { transform: rotate(180deg); }
+  .panel { display: none; padding: 0 0 16px; color: var(--muted-fg); font-size: 15px; }
+  .item.open .panel { display: block; }
+  .panel p { margin: 0 0 10px; }
+  .panel ol, .panel ul { margin: 0 0 10px; padding-left: 20px; }
+  .panel li { margin-bottom: 4px; }
+  .confirm { background: #fef08a; color: #713f12; border-radius: 3px; padding: 0 3px; font-size: 13px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 1px solid var(--border);
+         border-radius: 8px; background: #fff; color: #27272a; font: 500 13px/1 inherit; cursor: pointer; }
+  .btn:hover { background: #f4f4f5; }
+  .btn svg { width: 15px; height: 15px; }
+  .btn.done { border-color: var(--teal-600); color: var(--teal-700); background: var(--teal-50); }
+  .after { text-align: center; margin: 24px 0 0; font-size: 15px; color: var(--muted-fg); }
+  .cta { display: inline-flex; align-items: center; justify-content: center; margin-top: 10px; height: 44px; padding: 0 18px;
+         border-radius: 8px; background: var(--teal-600); color: #fff; font-weight: 600; font-size: 14px; text-decoration: none; }
+
+  /* ---- toast (sonner look) ---- */
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+           background: #fff; border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.12); border-radius: 10px;
+           padding: 12px 16px; font-size: 14px; font-weight: 500; transition: all .2s; max-width: 92vw; word-break: break-word; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---- clipboard preview (review aid only) ---- */
+  .clip { background: #fff; border: 1px dashed #9ca3af; border-radius: 12px; padding: 14px; font-size: 13px; }
+  .clip pre { white-space: pre-wrap; margin: 6px 0 0; font: 13px/1.5 ui-monospace, "Geist Mono", Menlo, monospace; color: #111; }
+
+  /* ---- chat mock (Journey B outcome) ---- */
+  .chat-head { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid #eee; font-weight: 600; font-size: 15px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg,#f59e0b,#db2777); }
+  .chat { padding: 16px 12px 22px; display: flex; flex-direction: column; gap: 8px; background: #fff; min-height: 460px; }
+  .bubble { max-width: 82%; padding: 9px 13px; border-radius: 18px; font-size: 14.5px; white-space: pre-wrap; word-break: break-word; }
+  .them { align-self: flex-start; background: #efefef; }
+  .me { align-self: flex-end; background: #3b82f6; color: #fff; }
+  .me a { color: #fff; }
+  .meta { align-self: center; font-size: 11px; color: #999; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="review">
+  <h1>0001 FAQ: site FAQ + "Copy answer" (UX mockup)</h1>
+  <p>Spec: <code>docs/ux/0001-faq.md</code>. Everything left of the dashed box is the proposed design. The dashed box and the labels are review aids only.</p>
+  <p><span class="legend">Yellow</span> = <code>[CONFIRM]</code> placeholder, JCC to fill. It must never reach the live site.
+     Try the deep link: add <code>#faq-timeline</code> to this file's URL and reload.</p>
+
+  <div class="frames">
+    <!-- Frame 1: the site FAQ -->
+    <div class="frame-wrap">
+      <p class="frame-label">1 · Site FAQ, 375px (captain + JCC)</p>
+      <div class="phone" id="site">
+        <header class="nav">
+          <a class="logo" href="#">Sidestep</a>
+          <nav class="nav-links" aria-label="Main">
+            <a href="#">Process</a><a href="#">Pricing</a><a class="new" href="#faq">FAQ</a>
+          </nav>
+        </header>
+        <section class="faq" id="faq" aria-labelledby="faq-title">
+          <p class="eyebrow">FAQ</p>
+          <h2 id="faq-title">Common questions, answered.</h2>
+          <p class="sub">Straight answers to what captains ask us most.</p>
+          <div class="acc" id="acc"></div>
+          <p class="after">Didn't see your question?<br>
+            <a class="cta" href="#">Get a quote and ask us</a></p>
+        </section>
+      </div>
+      <p class="note">Tap a question to open it. Each open answer has <b>Copy answer</b> (plain text + link, for pasting into a chat or email) and <b>Copy link</b> (opens this exact answer). Anyone can use them: JCC to reply, captains to forward to their team.</p>
+    </div>
+
+    <!-- Frame 2: clipboard preview -->
+    <div class="frame-wrap">
+      <p class="frame-label">2 · What lands on the clipboard</p>
+      <div class="clip" aria-live="polite">
+        <b id="clip-kind">Nothing copied yet.</b>
+        <pre id="clip-text">Open a question and tap "Copy answer" or "Copy link".</pre>
+      </div>
+      <p class="note">Rule: <b>answer text, blank line, link to that answer.</b> Plain text only: no formatting, no emoji, no greeting (JCC adds his own "Hey Sam!" if he wants). In-answer links (like "price calculator") become plain words; the one link at the end is always the answer's own deep link.</p>
+    </div>
+
+    <!-- Frame 3: Journey B outcome -->
+    <div class="frame-wrap">
+      <p class="frame-label">3 · Journey B: JCC's reply, pasted</p>
+      <div class="phone">
+        <div class="chat-head"><span class="avatar" aria-hidden="true"></span>Sam · Rec league captain</div>
+        <div class="chat" id="chat">
+          <span class="meta">Tue 9:48 PM</span>
+          <div class="bubble them">hey! how long do jerseys take? our season starts oct 20</div>
+          <div class="bubble me" id="chat-reply"></div>
+          <span class="meta">Sent in about 25 seconds</span>
+        </div>
+      </div>
+      <p class="note">The paste above is generated from the same answer data as frame 1, so it can't drift from the site. Chat apps turn the link into a tap target.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ONE answer source. The site FAQ, the copied text and the chat paste are all
+   rendered from this array: that is the "edit once" idea in miniature.
+   Syntax: blank line = new paragraph, "1. " / "- " lines = list,
+   [label](href) = link on site, plain label in copied text,
+   {{CONFIRM: ...}} = placeholder for JCC. */
+const SITE = "https://sidestep.design";
+const PRICING = { tiers: [[5,9,60],[10,24,50],[25,49,45],[50,null,40]], designFee: 125 }; // mirrors lib/pricing.ts
+const t = PRICING.tiers;
+const FAQ = [
+  { id: "cost", q: "How much do custom jerseys cost?",
+    a: `Jerseys are $${t[3][2]} to $${t[0][2]} each. The more you order, the less each one costs: $${t[0][2]} each for ${t[0][0]}–${t[0][1]}, $${t[1][2]} for ${t[1][0]}–${t[1][1]}, $${t[2][2]} for ${t[2][0]}–${t[2][1]} and $${t[3][2]} for ${t[3][0]} or more.\n\nWant us to design it for you? That's a flat $${PRICING.designFee} design fee. The [price calculator](#pricing) on our site works out your total, and we confirm your final quote before anything is made.\n\n{{CONFIRM: Are tax and delivery included in these prices, or extra?}}` },
+  { id: "minimum", q: "What's the minimum order?",
+    a: `5 jerseys per design. Small runs cost more to set up, so 5–9 jerseys are $${t[0][2]} each. From 10 jerseys the price drops to $${t[1][2]} each.\n\n{{CONFIRM: Live site says "minimum 10, 5–10 carry a special-order fee" but the calculator says 5–9 are $60 each with no extra fee. Which is true?}}` },
+  { id: "timeline", q: "How long does an order take?",
+    a: `Most orders take around 4 weeks from the day you approve your design to delivery. The design back-and-forth comes before that, so get in touch early.\n\nPlaying against a season start or a tournament? Put your date on the [quote form](/intake) and we'll tell you up front if it's tight.\n\n{{CONFIRM: Do you offer rush orders? If yes, how fast and what does it cost?}}` },
+  { id: "process", q: "How does the process work?",
+    a: `1. Get a quote: tell us about your team on our [quote form](/intake).\n2. Design: add your colours, logos and ideas to our jersey template, or we design it with you.\n3. 3D mock-up: see exactly how your jersey will look before anything is made.\n4. Production: once you're happy with the mock-up, most orders arrive in around 4 weeks.\n\n{{CONFIRM: Add a step for names/numbers/sizes and for payment? When do they happen?}}` },
+  { id: "design", q: "Do you help with the design?",
+    a: `Yes. Send us a rough idea, a mood board or a sketch and we'll build the design with you for a flat $${PRICING.designFee} fee. You'll see a 3D mock-up before anything goes into production.\n\nAlready have a finished design? Then there's no design fee.\n\n{{CONFIRM: How many rounds of changes are included?}}` },
+  { id: "design-tips", q: "Any tips for designing our jerseys?",
+    a: `A few things that make a big difference:\n- Send logos as SVG files or the largest PNG you have. Blurry logos print blurry.\n- Make names and numbers stand out hard against the jersey colour so they read from across the field.\n- Skip tiny text and thin lines. They disappear from a distance.\n- Sublimation prints the whole jersey, so full-body patterns and gradients are fair game.\n\n{{CONFIRM: JCC to edit or replace these tips. Is there any extra cost for more colours or full-body graphics?}}` },
+  { id: "colour", q: "Will the colours match what I see on screen?",
+    a: `Close, but not exactly. Screens glow and fabric doesn't, so colours on your phone (and on the 3D mock-up) can look a bit different on the finished jersey.\n\nIf a colour has to be right, like a club or sponsor colour, send us its Pantone code and {{CONFIRM: we'll match it as closely as the fabric allows}}.\n\n{{CONFIRM: Can you send a printed colour sample before production? Cost and time?}}` },
+  { id: "shipping", q: "Where do you ship?",
+    a: `We currently serve the Greater Vancouver area. If you're outside that region, get in touch and we'll see what we can do.` },
+];
+
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function inlineHtml(s) {
+  return esc(s)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\{\{CONFIRM: ([^}]+)\}\}/g, '<mark class="confirm">[CONFIRM: $1]</mark>');
+}
+function toHtml(a) {
+  return a.split("\n\n").map(block => {
+    const lines = block.split("\n");
+    if (lines.every(l => /^\d+\. /.test(l))) return "<ol>" + lines.map(l => "<li>" + inlineHtml(l.replace(/^\d+\. /, "")) + "</li>").join("") + "</ol>";
+    if (lines.every(l => /^- /.test(l)) || (lines.length > 1 && lines.slice(1).every(l => /^- /.test(l)))) {
+      const head = /^- /.test(lines[0]) ? "" : "<p>" + inlineHtml(lines.shift()) + "</p>";
+      return head + "<ul>" + lines.map(l => "<li>" + inlineHtml(l.slice(2)) + "</li>").join("") + "</ul>";
+    }
+    return "<p>" + inlineHtml(block) + "</p>";
+  }).join("");
+}
+const linkFor = id => `${SITE}/#faq-${id}`;
+function toPlain(item) {
+  const body = item.a
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\{\{CONFIRM: ([^}]+)\}\}/g, "[CONFIRM: $1]")
+    .replace(/^- /gm, "• ");
+  return body + "\n\n" + linkFor(item.id);
+}
+
+const icons = {
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+};
+const chev = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+const acc = document.getElementById("acc");
+acc.innerHTML = FAQ.map(f => `
+  <div class="item" id="faq-${f.id}" data-id="${f.id}">
+    <h3 style="margin:0"><button class="trigger" aria-expanded="false" aria-controls="p-${f.id}" id="t-${f.id}">
+      <span>${esc(f.q)}</span>${chev}</button></h3>
+    <div class="panel" id="p-${f.id}" role="region" aria-labelledby="t-${f.id}">
+      ${toHtml(f.a)}
+      <div class="actions">
+        <button class="btn" data-copy="answer" data-id="${f.id}">${icons.copy}<span>Copy answer</span></button>
+        <button class="btn" data-copy="link" data-id="${f.id}">${icons.link}<span>Copy link</span></button>
+      </div>
+    </div>
+  </div>`).join("");
+
+function setOpen(item, open) {
+  item.classList.toggle("open", open);
+  item.querySelector(".trigger").setAttribute("aria-expanded", String(open));
+}
+acc.addEventListener("click", async e => {
+  const trig = e.target.closest(".trigger");
+  if (trig) {
+    const item = trig.closest(".item");
+    const willOpen = !item.classList.contains("open");
+    acc.querySelectorAll(".item.open").forEach(i => setOpen(i, false)); // one open at a time, like today
+    setOpen(item, willOpen);
+    return;
+  }
+  const btn = e.target.closest("[data-copy]");
+  if (!btn) return;
+  const item = FAQ.find(f => f.id === btn.dataset.id);
+  const kind = btn.dataset.copy;
+  const text = kind === "answer" ? toPlain(item) : linkFor(item.id);
+  let ok = true;
+  try { await navigator.clipboard.writeText(text); } catch { ok = false; }
+  document.getElementById("clip-kind").textContent = kind === "answer" ? "Copy answer →" : "Copy link →";
+  document.getElementById("clip-text").textContent = text;
+  toast(ok ? (kind === "answer" ? "Answer copied. Paste it into your message." : "Link copied.")
+           : `Couldn't copy. Here it is: ${text}`);
+  const label = btn.querySelector("span"), old = label.textContent, oldIcon = btn.querySelector("svg").outerHTML;
+  if (ok) {
+    btn.classList.add("done"); btn.querySelector("svg").outerHTML = icons.check; label.textContent = "Copied!";
+    setTimeout(() => { btn.classList.remove("done"); btn.querySelector("svg").outerHTML = oldIcon; label.textContent = old; }, 2000);
+  }
+});
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+// Deep link: #faq-<id> opens that item, scrolls it under the sticky nav, moves focus.
+// Unknown id: land on the FAQ with everything closed. No error.
+function openFromHash() {
+  const m = location.hash.match(/^#faq-([a-z0-9-]+)$/);
+  const item = m && document.getElementById("faq-" + m[1]);
+  if (!item) return;
+  acc.querySelectorAll(".item.open").forEach(i => setOpen(i, false));
+  setOpen(item, true);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  item.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  item.querySelector(".trigger").focus({ preventScroll: true });
+  item.classList.add("flash"); setTimeout(() => item.classList.remove("flash"), 2000);
+}
+addEventListener("hashchange", openFromHash);
+if (location.hash) addEventListener("load", openFromHash); else setOpen(document.getElementById("faq-cost"), true);
+
+// Frame 3 uses the real "Copy answer" output for the timeline question.
+document.getElementById("chat-reply").innerHTML =
+  esc(toPlain(FAQ.find(f => f.id === "timeline")).replace(/\n\n\[CONFIRM[^\]]+\]/, ""))
+    .replace(/(https:\/\/\S+)/, '<a href="#faq-timeline">$1</a>');
+</script>
+</body>
+</html>
