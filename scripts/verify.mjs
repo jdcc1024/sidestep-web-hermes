@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Verify gate — the only way to earn a completion receipt.
+ * Verify gate — the only way to earn a receipt.
  *
  * Runs typecheck + lint + tests (add --build for config/deps/routing changes).
  * On success, writes .verify-receipt.json containing a hash of the exact
- * working-tree state that passed. `dag-update.js complete` refuses to mark a
- * task done unless a receipt exists AND its hash matches the current tree —
- * so "verified" can never drift from "what's actually in the files".
+ * working-tree state that passed. The receipt is proof that verify passed on
+ * this exact tree: if its hash doesn't match the current tree, the files have
+ * changed since and "verified" no longer holds.
  *
  * Usage:
  *   node scripts/verify.mjs           # typecheck + lint + test
