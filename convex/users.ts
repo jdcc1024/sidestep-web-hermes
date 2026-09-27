@@ -198,21 +198,11 @@ export const backfillProfilesFromClerk = internalAction({
 });
 
 // Returns the currently authenticated user's record, or null if not found.
-// Used by UserSync in providers.tsx to avoid calling syncCurrentUser when
-// the user already exists in the database.
+// Used by UserSync (components/layout/UserSync.tsx) to avoid calling
+// syncCurrentUser when the user already exists in the database.
 export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
     return getCurrentUserOrNull(ctx);
-  },
-});
-
-export const getByClerkId = query({
-  args: { clerkId: v.string() },
-  handler: async (ctx, { clerkId }) => {
-    return ctx.db
-      .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
-      .unique();
   },
 });
