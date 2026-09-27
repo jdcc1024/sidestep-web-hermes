@@ -1,25 +1,18 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
-import { ConvexHttpClient } from "convex/browser";
 import { Resend } from "resend";
-import { api } from "@/convex/_generated/api";
-import { clerkProfileOf } from "@/lib/clerkProfile";
 import {
   notifyNewRegistration,
   type ClerkRegistrationData,
   type EmailSender,
 } from "@/lib/registrationNotification";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
+// Registration email only. This route deliberately writes nothing to Convex:
+// the users row is created by syncCurrentUser and kept current (profile and
+// admin flag) by users.refreshFromClerk, which reads Clerk server-side.
 type ClerkUserEvent = {
   type: "user.created" | "user.updated";
-  data: ClerkRegistrationData & {
-    // privateMetadata is server-only by Clerk's design — never sent to the
-    // browser. We read it here and forward to Convex so admin status is
-    // anchored to Clerk as the source of truth.
-    private_metadata?: { is_admin?: unknown };
-  };
+  data: ClerkRegistrationData;
 };
 
 // Null when Resend isn't configured (local dev, preview deploys) so the
@@ -64,24 +57,10 @@ export async function POST(req: Request) {
     return new Response("Invalid signature", { status: 401 });
   }
 
-  if (event.type !== "user.created" && event.type !== "user.updated") {
-    return new Response(null, { status: 200 });
-  }
-
-  const { id, private_metadata } = event.data;
-  const { name, email } = clerkProfileOf(event.data);
-  const isAdmin = private_metadata?.is_admin === true;
-
-  await convex.mutation(api.users.syncUser, {
-    clerkId: id,
-    email,
-    name,
-    isAdmin,
-  });
-
   // Ops gets a heads-up only for brand-new captains who found us on their
   // own; invite-link sign-ups are already tracked as intake leads.
   if (event.type === "user.created") {
+    const { id } = event.data;
     const result = await notifyNewRegistration(event.data, {
       send: resendSender(),
       env: process.env,

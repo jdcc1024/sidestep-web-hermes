@@ -27,6 +27,8 @@ export type ClerkUserPayload = {
   primary_email_address_id?: string | null;
   first_name?: string | null;
   last_name?: string | null;
+  // Backend API only; read through lib/adminFlag, never directly.
+  private_metadata?: unknown;
 };
 
 export type ClerkProfile = {

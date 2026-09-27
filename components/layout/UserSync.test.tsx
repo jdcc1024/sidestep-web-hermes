@@ -17,7 +17,7 @@ vi.mock("convex/react", () => ({
   useAction: () => refreshFromClerk,
 }));
 
-import { UserSync } from "./UserSync";
+import { AdminFlagReconciler, UserSync } from "./UserSync";
 
 const row = {
   _id: "users_1",
@@ -96,6 +96,48 @@ describe("UserSync", () => {
     render(<UserSync />);
 
     expect(syncCurrentUser).not.toHaveBeenCalled();
+    expect(refreshFromClerk).not.toHaveBeenCalled();
+  });
+});
+
+describe("AdminFlagReconciler", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.clearAllMocks();
+    refreshFromClerk.mockResolvedValue("ok");
+    signedInAs("user_alice");
+  });
+
+  it("should refresh when Clerk grants admin but the Convex cache hasn't caught up", () => {
+    useQuery.mockReturnValue({ ...row, isAdmin: false });
+
+    const { rerender } = render(<AdminFlagReconciler clerkSaysAdmin />);
+    rerender(<AdminFlagReconciler clerkSaysAdmin />);
+
+    expect(refreshFromClerk).toHaveBeenCalledTimes(1);
+  });
+
+  it("should refresh when Clerk revokes admin but the cache still says admin", () => {
+    useQuery.mockReturnValue({ ...row, isAdmin: true });
+
+    render(<AdminFlagReconciler clerkSaysAdmin={false} />);
+
+    expect(refreshFromClerk).toHaveBeenCalledTimes(1);
+  });
+
+  it("should do nothing when the cache already agrees with Clerk", () => {
+    useQuery.mockReturnValue({ ...row, isAdmin: true });
+
+    render(<AdminFlagReconciler clerkSaysAdmin />);
+
+    expect(refreshFromClerk).not.toHaveBeenCalled();
+  });
+
+  it("should wait for the user row to load", () => {
+    useQuery.mockReturnValue(undefined);
+
+    render(<AdminFlagReconciler clerkSaysAdmin />);
+
     expect(refreshFromClerk).not.toHaveBeenCalled();
   });
 });

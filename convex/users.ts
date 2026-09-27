@@ -10,13 +10,19 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { getCurrentUserOrNull } from "./_auth";
-import { clerkProfileOf, fetchClerkUser } from "../lib/clerkProfile";
+import { isAdminFromClerk } from "../lib/adminFlag";
+import {
+  clerkProfileOf,
+  fetchClerkUser,
+  type ClerkUserPayload,
+} from "../lib/clerkProfile";
 
 // Called client-side on first sign-in. Convex verifies the Clerk JWT
 // automatically — no args needed, identity is read from auth context.
 //
 // The token itself has no name/email claims (see lib/clerkProfile), so this
-// creates the row and hydrateProfileFromClerk fills in who they are.
+// creates the row and refreshFromClerk fills in who they are. Never grants
+// admin: new rows start at false and existing rows keep their cached flag.
 export const syncCurrentUser = mutation({
   args: {},
   handler: async (ctx) => {
@@ -34,7 +40,7 @@ export const syncCurrentUser = mutation({
 
     if (existing) {
       // Patch only what the token actually gave us. Blindly writing both
-      // fields wipes the profile the webhook or the backfill just wrote,
+      // fields wipes the profile the refresh or the backfill just wrote,
       // since both claims are normally absent.
       const patch: { email?: string; name?: string } = {};
       if (email) patch.email = email;
@@ -55,80 +61,101 @@ export const syncCurrentUser = mutation({
   },
 });
 
-// Name/email only — isAdmin stays the webhook's to write, so a profile
-// refresh can never escalate anyone.
+// The only writer of users.isAdmin. Internal, and its callers only ever pass
+// a value derived by isAdminFromClerk from a server-side Backend API fetch —
+// the Convex row is a cache of Clerk private metadata, never a source.
+//
+// Name/email are no-clobber: a blank value from Clerk leaves the stored one.
+// isAdmin always lands, so a revocation in Clerk takes effect here too.
 //
 // The explicit return types on this and the two below are load-bearing: the
-// action that calls them lives in the same module, so `internal.users.*` is
+// actions that call them live in the same module, so `internal.users.*` is
 // self-referential and TypeScript can't infer through the cycle.
-export const applyClerkProfile = internalMutation({
-  args: { clerkId: v.string(), name: v.string(), email: v.string() },
-  handler: async (ctx, { clerkId, name, email }): Promise<Id<"users"> | null> => {
+export const applyClerkUser = internalMutation({
+  args: {
+    clerkId: v.string(),
+    name: v.string(),
+    email: v.string(),
+    isAdmin: v.boolean(),
+  },
+  handler: async (
+    ctx,
+    { clerkId, name, email, isAdmin },
+  ): Promise<Id<"users"> | null> => {
     const existing = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
       .unique();
     if (!existing) return null;
-    if (existing.name === name && existing.email === email) return existing._id;
 
-    await ctx.db.patch(existing._id, { name, email });
+    const patch: { name?: string; email?: string; isAdmin?: boolean } = {};
+    if (name && name !== existing.name) patch.name = name;
+    if (email && email !== existing.email) patch.email = email;
+    if (isAdmin !== existing.isAdmin) patch.isAdmin = isAdmin;
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(existing._id, patch);
+    }
     return existing._id;
   },
 });
 
-export type HydrateProfileResult =
+function cachedFieldsOf(clerkUser: ClerkUserPayload) {
+  return {
+    ...clerkProfileOf(clerkUser),
+    isAdmin: isAdminFromClerk(clerkUser.private_metadata),
+  };
+}
+
+export type RefreshFromClerkResult =
   | "ok"
   | "unauthenticated"
   | "unconfigured"
-  | "not-found"
-  | "empty";
+  | "not-found";
 
-// Pulls the caller's real name and email from Clerk's Backend API. Called by
-// UserSync only when the row is missing one of them, so a populated user
-// costs zero writes per page load.
-export const hydrateProfileFromClerk = action({
+// Re-reads the caller's own Clerk user from the Backend API and applies their
+// name, email and admin flag. UserSync calls it once per browser session, so
+// an admin grant or revocation made in the Clerk dashboard lands on the next
+// page load — no webhook involved. Takes no args: the Clerk id comes from the
+// verified token, so a caller can only ever refresh themselves.
+export const refreshFromClerk = action({
   args: {},
-  handler: async (ctx): Promise<HydrateProfileResult> => {
+  handler: async (ctx): Promise<RefreshFromClerkResult> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return "unauthenticated";
 
     const secretKey = process.env.CLERK_SECRET_KEY;
     if (!secretKey) {
       console.warn(
-        "CLERK_SECRET_KEY is not set on this Convex deployment — user names and emails will stay blank.",
+        "CLERK_SECRET_KEY is not set on this Convex deployment — user profiles and admin flags will not refresh.",
       );
       return "unconfigured";
     }
 
+    // Null also covers a Clerk-side error, so leave the cache as it was
+    // rather than revoke on a transient failure; the next session retries.
     const clerkUser = await fetchClerkUser(identity.subject, secretKey);
     if (!clerkUser) return "not-found";
 
-    const { name, email } = clerkProfileOf(clerkUser);
-    if (!name && !email) return "empty";
-
-    await ctx.runMutation(internal.users.applyClerkProfile, {
+    await ctx.runMutation(internal.users.applyClerkUser, {
       clerkId: identity.subject,
-      name,
-      email,
+      ...cachedFieldsOf(clerkUser),
     });
     return "ok";
   },
 });
 
-export const listUnhydratedClerkIds = internalQuery({
+export const listClerkIds = internalQuery({
   args: {},
   handler: async (ctx): Promise<string[]> => {
     const users = await ctx.db.query("users").collect();
-    return users
-      .filter((user) => !user.name || !user.email)
-      .map((user) => user.clerkId);
+    return users.map((user) => user.clerkId);
   },
 });
 
-// One-off backfill for rows created before the profile fetch existed:
+// Re-syncs every row's profile and admin flag from Clerk:
 //   npx convex run --prod users:backfillProfilesFromClerk '{}'
 // Rows for users Clerk has since deleted are counted as missing and left
-// blank rather than removed — orders still reference them.
+// as they are rather than removed — orders still reference them.
 export type BackfillProfilesResult = {
   scanned: number;
   patched: number;
@@ -146,7 +173,7 @@ export const backfillProfilesFromClerk = internalAction({
     }
 
     const clerkIds: string[] = await ctx.runQuery(
-      internal.users.listUnhydratedClerkIds,
+      internal.users.listClerkIds,
       {},
     );
 
@@ -154,51 +181,18 @@ export const backfillProfilesFromClerk = internalAction({
     let missing = 0;
     for (const clerkId of clerkIds) {
       const clerkUser = await fetchClerkUser(clerkId, secretKey);
-      const profile = clerkUser ? clerkProfileOf(clerkUser) : null;
-      if (!profile || (!profile.name && !profile.email)) {
+      if (!clerkUser) {
         missing += 1;
         continue;
       }
-      await ctx.runMutation(internal.users.applyClerkProfile, {
+      await ctx.runMutation(internal.users.applyClerkUser, {
         clerkId,
-        ...profile,
+        ...cachedFieldsOf(clerkUser),
       });
       patched += 1;
     }
 
     return { scanned: clerkIds.length, patched, missing };
-  },
-});
-
-// Called by the Clerk webhook on user.created and user.updated. The webhook
-// is the only path that writes isAdmin — keeps Clerk's privateMetadata as
-// the canonical source. syncCurrentUser (called from the browser) never
-// touches isAdmin.
-export const syncUser = mutation({
-  args: {
-    clerkId: v.string(),
-    email: v.string(),
-    name: v.string(),
-    isAdmin: v.boolean(),
-  },
-  handler: async (ctx, { clerkId, email, name, isAdmin }) => {
-    const existing = await ctx.db
-      .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
-      .unique();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, { email, name, isAdmin });
-      return existing._id;
-    }
-
-    return ctx.db.insert("users", {
-      clerkId,
-      email,
-      name,
-      isAdmin,
-      createdAt: Date.now(),
-    });
   },
 });
 
