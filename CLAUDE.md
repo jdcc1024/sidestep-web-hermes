@@ -417,3 +417,16 @@ If you are running as a loop iteration, `scripts/ralph-prompt.md` is your contra
 - **Don't** over-automate QA — manual taste-checking is essential
 - **Don't** create shallow modules with many tiny files and complex dependencies
 
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->
