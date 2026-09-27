@@ -1,7 +1,5 @@
 # Issue: Jersey Runs nav link has no route
 
-## Status: done
-
 ## Phase: 1
 
 ## Type: bug
@@ -29,7 +27,7 @@ directly:
 
 A `/portal/runs` index would therefore have re-listed the orders already on
 `/portal`, so building it would have been new product scope rather than a bug
-fix. Filed as **P-01** (needs-human) in case the human wants that section after
+fix. Filed as **P-01** (a human decision) in case the human wants that section after
 all.
 
 ## Acceptance Criteria

@@ -1,7 +1,5 @@
 # Issue: Reveal Wrapper and Landing Section Reveals
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

@@ -1,7 +1,5 @@
 # Issue: Portal Page Dark-Mode Sweep
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

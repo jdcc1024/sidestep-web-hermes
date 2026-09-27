@@ -1,7 +1,5 @@
 # Issue: Logged-In User Sees Their Jersey Run Responses
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: feature
@@ -35,7 +33,7 @@ Anonymous visitors continue to see only the form on `/run/[id]` — no behaviour
 - [ ] No regressions in existing tests
 
 ## Dependencies
-- Blocked by: 2-09 (done); ideally lands after 2-14 so "Submit and add another" and the per-run panel ship together
+- Blocked by: 2-09; ideally lands after 2-14 so "Submit and add another" and the per-run panel ship together
 - Blocks: none
 - Note: This supersedes/extends the dashboard portion of 3-04. When this lands, mark 3-04 as obsolete or fold it in — confirm with the human during planning which approach they prefer.
 

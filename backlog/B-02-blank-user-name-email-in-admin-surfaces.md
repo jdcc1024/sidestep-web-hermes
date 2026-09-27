@@ -1,7 +1,5 @@
 # Issue: Blank Captain / Owner / Customer names across admin surfaces
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: bug

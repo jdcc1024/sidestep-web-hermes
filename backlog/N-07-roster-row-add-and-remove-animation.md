@@ -1,7 +1,5 @@
 # Issue: Roster Row Add and Remove Animation
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

@@ -1,7 +1,5 @@
 # Issue: Jersey Breakdown Derivations + Order Detail Roster/Size View
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Run Setup Slimming — Fixed Sizes, Names Mode Relocation, Start Collecting
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

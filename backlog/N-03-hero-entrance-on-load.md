@@ -1,7 +1,5 @@
 # Issue: Hero Entrance on Load
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

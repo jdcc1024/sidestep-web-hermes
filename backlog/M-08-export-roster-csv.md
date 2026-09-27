@@ -1,7 +1,5 @@
 # Issue: Export A Design's Roster To CSV
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

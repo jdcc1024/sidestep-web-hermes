@@ -1,7 +1,5 @@
 # Issue: Migrate Remaining Surfaces + Retire Old Tables
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

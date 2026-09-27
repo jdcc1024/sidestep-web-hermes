@@ -1,7 +1,5 @@
 # Issue: JerseyRunSetup → RHF + zod + shadcn Form (Pilot Form)
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

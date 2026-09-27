@@ -1,7 +1,5 @@
 # Issue: Pricing Calculator
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

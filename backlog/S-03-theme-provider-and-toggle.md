@@ -1,7 +1,5 @@
 # Issue: Theme Provider, Dark Mode, and Theme Toggle Component
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: infrastructure

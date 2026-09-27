@@ -1,7 +1,5 @@
 # Issue: Marketing Sweep — shadcn primitives + theme toggle in nav
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

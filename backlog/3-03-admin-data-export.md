@@ -1,7 +1,5 @@
 # Issue: Admin Data Export
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Consolidate Edit Design Into The Design Page
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: improvement

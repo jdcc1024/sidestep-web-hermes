@@ -1,7 +1,5 @@
 # Issue: Order Creation
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

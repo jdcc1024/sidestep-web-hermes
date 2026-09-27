@@ -1,7 +1,5 @@
 # Issue: Customer Participation History
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: User Sync Architecture Revisit
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

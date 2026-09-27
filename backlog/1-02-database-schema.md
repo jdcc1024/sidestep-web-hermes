@@ -1,7 +1,5 @@
 # Issue: Database Schema
 
-## Status: done
-
 ## Phase: 1
 
 ## Type: infrastructure

@@ -1,7 +1,5 @@
 # Issue: Order Page Visual Pass
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

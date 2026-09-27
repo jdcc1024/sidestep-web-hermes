@@ -1,7 +1,5 @@
 # Issue: Portal Sidebar Active Indicator
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

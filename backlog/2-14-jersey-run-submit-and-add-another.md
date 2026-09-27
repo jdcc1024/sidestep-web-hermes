@@ -1,7 +1,5 @@
 # Issue: Jersey Run "Submit and Add Another"
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature
@@ -28,7 +26,7 @@ On the public jersey run form (`/run/[id]`), a single user often fills out respo
 - [ ] No regressions in existing tests
 
 ## Dependencies
-- Blocked by: 2-09 (done)
+- Blocked by: 2-09
 - Blocks: none
 
 ## PRD Reference

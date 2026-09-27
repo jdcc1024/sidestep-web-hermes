@@ -1,7 +1,5 @@
 # Issue: Admin Jersey Run Oversight
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

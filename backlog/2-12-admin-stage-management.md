@@ -1,7 +1,5 @@
 # Issue: Admin Stage Management
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

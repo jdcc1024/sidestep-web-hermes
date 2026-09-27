@@ -1,7 +1,5 @@
 # Issue: IntakeForm → RHF + zod + shadcn Form
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

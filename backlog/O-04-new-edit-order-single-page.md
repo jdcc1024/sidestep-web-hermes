@@ -1,7 +1,5 @@
 # Issue: New Edit Order Single Page
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature
@@ -28,7 +26,7 @@ Render the order as a single scrollable page that handles both New and Edit on o
 ## Dependencies
 - Blocked by: O-03
 - Blocks: O-05
-- External (not yet a DAG node): the **locked → read-only** behaviour is layered on later by O-06, which is gated on the Confirm/Lock Roster slice (separate PRD). This issue ships the editable + zero-design states only.
+- External (not yet an issue): the **locked → read-only** behaviour is layered on later by O-06, which is gated on the Confirm/Lock Roster slice (separate PRD). This issue ships the editable + zero-design states only.
 
 ## PRD Reference
 See: docs/prd/new-edit-order-page.md — Section 2, Section 4 (P0), Section 8 (Success Metrics)

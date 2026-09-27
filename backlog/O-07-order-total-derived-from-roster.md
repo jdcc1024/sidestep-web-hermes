@@ -1,7 +1,5 @@
 # Issue: Order Total Derived From Roster
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

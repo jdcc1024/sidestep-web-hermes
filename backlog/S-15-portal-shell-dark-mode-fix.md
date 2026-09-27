@@ -1,7 +1,5 @@
 # Issue: Portal Shell Dark-Mode Fix
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: bug

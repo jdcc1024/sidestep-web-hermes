@@ -1,7 +1,5 @@
 # Issue: Run Surface Lock Controls
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

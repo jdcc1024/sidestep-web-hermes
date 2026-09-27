@@ -1,7 +1,5 @@
 # Issue: Removed Designs Section Reveal
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

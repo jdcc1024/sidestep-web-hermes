@@ -1,7 +1,5 @@
 # Issue: Extract Admin Join Users By Id Helper
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

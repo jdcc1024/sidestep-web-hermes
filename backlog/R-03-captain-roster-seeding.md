@@ -1,7 +1,5 @@
 # Issue: Captain Roster Seeding + "Not Yet Filled"
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

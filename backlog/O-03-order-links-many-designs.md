@@ -1,7 +1,5 @@
 # Issue: Order Links Many Designs
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

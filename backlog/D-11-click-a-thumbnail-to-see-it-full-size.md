@@ -1,7 +1,5 @@
 # Issue: Click A Thumbnail To See It Full Size
 
-## Status: done
-
 ## Phase: phase-2
 
 ## Type: improvement

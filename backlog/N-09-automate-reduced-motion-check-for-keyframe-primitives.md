@@ -1,7 +1,5 @@
 # Issue: Automate Reduced-Motion Check For Keyframe Primitives
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement
@@ -60,7 +58,7 @@ See: docs/prd/motion-adoption.md — Section 9 (Testing Strategy), Section 8 (re
   so the check can reach a portal dialog. Weigh that against the fragility it
   adds — the check currently needs nothing but a dev server, which is a large
   part of why it is trustworthy. An alternative is asking the human to make
-  `/dev/components` public, which is a question for `QUESTIONS.md`, not a
+  `/dev/components` public, which is a question for the human, not a
   decision to take unilaterally.
 - Don't lower the bar by asserting on class names instead of measured motion.
   The existing four cases sample real frames; matching that is the point.

@@ -1,7 +1,5 @@
 # Issue: Admin Customer Management
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

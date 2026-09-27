@@ -1,7 +1,5 @@
 # Issue: Relabel / Remove Design on the Roster
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Project Scaffolding
 
-## Status: done
-
 ## Phase: 1
 
 ## Type: infrastructure

@@ -1,7 +1,5 @@
 # Issue: Extract Qty-By-Design Rollup Helper
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

@@ -1,7 +1,5 @@
 # Issue: Shared Block Editor: Text Sections and Reorder
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature
@@ -42,7 +40,7 @@ reorderable and removable here but not yet editable — their menu entries land 
 D-04 and D-05, which own those editors.
 
 **Screenshots not captured** — the dev deployment still holds one pre-D-01 design
-(`TOC 2026 Jersey`), so the schema can't push. See D-09 / QUESTIONS.md.
+(`TOC 2026 Jersey`), so the schema can't push. See D-09.
 
 ## Dependencies
 - Blocked by: D-02

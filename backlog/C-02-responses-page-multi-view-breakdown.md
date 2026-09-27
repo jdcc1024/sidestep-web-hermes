@@ -1,7 +1,5 @@
 # Issue: Captain Responses Page — Multi-View Breakdown (By Roster / By Fan)
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

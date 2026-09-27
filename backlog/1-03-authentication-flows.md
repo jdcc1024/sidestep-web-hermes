@@ -1,7 +1,5 @@
 # Issue: Authentication Flows
 
-## Status: pending
-
 ## Phase: 1
 
 ## Type: infrastructure

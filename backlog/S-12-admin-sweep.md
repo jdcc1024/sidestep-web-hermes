@@ -1,7 +1,5 @@
 # Issue: Admin Sweep — shadcn primitives + theme toggle in admin header
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

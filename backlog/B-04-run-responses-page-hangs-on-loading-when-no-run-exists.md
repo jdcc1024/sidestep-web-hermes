@@ -1,7 +1,5 @@
 # Issue: Run responses page hangs on loading when no run exists
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: bug

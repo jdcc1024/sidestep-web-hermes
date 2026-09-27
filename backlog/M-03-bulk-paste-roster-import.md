@@ -1,7 +1,5 @@
 # Issue: Bulk Paste Roster Import
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

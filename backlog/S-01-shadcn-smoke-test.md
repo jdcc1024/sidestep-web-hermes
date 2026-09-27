@@ -1,7 +1,5 @@
 # Issue: shadcn Compatibility Smoke Test
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: infrastructure

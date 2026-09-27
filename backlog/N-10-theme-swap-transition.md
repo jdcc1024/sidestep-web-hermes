@@ -1,7 +1,5 @@
 # Issue: Theme Swap Transition (A/B)
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

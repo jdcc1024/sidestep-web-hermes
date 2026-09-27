@@ -1,7 +1,5 @@
 # Issue: SEO, Performance, and Mobile Polish
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

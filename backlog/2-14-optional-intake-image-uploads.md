@@ -1,7 +1,5 @@
 # Issue: Intake form — inspiration links (no anonymous uploads)
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature
@@ -29,7 +27,7 @@ don't want to own. Instead:
    auth). That is the one place binary uploads happen, and it is authenticated.
 
 This supersedes the earlier "abuse-control mechanism" open question, which is
-now moot — see `backlog/QUESTIONS.md` (Answered).
+now moot (answered by the human).
 
 ## Acceptance Criteria
 - [x] The link field is fully optional — submitting without any link works exactly as today

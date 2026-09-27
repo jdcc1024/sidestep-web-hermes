@@ -1,7 +1,5 @@
 # Issue: Captain And Assistant Captain Designation
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

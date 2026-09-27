@@ -1,7 +1,5 @@
 # Issue: Adopt Motion and Convert the Pricing Spotlight
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: infrastructure

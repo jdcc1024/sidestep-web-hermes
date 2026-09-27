@@ -1,7 +1,5 @@
 # Issue: Design Form Captures Specs
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

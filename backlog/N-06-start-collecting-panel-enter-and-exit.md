@@ -1,7 +1,5 @@
 # Issue: Start Collecting Panel Enter and Exit
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

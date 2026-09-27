@@ -151,7 +151,7 @@ Reworks the order around the customer-ordering flows: silhouette specs move onto
 | O-05 | Order Detail Design Sections + Handoff | feature | O-04 |
 
 ### Gated on the Roster / Lock track (now real issues — see Track R)
-| # | Issue | Type | Depends On (internal) | External block (now a DAG node) |
+| # | Issue | Type | Depends On (internal) | External block (now an issue) |
 |---|-------|------|------------------------|----------------|
 | O-06 | Freeze Order When Roster Locked | improvement | O-05 | **R-06** (Lock & Freeze) |
 | O-07 | Order Total Derived From Roster | improvement | O-05 | **R-04** (Derived Counts Query) |
@@ -159,7 +159,7 @@ Reworks the order around the customer-ordering flows: silhouette specs move onto
 
 ### Parallelization Notes for Track O
 - O-02 and O-03 both fan out from O-01; O-03 additionally needs O-02 (it links spec-carrying designs), so the practical order is O-01 → O-02 → O-03.
-- O-06, O-07, O-08 all sit behind O-05 and can run in parallel **once their external dependency lands** — until then they stay blocked at the PRD level, not just the DAG level.
+- O-06, O-07, O-08 all sit behind O-05 and can run in parallel **once their external dependency lands** — until then they stay blocked at the PRD level, not just on the board.
 
 ### Critical Path
 `O-01 → O-02 → O-03 → O-04 → O-05 → (O-06 ‖ O-07 ‖ O-08, each after its external dependency)`
@@ -252,7 +252,7 @@ Turns the flat design page into a structured internal brief built from **reorder
 ### Open Questions Affecting Track D
 - **Before D-03**: exact drag-reorder affordance (whole-block handle vs edge grip) + mobile behavior — pick a default, note it in the session report (PRD §10).
 - **During D-03**: where the required **Overview** is authored on create (create form vs editor) — lean: create form requires an Overview body, editor handles the rest (PRD §10).
-- **Before D-08**: agree the motion/polish direction with a human (park `needs-human` / short `/grill-me`) before implementing.
+- **Before D-08**: agree the motion/polish direction with a human (raise it as a NEEDS DECISION for the human / short `/grill-me`) before implementing.
 
 ---
 

@@ -1,7 +1,5 @@
 # Issue: Design Page Motion and Polish
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement
@@ -31,11 +29,11 @@ The deliberately-deferred polish pass. After the functional skeleton lands (bloc
 See: docs/prd/design-page-blocks.md — Section 2 (skeleton first), Section 5 (Out of Scope: motion is a later task), Appendix slice 8
 
 ## Implementation Notes
-- **Human-in-the-loop:** per the grill (#10) and PRD, motion direction is a taste decision. When picked up, park with `needs-human` (or run a short `/grill-me`) to agree scope before building, and record the answer in `backlog/QUESTIONS.md`.
+- **Human-in-the-loop:** per the grill (#10) and PRD, motion direction is a taste decision. When picked up, stop and raise it under `## NEEDS DECISION` (or run a short `/grill-me`) to agree scope before building, and record the agreed direction in this file.
 - Keep it tasteful and performance-safe; honor `prefers-reduced-motion`.
-- This exists as a placeholder so the DAG reflects the full plan; refine scope when the skeleton is done.
+- This exists as a placeholder so the backlog reflects the full plan; refine scope when the skeleton is done.
 
 ## TDD Approach
-1. Agree direction with a human; capture in QUESTIONS.md.
+1. Agree direction with a human; capture it in this file.
 2. Implement the agreed motion/polish; guard reduced-motion.
 3. Verify: existing tests green; manual pass across breakpoints + light/dark.

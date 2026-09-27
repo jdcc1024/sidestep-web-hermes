@@ -1,7 +1,5 @@
 # Issue: Owner-scoped portal pages flash "not found" while auth is still loading
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: bug

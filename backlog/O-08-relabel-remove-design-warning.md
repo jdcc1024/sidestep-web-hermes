@@ -1,7 +1,5 @@
 # Issue: Relabel Remove Design Warning
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

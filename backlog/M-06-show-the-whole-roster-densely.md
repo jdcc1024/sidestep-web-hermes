@@ -1,7 +1,5 @@
 # Issue: Show The Whole Roster, Densely
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

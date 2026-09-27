@@ -1,7 +1,5 @@
 # Issue: Order Page Design Main Image
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

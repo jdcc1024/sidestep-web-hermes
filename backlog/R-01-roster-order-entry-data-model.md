@@ -1,7 +1,5 @@
 # Issue: Roster & Order Entry Data Model
 
-## Status: done
-
 ## Phase: 1
 
 ## Type: infrastructure

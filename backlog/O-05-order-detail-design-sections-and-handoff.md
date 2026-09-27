@@ -1,7 +1,5 @@
 # Issue: Order Detail Design Sections And Handoff
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

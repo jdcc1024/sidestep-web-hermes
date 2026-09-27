@@ -1,7 +1,5 @@
 # Issue: Palette Block Editor
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Derived Counts Query
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

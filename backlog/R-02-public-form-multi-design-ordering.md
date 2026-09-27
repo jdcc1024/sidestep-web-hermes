@@ -1,7 +1,5 @@
 # Issue: Public Form — Fan Orders Across All Designs
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

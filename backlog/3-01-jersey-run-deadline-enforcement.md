@@ -1,7 +1,5 @@
 # Issue: Jersey Run Deadline Enforcement
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

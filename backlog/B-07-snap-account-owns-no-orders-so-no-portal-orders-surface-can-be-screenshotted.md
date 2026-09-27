@@ -1,7 +1,5 @@
 # Issue: Snap account owns no orders, so no /portal/orders/* surface can be screenshotted
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: infrastructure
@@ -10,7 +8,7 @@
 
 `SNAP_UID` (jcc@sidestep.design) owns **zero** orders and **zero** designs on the
 dev deployment — all four dev orders and both designs belong to
-jdcc1024@gmail.com. Every `/portal/orders/<id>` route the loop tries to
+jdcc1024@gmail.com. Every `/portal/orders/<id>` route an agent tries to
 photograph therefore either 404s or throws "You don't have access to this
 order", and `/portal` itself shows three empty states. B-04 (the no-run-yet
 fix) shipped with no screenshots for exactly this reason, and every future
@@ -31,7 +29,7 @@ is **absent**, so a stale-but-present file is used as-is.
 - [x] `node scripts/snap.mjs` on `/portal` and `/portal/orders/<id>/run/responses` produces non-blank captures
 - [x] The no-run-yet state from B-04 is photographable
 - [x] Seeding is idempotent and scoped to one account, so re-running it can't multiply fixtures or touch anybody else's rows
-- [x] The stale-session cause of the `/portal` abort is documented where the loop will read it
+- [x] The stale-session cause of the `/portal` abort is documented where agents will read it
 
 ## Dependencies
 

@@ -1,7 +1,5 @@
 # Issue: Staggered Process and Pricing Card Entrances
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

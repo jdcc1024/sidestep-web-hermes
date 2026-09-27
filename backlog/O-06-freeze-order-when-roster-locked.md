@@ -1,7 +1,5 @@
 # Issue: Freeze Order When Roster Locked
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

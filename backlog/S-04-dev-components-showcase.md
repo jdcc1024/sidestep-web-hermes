@@ -1,7 +1,5 @@
 # Issue: /dev/components Showcase Page
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: infrastructure

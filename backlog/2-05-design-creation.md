@@ -1,7 +1,5 @@
 # Issue: Design Creation
 
-## Status: pending
-
 ## Phase: 2
 
 ## Type: feature

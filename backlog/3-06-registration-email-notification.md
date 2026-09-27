@@ -1,7 +1,5 @@
 # Issue: Registration Email Notification
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Application Shell
 
-## Status: pending
-
 ## Phase: 1
 
 ## Type: infrastructure

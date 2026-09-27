@@ -1,7 +1,5 @@
 # Issue: Layout Sweep — Final shadcn pass and migration audit
 
-## Status: pending
-
 ## Phase: 3
 
 ## Type: improvement

@@ -1,7 +1,5 @@
 # Issue: DesignForm → RHF + zod + shadcn Form
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: improvement

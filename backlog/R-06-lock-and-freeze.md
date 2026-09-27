@@ -1,7 +1,5 @@
 # Issue: Lock & Freeze
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

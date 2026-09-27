@@ -1,7 +1,5 @@
 # Issue: Public Intake Form
 
-## Status: pending
-
 ## Phase: 2
 
 ## Type: feature

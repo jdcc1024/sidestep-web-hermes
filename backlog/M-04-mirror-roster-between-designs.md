@@ -1,7 +1,5 @@
 # Issue: Mirror Roster Between Designs
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

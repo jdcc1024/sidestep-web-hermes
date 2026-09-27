@@ -1,7 +1,5 @@
 # Issue: Jersey Run Public Form
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Jersey Run Captain Dashboard
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

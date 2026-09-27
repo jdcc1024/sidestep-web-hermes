@@ -1,7 +1,5 @@
 # Issue: Design Assets Metadata Table
 
-## Status: done
-
 ## Phase: 1
 
 ## Type: infrastructure

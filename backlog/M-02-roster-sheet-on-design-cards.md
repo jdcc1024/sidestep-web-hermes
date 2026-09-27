@@ -1,7 +1,5 @@
 # Issue: Roster Sheet on Design Cards
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

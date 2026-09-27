@@ -1,7 +1,5 @@
 # Issue: Unified Roster Read + Design-Card Roster Preview
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: feature

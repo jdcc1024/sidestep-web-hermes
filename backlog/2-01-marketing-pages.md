@@ -1,7 +1,5 @@
 # Issue: Marketing Pages
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

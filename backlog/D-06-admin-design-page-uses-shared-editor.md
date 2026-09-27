@@ -1,7 +1,5 @@
 # Issue: Admin Design Page Uses Shared Editor
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Order Status Tracking
 
-## Status: pending
-
 ## Phase: 2
 
 ## Type: feature

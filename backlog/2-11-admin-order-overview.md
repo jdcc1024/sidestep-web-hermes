@@ -1,7 +1,5 @@
 # Issue: Admin Order Overview
 
-## Status: pending
-
 ## Phase: 2
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Gallery Blocks and Asset Pool
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

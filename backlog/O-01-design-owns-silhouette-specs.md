@@ -1,7 +1,5 @@
 # Issue: Design Owns Silhouette Specs
 
-## Status: done
-
 ## Phase: 1
 
 ## Type: infrastructure

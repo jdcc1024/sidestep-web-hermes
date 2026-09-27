@@ -1,7 +1,5 @@
 # Issue: Fix Mobile Responsive Shell
 
-## Status: done
-
 ## Phase: 1
 
 ## Type: bug

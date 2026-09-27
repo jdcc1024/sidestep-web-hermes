@@ -1,7 +1,5 @@
 # Issue: Install shadcn Primitives and Dependencies
 
-## Status: done
-
 ## Phase: 3
 
 ## Type: infrastructure

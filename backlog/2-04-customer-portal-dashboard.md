@@ -1,7 +1,5 @@
 # Issue: Customer Portal Dashboard
 
-## Status: pending
-
 ## Phase: 2
 
 ## Type: feature

@@ -1,7 +1,5 @@
 # Issue: Jersey Run Creation
 
-## Status: done
-
 ## Phase: 2
 
 ## Type: feature

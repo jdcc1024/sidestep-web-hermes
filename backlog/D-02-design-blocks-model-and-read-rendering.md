@@ -1,7 +1,5 @@
 # Issue: Design Blocks Model and Read Rendering
 
-## Status: done
-
 ## Phase: 1
 
 ## Type: feature
