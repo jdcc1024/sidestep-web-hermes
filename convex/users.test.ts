@@ -71,7 +71,7 @@ describe("users.syncCurrentUser", () => {
   });
 });
 
-describe("users.hydrateProfileFromClerk", () => {
+describe("users.refreshFromClerk", () => {
   const clerkPayload = {
     id: "user_dana_clerk",
     first_name: "Dana",
@@ -109,7 +109,7 @@ describe("users.hydrateProfileFromClerk", () => {
 
     const result = await t
       .withIdentity({ subject: "user_dana_clerk" })
-      .action(api.users.hydrateProfileFromClerk, {});
+      .action(api.users.refreshFromClerk, {});
 
     expect(result).toBe("ok");
     expect(await t.run(async (ctx) => ctx.db.get(userId))).toMatchObject({
@@ -121,7 +121,7 @@ describe("users.hydrateProfileFromClerk", () => {
   it("should refuse an unauthenticated caller", async () => {
     vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
     const t = convexTest(schema, modules);
-    expect(await t.action(api.users.hydrateProfileFromClerk, {})).toBe(
+    expect(await t.action(api.users.refreshFromClerk, {})).toBe(
       "unauthenticated",
     );
   });
@@ -136,7 +136,7 @@ describe("users.hydrateProfileFromClerk", () => {
 
     const result = await t
       .withIdentity({ subject: "user_dana_clerk" })
-      .action(api.users.hydrateProfileFromClerk, {});
+      .action(api.users.refreshFromClerk, {});
 
     expect(result).toBe("unconfigured");
     expect(fetchMock).not.toHaveBeenCalled();
@@ -151,37 +151,151 @@ describe("users.hydrateProfileFromClerk", () => {
 
     const result = await t
       .withIdentity({ subject: "user_dana_clerk" })
-      .action(api.users.hydrateProfileFromClerk, {});
+      .action(api.users.refreshFromClerk, {});
 
     expect(result).toBe("not-found");
   });
 
-  it("should never write isAdmin — the webhook owns it", async () => {
-    vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: true, json: async () => clerkPayload }),
-    );
-
-    const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
+  async function seedPopulatedUser(
+    t: ReturnType<typeof convexTest>,
+    isAdmin: boolean,
+  ) {
+    return t.run(async (ctx) =>
       ctx.db.insert("users", {
         clerkId: "user_dana_clerk",
-        email: "",
-        name: "",
-        isAdmin: true,
+        email: "dana@example.com",
+        name: "Dana Reyes",
+        isAdmin,
         createdAt: Date.now(),
       }),
     );
+  }
+
+  function stubClerkUser(overrides: Record<string, unknown>) {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ...clerkPayload, ...overrides }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("should grant admin when Clerk private metadata has isAdmin: true", async () => {
+    vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
+    stubClerkUser({ private_metadata: { isAdmin: true } });
+
+    const t = convexTest(schema, modules);
+    const userId = await seedPopulatedUser(t, false);
 
     await t
       .withIdentity({ subject: "user_dana_clerk" })
-      .action(api.users.hydrateProfileFromClerk, {});
+      .action(api.users.refreshFromClerk, {});
 
     expect(await t.run(async (ctx) => ctx.db.get(userId))).toMatchObject({
       isAdmin: true,
-      name: "Dana Reyes",
     });
+  });
+
+  it("should revoke a cached admin when Clerk no longer says admin", async () => {
+    vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
+    stubClerkUser({ private_metadata: {} });
+
+    const t = convexTest(schema, modules);
+    const userId = await seedPopulatedUser(t, true);
+
+    await t
+      .withIdentity({ subject: "user_dana_clerk" })
+      .action(api.users.refreshFromClerk, {});
+
+    expect(await t.run(async (ctx) => ctx.db.get(userId))).toMatchObject({
+      isAdmin: false,
+    });
+  });
+
+  it("should revoke admin even when Clerk has no name or email to apply", async () => {
+    vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: "user_dana_clerk", private_metadata: {} }),
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    const userId = await seedPopulatedUser(t, true);
+
+    await t
+      .withIdentity({ subject: "user_dana_clerk" })
+      .action(api.users.refreshFromClerk, {});
+
+    // A blank Clerk profile never clobbers the stored name/email.
+    expect(await t.run(async (ctx) => ctx.db.get(userId))).toMatchObject({
+      isAdmin: false,
+      name: "Dana Reyes",
+      email: "dana@example.com",
+    });
+  });
+
+  it("should ignore an isAdmin flag in public metadata", async () => {
+    vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
+    stubClerkUser({ public_metadata: { isAdmin: true }, private_metadata: {} });
+
+    const t = convexTest(schema, modules);
+    const userId = await seedPopulatedUser(t, false);
+
+    await t
+      .withIdentity({ subject: "user_dana_clerk" })
+      .action(api.users.refreshFromClerk, {});
+
+    expect(await t.run(async (ctx) => ctx.db.get(userId))).toMatchObject({
+      isAdmin: false,
+    });
+  });
+
+  it("should write nothing for an unauthenticated caller", async () => {
+    vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
+    const fetchMock = stubClerkUser({ private_metadata: { isAdmin: true } });
+
+    const t = convexTest(schema, modules);
+    const userId = await seedPopulatedUser(t, false);
+    const before = await t.run(async (ctx) => ctx.db.get(userId));
+
+    expect(await t.action(api.users.refreshFromClerk, {})).toBe(
+      "unauthenticated",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await t.run(async (ctx) => ctx.db.get(userId))).toEqual(before);
+  });
+});
+
+describe("public Convex API", () => {
+  it("should not expose syncUser", async () => {
+    // It took isAdmin as an argument with no auth check — anyone holding the
+    // deployment URL could make themselves admin.
+    const users = await import("./users");
+    expect("syncUser" in users).toBe(false);
+  });
+
+  it("should have no public function that accepts isAdmin", async () => {
+    // Walks every registered function in every module. The users.isAdmin
+    // cache is written only by internal functions, from a Clerk fetch.
+    const offenders: string[] = [];
+    for (const [path, load] of Object.entries(modules)) {
+      if (path.includes("_generated") || /\.test\./.test(path)) continue;
+      const mod = (await load()) as Record<string, unknown>;
+      for (const [name, fn] of Object.entries(mod)) {
+        const registered = fn as {
+          isPublic?: boolean;
+          exportArgs?: () => string;
+        };
+        if (!registered?.isPublic || !registered.exportArgs) continue;
+        if (/is_?admin/i.test(registered.exportArgs())) {
+          offenders.push(`${path}:${name}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
 
@@ -191,7 +305,7 @@ describe("users.backfillProfilesFromClerk", () => {
     vi.unstubAllEnvs();
   });
 
-  it("should fill every blank row and skip the ones already populated", async () => {
+  it("should refresh every row's profile and admin flag from Clerk", async () => {
     vi.stubEnv("CLERK_SECRET_KEY", "sk_test_abc");
     const byId: Record<string, unknown> = {
       user_blank_one: {
@@ -200,6 +314,17 @@ describe("users.backfillProfilesFromClerk", () => {
         last_name: "One",
         primary_email_address_id: "idn_1",
         email_addresses: [{ id: "idn_1", email_address: "one@example.com" }],
+        private_metadata: { isAdmin: true },
+      },
+      // Cached as admin, but Clerk has since revoked it.
+      user_already_set: {
+        id: "user_already_set",
+        first_name: "Already",
+        last_name: "Set",
+        primary_email_address_id: "idn_3",
+        email_addresses: [{ id: "idn_3", email_address: "set@example.com" }],
+        private_metadata: {},
+        public_metadata: { isAdmin: true },
       },
       user_blank_two: {
         id: "user_blank_two",
@@ -232,27 +357,33 @@ describe("users.backfillProfilesFromClerk", () => {
         clerkId: "user_already_set",
         email: "set@example.com",
         name: "Already Set",
-        isAdmin: false,
+        isAdmin: true,
         createdAt: Date.now(),
       });
     });
 
     const result = await t.action(internal.users.backfillProfilesFromClerk, {});
 
-    expect(result).toEqual({ scanned: 3, patched: 2, missing: 1 });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({ scanned: 4, patched: 3, missing: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
 
     const rows = await t.run(async (ctx) => ctx.db.query("users").collect());
     const byClerkId = new Map(rows.map((row) => [row.clerkId, row]));
     expect(byClerkId.get("user_blank_one")).toMatchObject({
       name: "Blank One",
       email: "one@example.com",
+      isAdmin: true,
+    });
+    expect(byClerkId.get("user_already_set")).toMatchObject({
+      name: "Already Set",
+      isAdmin: false,
     });
     // No first/last name in Clerk either — the email is a better label than "".
     expect(byClerkId.get("user_blank_two")).toMatchObject({
       name: "two@example.com",
       email: "two@example.com",
     });
+    expect(byClerkId.get("user_blank_two")).toMatchObject({ isAdmin: false });
     expect(byClerkId.get("user_gone")).toMatchObject({ name: "", email: "" });
   });
 
@@ -265,50 +396,3 @@ describe("users.backfillProfilesFromClerk", () => {
   });
 });
 
-describe("users.syncUser", () => {
-  it("upserts the user keyed by clerkId (insert then patch)", async () => {
-    const t = convexTest(schema, modules);
-
-    const id1 = await t.mutation(api.users.syncUser, {
-      clerkId: "user_bob_clerk",
-      email: "bob@example.com",
-      name: "Bob",
-      isAdmin: false,
-    });
-
-    const id2 = await t.mutation(api.users.syncUser, {
-      clerkId: "user_bob_clerk",
-      email: "bob+new@example.com",
-      name: "Bob Updated",
-      isAdmin: true,
-    });
-
-    expect(id1).toBe(id2);
-
-    const row = await t.run(async (ctx) => ctx.db.get(id1));
-    expect(row).toMatchObject({
-      email: "bob+new@example.com",
-      name: "Bob Updated",
-      isAdmin: true,
-    });
-  });
-
-  it("rejects calls with a missing required field (email)", async () => {
-    const t = convexTest(schema, modules);
-    // Cast through unknown: we're exercising the validator's rejection of a
-    // malformed payload, which is exactly the trust-boundary check this
-    // smoke test covers.
-    await expect(
-      t.mutation(api.users.syncUser, {
-        clerkId: "user_no_email",
-        name: "Nameless",
-        isAdmin: false,
-      } as unknown as {
-        clerkId: string;
-        email: string;
-        name: string;
-        isAdmin: boolean;
-      }),
-    ).rejects.toThrow();
-  });
-});
