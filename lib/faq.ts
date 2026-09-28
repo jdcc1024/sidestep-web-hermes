@@ -196,6 +196,17 @@ export function faqUrl(origin: string, id: string): string {
   return `${origin}/#${faqAnchorId(id)}`;
 }
 
+/**
+ * The origin copied FAQ links are built from (A1). NEXT_PUBLIC_SITE_URL wins so
+ * an admin copying from localhost still hands out the public URL. Browser-only
+ * fallback; read at call time so a click always sees the current value.
+ */
+export function siteOrigin(): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured) return configured.replace(/\/+$/, "");
+  return window.location.origin;
+}
+
 export function faqCopyText(plainText: string, origin: string, id: string): string {
   return `${plainText}\n\n${faqUrl(origin, id)}`;
 }
