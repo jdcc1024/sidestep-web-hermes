@@ -36,8 +36,9 @@ export function publishedFaqs(entries: readonly FaqEntry[]): FaqEntry[];
 export function faqAnchorId(id: string): string;          // "faq-<id>"
 export function faqUrl(origin: string, id: string): string; // `${origin}/#faq-${id}`
 export function faqCopyText(plainText: string, origin: string, id: string): string; // text + "\n\n" + url
-export function priceRange(): string;          // from PRICING_TIERS
-export function formatTierPriceList(): string; // from PRICING_TIERS
+export type TierFilter = { fromQuantity?: number }; // drop tiers whose max < fromQuantity
+export function priceRange(opts?: TierFilter): string;          // from PRICING_TIERS
+export function formatTierPriceList(opts?: TierFilter): string; // from PRICING_TIERS
 ```
 
 Markdown subset: a blank line separates blocks. Consecutive lines starting
@@ -48,6 +49,24 @@ newlines join with a space. No HTML is ever interpreted.
 
 ### `content/faq.ts`
 
+**Rule (JCC, D10): every FAQ string lives here.** Adding, rewording,
+reordering, hiding or publishing an entry, or changing the section heading,
+must never need a change to JSX or any component. Besides `FAQ`, export:
+
+```ts
+export const FAQ_SECTION: {
+  eyebrow: string;   // "FAQ"
+  heading: string;   // "Common questions, answered."
+  subtitle?: string; // omitted → not rendered
+  cta?: { prompt: string; label: string; href: string }; // omitted → not rendered
+};
+```
+
+`eyebrow` and `heading` move over verbatim from today's `FaqSection.tsx`.
+`subtitle` and `cta` hold the UX §3 copy ("Straight answers to what captains
+ask us most." / "Didn't see your question?" / "Get a quote and ask us" →
+`/intake`) only if Gate 1 approved it (D11); otherwise leave them out.
+
 Exports `FAQ: FaqEntry[]` in UX order: `cost, minimum, timeline, process,
 design, design-tips, colour, shipping`.
 - `minimum`, `timeline`, `design`, `shipping`: `published: true`, question and
@@ -56,21 +75,24 @@ design, design-tips, colour, shipping`.
   answer copied **verbatim from `docs/ux/0001-faq.md` §3** (Q1, Q4, Q6, Q7),
   including the `[CONFIRM: …]` lines. The `cost` answer interpolates
   `priceRange()`, `formatTierPriceList()` and `DESIGN_FEE` instead of typing
-  the numbers.
+  the numbers, and calls them with `{ fromQuantity: 10 }` if Gate 1 decided
+  A4 = A (don't advertise 5–9 in the cost answer).
+- `minimum` keeps today's live wording (JCC, A3) and gets a comment above it:
+  the FAQ steers new customers to 10+ on purpose, the calculator still quotes
+  5–9 for repeat customers, and the two must not be "fixed" to agree.
 - Also exports `PERMANENT_IDS = ["minimum", "timeline", "design", "shipping"] as const`,
   with a comment that ids in it must never be removed or renamed, and that an
   id is appended when its entry is first published.
 
 ### `FaqSection.tsx` (stays a server component)
 
-Renders `publishedFaqs(FAQ)`. Each `AccordionItem` gets `value={id}` and
+Renders `publishedFaqs(FAQ)` and `FAQ_SECTION`. The component contains no
+literal user-facing copy; every string comes from `content/faq.ts`. Each `AccordionItem` gets `value={id}` and
 `id={faqAnchorId(id)}`, and its answer is rendered from `parseAnswer` blocks as
-`<p>`, `<ul>`, `<ol>` and `next/link` elements. It adds the UX §3 section copy:
-the subtitle "Straight answers to what captains ask us most." and, after the
-list, "Didn't see your question?" with a "Get a quote and ask us" link to
-`/intake`, styled with `buttonVariants` per CLAUDE.md, not `<Button render={<Link/>}>`.
-**Hold:** the subtitle and CTA are UX draft copy (D11). If Gate 1 hasn't approved
-them by build time, ship without them and note that in the handoff.
+`<p>`, `<ul>`, `<ol>` and `next/link` elements. It renders
+`FAQ_SECTION.subtitle` under the heading and `FAQ_SECTION.cta` after the list
+when present (the CTA link styled with `buttonVariants` per CLAUDE.md, not
+`<Button render={<Link/>}>`), and nothing for either when absent.
 
 ### `MarketingNav.tsx`
 
@@ -91,6 +113,7 @@ lib/faq.ts
 - [ ] `faqCopyText("Body", "https://x.test", "timeline")` === `"Body\n\nhttps://x.test/#faq-timeline"`
 - [ ] With the current tiers, `formatTierPriceList()` === `"$60 each for 5–9, $50 for 10–24, $45 for 25–49 and $40 for 50 or more"` and `priceRange()` === `"$40 to $60"`
 - [ ] Both price helpers are derived from `PRICING_TIERS` (the test builds expectations from `PRICING_TIERS`, or mocks it with different prices and sees the output change)
+- [ ] With `{ fromQuantity: 10 }`: `formatTierPriceList` === `"$50 each for 10–24, $45 for 25–49 and $40 for 50 or more"` and `priceRange` === `"$40 to $50"`
 
 content/faq.ts (content lint, `content/faq.test.ts`)
 - [ ] Ids are unique and match `/^[a-z0-9]+(-[a-z0-9]+)*$/`
@@ -105,14 +128,16 @@ FaqSection (`FaqSection.test.tsx`, jsdom)
 - [ ] No text matching `[CONFIRM` appears anywhere in the rendered output
 - [ ] Each item's root has `id="faq-<id>"`
 - [ ] Opening an item shows its answer. A test fixture answer with a list renders a real `<ul>`/`<ol>`, and a link renders an `<a href>`
-- [ ] Section keeps `id="faq"` and the "Common questions, answered." heading
-- [ ] (if D11 approved) The "Get a quote and ask us" link points to `/intake`
+- [ ] Section keeps `id="faq"`, and with the real content shows the "FAQ" eyebrow and "Common questions, answered." heading
+- [ ] Section copy comes from `FAQ_SECTION`: a fixture with a different heading, a subtitle and a `cta` renders exactly those (CTA as an `<a>` with the fixture href), and a fixture without `subtitle`/`cta` renders neither
+- [ ] `FaqSection.tsx` contains no user-facing string literals (grep for the heading/eyebrow text finds them only in `content/faq.ts`)
 
 MarketingNav
 - [ ] A "FAQ" link with `href="/#faq"` appears after "Pricing" in the desktop nav and in the mobile sheet
 
 Regression
-- [ ] The live site's visible FAQ text is unchanged apart from the approved subtitle and CTA
+- [ ] The live site's visible FAQ text is unchanged apart from the approved subtitle and CTA; `minimum` still says "standard minimum is 10 … 5–10 … special-order fee" verbatim
+- [ ] `lib/pricing.ts` and `PricingCalculator`/`PricingSection` are untouched (JCC, A3)
 - [ ] `npm run verify` passes
 
 ## Dependencies
@@ -128,8 +153,8 @@ Regression
   tree: "`content/` ← editable site copy (FAQ)".
 - Don't use `react-markdown` or add any dependency. Don't use `dangerouslySetInnerHTML`.
 - Leave `<Reveal>` around the FAQ as it is. F-02 removes it.
-- Testability: `FaqSection` takes an optional `entries?: readonly FaqEntry[]`
-  prop that defaults to `FAQ`, so tests can pass fixtures (a list, a link, a
+- Testability: `FaqSection` takes optional `entries?: readonly FaqEntry[]` and
+  `section?: typeof FAQ_SECTION` props that default to `FAQ` / `FAQ_SECTION`, so tests can pass fixtures (a list, a link, a
   `[CONFIRM]` draft) without `vi.mock`. `app/page.tsx` keeps calling
   `<FaqSection />`.
 - The price helpers live in `lib/faq.ts`, not `lib/pricing.ts`, so the pricing
