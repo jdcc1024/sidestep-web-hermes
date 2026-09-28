@@ -24,6 +24,7 @@ const navLinks = [
   { href: "/#customize", label: "Customize" },
   { href: "/#process", label: "Process" },
   { href: "/#pricing", label: "Pricing" },
+  { href: "/#faq", label: "FAQ" },
 ];
 
 export function MarketingNav() {
