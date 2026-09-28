@@ -47,15 +47,50 @@ export function FaqAccordion({ items }: { items: FaqAccordionItem[] }) {
     return () => window.removeEventListener("hashchange", openFromHash);
   }, [idsKey]);
 
-  // Runs after the commit that opened the item, so its panel is in the DOM
-  // and the scroll lands on the item's final layout.
+  // Runs after the commit that opened the item, so its panel is in the DOM.
+  // The scroll waits for the accordion's height animations to finish: when the
+  // previously open item sits above the target, its collapse shifts the page up
+  // after any earlier scroll, leaving the target under the sticky nav. The
+  // collapse runs under reduced motion too, so both modes wait.
   useEffect(() => {
     if (!target) return;
     const item = document.getElementById(faqAnchorId(target.id));
     if (!item) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    item.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
     item.querySelector<HTMLElement>("[data-slot=accordion-trigger]")?.focus({ preventScroll: true });
+
+    let cancelled = false;
+    const scroll = () => {
+      if (cancelled) return;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      item.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    };
+
+    const root = item.parentElement;
+    // jsdom has no Web Animations API: nothing animates there, so scroll now.
+    if (!root || typeof root.getAnimations !== "function") {
+      scroll();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    // One frame lets the panel state attributes and CSS animations start.
+    const frame = requestAnimationFrame(() => {
+      const running = root
+        .getAnimations({ subtree: true })
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity);
+      if (running.length === 0) return scroll();
+      const settled = Promise.allSettled(running.map((a) => a.finished));
+      // Never wait on a stuck animation for longer than a beat.
+      const cap = new Promise((resolve) => setTimeout(resolve, 600));
+      // Scroll on the frame after the last animation ends, once a closed
+      // panel has unmounted and layout is final.
+      void Promise.race([settled, cap]).then(() => requestAnimationFrame(scroll));
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
   }, [target]);
 
   return (
