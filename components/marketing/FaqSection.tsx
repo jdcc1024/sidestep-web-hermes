@@ -1,18 +1,13 @@
 import Link from "next/link";
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { FaqAccordion } from "@/components/marketing/FaqAccordion";
 import { buttonVariants } from "@/components/ui/button";
 import { FAQ, FAQ_SECTION } from "@/content/faq";
 import {
-  faqAnchorId,
   isExternalHref,
   parseAnswer,
   publishedFaqs,
+  toPlainText,
   type Block,
   type FaqEntry,
   type Inline,
@@ -20,6 +15,9 @@ import {
 import { cn } from "@/lib/utils";
 
 // All copy comes from content/faq.ts (D10); this component only lays it out.
+// Answers are parsed here, on the server. FaqAccordion (the client half: deep
+// links and copy buttons) gets only the rendered node and the plain text, so
+// no Markdown parsing ships to the browser.
 
 function InlineContent({ inlines }: { inlines: Inline[] }) {
   return inlines.map((inline, i) => {
@@ -97,30 +95,29 @@ export function FaqSection({
           )}
         </div>
 
-        <Accordion className="mt-12 rounded-xl border border-border bg-card px-5 shadow-sm">
-          {publishedFaqs(entries).map((faq) => (
-            <AccordionItem
-              key={faq.id}
-              value={faq.id}
-              id={faqAnchorId(faq.id)}
-              className="scroll-mt-24"
-            >
-              <AccordionTrigger className="py-4 text-base font-semibold text-foreground">
-                {faq.question}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {parseAnswer(faq.answer).map((block, i) => (
-                  <AnswerBlock key={i} block={block} />
-                ))}
-                {faq.finePrint && (
-                  <p className="text-xs text-muted-foreground">
-                    {faq.finePrint}
-                  </p>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+        <FaqAccordion
+          items={publishedFaqs(entries).map((faq) => {
+            const blocks = parseAnswer(faq.answer);
+            return {
+              id: faq.id,
+              question: faq.question,
+              answerNode: (
+                <>
+                  {blocks.map((block, i) => (
+                    <AnswerBlock key={i} block={block} />
+                  ))}
+                  {faq.finePrint && (
+                    <p className="text-xs text-muted-foreground">
+                      {faq.finePrint}
+                    </p>
+                  )}
+                </>
+              ),
+              // Never includes finePrint (D5).
+              plainText: toPlainText(blocks),
+            };
+          })}
+        />
 
         {section.cta && (
           <div className="mt-10 flex flex-col items-center gap-3 text-center">
