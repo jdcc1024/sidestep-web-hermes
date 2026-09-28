@@ -1,61 +1,75 @@
-# Issue: FAQ content pass — apply JCC's answers and publish
+# Issue: FAQ content pass — apply JCC's approved wording and publish
 
 ## Phase: 2
 
 ## Type: improvement
 
-## Size: S (1–2 files, content only)
+## Size: S (1 file, content only)
 
 ## Description
 
-Initiative 0001. Turn the FAQ from "today's 4 answers plus 4 hidden drafts"
-into the approved set of 8, by editing only `content/faq.ts`. This is the first
-real use of "one place I edit". **JCC can do this himself in GitHub's web
-editor** as the dry run. Otherwise ss-dev does it from the approved text.
+Initiative 0001. Turn the FAQ from "today's 4 answers plus hidden drafts" into
+the approved pilot set of 7, by editing **only `content/faq.ts`**. This is the
+proof of D10: a full content change needs no JSX, component or test change.
 
-Inputs, in order of authority:
-1. JCC's Gate 1 answers to UX `needs_decision` D2–D8, D11 and architect A4 (on the board /
-   Gate 1 packet `~/sidestep/docs/gates/0001-gate1.md`).
-2. The drafts in `docs/ux/0001-faq.md` §3, as marked up or approved by JCC.
+**ss-dev does this issue (P1 = B).** Nothing is pushed before Gate 2, so JCC
+can't use GitHub's web editor as the dry run; his own "one place I edit" check
+moves to Gate 2 (edit `content/faq.ts` locally, reload).
 
-For each of the 8 entries:
-- Replace the answer with the approved wording, verbatim. **Except `minimum`:
-  it keeps today's live wording (JCC, A3).** For `timeline` and `design` this
-  **replaces today's live text** (for example, the
-  "20+ years" line leaves `design`, per UX).
-- Remove every `[CONFIRM: …]` by filling it with JCC's fact or deleting it, as
-  JCC decided.
-- Set `published: true` and append the id to `PERMANENT_IDS`.
-- Keep prices in the `cost` answer interpolated from `lib/pricing.ts`. Never
-  type a tier price or the design fee as a literal. (`minimum` is the one
-  deliberate exception: its "10" and "5–10" are policy wording, not the
-  calculator's numbers.)
-- If JCC approved D11, set `FAQ_SECTION.subtitle` / `cta` to the approved text.
-  Still `content/faq.ts` only.
-- An entry JCC isn't ready to answer stays `published: false`. It is invisible
-  and never copied, and that is fine to ship.
+Source of truth: `docs/ux/0001-faq.md` §3 at commit f3f406c (all pilot wording
+approved by JCC, D11, 2026-09-28), and the decisions in
+`~/sidestep/docs/gates/0001-gate1.md` → `## JCC decisions`. Not the mockup.
 
-If D8 says so, also update the "20+ years" claim in
-`components/marketing/HeroSection.tsx` (and its test).
+| id | Change in this issue |
+|---|---|
+| `cost` | already §3 Q1 text from F-01 → set `published: true` |
+| `minimum` | question → "What's the minimum order?"; answer → exactly "Our minimum is 10 jerseys per design." (D1b). Keep the A3 comment above it, updated to say the 5–9 sentence was dropped on purpose |
+| `timeline` | answer → §3 Q3 (3 paragraphs, incl. "We don't do rush orders…", D3) |
+| `process` | already §3 Q4 text → set `published: true` |
+| `design` | answer → §3 Q5 (2 paragraphs; the "20+ years" and 3D mock-up lines go, D8); fee as `$${DESIGN_FEE}`; add `finePrint: "Includes up to 3 rounds of changes."` (D5) |
+| `design-tips` | **unchanged**: stays `published: false` with its `[CONFIRM]` (D6, follow-up card t_cd0e61b4) |
+| `colour` | already §3 Q7 text → set `published: true` |
+| `shipping` | unchanged (§3 Q8 = live text) |
+
+Then set `PERMANENT_IDS` to the 7 published ids. `FAQ_SECTION` is already the
+approved copy from F-01; leave it.
+
+Rules:
+- Copy §3 verbatim (same words and punctuation; line breaks inside a paragraph
+  don't matter, blank lines and `**`/`[…](…)` syntax do).
+- No price or fee literal: `$125` in `design` is `$${DESIGN_FEE}`, as in `cost`.
+- `lib/pricing.ts`, the calculator and `HeroSection` are not touched (A3, D8).
 
 ## Acceptance Criteria
-- [ ] No published entry contains `[CONFIRM`. Any entry that still contains one is `published: false` and named in the handoff as deliberately held back
-- [ ] Every published entry's question and answer match the Gate-1-approved text verbatim (SDET diffs against the approved source)
-- [ ] `PERMANENT_IDS` contains every published id
-- [ ] No price or fee is typed as a literal in `content/faq.ts`. They come from `lib/pricing.ts` (grep: no `\$\d` outside `${…}` interpolation)
-- [ ] The diff touches only `content/faq.ts` (plus `HeroSection` if D8 says so): no JSX or component change was needed
-- [ ] The rendered site shows the published entries in the order `cost, minimum, timeline, process, design, design-tips, colour, shipping` (skipping any unpublished)
-- [ ] `minimum` is unchanged from today's live text, and `lib/pricing.ts` / the calculator are untouched (JCC, A3)
+- [ ] ss-dev's build commits (everything after SDET's F-03 test commit) touch only `content/faq.ts`: no JSX, component, test or `lib/` change was needed. Across the whole F-03 branch, `HeroSection`, `lib/pricing.ts`, `PricingCalculator` and `PricingSection` are untouched
+- [ ] Published entries, in order, are exactly `cost, minimum, timeline, process, design, colour, shipping`; `design-tips` is present and `published: false`
+- [ ] The rendered site shows those 7 questions in that order, with the question text from §3's table (incl. "What's the minimum order?")
+- [ ] For each published entry, the answer (whitespace-collapsed) equals §3's approved text (whitespace-collapsed, `> ` markers stripped), with `cost`'s numbers produced by the interpolation. SDET encodes each expected string in the test
+- [ ] `minimum` answer === `"Our minimum is 10 jerseys per design."`
+- [ ] `design.finePrint` === `"Includes up to 3 rounds of changes."`; the rendered `design` panel shows it as muted fine print; `toPlainText(parseAnswer(design.answer))` does not contain "rounds"
+- [ ] `design` answer contains `` `$${DESIGN_FEE}` `` output ("$125" with today's constant) and not "20+ years" or "3D mock-up"
+- [ ] No price literal: `content/faq.ts` source has no match for `/\$\d/`
+- [ ] No published entry contains `[CONFIRM` (the existing content lint and runtime gate stay green)
+- [ ] `PERMANENT_IDS` equals the 7 published ids
+- [ ] Copy answer for `timeline` (admin, `NEXT_PUBLIC_SITE_URL` unset) produces the §3 Q3 text as 3 paragraphs with "quote form" as plain words, then a blank line and `<origin>/#faq-timeline`
+- [ ] Copy answer for `colour` ends with `"Tissus Print explains it well.\n<Tissus Print URL>\n\n<origin>/#faq-colour"` and contains the 3 headings without `**`
 - [ ] `npm run verify` passes
 
 ## Dependencies
 - Blocked by: F-01-faq-answer-source
-- Blocked by: JCC decisions D2–D8, D11 and A4 (Gate 1). D1 is settled: keep
-  the live `minimum` answer, leave the calculator alone (A3). No F-04.
+- Blocked by: F-02-faq-deep-links-and-copy (stacked branches; the Copy answer
+  criteria above need F-02's buttons)
 
 ## Notes
-- Files likely touched: `content/faq.ts`, maybe
-  `components/marketing/HeroSection.tsx` (+ `.test.tsx`).
-- Independent of F-02. It can land before or after it.
-- If JCC edits via GitHub's web editor, the commit skips `npm run verify`. Run
-  it afterwards (SDET or ss-dev) on `main` and report the result.
+- Files likely touched: `content/faq.ts` only. If any criterion seems to need
+  another file, stop and report it: that's a bug in F-01/F-02's content
+  boundary, not something to fix here.
+- The F-01 tests that pin today's live wording (the 4 published questions in
+  `FaqSection.test.tsx`, the byte-identical regression check, `PERMANENT_IDS`
+  contents) are expected to go red here. SDET's F-03 test card replaces them
+  with the §3 expectations in its own commit, before the build; the build
+  never edits tests (the diff rule above).
+- `docs/ux/0001-faq.md` §4's Journey B paste example predates D3 (it lacks the
+  "We don't do rush orders" paragraph). §3 wins.
+- Branching: this branch starts from the F-02 build branch; Gate 2 merges it
+  once, fast-forward.
