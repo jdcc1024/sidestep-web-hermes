@@ -15,6 +15,10 @@ import { QuoteCtaSection } from "@/components/marketing/QuoteCtaSection";
 // a scroll trigger would fire the instant the page loaded anyway, and it
 // staggers per element rather than fading in as one block — neither of which
 // <Reveal> can express from the outside.
+//
+// The FAQ isn't revealed at all: it is a deep-link target (/#faq-<id>), and a
+// fade-and-rise would play on the answer the visitor asked for and shift it
+// under the sticky nav.
 export default function Home() {
   return (
     <MarketingShell>
@@ -28,9 +32,7 @@ export default function Home() {
       <Reveal>
         <PricingSection />
       </Reveal>
-      <Reveal>
-        <FaqSection />
-      </Reveal>
+      <FaqSection />
       <Reveal>
         <QuoteCtaSection />
       </Reveal>

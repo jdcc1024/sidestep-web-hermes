@@ -45,8 +45,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.SNAP_BASE || 'http://localhost:8080';
 const SPOTLIGHT = '[data-testid="tier-spotlight"]';
-/** A section far enough down the landing page to be reliably below the fold. */
-const REVEALED_SECTION = '#faq';
+/**
+ * A section far enough down the landing page to be reliably below the fold,
+ * and still wrapped in <Reveal>. Not #faq: that lost its reveal in F-02
+ * because it is a deep-link target.
+ */
+const REVEALED_SECTION = '#quote';
 /**
  * The last of the three process step cards — the one furthest into the stagger,
  * so if any turn of the sequence escapes suppression it is the likeliest to.
