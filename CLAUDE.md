@@ -100,6 +100,7 @@ project-root/
 ├── README.md              ← Human-facing project docs
 ├── app/                   ← Next.js App Router routes
 ├── components/            ← React components (ui/ = shadcn primitives)
+├── content/               ← editable site copy (FAQ)
 ├── convex/                ← Convex schema + server functions
 ├── lib/                   ← Shared business logic (framework-free, unit-tested)
 ├── scripts/
