@@ -220,17 +220,26 @@ describe("FaqAccordion: deep links", () => {
     },
   );
 
-  it("a hash for the real, unpublished design-tips entry opens nothing on the real FAQ", async () => {
+  // F-03 publishes design-tips, so on the real FAQ its deep link now opens Q6.
+  // The "unpublished id opens nothing" path stays covered by the fixture test
+  // above (#faq-design-tips / #faq-gated against ENTRIES).
+  it("deep link /#faq-design-tips opens the real, now-published Q6 item on the real FAQ (F-03)", async () => {
     loadWithHash("#faq-design-tips");
     render(<FaqSection />);
-    await settle();
-    expect(document.getElementById("faq-design-tips")).toBeNull();
+    const q6 = () => screen.getByRole("button", { name: "What should we know before sending our design?" });
+    await waitFor(() => expect(q6()).toHaveAttribute("aria-expanded", "true"));
+
     const triggers = within(document.getElementById("faq")!)
       .getAllByRole("button")
       .filter((b) => b.hasAttribute("aria-expanded"));
-    expect(triggers.length).toBeGreaterThan(0);
-    for (const t of triggers) expect(t).toHaveAttribute("aria-expanded", "false");
-    expect(scrollCalls).toHaveLength(0);
+    expect(triggers).toHaveLength(8);
+    expect(triggers.filter((t) => t.getAttribute("aria-expanded") === "true")).toEqual([q6()]);
+
+    const item = document.getElementById("faq-design-tips");
+    expect(item).not.toBeNull();
+    expect(within(item!).getAllByRole("listitem")).toHaveLength(4);
+    await waitFor(() => expect(document.activeElement).toBe(q6()));
+    await waitFor(() => expect(scrollCalls.map((c) => c.el)).toContain(item));
   });
 
   it("clicking a trigger doesn't change location.hash (no URL rewrite, no history entry)", async () => {

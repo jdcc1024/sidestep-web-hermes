@@ -28,12 +28,19 @@ import type { FaqEntry } from "@/lib/faq";
  * criteria name (`text-muted-foreground`, a smaller text-size class).
  */
 
+// The 8 published questions after F-03, in order (UX §3 table, at 0d4b39a).
+// F-03 replaced the 4 pre-F-01 live questions that used to be pinned here.
 const LIVE_QUESTIONS = [
-  "What is your minimum order?",
+  "How much do custom jerseys cost?",
+  "What's the minimum order?",
   "How long does an order take?",
+  "How does the process work?",
   "Do you help with the design?",
+  "What should we know before sending our design?",
+  "Will the colours match what I see on screen?",
   "Where do you ship?",
 ];
+const LIVE_IDS = ["cost", "minimum", "timeline", "process", "design", "design-tips", "colour", "shipping"];
 
 function entry(overrides: Partial<FaqEntry> & Pick<FaqEntry, "id">): FaqEntry {
   return {
@@ -111,9 +118,8 @@ describe("FaqSection (real content)", () => {
 
   it('each item\'s root has id="faq-<id>"', async () => {
     const { container } = render(<FaqSection />);
-    const ids = ["minimum", "timeline", "design", "shipping"];
 
-    ids.forEach((id, i) => {
+    LIVE_IDS.forEach((id, i) => {
       const item = container.querySelector(`#faq-${id}`);
       expect(item, `#faq-${id}`).not.toBeNull();
       expect(within(item as HTMLElement).getByRole("button", { name: LIVE_QUESTIONS[i] })).toBeInTheDocument();
@@ -129,7 +135,7 @@ describe("FaqSection (real content)", () => {
     const hidden = screen.queryByText(/Most orders take around 4 weeks/);
     if (hidden) expect(hidden).not.toBeVisible();
     const live = await open("How long does an order take?");
-    expect(live).toHaveTextContent(/Most orders take around 4 weeks from confirmed design to delivery\./);
+    expect(live).toHaveTextContent(/Most orders take around 4 weeks from the day you approve your design to delivery\./);
     expect(live).toBeVisible();
 
     render(

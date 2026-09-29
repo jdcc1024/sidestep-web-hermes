@@ -18,9 +18,9 @@ import { DESIGN_FEE } from "@/lib/pricing";
  * Content lint for content/faq.ts, plus the F-01 acceptance criteria that are
  * about the content itself (backlog/F-01-faq-answer-source.md).
  *
- * This is the file JCC's edits must keep green. The last describe block pins
- * today's live wording (F-01 is a visitor-facing refactor); the F-03 test card
- * replaces that block when the approved §3 wording goes live.
+ * This is the file JCC's edits must keep green. The approved §3 wording that
+ * F-03 publishes is pinned in content/faq.approved.test.ts, which replaced
+ * the F-01 "unpublished entries" and "regression" blocks that used to be here.
  */
 
 const SOURCE = readFileSync(join(process.cwd(), "content", "faq.ts"), "utf-8");
@@ -71,7 +71,7 @@ describe("content/faq.ts: content lint", () => {
   });
 
   it("every id in PERMANENT_IDS exists in FAQ and is published", () => {
-    // F-01 starts the list with the 4 live ids; later issues only append.
+    // Ids only ever get appended: the 4 ids live before F-01 must stay.
     expect(PERMANENT_IDS).toEqual(
       expect.arrayContaining(["minimum", "timeline", "design", "shipping"]),
     );
@@ -95,13 +95,12 @@ describe("content/faq.ts: content lint", () => {
     }
   });
 
-  it("the 5 in-pilot done_when topics have an entry (cost, minimum, timeline, process, colour); design-tips exists and is published: false (D6)", () => {
-    const ids = FAQ.map((e) => e.id);
-    for (const id of ["cost", "minimum", "timeline", "process", "colour"]) {
-      expect(ids).toContain(id);
+  it("the 6 done_when topics each have a published, publishable entry (cost, minimum, timeline, process, design-tips, colour)", () => {
+    // Register done_when: lead time, order cost, MOQ, design tips, the design
+    // process, screen-vs-print colour. D6b puts design-tips back in (F-03).
+    for (const id of ["cost", "minimum", "timeline", "process", "design-tips", "colour"]) {
+      expect(isPublishable(byId(id)), `"${id}" is not live`).toBe(true);
     }
-    // D6: design tips are out of the pilot. This must not require publishing.
-    expect(byId("design-tips").published).toBe(false);
   });
 
   it("cost answer interpolates formatTierPriceList/priceRange from 10 and DESIGN_FEE, and does not mention 5–9 (A4 = A)", () => {
@@ -154,126 +153,5 @@ describe("content/faq.ts: content lint", () => {
         href: "/intake",
       },
     });
-  });
-});
-
-/**
- * Not a checklist line, but the issue's content table: cost, process and colour
- * go in as §3's approved text (docs/ux/0001-faq.md, commit f3f406c). F-03
- * publishes them without rewording, so these hold through F-03. Compared as
- * plain text, so source line breaks don't matter; prices come from the helpers.
- */
-describe("content/faq.ts: unpublished entries carry §3 approved text", () => {
-  it("cost, process, colour, design-tips are unpublished in F-01, with §3 questions", () => {
-    expect(byId("cost")).toMatchObject({
-      question: "How much do custom jerseys cost?",
-      published: false,
-    });
-    expect(byId("process")).toMatchObject({
-      question: "How does the process work?",
-      published: false,
-    });
-    expect(byId("colour")).toMatchObject({
-      question: "Will the colours match what I see on screen?",
-      published: false,
-    });
-    expect(byId("design-tips")).toMatchObject({
-      question: "Any tips for designing our jerseys?",
-      published: false,
-    });
-  });
-
-  it("cost reads as §3 Q1", () => {
-    const from10 = { fromQuantity: 10 };
-    expect(toPlainText(parseAnswer(byId("cost").answer))).toBe(
-      `Jerseys are ${priceRange(from10)} each, and the more you order, the less each one costs: ` +
-        `${formatTierPriceList(from10)}. Tax and shipping are included, so there are no hidden fees.` +
-        "\n\n" +
-        `Want us to design it for you? That's a flat $${DESIGN_FEE} design fee, tax included. ` +
-        "The price calculator works out your total, and we confirm your final quote before anything is made.",
-    );
-  });
-
-  it("process reads as §3 Q4 (6 numbered steps)", () => {
-    expect(toPlainText(parseAnswer(byId("process").answer))).toBe(
-      [
-        "1. Get a quote: tell us about your team on our quote form.",
-        "2. Design: add your colours, logos and ideas to our jersey template, or we design it with you.",
-        "3. Names, numbers & sizes: send us your team's roster. We need it before we confirm your order.",
-        "4. 3D mock-up: see exactly how your jersey will look before anything is made.",
-        "5. Confirm: we lock in your design, roster and final quote, and send your invoice.",
-        "6. Production: most orders arrive in around 4 weeks.",
-      ].join("\n"),
-    );
-  });
-
-  it("colour reads as §3 Q7", () => {
-    const blocks = parseAnswer(byId("colour").answer);
-    const [link] = externalLinks(blocks);
-    expect(link.href).toBe(
-      "https://www.tissus-print.com/en/blog/printing/print-file-preparation/understanding-the-difference-between-screen-display-and-printed-fabric-why-do-colours-change",
-    );
-    expect(toPlainText(blocks)).toBe(
-      [
-        "Close, but not exactly. This one surprises a lot of people, so here's what's going on.",
-        "",
-        "Screen Glow vs Fabric\nYour phone lights up every colour from behind. A jersey can't do that. It only reflects whatever light is around it, so bright, neon-ish colours on your screen come out a bit softer on fabric.",
-        "",
-        "Screen differences\nNo two screens show colour the same way. Your design will look slightly different on your phone, your laptop and your teammate's phone, and that goes for the mock-ups we send you too. Brightness and night mode make a bigger difference than you'd think.",
-        "",
-        "Lighting and Cameras\nThe finished jersey will look different under gym lights than it does outside. Phone cameras also adjust colour on their own, so a photo of an old jersey isn't a reliable colour reference.",
-        "",
-        "Need a specific colour, like a club or sponsor colour? Send us the Pantone code and we'll match it as closely as the fabric allows.",
-        "",
-        `Want the longer version? Tissus Print explains it well.\n${link.href}`,
-      ].join("\n"),
-    );
-  });
-});
-
-/**
- * Regression: F-01 must not change what a visitor reads. These strings are
- * copied from components/marketing/FaqSection.tsx at main 12afdf7.
- * F-03's test card replaces this block (D1b, D3, D5, D8 change the wording).
- */
-describe("content/faq.ts: regression (F-01 only; replaced by F-03 tests)", () => {
-  it("the 4 published entries' questions and answers are byte-identical to today's FaqSection.tsx", () => {
-    const live = FAQ.filter((e) => e.published).map(({ id, question, answer, finePrint }) => ({
-      id,
-      question,
-      answer,
-      finePrint,
-    }));
-
-    expect(live).toEqual([
-      {
-        id: "minimum",
-        question: "What is your minimum order?",
-        answer:
-          "Our standard minimum is 10 jerseys per design. Smaller runs of 5–10 jerseys are possible but carry a special-order fee.",
-        finePrint: undefined,
-      },
-      {
-        id: "timeline",
-        question: "How long does an order take?",
-        answer:
-          "Most orders take around 4 weeks from confirmed design to delivery. We'll flag a tighter timeline up front if you're working against a tournament or season start.",
-        finePrint: undefined,
-      },
-      {
-        id: "design",
-        question: "Do you help with the design?",
-        answer:
-          "Yes — our team has 20+ years of industry experience and can guide you through the design from a rough idea, mood board, or sketch. You'll see a 3D mock-up before anything goes into production.",
-        finePrint: undefined,
-      },
-      {
-        id: "shipping",
-        question: "Where do you ship?",
-        answer:
-          "We currently serve the Greater Vancouver area. If you're outside that region, get in touch and we'll see what we can do.",
-        finePrint: undefined,
-      },
-    ]);
   });
 });
