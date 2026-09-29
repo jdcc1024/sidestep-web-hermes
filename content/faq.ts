@@ -45,23 +45,29 @@ export const FAQ: FaqEntry[] = [
     answer: `Jerseys are ${priceRange(FROM_10)} each, and the more you order, the less each one costs: ${formatTierPriceList(FROM_10)}. Tax and shipping are included, so there are no hidden fees.
 
 Want us to design it for you? That's a flat $${DESIGN_FEE} design fee, tax included. The [price calculator](/#pricing) works out your total, and we confirm your final quote before anything is made.`,
-    published: false,
+    published: true,
   },
   // Deliberate mismatch, do not "fix": the FAQ steers new customers to 10 or
   // more jerseys, while the price calculator still quotes the 5–9 tier for
-  // repeat customers (A3, D1b). The two are meant to disagree.
+  // repeat customers (A3, D1b). The sentence about smaller runs was dropped
+  // from this answer on purpose, so the two are meant to disagree.
   {
     id: "minimum",
-    question: "What is your minimum order?",
-    answer:
-      "Our standard minimum is 10 jerseys per design. Smaller runs of 5–10 jerseys are possible but carry a special-order fee.",
+    question: "What's the minimum order?",
+    answer: "Our minimum is 10 jerseys per design.",
     published: true,
   },
   {
     id: "timeline",
     question: "How long does an order take?",
-    answer:
-      "Most orders take around 4 weeks from confirmed design to delivery. We'll flag a tighter timeline up front if you're working against a tournament or season start.",
+    answer: `Most orders take around 4 weeks from the day you approve your design to
+delivery. The design back-and-forth comes before that, so get in touch early.
+
+Playing against a season start or a tournament? Put your date on the
+[quote form](/intake) and we'll tell you up front if it's tight.
+
+We don't do rush orders. If your date is really tight, get in touch and
+we'll talk it through.`,
     published: true,
   },
   {
@@ -76,30 +82,36 @@ Want us to design it for you? That's a flat $${DESIGN_FEE} design fee, tax inclu
 5. Confirm: we lock in your design, roster and final quote, and send your
    invoice.
 6. Production: most orders arrive in around 4 weeks.`,
-    published: false,
+    published: true,
   },
   {
     id: "design",
     question: "Do you help with the design?",
-    answer:
-      "Yes — our team has 20+ years of industry experience and can guide you through the design from a rough idea, mood board, or sketch. You'll see a 3D mock-up before anything goes into production.",
+    answer: `Yes. Send us a rough idea, a mood board or a sketch and we'll design it with
+you for a flat $${DESIGN_FEE} fee.
+
+Already have a finished design? Then there's no design fee.`,
+    finePrint: "Includes up to 3 rounds of changes.",
     published: true,
   },
-  // Held out of the pilot (D6); JCC reviews the tips on their own card. The
-  // [CONFIRM] line keeps it off the site even if someone flips `published`.
   {
     id: "design-tips",
-    question: "Any tips for designing our jerseys?",
-    answer: `A few things that make a big difference:
-- Send logos as SVG files or the largest PNG you have. Blurry logos print blurry.
-- Make names and numbers stand out hard against the jersey colour so they read
-  from across the field.
-- Skip tiny text and thin lines. They disappear from a distance.
-- Sublimation prints the whole jersey, so full-body patterns and gradients
-  are fair game.
+    question: "What should we know before sending our design?",
+    answer: `Most of the hold-ups we see come down to a few things:
 
-[CONFIRM: JCC to edit or replace these tips. Is there any extra cost for more colours or full-body graphics?]`,
-    published: false,
+- Send the original logo file, not a screenshot or a picture saved off
+  Instagram. Whoever made your logo should have it, usually as an .ai, .eps,
+  .svg or .pdf file. If a small image is all you've got, send it anyway and
+  we'll tell you what we can do with it.
+- Tell us your exact colours. "Navy" is a different blue to everyone, so if
+  your club or a sponsor has official colours, send us the Pantone codes.
+- Get your team to agree on the look before you send it. Changing direction
+  after we've started designing slows everything down.
+- Before you confirm, check the mock-up and your roster one more time: how
+  every name is spelled, and that each player has the right number and size.
+  A typo is a quick fix on the mock-up, but after printing it means making
+  that jersey again.`,
+    published: true,
   },
   {
     id: "colour",
@@ -127,7 +139,7 @@ Need a specific colour, like a club or sponsor colour? Send us the Pantone
 code and we'll match it as closely as the fabric allows.
 
 Want the longer version? [Tissus Print explains it well](https://www.tissus-print.com/en/blog/printing/print-file-preparation/understanding-the-difference-between-screen-display-and-printed-fabric-why-do-colours-change).`,
-    published: false,
+    published: true,
   },
   {
     id: "shipping",
@@ -143,4 +155,13 @@ Want the longer version? [Tissus Print explains it well](https://www.tissus-prin
  * in this list: links already shared with customers would break. Append an id
  * here when its entry is first published.
  */
-export const PERMANENT_IDS = ["minimum", "timeline", "design", "shipping"] as const;
+export const PERMANENT_IDS = [
+  "cost",
+  "minimum",
+  "timeline",
+  "process",
+  "design",
+  "design-tips",
+  "colour",
+  "shipping",
+] as const;
