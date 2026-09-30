@@ -14,8 +14,8 @@ import {
   isPublishable,
   parseAnswer,
   publishedFaqs,
-  toPlainText,
   type FaqEntry,
+  type Inline,
 } from "@/lib/faq";
 import { DESIGN_FEE } from "@/lib/pricing";
 
@@ -54,7 +54,28 @@ function byId(id: string): FaqEntry {
   return found;
 }
 
-const plain = (answer: string) => toPlainText(parseAnswer(answer));
+/**
+ * What a visitor reads: each block's text (link labels only, no hrefs), blocks
+ * separated by a blank line, list items one per line. Test-local on purpose:
+ * it only needs parseAnswer, so these content checks don't depend on
+ * toPlainText (the old Copy answer formatter, removed with that feature).
+ */
+function plain(answer: string): string {
+  const inline = (inlines: Inline[]) => inlines.map((i) => i.text).join("");
+  return parseAnswer(answer)
+    .map((b) => {
+      switch (b.kind) {
+        case "heading":
+          return b.text;
+        case "p":
+          return inline(b.content);
+        case "ul":
+        case "ol":
+          return b.items.map(inline).join("\n");
+      }
+    })
+    .join("\n\n");
+}
 
 describe("F-03: published set and order", () => {
   it("the fixture's order is the issue's order (guards the fixture itself)", () => {
@@ -208,14 +229,20 @@ describe("F-03: entry-specific criteria", () => {
     }
   });
 
-  it("colour keeps its 3 headings and the Tissus Print link (§3 Q7, D7)", () => {
+  it("colour keeps its 3 headings and its last paragraph links to Tissus Print (§3 Q7, D7)", () => {
     const blocks = parseAnswer(byId("colour").answer);
     expect(blocks.filter((b) => b.kind === "heading").map((b) => b.kind === "heading" && b.text)).toEqual([
       "Screen Glow vs Fabric",
       "Screen differences",
       "Lighting and Cameras",
     ]);
-    expect(plain(byId("colour").answer).endsWith(`Tissus Print explains it well.\n${TISSUS_PRINT_URL}`)).toBe(true);
+    const last = blocks[blocks.length - 1];
+    expect(last.kind).toBe("p");
+    expect(last.kind === "p" ? last.content : []).toContainEqual({
+      kind: "link",
+      text: "Tissus Print explains it well",
+      href: TISSUS_PRINT_URL,
+    });
   });
 
   it("cost reads as the approved text with tiers from 10 up only: the 5–9 tier is not mentioned (A4 = A)", () => {
