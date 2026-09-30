@@ -3,8 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>0001 FAQ mockup: site FAQ + copy answer</title>
+<title>0001 FAQ mockup: site FAQ + copy answer (removed 2026-09-30)</title>
 <!--
+  Copy answer / Copy link removed 2026-09-30 by JCC (d568273). This mockup is
+  kept as history: its buttons and clipboard frames no longer match the site,
+  and its wording is superseded by content/faq.ts @ c8b72ff.
   UX mockup for initiative 0001 (docs/ux/0001-faq.md). Static, no build, no network.
   Open this file in a browser. Try: mockup.html#faq-timeline (deep link opens that item).
   Visual tokens copied from the live site: Inter, teal-600/700, muted section bg,
@@ -100,7 +103,7 @@
 </head>
 <body>
 <div class="review">
-  <h1>0001 FAQ: site FAQ + "Copy answer" (UX mockup)</h1>
+  <h1>0001 FAQ: site FAQ + "Copy answer" (UX mockup; Copy answer removed 2026-09-30)</h1>
   <p>Spec: <code>docs/ux/0001-faq.md</code>. Everything left of the dashed box is the proposed design. The dashed box and the labels are review aids only.</p>
   <p><span class="legend">Yellow</span> = <code>[CONFIRM]</code> placeholder, JCC to fill. It must never reach the live site.
      Try the deep link: add <code>#faq-timeline</code> to this file's URL and reload.</p>
@@ -125,7 +128,7 @@
             <a class="cta" href="#">Get a quote and ask us</a></p>
         </section>
       </div>
-      <p class="note">Tap a question to open it. Each open answer has <b>Copy answer</b> (plain text + link, for pasting into a chat or email) and <b>Copy link</b> (opens this exact answer). Anyone can use them: JCC to reply, captains to forward to their team.</p>
+      <p class="note">(Copy buttons removed 2026-09-30.) Tap a question to open it. Each open answer has <b>Copy answer</b> (plain text + link, for pasting into a chat or email) and <b>Copy link</b> (opens this exact answer). Anyone can use them: JCC to reply, captains to forward to their team.</p>
     </div>
 
     <!-- Frame 2: clipboard preview -->
@@ -133,7 +136,7 @@
       <p class="frame-label">2 · What lands on the clipboard</p>
       <div class="clip" aria-live="polite">
         <b id="clip-kind">Nothing copied yet.</b>
-        <pre id="clip-text">Open a question and tap "Copy answer" or "Copy link".</pre>
+        <pre id="clip-text">Open a question and tap "Copy answer" or "Copy link". (Removed from the site 2026-09-30.)</pre>
       </div>
       <p class="note">Rule: <b>answer text, blank line, link to that answer.</b> Plain text only: no formatting, no emoji, no greeting (JCC adds his own "Hey Sam!" if he wants). In-answer links (like "price calculator") become plain words; the one link at the end is always the answer's own deep link.</p>
     </div>
@@ -226,7 +229,7 @@ acc.innerHTML = FAQ.map(f => `
     <div class="panel" id="p-${f.id}" role="region" aria-labelledby="t-${f.id}">
       ${toHtml(f.a)}
       <div class="actions">
-        <button class="btn" data-copy="answer" data-id="${f.id}">${icons.copy}<span>Copy answer</span></button>
+        <button class="btn" data-copy="answer" data-id="${f.id}">${icons.copy}<span>Copy answer</span></button><!-- removed from the site 2026-09-30 -->
         <button class="btn" data-copy="link" data-id="${f.id}">${icons.link}<span>Copy link</span></button>
       </div>
     </div>
@@ -252,7 +255,7 @@ acc.addEventListener("click", async e => {
   const text = kind === "answer" ? toPlain(item) : linkFor(item.id);
   let ok = true;
   try { await navigator.clipboard.writeText(text); } catch { ok = false; }
-  document.getElementById("clip-kind").textContent = kind === "answer" ? "Copy answer →" : "Copy link →";
+  document.getElementById("clip-kind").textContent = kind === "answer" ? "Copy answer →" : "Copy link →"; // removed from the site 2026-09-30
   document.getElementById("clip-text").textContent = text;
   toast(ok ? (kind === "answer" ? "Answer copied. Paste it into your message." : "Link copied.")
            : `Couldn't copy. Here it is: ${text}`);
@@ -286,7 +289,7 @@ function openFromHash() {
 addEventListener("hashchange", openFromHash);
 if (location.hash) addEventListener("load", openFromHash); else setOpen(document.getElementById("faq-cost"), true);
 
-// Frame 3 uses the real "Copy answer" output for the timeline question.
+// Frame 3 uses the real "Copy answer" output for the timeline question (Copy answer removed from the site 2026-09-30).
 document.getElementById("chat-reply").innerHTML =
   esc(toPlain(FAQ.find(f => f.id === "timeline")).replace(/\n\n\[CONFIRM[^\]]+\]/, ""))
     .replace(/(https:\/\/\S+)/, '<a href="#faq-timeline">$1</a>');

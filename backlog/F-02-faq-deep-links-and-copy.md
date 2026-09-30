@@ -1,4 +1,11 @@
-# Issue: FAQ deep links + admin-only Copy answer / Copy link
+# Issue: FAQ deep links + admin-only Copy answer / Copy link (copy half removed 2026-09-30)
+
+> **Copy half removed 2026-09-30 by JCC (d568273; leftovers in c265c64).**
+> `CopyAnswerButtons`, `useIsAdmin`, `siteOrigin` / `NEXT_PUBLIC_SITE_URL` and
+> the plain-text path are gone, so the "Admin gate", "Copy" and copy-related
+> "End to end" criteria below no longer apply. The deep-link half
+> (`FaqAccordion`, `/#faq-<id>`, `<Reveal>` removal) stands. This issue is
+> kept as the record of what was built.
 
 ## Phase: 2
 
@@ -9,7 +16,7 @@
 ## Description
 
 Initiative 0001, the "send an answer in under a minute" half. It makes
-`/#faq-<id>` open one answer, and puts **Copy answer** and **Copy link**
+`/#faq-<id>` open one answer, and puts **Copy answer** and **Copy link** (both removed 2026-09-30)
 buttons inside each open answer, **visible only to a signed-in admin (JCC,
 D9 = B)**. The design is in `docs/architecture/0001-faq.md` (Deep links, Copy
 action, Admin check). UX spec: `docs/ux/0001-faq.md` §4 (Journeys A' and B),
@@ -73,7 +80,7 @@ panel ends where the answer (or fine print) ends, and when the buttons appear
 for an admin they only add height below the text (the text doesn't move).
 
 Two outline `Button`s, `size="sm"` plus a class for a 40px minimum height:
-- **Copy answer** (Copy icon) → `navigator.clipboard.writeText(faqCopyText(plainText, siteOrigin(), id))`
+- **Copy answer** (removed 2026-09-30) (Copy icon) → `navigator.clipboard.writeText(faqCopyText(plainText, siteOrigin(), id))`
 - **Copy link** (Link icon) → `writeText(faqUrl(siteOrigin(), id))`
 
 `siteOrigin()` returns `process.env.NEXT_PUBLIC_SITE_URL` (trailing `/`
@@ -113,14 +120,14 @@ Deep link (`FaqAccordion.test.tsx`, jsdom; stub `scrollIntoView` and `matchMedia
 Admin gate (`useIsAdmin.test.tsx` + `CopyAnswerButtons.test.tsx`; mock `convex/react` `useConvexAuth`/`useQuery` as in `components/layout/UserSync.test.tsx`)
 - [ ] `useIsAdmin` is `true` only when authenticated and `getCurrentUser` returns `{ isAdmin: true }`
 - [ ] `useIsAdmin` is `false` while auth is loading, when not authenticated (and then `useQuery` is called with `"skip"`), when the query is `undefined` (loading) or `null` (no row), and when `isAdmin` is `false`
-- [ ] Non-admin (each of the false cases above): an open item renders no "Copy answer"/"Copy link" and `CopyAnswerButtons` renders nothing at all (its container is empty: `container.firstChild === null`)
-- [ ] Admin: an open item renders exactly one "Copy answer" and one "Copy link"; collapsed items render neither
+- [ ] (removed 2026-09-30) Non-admin (each of the false cases above): an open item renders no "Copy answer"/"Copy link" and `CopyAnswerButtons` renders nothing at all (its container is empty: `container.firstChild === null`)
+- [ ] (removed 2026-09-30) Admin: an open item renders exactly one "Copy answer" and one "Copy link"; collapsed items render neither
 - [ ] Switching the mocked query from `undefined` to `{ isAdmin: true }` (re-render) makes the buttons appear without throwing
 - [ ] Static guard (grep test or review): `lib/useIsAdmin.ts` and `components/marketing/*` contain no `publicMetadata`, `unsafeMetadata`, `sessionClaims` or `is_admin`; the F-02 diff touches nothing under `convex/`
 - [ ] `lib/useIsAdmin.ts` has the "UI hint only, never authorise with it" comment
 
 Copy (`CopyAnswerButtons.test.tsx`, jsdom, admin mocked true; stub `navigator.clipboard`, mock `sonner` as in `CopyInviteLinkButton.test.tsx`)
-- [ ] Copy answer writes `plainText + "\n\n" + window.location.origin + "/#faq-" + id`, exactly (with `NEXT_PUBLIC_SITE_URL` unset)
+- [ ] (removed 2026-09-30) Copy answer writes `plainText + "\n\n" + window.location.origin + "/#faq-" + id`, exactly (with `NEXT_PUBLIC_SITE_URL` unset)
 - [ ] Copy link writes `window.location.origin + "/#faq-" + id`, exactly (with `NEXT_PUBLIC_SITE_URL` unset)
 - [ ] With `NEXT_PUBLIC_SITE_URL="https://box.tail1234.ts.net/"` (`vi.stubEnv`), both buttons use `https://box.tail1234.ts.net/#faq-<id>` regardless of `window.location.origin`
 - [ ] After a successful copy, the pressed button's accessible name contains "Copied!" and a success toast fires. The label reverts after 2 s (fake timers)

@@ -1,5 +1,11 @@
 # Issue: FAQ content pass — apply JCC's approved wording and publish
 
+> **Copy half removed 2026-09-30 by JCC (d568273; leftovers in c265c64).** The
+> "Copy answer for …" criteria (removed) and the `toPlainText` check below no
+> longer apply. The approved wording is now `content/faq.ts` @ c8b72ff (JCC reworded
+> four answers after this issue shipped), not UX §3. This issue is kept as the
+> record of what was built.
+
 ## Phase: 2
 
 ## Type: improvement
@@ -76,20 +82,20 @@ Rules:
 - [ ] `minimum` answer === `"Our minimum is 10 jerseys per design."`
 - [ ] `design-tips` answer (whitespace-collapsed) equals §3 Q6 verbatim (the block above); it parses to one paragraph followed by one `ul` of 4 items, and the rendered panel shows 4 list items
 - [ ] `design-tips` answer contains no `$`, and no match for `/price|cost|fee|surcharge|\[CONFIRM/i`; none of the old tips' text remains (e.g. no "Skip tiny text", no "fair game")
-- [ ] Copy answer for `design-tips` (admin, `NEXT_PUBLIC_SITE_URL` unset) === the intro line, a blank line, the 4 bullets each on one line starting `• `, a blank line, then `<origin>/#faq-design-tips`
+- [ ] ~~Copy answer for `design-tips`~~ (removed 2026-09-30) (admin, `NEXT_PUBLIC_SITE_URL` unset) === the intro line, a blank line, the 4 bullets each on one line starting `• `, a blank line, then `<origin>/#faq-design-tips`
 - [ ] Deep link `/#faq-design-tips` opens the Q6 item (it's published now, so F-02's unknown/unpublished-id path no longer applies to it)
 - [ ] `design.finePrint` === `"Includes up to 3 rounds of changes."`; the rendered `design` panel shows it as muted fine print; `toPlainText(parseAnswer(design.answer))` does not contain "rounds"
 - [ ] `design` answer contains `` `$${DESIGN_FEE}` `` output ("$125" with today's constant) and not "20+ years" or "3D mock-up"
 - [ ] No price literal: `content/faq.ts` source has no match for `/\$\d/`
 - [ ] No published entry contains `[CONFIRM`, and `content/faq.ts` source has no `[CONFIRM` at all (the existing content lint and runtime gate stay green)
 - [ ] `PERMANENT_IDS` equals the 8 published ids, in the order above
-- [ ] Copy answer for `timeline` (admin, `NEXT_PUBLIC_SITE_URL` unset) produces the §3 Q3 text as 3 paragraphs with "quote form" as plain words, then a blank line and `<origin>/#faq-timeline`
-- [ ] Copy answer for `colour` ends with `"Tissus Print explains it well.\n<Tissus Print URL>\n\n<origin>/#faq-colour"` and contains the 3 headings without `**`
+- [ ] ~~Copy answer for `timeline`~~ (removed 2026-09-30) (admin, `NEXT_PUBLIC_SITE_URL` unset) produces the §3 Q3 text as 3 paragraphs with "quote form" as plain words, then a blank line and `<origin>/#faq-timeline`
+- [ ] ~~Copy answer for `colour`~~ (removed 2026-09-30) ends with `"Tissus Print explains it well.\n<Tissus Print URL>\n\n<origin>/#faq-colour"` and contains the 3 headings without `**`
 - [ ] `npm run verify` passes
 
 ## Dependencies
 - Blocked by: F-01-faq-answer-source
-- Blocked by: F-02-faq-deep-links-and-copy (stacked branches; the Copy answer
+- Blocked by: F-02-faq-deep-links-and-copy (stacked branches; the Copy answer (removed 2026-09-30)
   criteria above need F-02's buttons)
 
 ## Notes

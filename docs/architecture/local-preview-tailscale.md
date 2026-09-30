@@ -55,12 +55,10 @@ tailscale funnel 8080                       # terminal 2: foreground, Ctrl+C sto
 tailscale funnel status                     # shows the public URL
 ```
 
-Then put the URL in `.env.local` so the FAQ's copy buttons build the right links
-(F-02), and rebuild, because `NEXT_PUBLIC_*` values are baked in at build time:
-
-```
-NEXT_PUBLIC_SITE_URL=https://<machine>.<tailnet>.ts.net
-```
+That URL (`https://<machine>.<tailnet>.ts.net`) is what you send customers,
+e.g. `https://<machine>.<tailnet>.ts.net/#faq-timeline`. No env var is needed.
+(`NEXT_PUBLIC_SITE_URL` used to be set here for the FAQ copy buttons. It was
+removed with them: Copy answer removed 2026-09-30 by JCC, d568273 / c265c64.)
 
 ## Why `next start`, not `npm run dev`, for customers
 
