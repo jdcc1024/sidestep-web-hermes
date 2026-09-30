@@ -21,15 +21,17 @@ import { DESIGN_FEE } from "@/lib/pricing";
 
 /**
  * Acceptance tests for F-03 (backlog/F-03-faq-content-pass.md): the content
- * side. content/faq.ts must carry JCC's approved §3 wording (the expected
- * text lives in ./__fixtures__/faq-approved.ts) and publish all 8 entries.
+ * side. content/faq.ts must carry JCC's approved wording (the expected text
+ * lives in ./__fixtures__/faq-approved.ts: UX §3 at 0d4b39a, except cost,
+ * design, design-tips and colour, which follow JCC's rewording at c8b72ff)
+ * and publish all 8 entries.
  *
  * "Same wording" is checked two ways, as the issue asks: the Markdown with all
  * whitespace collapsed (same words and punctuation, same `**` / `[…](…)`
  * syntax), and the parsed block structure (so blank lines, i.e. paragraph and
  * list boundaries, matter while line breaks inside a paragraph don't).
  *
- * Rendering and Copy answer on the real content are in
+ * Rendering on the real content is in
  * components/marketing/FaqSection.content.test.tsx.
  */
 
@@ -87,7 +89,7 @@ describe("F-03: published set and order", () => {
   });
 });
 
-describe("F-03: each published entry equals §3 (docs/ux/0001-faq.md at 0d4b39a)", () => {
+describe("F-03: each published entry equals the approved wording (§3 at 0d4b39a + JCC's c8b72ff edits)", () => {
   it.each(APPROVED_FAQ.map((a) => [a.id, a] as const))(
     "%s: question is §3's question text",
     (id, expected) => {
@@ -96,14 +98,14 @@ describe("F-03: each published entry equals §3 (docs/ux/0001-faq.md at 0d4b39a)
   );
 
   it.each(APPROVED_FAQ.map((a) => [a.id, a] as const))(
-    "%s: answer (whitespace-collapsed) equals §3's approved text, with cost's numbers from the interpolation",
+    "%s: answer (whitespace-collapsed) equals the approved text, with cost's numbers from the interpolation",
     (id, expected) => {
       expect(collapse(byId(id).answer)).toBe(collapse(expected.answer));
     },
   );
 
   it.each(APPROVED_FAQ.map((a) => [a.id, a] as const))(
-    "%s: answer has §3's paragraph/list/heading structure (blank lines matter, line breaks don't)",
+    "%s: answer has the approved paragraph/list/heading structure (blank lines matter, line breaks don't)",
     (id, expected) => {
       expect(parseAnswer(byId(id).answer)).toEqual(parseAnswer(expected.answer));
     },
@@ -151,8 +153,9 @@ describe("F-03: entry-specific criteria", () => {
     expect(answer).toContain(`$${DESIGN_FEE}`);
     expect(answer).not.toContain("20+ years");
     expect(answer).not.toMatch(/3D mock-up/i);
+    // JCC's wording at c8b72ff.
     expect(plain(answer)).toBe(
-      `Yes. Send us a rough idea, a mood board or a sketch and we'll design it with you for a flat $${DESIGN_FEE} fee.` +
+      `Send us a rough idea, a mood board or a sketch and we'll design it with you for a flat $${DESIGN_FEE} fee. Our design forms will ask for your input on things like colours, theme, team vibes, etc!` +
         "\n\nAlready have a finished design? Then there's no design fee.",
     );
   });
@@ -168,22 +171,31 @@ describe("F-03: entry-specific criteria", () => {
     expect(list.kind === "ul" && list.items).toHaveLength(4);
   });
 
-  it("design-tips answer (whitespace-collapsed) equals §3 Q6 verbatim", () => {
+  it("design-tips answer (whitespace-collapsed) equals JCC's c8b72ff wording verbatim", () => {
     expect(collapse(byId("design-tips").answer)).toBe(
-      collapse(`Most of the hold-ups we see come down to a few things:
+      collapse(`Here are a few common gotchas when designing your jersey:
 
-- Send the original logo file, not a screenshot or a picture saved off Instagram. Whoever made your logo should have it, usually as an .ai, .eps, .svg or .pdf file. If a small image is all you've got, send it anyway and we'll tell you what we can do with it.
-- Tell us your exact colours. "Navy" is a different blue to everyone, so if your club or a sponsor has official colours, send us the Pantone codes.
-- Get your team to agree on the look before you send it. Changing direction after we've started designing slows everything down.
-- Before you confirm, check the mock-up and your roster one more time: how every name is spelled, and that each player has the right number and size. A typo is a quick fix on the mock-up, but after printing it means making that jersey again.`),
+- If possible, send the original logo file. Ideally as an .ai, .eps, .svg or .pdf file. If you're using AI to create your file, we will charge the design fee to vectorize it.
+- Colours look different on screens than it does on fabric. If your club or a sponsor has official colours, send us the Pantone codes, or look up the closest Pantone to your colours.
+- Get your team to agree on the look before you send it. Changing direction after we've started designing can add delays into the production process.
+- Before you confirm, double check the mock-up and your roster! e.g. Name spelling, sizes ordered, etc.`),
     );
   });
 
-  it("design-tips answer has no $, no price/cost/fee/surcharge/[CONFIRM, and none of the old tips' text", () => {
+  it("design-tips keeps the file-format tip (.ai, .eps, .svg or .pdf) and the agree-on-the-look tip", () => {
+    const text = collapse(plain(byId("design-tips").answer));
+    expect(text).toContain(".ai, .eps, .svg or .pdf");
+    expect(text).toContain("agree on the look");
+  });
+
+  // The old "no price/cost/fee wording" guard was dropped at c8b72ff: JCC chose
+  // to mention the design fee for vectorising AI-made files. Prices still come
+  // only from lib/pricing.ts, so no dollar amount may be typed into this answer.
+  it("design-tips answer has no fine print, no $ amount, no [CONFIRM, and none of the old tips' text", () => {
     const { answer, finePrint } = byId("design-tips");
     expect(finePrint).toBeUndefined();
     expect(answer).not.toContain("$");
-    expect(answer).not.toMatch(/price|cost|fee|surcharge|\[CONFIRM/i);
+    expect(answer).not.toContain("[CONFIRM");
     for (const old of [
       "Skip tiny text",
       "fair game",
@@ -206,7 +218,7 @@ describe("F-03: entry-specific criteria", () => {
     expect(plain(byId("colour").answer).endsWith(`Tissus Print explains it well.\n${TISSUS_PRINT_URL}`)).toBe(true);
   });
 
-  it("cost reads as §3 Q1 with tiers from 10 up only: the 5–9 tier is not mentioned (A4 = A)", () => {
+  it("cost reads as the approved text with tiers from 10 up only: the 5–9 tier is not mentioned (A4 = A)", () => {
     const text = plain(byId("cost").answer);
     expect(text).not.toContain("5–9");
     expect(text).toBe(plain(approved("cost").answer));

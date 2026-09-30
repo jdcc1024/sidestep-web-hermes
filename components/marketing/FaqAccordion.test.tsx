@@ -15,8 +15,9 @@ import userEvent from "@testing-library/user-event";
  * `scrollIntoView` and `matchMedia` are stubs; position below the nav and
  * full opacity are checked by screenshot at review.
  *
- * convex/react is mocked (signed out) because F-02 puts `useIsAdmin()` in the
- * tree via CopyAnswerButtons, and the real hook needs a ConvexProvider.
+ * convex/react is mocked (signed out) so the tests don't depend on whether
+ * anything in the tree still calls a Convex hook. (F-02 put `useIsAdmin()`
+ * here via CopyAnswerButtons, removed in d568273.)
  */
 
 vi.mock("convex/react", () => ({
@@ -298,18 +299,14 @@ describe("FaqAccordion: deep links", () => {
 describe("FaqAccordion: build constraints (issue description)", () => {
   const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf-8");
 
-  it('FaqAccordion and CopyAnswerButtons are "use client" modules, FaqSection renders FaqAccordion, and the client never parses Markdown', () => {
+  it('FaqAccordion is a "use client" module, FaqSection renders FaqAccordion, and the client never parses Markdown', () => {
     const accordion = read("components/marketing/FaqAccordion.tsx");
-    const buttons = read("components/marketing/CopyAnswerButtons.tsx");
     const section = read("components/marketing/FaqSection.tsx");
 
     expect(accordion).toMatch(/^\s*["']use client["']/);
-    expect(buttons).toMatch(/^\s*["']use client["']/);
     expect(section).toMatch(/import[^;]*\bFaqAccordion\b[^;]*from\s+["'][^"']*FaqAccordion["']/);
 
-    for (const [name, src] of [["FaqAccordion.tsx", accordion], ["CopyAnswerButtons.tsx", buttons]]) {
-      expect(src, `${name} must not parse Markdown`).not.toMatch(/\b(parseAnswer|toPlainText)\b/);
-      expect(src, `${name} must not import content/faq`).not.toMatch(/["']@\/content\/faq["']/);
-    }
+    expect(accordion, "FaqAccordion.tsx must not parse Markdown").not.toMatch(/\b(parseAnswer|toPlainText)\b/);
+    expect(accordion, "FaqAccordion.tsx must not import content/faq").not.toMatch(/["']@\/content\/faq["']/);
   });
 });

@@ -120,8 +120,8 @@ describe("useIsAdmin: static guards (issue: Admin gate)", () => {
         .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
         .map((f) => `${dir}/${f}`),
     ];
-    // The two new client components must exist and be covered by this scan.
-    expect(files).toContain("components/marketing/CopyAnswerButtons.tsx");
+    // FaqAccordion must exist and be covered by this scan. (CopyAnswerButtons
+    // was the other one; removed in d568273.)
     expect(files).toContain("components/marketing/FaqAccordion.tsx");
 
     for (const file of files) {
