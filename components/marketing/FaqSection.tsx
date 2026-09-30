@@ -7,7 +7,6 @@ import {
   isExternalHref,
   parseAnswer,
   publishedFaqs,
-  toPlainText,
   type Block,
   type FaqEntry,
   type Inline,
@@ -16,8 +15,8 @@ import { cn } from "@/lib/utils";
 
 // All copy comes from content/faq.ts (D10); this component only lays it out.
 // Answers are parsed here, on the server. FaqAccordion (the client half: deep
-// links and copy buttons) gets only the rendered node and the plain text, so
-// no Markdown parsing ships to the browser.
+// links) gets only the rendered node, so no Markdown parsing ships to the
+// browser.
 
 function InlineContent({ inlines }: { inlines: Inline[] }) {
   return inlines.map((inline, i) => {
@@ -113,8 +112,6 @@ export function FaqSection({
                   )}
                 </>
               ),
-              // Never includes finePrint (D5).
-              plainText: toPlainText(blocks),
             };
           })}
         />

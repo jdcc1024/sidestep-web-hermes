@@ -15,8 +15,6 @@ export type FaqAccordionItem = {
   question: string;
   /** The answer blocks plus fine print, rendered on the server. */
   answerNode: ReactNode;
-  /** What "Copy answer" copies. Never includes the fine print. */
-  plainText: string;
 };
 
 const DEEP_LINK = /^#faq-([a-z0-9-]+)$/;

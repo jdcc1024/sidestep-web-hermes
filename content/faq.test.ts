@@ -8,7 +8,6 @@ import {
   isPublishable,
   parseAnswer,
   priceRange,
-  toPlainText,
   type Block,
   type FaqEntry,
 } from "@/lib/faq";
@@ -130,16 +129,6 @@ describe("content/faq.ts: content lint", () => {
     const external = externalLinks(blocks);
     expect(external).toHaveLength(1);
     expect(external[0].href.startsWith("https://www.tissus-print.com/")).toBe(true);
-  });
-
-  it("colour plain text has no **, keeps heading + body on adjacent lines, and ends with the Tissus Print sentence then its URL", () => {
-    const blocks = parseAnswer(byId("colour").answer);
-    const [link] = externalLinks(blocks);
-    const plain = toPlainText(blocks);
-
-    expect(plain).not.toContain("**");
-    expect(plain).toContain("Screen Glow vs Fabric\nYour phone lights up");
-    expect(plain.endsWith(`Tissus Print explains it well.\n${link.href}`)).toBe(true);
   });
 
   it("FAQ_SECTION equals the D11 values (eyebrow, heading, subtitle, cta prompt/label/href)", () => {

@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// F-02 puts useIsAdmin() (convex/react) inside each open panel. These F-01
-// tests render without a ConvexProvider, so they run as a signed-out visitor:
-// no copy buttons, and the panel content is exactly the answer + fine print.
+// Nothing in the FAQ calls a Convex hook since Copy answer was removed; the
+// mock stays as a guard so these tests render as a signed-out visitor with no
+// ConvexProvider: the panel content is exactly the answer + fine print.
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isLoading: false, isAuthenticated: false }),
   useQuery: () => undefined,

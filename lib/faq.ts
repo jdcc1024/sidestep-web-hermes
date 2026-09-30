@@ -129,52 +129,6 @@ export function parseAnswer(md: string): Block[] {
 }
 
 // ---------------------------------------------------------------------------
-// Plain text (clipboard)
-
-function inlinesToPlain(inlines: Inline[], urls: string[]): string {
-  return inlines
-    .map((inline) => {
-      if (inline.kind === "link" && isExternalHref(inline.href)) {
-        urls.push(inline.href);
-      }
-      return inline.text;
-    })
-    .join("");
-}
-
-function blockToPlain(block: Block): string {
-  const urls: string[] = [];
-  let text: string;
-  switch (block.kind) {
-    case "heading":
-      return block.text;
-    case "p":
-      text = inlinesToPlain(block.content, urls);
-      break;
-    case "ul":
-      text = block.items.map((item) => `• ${inlinesToPlain(item, urls)}`).join("\n");
-      break;
-    case "ol":
-      text = block.items
-        .map((item, i) => `${i + 1}. ${inlinesToPlain(item, urls)}`)
-        .join("\n");
-      break;
-  }
-  // External URLs go on their own line after the block (UX §5 exception, D7).
-  return [text, ...urls].join("\n");
-}
-
-export function toPlainText(blocks: Block[]): string {
-  return blocks
-    .map((block, i) => {
-      const text = blockToPlain(block);
-      if (i === blocks.length - 1) return text;
-      return text + (block.kind === "heading" ? "\n" : "\n\n");
-    })
-    .join("");
-}
-
-// ---------------------------------------------------------------------------
 // Publishing and links
 
 export function isPublishable(entry: FaqEntry): boolean {
@@ -190,25 +144,6 @@ export function publishedFaqs(entries: readonly FaqEntry[]): FaqEntry[] {
 
 export function faqAnchorId(id: string): string {
   return `faq-${id}`;
-}
-
-export function faqUrl(origin: string, id: string): string {
-  return `${origin}/#${faqAnchorId(id)}`;
-}
-
-/**
- * The origin copied FAQ links are built from (A1). NEXT_PUBLIC_SITE_URL wins so
- * an admin copying from localhost still hands out the public URL. Browser-only
- * fallback; read at call time so a click always sees the current value.
- */
-export function siteOrigin(): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL;
-  if (configured) return configured.replace(/\/+$/, "");
-  return window.location.origin;
-}
-
-export function faqCopyText(plainText: string, origin: string, id: string): string {
-  return `${plainText}\n\n${faqUrl(origin, id)}`;
 }
 
 // ---------------------------------------------------------------------------

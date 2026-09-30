@@ -1,15 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  faqAnchorId,
-  faqCopyText,
-  faqUrl,
   formatTierPriceList,
   isExternalHref,
   isPublishable,
   parseAnswer,
   priceRange,
   publishedFaqs,
-  toPlainText,
   type Block,
   type FaqEntry,
   type Inline,
@@ -127,52 +123,6 @@ describe("lib/faq.ts: parser", () => {
       expect(links(block.content), md).toEqual([]);
       expect(inlineText(block.content), md).toBe(md);
     }
-  });
-});
-
-describe("lib/faq.ts: plain text", () => {
-  it("toPlainText separates blocks by one blank line, prefixes ol items 1. 2., ul items •, and renders same-site links as text only", () => {
-    const md = [
-      "Intro with the [price calculator](/#pricing) and the [top](#faq).",
-      "",
-      "1. one",
-      "2. two",
-      "",
-      "- red",
-      "- blue",
-      "",
-      "End",
-    ].join("\n");
-
-    expect(toPlainText(parseAnswer(md))).toBe(
-      "Intro with the price calculator and the top.\n\n1. one\n2. two\n\n• red\n• blue\n\nEnd",
-    );
-  });
-
-  it('a heading is followed by a single \\n, not a blank line: "intro\\n\\n**H**\\nbody" → "intro\\n\\nH\\nbody"', () => {
-    expect(toPlainText(parseAnswer("intro\n\n**H**\nbody"))).toBe(
-      "intro\n\nH\nbody",
-    );
-  });
-
-  it("an external link keeps its text inline and its URL goes on its own line after the block that contains it", () => {
-    expect(
-      toPlainText(parseAnswer("More? [Read this](https://x.test/a).\n\nNext")),
-    ).toBe("More? Read this.\nhttps://x.test/a\n\nNext");
-  });
-
-  it('faqUrl("https://x.test", "timeline") === "https://x.test/#faq-timeline"', () => {
-    expect(faqUrl("https://x.test", "timeline")).toBe(
-      "https://x.test/#faq-timeline",
-    );
-    // The anchor half of the same contract: the id on the rendered item.
-    expect(faqAnchorId("timeline")).toBe("faq-timeline");
-  });
-
-  it('faqCopyText("Body", "https://x.test", "timeline") === "Body\\n\\nhttps://x.test/#faq-timeline"', () => {
-    expect(faqCopyText("Body", "https://x.test", "timeline")).toBe(
-      "Body\n\nhttps://x.test/#faq-timeline",
-    );
   });
 });
 
