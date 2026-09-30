@@ -8,7 +8,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { CopyAnswerButtons } from "@/components/marketing/CopyAnswerButtons";
 import { faqAnchorId } from "@/lib/faq";
 
 export type FaqAccordionItem = {
@@ -112,7 +111,6 @@ export function FaqAccordion({ items }: { items: FaqAccordionItem[] }) {
           </AccordionTrigger>
           <AccordionContent className="text-muted-foreground">
             {item.answerNode}
-            <CopyAnswerButtons id={item.id} plainText={item.plainText} />
           </AccordionContent>
         </AccordionItem>
       ))}
