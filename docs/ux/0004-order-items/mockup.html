@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0004 mockup: one order list the captain owns</title>
+<!--
+  UX mockup for docs/ux/0004-order-items.md. Static, no build, no network.
+  Visual tokens copied from the portal: Inter, teal-600/700 accents, shadcn card
+  radius and borders, amber notes (OrderForm / OrderLocked), size pills
+  (JerseyRunPublicForm SizeOption). Sample data mirrors the dev seed
+  (convex/_devSeed.ts "Snap Demo — Live Run").
+  Frames: 1 order page, 2 add item, 3 edit a player's item, 4 removed + undo,
+  5 new order with nothing on it, 6 locked.
+-->
+<style>
+  :root {
+    --bg:#fff; --muted:#f5f5f5; --fg:#0a0a0a; --muted-fg:#737373; --border:#e5e5e5;
+    --teal-50:#f0fdfa; --teal-100:#ccfbf1; --teal-600:#0d9488; --teal-700:#0f766e;
+    --amber-50:#fffbeb; --amber-300:#fcd34d; --amber-800:#92400e; --radius:10px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         color:var(--fg); background:#e9eef0; line-height:1.45; font-size:14px; }
+  :focus-visible { outline:2px solid var(--teal-600); outline-offset:2px; border-radius:6px; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+
+  /* review chrome */
+  .review { max-width:1260px; margin:0 auto; padding:24px 16px 64px; }
+  .review h1 { font-size:20px; margin:0 0 4px; }
+  .review > p { margin:0 0 4px; color:#444; }
+  .frames { display:flex; flex-wrap:wrap; gap:28px; margin-top:20px; align-items:flex-start; }
+  .frame-wrap { flex:0 1 375px; min-width:0; }
+  .frame-label { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#555; margin:0 0 8px; }
+  .phone { position:relative; width:100%; max-width:375px; min-height:640px; background:var(--bg); border:1px solid #cfd6d9;
+           border-radius:28px; overflow:hidden; box-shadow:0 12px 30px rgba(0,0,0,.12); }
+  .note { font-size:13px; color:#444; margin-top:10px; max-width:375px; }
+
+  /* portal chrome */
+  .topbar { height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; border-bottom:1px solid var(--border); }
+  .logo { font-family:"Bebas Neue", Impact, "Arial Narrow", sans-serif; font-size:22px; letter-spacing:.04em; }
+  .avatar { width:28px; height:28px; border-radius:50%; background:#d4d4d4; }
+  .page { padding:16px; }
+  .back { color:var(--teal-700); font-weight:500; font-size:13px; text-decoration:none; }
+  .eyebrow { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--teal-700); margin:12px 0 4px; }
+  h2.title { font-size:26px; font-weight:800; letter-spacing:-.02em; margin:0; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chip { display:inline-flex; align-items:center; gap:4px; height:22px; padding:0 8px; border-radius:999px; font-size:12px; font-weight:500;
+          background:var(--muted); color:#404040; border:1px solid transparent; }
+  .chip.outline { background:transparent; border-color:var(--border); color:var(--muted-fg); }
+  .chip.amber { background:#fef3c7; color:var(--amber-800); }
+  .chip.teal { background:var(--teal-100); color:var(--teal-700); }
+
+  .card { border:1px solid var(--border); border-radius:var(--radius); background:#fff; margin-top:14px; }
+  .card-h { padding:14px 14px 10px; }
+  .card-h h3 { margin:0; font-size:15px; font-weight:700; }
+  .card-h p { margin:4px 0 0; color:var(--muted-fg); font-size:13px; }
+  .progress-mini { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; }
+  .progress-mini b { font-weight:600; }
+  .link { color:var(--teal-700); font-weight:600; text-decoration:none; font-size:13px; }
+
+  .kit { border-top:1px solid var(--border); }
+  .kit-h { display:flex; align-items:center; gap:10px; padding:12px 14px 6px; }
+  .thumb { width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg,#0f766e,#111); flex:none; }
+  .thumb.away { background:linear-gradient(135deg,#f5f5f5,#0d9488); border:1px solid var(--border); }
+  .kit-h .name { font-weight:700; font-size:14px; }
+  .kit-h .count { color:var(--muted-fg); font-size:12px; }
+  .sizes { display:flex; flex-wrap:wrap; gap:4px; padding:0 14px 8px; }
+  .rows { list-style:none; margin:0; padding:0; }
+  .row { display:flex; align-items:center; gap:8px; min-height:48px; padding:6px 6px 6px 14px; border-top:1px solid #f0f0f0; }
+  .row .who { flex:1; min-width:0; }
+  .row .who .n { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .who .n .num { color:var(--muted-fg); font-weight:400; }
+  .row .who .by { font-size:11.5px; color:var(--muted-fg); }
+  .letter { display:inline-flex; width:18px; height:18px; border-radius:4px; background:#171717; color:#fff; font-size:10px; font-weight:700;
+            align-items:center; justify-content:center; margin-left:4px; vertical-align:1px; }
+  .size { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .size.need { font-weight:600; font-size:12px; color:var(--amber-800); background:#fef3c7; padding:2px 8px; border-radius:999px; }
+  .more { width:44px; height:44px; border:0; background:transparent; border-radius:8px; font-size:18px; color:#525252; cursor:pointer; }
+  .more:hover { background:var(--muted); }
+  .kit-actions { display:flex; gap:8px; padding:10px 14px 14px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:40px; padding:0 14px; border-radius:8px;
+         font:inherit; font-weight:600; font-size:14px; cursor:pointer; border:1px solid var(--border); background:#fff; color:var(--fg); }
+  .btn.primary { background:var(--teal-600); border-color:var(--teal-600); color:#fff; }
+  .btn.ghost { border-color:transparent; }
+  .btn.danger { color:#b91c1c; border-color:#fecaca; }
+  .btn.block { width:100%; }
+  .total { display:flex; justify-content:space-between; padding:12px 14px; border-top:1px solid var(--border); background:var(--muted);
+           border-radius:0 0 var(--radius) var(--radius); font-size:13px; }
+  .amber-note { margin:10px 14px; padding:10px 12px; border:1px solid var(--amber-300); background:var(--amber-50); color:var(--amber-800);
+                border-radius:8px; font-size:13px; }
+  .empty { margin:12px 14px; padding:18px 14px; border:1px dashed var(--border); border-radius:8px; background:#fafafa; text-align:center; color:var(--muted-fg); font-size:13px; }
+  .empty b { display:block; color:var(--fg); font-size:14px; margin-bottom:4px; }
+
+  /* bottom sheet */
+  .scrim { position:absolute; inset:0; background:rgba(0,0,0,.4); }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:18px 18px 0 0; padding:10px 16px 18px; }
+  .grab { width:40px; height:4px; border-radius:4px; background:#d4d4d4; margin:0 auto 10px; }
+  .sheet h3 { margin:0; font-size:17px; }
+  .sheet .sub { color:var(--muted-fg); font-size:13px; margin:2px 0 12px; }
+  label.f { display:block; font-weight:500; font-size:13px; margin:12px 0 4px; }
+  .hint { font-size:12px; color:var(--muted-fg); margin:-2px 0 6px; }
+  .input { height:44px; width:100%; border:1px solid var(--border); border-radius:8px; padding:0 12px; font:inherit; font-size:16px; background:#fff; }
+  .two { display:grid; grid-template-columns:1fr 92px; gap:10px; }
+  .pills { display:flex; flex-wrap:wrap; gap:6px; }
+  .pill { min-width:48px; height:40px; padding:0 10px; border:1px solid var(--border); border-radius:8px; background:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  .pill[aria-pressed="true"] { border-color:var(--teal-600); background:var(--teal-50); color:var(--teal-700); }
+  .stepper { display:inline-flex; align-items:center; border:1px solid var(--border); border-radius:8px; }
+  .stepper button { width:44px; height:40px; border:0; background:transparent; font-size:18px; cursor:pointer; }
+  .stepper span { width:36px; text-align:center; font-weight:600; font-variant-numeric:tabular-nums; }
+  .seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .seg button { height:36px; padding:0 12px; border:0; border-right:1px solid var(--border); background:#fff; font:inherit; font-size:13px; cursor:pointer; }
+  .seg button:last-child { border-right:0; }
+  .seg button[aria-pressed="true"] { background:var(--teal-50); color:var(--teal-700); font-weight:600; }
+  .sheet-actions { display:flex; gap:8px; margin-top:16px; }
+  .sheet-actions .btn { flex:1; }
+  .sheet-actions.stack { flex-direction:column-reverse; }
+  .sheet-actions.stack .btn { flex:none; }
+  .meta { background:var(--muted); border-radius:8px; padding:10px 12px; font-size:12.5px; color:#404040; }
+  .meta dt { color:var(--muted-fg); font-size:11px; text-transform:uppercase; letter-spacing:.05em; margin-top:6px; }
+  .meta dt:first-child { margin-top:0; }
+  .meta dd { margin:0; }
+  .toast { position:absolute; left:12px; right:12px; bottom:16px; background:#171717; color:#fff; border-radius:10px; padding:12px 14px;
+           display:flex; align-items:center; justify-content:space-between; font-size:13.5px; box-shadow:0 8px 20px rgba(0,0,0,.25); }
+  .toast button { background:transparent; border:0; color:#5eead4; font:inherit; font-weight:700; cursor:pointer; min-height:44px; padding:0 12px; }
+  .dim { opacity:.35; }
+</style>
+</head>
+<body>
+<div class="review">
+  <h1>0004 · One order list the captain owns</h1>
+  <p>Mobile-first mockup for <code>docs/ux/0004-order-items.md</code>. Static; the buttons don't do anything.</p>
+  <p>Proposed words in use: <b>order list</b>, <b>item</b>, <b>order form</b> (today: roster / slot / collected / responses / jersey run). See section 6 of the doc.</p>
+
+  <div class="frames">
+
+    <!-- 1 -->
+    <div class="frame-wrap">
+      <p class="frame-label">1 · Order page: the list comes first</p>
+      <div class="phone">
+        <div class="topbar"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page">
+          <a class="back" href="#">← My orders</a>
+          <p class="eyebrow">Order</p>
+          <h2 class="title">Snap Demo — Live Run</h2>
+          <div class="chips"><span class="chip">Dodgeball</span><span class="chip amber">Order started</span></div>
+
+          <div class="card">
+            <div class="progress-mini"><span>Step 1 of 8 · <b>Order started</b></span><a class="link" href="#">See all steps</a></div>
+          </div>
+
+          <section class="card" aria-labelledby="ol1">
+            <div class="card-h">
+              <h3 id="ol1">Order list</h3>
+              <p>Everything we'll make for this order. Add items yourself, or share the order form and let players add their own.</p>
+            </div>
+
+            <div class="kit">
+              <div class="kit-h"><span class="thumb"></span><div><div class="name">Home Kit</div><div class="count">4 items · 1 needs a size</div></div></div>
+              <div class="sizes"><span class="chip">M ×2</span><span class="chip">L ×1</span></div>
+              <ul class="rows">
+                <li class="row"><div class="who"><div class="n">Avery Quinn <span class="num">#7</span><span class="letter" title="Captain">C</span></div><div class="by">Added by Avery</div></div><span class="size">M</span><button class="more" aria-label="Edit Avery Quinn #7">⋯</button></li>
+                <li class="row"><div class="who"><div class="n">Sam Okafor <span class="num">#12</span><span class="letter" title="Assistant captain">A</span></div><div class="by">Added by Sam</div></div><span class="size">L</span><button class="more" aria-label="Edit Sam Okafor #12">⋯</button></li>
+                <li class="row"><div class="who"><div class="n">Sidestep <span class="num">#72</span></div><div class="by">Added by you</div></div><span class="size">M</span><button class="more" aria-label="Edit Sidestep #72">⋯</button></li>
+                <li class="row"><div class="who"><div class="n">Jordan Lee <span class="num">#4</span></div><div class="by">Added by you</div></div><span class="size need">Needs size</span><button class="more" aria-label="Edit Jordan Lee #4">⋯</button></li>
+              </ul>
+              <div class="kit-actions"><button class="btn primary">+ Add item</button><button class="btn ghost">Paste a list</button></div>
+            </div>
+
+            <div class="kit">
+              <div class="kit-h"><span class="thumb away"></span><div><div class="name">Away Kit</div><div class="count">3 items</div></div></div>
+              <div class="sizes"><span class="chip">S ×1</span><span class="chip">2XL ×2</span></div>
+              <ul class="rows">
+                <li class="row"><div class="who"><div class="n">Riley Tran <span class="num">#23</span></div><div class="by">Added by Riley</div></div><span class="size">S</span><button class="more" aria-label="Edit Riley Tran #23">⋯</button></li>
+                <li class="row"><div class="who"><div class="n">No name</div><div class="by">Added by Riley</div></div><span class="size">2XL ×2</span><button class="more" aria-label="Edit no-name 2XL">⋯</button></li>
+              </ul>
+              <div class="kit-actions"><button class="btn primary">+ Add item</button><button class="btn ghost">Paste a list</button></div>
+            </div>
+
+            <div class="total"><span><b>7 items</b> · S×1 M×2 L×1 2XL×2</span><span>1 needs a size</span></div>
+          </section>
+
+          <section class="card" aria-labelledby="of1">
+            <div class="card-h">
+              <h3 id="of1">Order form</h3>
+              <p>Players add their own name, number and size. It all lands on your list above.</p>
+            </div>
+            <div style="padding:0 14px 14px">
+              <div class="chips" style="margin:0 0 10px"><span class="chip teal">Open</span><span class="chip outline">Closes Oct 13, 2026</span></div>
+              <div style="display:flex; gap:8px"><button class="btn primary">Copy link</button><button class="btn">Form settings</button></div>
+            </div>
+          </section>
+
+          <div class="card"><div class="card-h"><h3>Order details</h3><p>Team name, sport, designs</p></div></div>
+        </div>
+      </div>
+      <p class="note">Timeline folds to one line on phones. The first item sits about one screen down (today it's about three). Player-added and captain-added items share one list. "Needs size" rows stay visible, so the gaps show before the deadline.</p>
+    </div>
+
+    <!-- 2 -->
+    <div class="frame-wrap">
+      <p class="frame-label">2 · + Add item (bottom sheet)</p>
+      <div class="phone">
+        <div class="topbar dim"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page dim"><h2 class="title">Snap Demo — Live Run</h2></div>
+        <div class="scrim"></div>
+        <div class="sheet" role="dialog" aria-labelledby="add-h">
+          <div class="grab"></div>
+          <h3 id="add-h">Add an item</h3>
+          <p class="sub">Home Kit</p>
+          <div class="two">
+            <div><label class="f" for="a-name">Name on jersey</label><input id="a-name" class="input" value="Sidestep"></div>
+            <div><label class="f" for="a-num">Number</label><input id="a-num" class="input" inputmode="numeric" value="72"></div>
+          </div>
+          <p class="hint" style="margin-top:6px">Leave either one blank if you don't want it printed.</p>
+          <label class="f">Size</label>
+          <p class="hint">Not sure yet? Skip it and we'll mark it "needs size".</p>
+          <div class="pills" role="group" aria-label="Size">
+            <button class="pill" aria-pressed="false">XS</button><button class="pill" aria-pressed="false">S</button>
+            <button class="pill" aria-pressed="true">M</button><button class="pill" aria-pressed="false">L</button>
+            <button class="pill" aria-pressed="false">XL</button><button class="pill" aria-pressed="false">2XL</button>
+            <button class="pill" aria-pressed="false">3XL</button><button class="pill" aria-pressed="false">4XL</button>
+          </div>
+          <div style="display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap">
+            <div><label class="f">How many</label><div class="stepper"><button aria-label="One fewer">−</button><span>1</span><button aria-label="One more">+</button></div></div>
+            <div><label class="f">Captain letter</label><div class="seg" role="group" aria-label="Captain letter"><button aria-pressed="true">None</button><button aria-pressed="false">C</button><button aria-pressed="false">A</button></div></div>
+          </div>
+          <div class="sheet-actions stack"><button class="btn block">Add and start another</button><button class="btn primary block">Add</button></div>
+        </div>
+      </div>
+      <p class="note">One sheet does name, number, size and quantity. "Add and start another" keeps the sheet open with the fields cleared, so a whole team goes in without leaving it. The sizes are the same catalog the order form uses (<code>SIZE_OPTIONS</code>). If the order has 2+ designs, the sheet opens on the design whose button you tapped.</p>
+    </div>
+
+    <!-- 3 -->
+    <div class="frame-wrap">
+      <p class="frame-label">3 · Edit an item a player added</p>
+      <div class="phone">
+        <div class="topbar dim"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page dim"><h2 class="title">Snap Demo — Live Run</h2></div>
+        <div class="scrim"></div>
+        <div class="sheet" role="dialog" aria-labelledby="ed-h">
+          <div class="grab"></div>
+          <h3 id="ed-h">Edit item</h3>
+          <p class="sub">Away Kit</p>
+          <dl class="meta">
+            <dt>Added by</dt><dd>Riley Tran · riley.tran@example.com · Sep 29, through the order form</dd>
+            <dt>Do you also want shorts?</dt><dd>Yes</dd>
+          </dl>
+          <div class="two">
+            <div><label class="f" for="e-name">Name on jersey</label><input id="e-name" class="input" value="Riley Tran"></div>
+            <div><label class="f" for="e-num">Number</label><input id="e-num" class="input" value="23"></div>
+          </div>
+          <label class="f">Size</label>
+          <div class="pills" role="group" aria-label="Size">
+            <button class="pill" aria-pressed="false">XS</button><button class="pill" aria-pressed="false">S</button>
+            <button class="pill" aria-pressed="true">M</button><button class="pill" aria-pressed="false">L</button>
+            <button class="pill" aria-pressed="false">XL</button><button class="pill" aria-pressed="false">2XL</button>
+          </div>
+          <label class="f">How many</label><div class="stepper"><button aria-label="One fewer">−</button><span>1</span><button aria-label="One more">+</button></div>
+          <div class="sheet-actions"><button class="btn danger">Remove</button><button class="btn primary">Save</button></div>
+        </div>
+      </div>
+      <p class="note">The captain can change anything a player sent until the order is locked (JCC, 2026-09-29). Who added it and their answers to custom questions sit read-only at the top, so the captain knows whose item it is before changing it. Riley texted "actually I'm a medium", so S becomes M.</p>
+    </div>
+
+    <!-- 4 -->
+    <div class="frame-wrap">
+      <p class="frame-label">4 · Remove, with undo</p>
+      <div class="phone">
+        <div class="topbar"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page">
+          <section class="card" style="margin-top:0">
+            <div class="kit" style="border-top:0">
+              <div class="kit-h"><span class="thumb away"></span><div><div class="name">Away Kit</div><div class="count">2 items</div></div></div>
+              <div class="sizes"><span class="chip">2XL ×2</span></div>
+              <ul class="rows">
+                <li class="row"><div class="who"><div class="n">No name</div><div class="by">Added by Riley</div></div><span class="size">2XL ×2</span><button class="more">⋯</button></li>
+              </ul>
+              <div class="kit-actions"><button class="btn primary">+ Add item</button><button class="btn ghost">Paste a list</button></div>
+            </div>
+          </section>
+        </div>
+        <div class="toast" role="status"><span>Removed Riley Tran #23 (M)</span><button>Undo</button></div>
+      </div>
+      <p class="note">Remove works straight away and shows Undo for about 8 seconds, so there's no "are you sure?" step. Removing a player who already has a size just works. Today that combo throws "This slot has orders on it — remove those first" with no way to do what it asks.</p>
+    </div>
+
+    <!-- 5 -->
+    <div class="frame-wrap">
+      <p class="frame-label">5 · New order, nothing on it yet</p>
+      <div class="phone">
+        <div class="topbar"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page">
+          <a class="back" href="#">← My orders</a>
+          <p class="eyebrow">Order</p>
+          <h2 class="title">Westside FC</h2>
+          <div class="chips"><span class="chip">Ultimate</span><span class="chip amber">Order started</span></div>
+          <section class="card" aria-labelledby="ol5">
+            <div class="card-h"><h3 id="ol5">Order list</h3><p>Everything we'll make for this order.</p></div>
+            <div class="kit">
+              <div class="kit-h"><span class="thumb"></span><div><div class="name">Home Kit</div><div class="count">No items yet</div></div></div>
+              <div class="empty"><b>Nothing on the list yet</b>Add your players one at a time, paste a list from a spreadsheet, or share the order form and let them add themselves.</div>
+              <div class="kit-actions"><button class="btn primary">+ Add item</button><button class="btn ghost">Paste a list</button></div>
+            </div>
+          </section>
+          <section class="card" aria-labelledby="of5">
+            <div class="card-h"><h3 id="of5">Order form</h3><p>Want players to send their own name, number and size? Make a link to share. Everything they send lands on your list, and you can still change it.</p></div>
+            <div style="padding:0 14px 14px"><button class="btn">Make an order form</button></div>
+          </section>
+        </div>
+      </div>
+      <p class="note">No deadline or link is needed to start (JCC, 2026-09-29). "Make an order form" is where the deadline gets asked, and only if the captain wants the link. Paste takes a 3rd column for size now (Name · Number · Size).</p>
+    </div>
+
+    <!-- 6 -->
+    <div class="frame-wrap">
+      <p class="frame-label">6 · Locked for production</p>
+      <div class="phone">
+        <div class="topbar"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page">
+          <section class="card" style="margin-top:0">
+            <div class="card-h"><h3>Order list</h3></div>
+            <div class="amber-note"><b>Locked for production.</b> Your list is confirmed and we're making it now. Need a change? Email us and we'll sort it out.</div>
+            <div class="kit">
+              <div class="kit-h"><span class="thumb"></span><div><div class="name">Home Kit</div><div class="count">4 items</div></div></div>
+              <ul class="rows">
+                <li class="row"><div class="who"><div class="n">Avery Quinn <span class="num">#7</span><span class="letter">C</span></div></div><span class="size" style="padding-right:14px">M</span></li>
+                <li class="row"><div class="who"><div class="n">Sam Okafor <span class="num">#12</span><span class="letter">A</span></div></div><span class="size" style="padding-right:14px">L</span></li>
+                <li class="row"><div class="who"><div class="n">Sidestep <span class="num">#72</span></div></div><span class="size" style="padding-right:14px">M</span></li>
+                <li class="row"><div class="who"><div class="n">Jordan Lee <span class="num">#4</span></div></div><span class="size" style="padding-right:14px">L</span></li>
+              </ul>
+              <div class="kit-actions"><button class="btn">Download CSV</button></div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <p class="note">Every ⋯, "+ Add item" and "Paste a list" goes away. Export stays, same as today. The lock note reuses the OrderLocked pattern in plainer words [CONFIRM: "Email us" or a different contact route].</p>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
