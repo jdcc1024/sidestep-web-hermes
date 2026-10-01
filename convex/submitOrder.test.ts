@@ -571,10 +571,12 @@ describe("Open mode: a player line matching a captain's Needs-size item fills th
     });
 
     const all = await allItems(t, orderId);
-    expect(all.find((i) => i._id === removed)).toMatchObject({
-      size: undefined,
-      submitterEmail: undefined,
-    });
+    // Convex stores no key for an undefined field, so check each field is
+    // absent rather than toMatchObject({ size: undefined }), which needs the key.
+    const removedItem = all.find((i) => i._id === removed);
+    expect(removedItem?.removedAt).toBeDefined();
+    expect(removedItem?.size).toBeUndefined();
+    expect(removedItem?.submitterEmail).toBeUndefined();
     expect(all.find((i) => i._id === sized)?.size).toBe("XL");
     const fresh = all.filter((i) => i._id !== removed && i._id !== sized);
     expect(fresh).toHaveLength(1);
