@@ -210,7 +210,7 @@ okay…"). No business facts are introduced except the one marked `[CONFIRM]`.
 
 **Locked**
 
-- `Locked for production.` `Your list is confirmed and we're making it now. Need a change? Email us and we'll sort it out.` `[CONFIRM: contact route — email, or the Discord/phone you actually use]`
+- `Locked for production.` `Your list is confirmed and we're making it now. Need a change? Email us and we'll sort it out.` "Email us" is a `mailto:info@sidestep.design` link (Q5 = A, JCC 2026-10-01). Keep it a real link: keyboard focusable, visible focus ring, and the underline and teal link style used elsewhere in the portal.
 
 **Errors.** No raw server text reaches the captain. `Could not save that item. Please try again.` Anything specific (e.g. "The order is locked") gets its own sentence.
 
@@ -350,7 +350,7 @@ sizes.
 - B. Yes, and rename the code too (architect to size it).
 - C. Keep today's words.
 
-**Q5. Locked-note contact route.** `Email us` or something else? `[CONFIRM]`
+**Q5. Locked-note contact route.** `Email us` or something else? **Decided: A, `mailto:info@sidestep.design`** (JCC, Discord, 2026-10-01).
 
 ### JCC decisions, 2026-09-29 (Discord, #general thread "Review add-to-order item workflow")
 
