@@ -202,7 +202,7 @@ function CollectedViews({
 }
 
 type EntryRow = {
-  _id: Id<"orderEntries">;
+  _id: Id<"orderItems">;
   submitterName: string;
   submitterEmail: string;
   designId: string;

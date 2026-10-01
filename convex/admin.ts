@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { requireAdmin } from "./_auth";
 import { joinUsersById } from "./_users";
+import { summarizeOrder } from "./_orderItems";
 import { INTERNAL_STAGES } from "../lib/orderStages";
 import {
   fileCountsByDesign,
@@ -88,21 +89,10 @@ export const getOrder = query({
       })),
     );
 
-    const jerseyRun = await ctx.db
-      .query("jerseyRuns")
-      .withIndex("by_order", (q) => q.eq("orderId", order._id))
-      .unique();
-
-    // Σ qty of the run's order entries (R-01 model) — total jerseys
-    // ordered, the count that replaced the old one-row-per-response tally.
-    const jerseyRunResponseCount = jerseyRun
-      ? (
-          await ctx.db
-            .query("orderEntries")
-            .withIndex("by_run", (q) => q.eq("runId", jerseyRun._id))
-            .collect()
-        ).reduce((sum, e) => sum + e.qty, 0)
-      : 0;
+    // The order's production total (`summary.itemCount`): the same number
+    // the captain's list shows, with or without an order form.
+    const { form: jerseyRun, summary: list } = await summarizeOrder(ctx, order);
+    const jerseyRunResponseCount = list.summary.itemCount;
 
     return {
       order,
@@ -165,15 +155,16 @@ export const updateOrderStages = mutation({
 // downloading an empty file. CSV formatting lives in lib/orderExport.ts —
 // this query only joins.
 //
-// With a run, a row is one order entry (one jersey line to produce),
-// carrying its roster slot's name/number when it has one and its design's
-// silhouette specs (which live on the design since O-01). Entries on
-// designs the order no longer links are excluded, so the export reconciles
-// with the production count from `orderEntries.countsByRun` (R-05).
+// A row is one sized order item (one jersey line to produce), carrying its
+// name/number/letter and its design's silhouette specs (which live on the
+// design since O-01). Rows come from `summarize`, so Needs-size items,
+// removed items and items on designs the order no longer links are all
+// excluded, and Σ qty equals `summary.itemCount` (R-05, L-02).
 //
-// Without a run there are no jerseys to enumerate, so rows degrade to one
-// per linked design — enough for the specs, with the order's own details
-// riding alongside.
+// `hasRun` means "the rows are jerseys": true with an order form, and also
+// without one once the captain has sized items. Only an order with neither
+// degrades to one row per linked design — enough for the specs, with the
+// order's own details riding alongside.
 export const exportOrder = query({
   args: { orderId: v.id("orders") },
   handler: async (ctx, { orderId }) => {
@@ -205,12 +196,16 @@ export const exportOrder = query({
       orderDate: order.createdAt,
     };
 
-    const run = await ctx.db
-      .query("jerseyRuns")
-      .withIndex("by_order", (q) => q.eq("orderId", order._id))
-      .unique();
+    const { form: run, summary: list } = await summarizeOrder(ctx, order);
+    // Linked-design order (the captain's arrangement), then oldest first
+    // within a design — `summarize` already sorts each design by createdAt.
+    const sized = list.designs.flatMap((d) =>
+      d.items.flatMap((item) =>
+        item.size === undefined ? [] : [{ ...item, size: item.size }],
+      ),
+    );
 
-    if (!run) {
+    if (!run && sized.length === 0) {
       return {
         ...base,
         hasRun: false,
@@ -230,47 +225,29 @@ export const exportOrder = query({
       };
     }
 
-    const entries = (
-      await ctx.db
-        .query("orderEntries")
-        .withIndex("by_run", (q) => q.eq("runId", run._id))
-        .collect()
-    ).filter((e) => designs.has(e.designId));
+    const rows = sized.map((item) => ({
+      ...specsOf(designs.get(item.designId)),
+      nameOnJersey: item.name ?? "",
+      numberOnJersey: item.number ?? "",
+      // In words, not the stored letter (M-09): whoever reads this file is
+      // making the garment and has no key to a one-character code.
+      roleOnJersey: item.designation
+        ? ROSTER_DESIGNATION_LABEL[item.designation]
+        : "",
+      size: item.size,
+      qty: item.qty,
+      submitterName: item.submitterName ?? "",
+      submitterEmail: item.submitterEmail ?? "",
+      submittedAt: item.createdAt,
+      customAnswers: item.customAnswers,
+    }));
 
-    // Group by the order's own design sequence so the file reads the way
-    // the captain arranged it, then oldest submission first within a design.
-    const designRank = new Map(order.designIds.map((id, i) => [id as string, i]));
-    entries.sort(
-      (a, b) =>
-        (designRank.get(a.designId) ?? 0) - (designRank.get(b.designId) ?? 0) ||
-        a.createdAt - b.createdAt,
-    );
-
-    const rows = await Promise.all(
-      entries.map(async (entry) => {
-        const slot = entry.rosterEntryId
-          ? await ctx.db.get(entry.rosterEntryId)
-          : null;
-        return {
-          ...specsOf(designs.get(entry.designId)),
-          nameOnJersey: slot?.name ?? "",
-          numberOnJersey: slot?.number ?? "",
-          // In words, not the stored letter (M-09): whoever reads this file is
-          // making the garment and has no key to a one-character code.
-          roleOnJersey: slot?.designation
-            ? ROSTER_DESIGNATION_LABEL[slot.designation]
-            : "",
-          size: entry.size,
-          qty: entry.qty,
-          submitterName: entry.submitterName,
-          submitterEmail: entry.submitterEmail,
-          submittedAt: entry.createdAt,
-          customAnswers: entry.customAnswers ?? {},
-        };
-      }),
-    );
-
-    return { ...base, hasRun: true, customQuestions: run.customQuestions, rows };
+    return {
+      ...base,
+      hasRun: true,
+      customQuestions: run?.customQuestions ?? [],
+      rows,
+    };
   },
 });
 
@@ -538,10 +515,8 @@ export const listJerseyRuns = query({
         const order = orders.get(run.orderId);
         const captain = captains.get(run.captainId);
 
-        const entries = await ctx.db
-          .query("orderEntries")
-          .withIndex("by_run", (q) => q.eq("runId", run._id))
-          .collect();
+        const list = order ? (await summarizeOrder(ctx, order)).summary : null;
+        const responseCount = list?.summary.itemCount ?? 0;
 
         return {
           _id: run._id,
@@ -553,8 +528,8 @@ export const listJerseyRuns = query({
           teamName: order?.teamName ?? "Unknown team",
           captainName: captain?.name ?? "Unknown",
           captainEmail: captain?.email ?? "",
-          // Σ qty — total jerseys ordered on the run (R-07).
-          responseCount: entries.reduce((sum, e) => sum + e.qty, 0),
+          // The order's production total (R-07), as on the captain's list.
+          responseCount,
         };
       }),
     );

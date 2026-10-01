@@ -3,6 +3,7 @@ import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { prepareBlocks } from "./_designBlocks";
+import { hasAnyItem, loadItems } from "./_orderItems";
 import { overviewBlocks } from "../lib/designBlock";
 
 /**
@@ -15,9 +16,11 @@ import { overviewBlocks } from "../lib/designBlock";
  * captain-side UI it shipped.
  *
  * This seeds the smallest set of rows that makes those surfaces photographable:
- * two designs, an order **with** a live run (roster slots + order entries, so
- * the C-01/C-02 breakdown views have something to group) and an order **with no
- * run at all**, which is the only way to photograph B-04's `NoRunYet` branch.
+ * two designs, an order **with** a live run (order items, players and a spare,
+ * so the C-01/C-02 breakdown views have something to group) and an order
+ * **with no run at all** (two captain items, one Needs size), which is the
+ * only way to photograph B-04's `NoRunYet` branch. Since L-02 every row is an
+ * `orderItems` row; the legacy roster/order entry tables are never written.
  *
  * Run against the dev deployment with:
  *   npx convex run _devSeed:seedPortalFixtures '{"email":"jcc@sidestep.design"}'
@@ -105,8 +108,19 @@ export const seedPortalFixtures = internalMutation({
     const runId = track(
       await ensureRun(ctx, user._id, orderWithRunId, now),
     );
-    track(await ensureRoster(ctx, runId, orderWithRunId, designIds, now));
-    track(await ensureEntries(ctx, runId, now));
+    track(
+      await ensureItems(ctx, orderWithRunId, designIds, runId, RUN_ORDER_ITEMS, now),
+    );
+    track(
+      await ensureItems(
+        ctx,
+        orderWithoutRunId,
+        [homeKit],
+        null,
+        NO_RUN_ORDER_ITEMS,
+        now,
+      ),
+    );
 
     return {
       userId: user._id,
@@ -120,21 +134,20 @@ export const seedPortalFixtures = internalMutation({
 });
 
 /**
- * A full-size, mostly-unfilled roster on the fixture order's home kit (M-01).
+ * A full-size, mostly-unsized roster on the fixture order's home kit (M-01).
  *
- * `seedPortalFixtures` seeds three slots and orders against all three, which
- * photographs the "everyone has ordered" case and nothing else. The design-card
- * roster preview exists for the opposite case — a captain seeds fifteen players
- * and needs to see that it saved — and its overflow cap can only be judged
- * against a card that actually overflows. This tops the home kit up to fifteen
- * slots, leaving the extras unordered so they render muted.
+ * `seedPortalFixtures` seeds three players, all sized, which photographs the
+ * "everyone has ordered" case and nothing else. The design-card roster
+ * preview exists for the opposite case — a captain adds fifteen players and
+ * needs to see that it saved — and its overflow cap can only be judged
+ * against a card that actually overflows. This tops the home kit up to
+ * fifteen named items, the added ones Needs size so they render muted.
  *
  * Run against the dev deployment with:
  *   npx convex run _devSeed:seedLargeRoster '{"email":"jcc@sidestep.design"}'
  *
  * Idempotent: it tops up to `size` and stops, so re-running adds nothing. It
- * only ever *adds* unfilled slots — nothing existing is edited or removed, and
- * `rosterEntries.remove` still refuses any slot that has orders on it.
+ * only ever *adds* captain items — nothing existing is edited or removed.
  */
 const PREVIEW_ROSTER_SIZE = 15;
 
@@ -178,40 +191,31 @@ export const seedLargeRoster = internalMutation({
         `Found no "${ORDER_WITH_RUN_TEAM}" order. Run seedPortalFixtures first.`,
       );
 
-    const run = await ctx.db
-      .query("jerseyRuns")
-      .withIndex("by_order", (q) => q.eq("orderId", order._id))
-      .unique();
-    if (!run)
-      throw new ConvexError("That order has no run. Run seedPortalFixtures first.");
-
-    // The home kit — designIds[0], the design seedPortalFixtures puts the
-    // already-filled slots on, so the card shows filled and unfilled together.
+    // The home kit — designIds[0], the design seedPortalFixtures puts sized
+    // players on, so the card shows filled and unfilled together.
     const designId = order.designIds[0];
     if (!designId) throw new ConvexError("That order has no designs.");
 
-    const existing = (
-      await ctx.db
-        .query("rosterEntries")
-        .withIndex("by_run", (q) => q.eq("runId", run._id))
-        .collect()
-    ).filter((e) => e.designId === designId);
+    const existing = (await loadItems(ctx, order._id)).filter(
+      (i) => i.designId === designId && i.name !== undefined,
+    );
 
     const now = Date.now();
-    const taken = new Set(existing.map((e) => e.name));
-    const added: Id<"rosterEntries">[] = [];
+    const taken = new Set(existing.map((i) => i.name));
+    const added: Id<"orderItems">[] = [];
     for (const name of PADDING_PLAYERS) {
       if (existing.length + added.length >= target) break;
       if (taken.has(name)) continue;
       added.push(
-        await ctx.db.insert("rosterEntries", {
-          runId: run._id,
+        await ctx.db.insert("orderItems", {
           orderId: order._id,
           designId,
           name,
           number: `${30 + added.length}`,
+          qty: 1,
           source: "captain",
           createdAt: now + added.length,
+          updatedAt: now + added.length,
         }),
       );
     }
@@ -219,7 +223,6 @@ export const seedLargeRoster = internalMutation({
     return {
       orderId: order._id,
       designId,
-      runId: run._id,
       before: existing.length,
       added: added.length,
       total: existing.length + added.length,
@@ -231,7 +234,7 @@ export const seedLargeRoster = internalMutation({
  * Unlink (or relink) the fixture order's away kit, so the O-08 removed-designs
  * receipt on `/portal/orders/<id>` can be photographed (N-08).
  *
- * A design counts as *removed* when order entries still point at it but the
+ * A design counts as *removed* when order items still point at it but the
  * order no longer lists it — a state only reachable through the edit form,
  * which a headless capture cannot click. The away kit is the right one to drop:
  * Riley Tran's three jerseys are on it, so the section renders with real
@@ -243,8 +246,8 @@ export const seedLargeRoster = internalMutation({
  *   npx convex run _devSeed:setFixtureDesignRemoved '{"email":"jcc@sidestep.design","removed":false}'
  *
  * Idempotent and its own undo — `removed: false` puts the away kit back. It
- * only ever edits one order's `designIds`; no design, roster slot or order
- * entry is created or deleted, which is what makes the round trip lossless.
+ * only ever edits one order's `designIds`; no design or order item is
+ * created or deleted, which is what makes the round trip lossless.
  */
 export const setFixtureDesignRemoved = internalMutation({
   args: { email: v.string(), removed: v.boolean() },
@@ -433,150 +436,110 @@ async function ensureRun(
   return { value, inserted: true };
 }
 
-// Player slots across both designs, so the responses page's "By roster" view
-// has more than one group to draw.
-// One captain and one assistant among the three, so every roster surface has
-// a letter to photograph (M-09) — and two of the three have none, which is the
-// ratio a real team has.
-const ROSTER_FIXTURE = [
-  { name: "Avery Quinn", number: "7", designIndex: 0, designation: "C" as const },
-  { name: "Sam Okafor", number: "12", designIndex: 0, designation: "A" as const },
-  { name: "Riley Tran", number: "23", designIndex: 1 },
-];
+// One fixture item: which of the order's designs it sits on, the player (if
+// any), and — when it came in through the form — who sent it.
+type ItemFixture = {
+  designIndex: number;
+  name?: string;
+  number?: string;
+  designation?: "C" | "A";
+  size?: string;
+  qty: number;
+  source: "captain" | "fan";
+  submitter?: { name: string; email: string; shorts: string };
+};
 
-async function ensureRoster(
-  ctx: MutationCtx,
-  runId: Id<"jerseyRuns">,
-  orderId: Id<"orders">,
-  designIds: Id<"designs">[],
-  now: number,
-): Promise<Ensured<Id<"rosterEntries">[]>> {
-  const existing = await ctx.db
-    .query("rosterEntries")
-    .withIndex("by_run", (q) => q.eq("runId", runId))
-    .collect();
-  // All-or-nothing on the run: partially topping up a roster a human has been
-  // editing would be worse than leaving it alone.
-  if (existing.length > 0) {
-    // The one exception, and it is deliberately narrow: a deployment seeded
-    // before M-09 has these exact three players with no letter on any of them,
-    // so the surfaces that render one have nothing to photograph. Matched by
-    // fixture name and applied only where the field is absent, so it never
-    // overwrites a letter a human moved.
-    for (const slot of ROSTER_FIXTURE) {
-      const row = existing.find(
-        (e) => e.name === slot.name && e.designation === undefined,
-      );
-      if (row && slot.designation)
-        await ctx.db.patch(row._id, { designation: slot.designation });
-    }
-    return {
-      value: existing
-        .sort((a, b) => a.createdAt - b.createdAt)
-        .map((e) => e._id),
-      inserted: false,
-    };
-  }
-
-  const value: Id<"rosterEntries">[] = [];
-  for (const [i, slot] of ROSTER_FIXTURE.entries()) {
-    value.push(
-      await ctx.db.insert("rosterEntries", {
-        runId,
-        orderId,
-        designId: designIds[slot.designIndex] ?? designIds[0],
-        name: slot.name,
-        number: slot.number,
-        designation: slot.designation,
-        source: "captain",
-        createdAt: now + i,
-      }),
-    );
-  }
-  return { value, inserted: true };
-}
-
-// Ordered jerseys. Three sizes so the size-breakdown chip row has a spread,
-// one line with no roster slot (a spare) so the "By fan" view differs from
-// "By roster", and two lines from one submitter so fan grouping is visible.
-const ENTRY_FIXTURE = [
+// The order with a run. Players across both designs, so the breakdown views
+// have more than one group to draw; one captain and one assistant among the
+// three, so every surface has a letter to photograph (M-09). Each player is
+// a captain's item a player then sized through the form. Three sizes so the
+// size chips have a spread, one spare with no name so the "By fan" view
+// differs from "By roster", and two jerseys from one submitter so fan
+// grouping is visible.
+const RUN_ORDER_ITEMS: ItemFixture[] = [
   {
-    rosterIndex: 0,
+    designIndex: 0,
+    name: "Avery Quinn",
+    number: "7",
+    designation: "C",
     size: "M",
     qty: 1,
-    submitterName: "Avery Quinn",
-    submitterEmail: "avery.quinn@example.com",
-    shorts: "Yes",
+    source: "captain",
+    submitter: { name: "Avery Quinn", email: "avery.quinn@example.com", shorts: "Yes" },
   },
   {
-    rosterIndex: 1,
+    designIndex: 0,
+    name: "Sam Okafor",
+    number: "12",
+    designation: "A",
     size: "L",
     qty: 1,
-    submitterName: "Sam Okafor",
-    submitterEmail: "sam.okafor@example.com",
-    shorts: "No",
+    source: "captain",
+    submitter: { name: "Sam Okafor", email: "sam.okafor@example.com", shorts: "No" },
   },
   {
-    rosterIndex: 2,
+    designIndex: 1,
+    name: "Riley Tran",
+    number: "23",
     size: "S",
     qty: 1,
-    submitterName: "Riley Tran",
-    submitterEmail: "riley.tran@example.com",
-    shorts: "Yes",
+    source: "captain",
+    submitter: { name: "Riley Tran", email: "riley.tran@example.com", shorts: "Yes" },
   },
   {
-    // No roster slot: a spare jersey ordered alongside Riley's own.
-    rosterIndex: null,
+    // No name: a spare jersey ordered alongside Riley's own.
+    designIndex: 1,
     size: "2XL",
     qty: 2,
-    submitterName: "Riley Tran",
-    submitterEmail: "riley.tran@example.com",
-    shorts: "No",
+    source: "fan",
+    submitter: { name: "Riley Tran", email: "riley.tran@example.com", shorts: "No" },
   },
-] as const;
+];
 
-async function ensureEntries(
+// The order with no run: what a captain types onto the list before making a
+// form — one jersey sized, one still Needs size. Numbers only, no names: this
+// order shares the home kit, and `seedLargeRoster` counts the kit's named
+// players, which must all be on the order with the run.
+const NO_RUN_ORDER_ITEMS: ItemFixture[] = [
+  { designIndex: 0, number: "4", size: "M", qty: 1, source: "captain" },
+  { designIndex: 0, number: "9", qty: 1, source: "captain" },
+];
+
+// All-or-nothing per order: topping up a list a human has been editing (or
+// re-adding items they removed) would be worse than leaving it alone.
+async function ensureItems(
   ctx: MutationCtx,
-  runId: Id<"jerseyRuns">,
+  orderId: Id<"orders">,
+  designIds: Id<"designs">[],
+  runId: Id<"jerseyRuns"> | null,
+  fixture: readonly ItemFixture[],
   now: number,
-): Promise<Ensured<Id<"orderEntries">[]>> {
-  const existing = await ctx.db
-    .query("orderEntries")
-    .withIndex("by_run", (q) => q.eq("runId", runId))
-    .collect();
-  if (existing.length > 0)
-    return { value: existing.map((e) => e._id), inserted: false };
+): Promise<Ensured<null>> {
+  if (await hasAnyItem(ctx, orderId)) return { value: null, inserted: false };
 
-  const roster = (
-    await ctx.db
-      .query("rosterEntries")
-      .withIndex("by_run", (q) => q.eq("runId", runId))
-      .collect()
-  ).sort((a, b) => a.createdAt - b.createdAt);
-  if (roster.length === 0)
-    throw new ConvexError("Cannot seed order entries before roster slots.");
-
-  const value: Id<"orderEntries">[] = [];
-  for (const [i, line] of ENTRY_FIXTURE.entries()) {
-    // A blank line still needs a design to group under (R-01 denormalizes it),
-    // so a spare borrows the design of the slot it was ordered alongside.
-    const slot = roster[line.rosterIndex ?? roster.length - 1];
-    value.push(
-      await ctx.db.insert("orderEntries", {
-        runId,
-        designId: slot.designId,
-        rosterEntryId: line.rosterIndex === null ? undefined : slot._id,
-        size: line.size,
-        qty: line.qty,
-        source: "fan",
-        submitterName: line.submitterName,
-        // Stored trim+lowercase, matching checkSubmitterEmail — the by-fan
-        // grouping keys on this exact value.
-        submitterEmail: line.submitterEmail.trim().toLowerCase(),
-        customAnswers: { "q-shorts": line.shorts },
-        createdAt: now + i,
-      }),
-    );
+  for (const [i, item] of fixture.entries()) {
+    await ctx.db.insert("orderItems", {
+      orderId,
+      designId: designIds[item.designIndex] ?? designIds[0],
+      name: item.name,
+      number: item.number,
+      designation: item.designation,
+      size: item.size,
+      qty: item.qty,
+      source: item.source,
+      ...(item.submitter && runId
+        ? {
+            submitterName: item.submitter.name,
+            // Stored trim+lowercase, matching checkSubmitterEmail — the by-fan
+            // grouping keys on this exact value.
+            submitterEmail: item.submitter.email.trim().toLowerCase(),
+            customAnswers: { "q-shorts": item.submitter.shorts },
+            runId,
+          }
+        : {}),
+      createdAt: now + i,
+      updatedAt: now + i,
+    });
   }
-  return { value, inserted: true };
+  return { value: null, inserted: true };
 }

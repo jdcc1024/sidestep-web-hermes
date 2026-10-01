@@ -11,6 +11,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireCurrentUser } from "./_auth";
 import { isLocked } from "../lib/jerseyRun/lock";
+import { summarize } from "../lib/orderItem";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -30,7 +31,8 @@ export async function loadItems(
 }
 
 // Whether the order has any item at all, removed ones included. Only the
-// backfill needs this ("already migrated"); everything else wants live items.
+// "already done?" checks need this (the backfill, the dev fixtures);
+// everything else wants live items.
 export async function hasAnyItem(
   ctx: Ctx,
   orderId: Id<"orders">,
@@ -51,6 +53,33 @@ export async function loadOrderForm(
     .query("jerseyRuns")
     .withIndex("by_order", (q) => q.eq("orderId", orderId))
     .unique();
+}
+
+// The order's live items run through the single read model (`summarize`),
+// with the titles and names mode it needs. Every count of an order — the
+// captain's list, the admin page and export, the closure email, the lock
+// snapshot — comes from here, so they can't disagree. `items` is returned
+// too for callers that need the raw rows alongside the summary.
+export async function summarizeOrder(ctx: Ctx, order: Doc<"orders">) {
+  const items = await loadItems(ctx, order._id);
+  const form = await loadOrderForm(ctx, order._id);
+
+  // Titles for the linked designs and for any unlinked design that still
+  // has items on it, so "removed designs" can name them.
+  const designIds = new Set<Id<"designs">>(order.designIds);
+  for (const item of items) designIds.add(item.designId);
+  const titles: Record<string, string> = {};
+  for (const designId of designIds) {
+    const design = await ctx.db.get(designId);
+    titles[designId] = design?.title ?? "Deleted design";
+  }
+
+  const summary = summarize(items, {
+    designIds: order.designIds,
+    titles,
+    namesMode: form?.namesMode ?? null,
+  });
+  return { items, form, summary };
 }
 
 // The one lock predicate for the list. Today's rule (L-01..L-05): the order's

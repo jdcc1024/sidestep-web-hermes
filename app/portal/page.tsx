@@ -17,13 +17,13 @@ import {
   type ChipTone,
 } from "@/lib/orderStages";
 
-// Shape returned by api.jerseyRuns.listMyResponses — one order entry (a
+// Shape returned by api.jerseyRuns.listMyResponses — one order item (a
 // jersey the signed-in user ordered) joined with its run and the linked
 // order's team name. Keep this in sync with the query handler in
 // convex/jerseyRuns.ts; if either grows fields, add them here too.
 type MyJerseyRunResponse = {
   entry: {
-    _id: Id<"orderEntries">;
+    _id: Id<"orderItems">;
     designTitle: string;
     name?: string;
     number?: string;

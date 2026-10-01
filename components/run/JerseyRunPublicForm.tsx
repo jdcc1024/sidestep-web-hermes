@@ -21,6 +21,7 @@ import {
 } from "@/lib/rosterEntry";
 import { ANSWER_MAX_LENGTH, isJerseyRunClosed } from "@/lib/jerseyRunResponse";
 import { sortSizes } from "@/lib/jerseyRun";
+import { userMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ import { Textarea } from "@/components/ui/textarea";
 type PublicDesign = {
   _id: Id<"designs">;
   title: string;
-  roster: { _id: Id<"rosterEntries">; name: string; number?: string }[];
+  roster: { _id: Id<"orderItems">; name: string; number?: string }[];
 };
 
 type PublicRun = {
@@ -109,7 +110,7 @@ type LineValues = {
   designId: string;
   name: string;
   number: string;
-  rosterEntryId: string;
+  itemId: string;
   size: string;
   qty: string;
 };
@@ -128,7 +129,7 @@ function emptyLine(designs: PublicDesign[]): LineValues {
     designId: designs.length === 1 ? designs[0]._id : "",
     name: "",
     number: "",
-    rosterEntryId: "",
+    itemId: "",
     size: "",
     qty: "1",
   };
@@ -173,7 +174,7 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
             designId: z.string(),
             name: z.string(),
             number: z.string(),
-            rosterEntryId: z.string(),
+            itemId: z.string(),
             size: z.string(),
             qty: z.string(),
           }),
@@ -215,10 +216,10 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
 
         if (run.namesMode === "fixed") {
           const slots = rosterByDesign.get(line.designId);
-          if (!line.rosterEntryId || !slots?.has(line.rosterEntryId)) {
+          if (!line.itemId || !slots?.has(line.itemId)) {
             ctx.addIssue({
               code: "custom",
-              path: ["lines", i, "rosterEntryId"],
+              path: ["lines", i, "itemId"],
               message: "Pick a name from the list.",
             });
           }
@@ -305,15 +306,15 @@ function OrderForm({
 
   function addSize(
     designId: string,
-    rosterEntryId: string,
+    itemId: string,
     size: string,
   ) {
     const lines = form.getValues("lines");
     const idx = lines.findIndex(
-      (l) => l.rosterEntryId === rosterEntryId && l.size === size,
+      (l) => l.itemId === itemId && l.size === size,
     );
     if (idx === -1) {
-      append({ designId, name: "", number: "", rosterEntryId, size, qty: "1" });
+      append({ designId, name: "", number: "", itemId, size, qty: "1" });
     } else {
       const cur = Number.parseInt(lines[idx].qty, 10) || 0;
       if (cur < MAX_QTY) update(idx, { ...lines[idx], qty: String(cur + 1) });
@@ -321,10 +322,10 @@ function OrderForm({
     if (form.formState.errors.lines) form.clearErrors("lines");
   }
 
-  function removeSize(rosterEntryId: string, size: string) {
+  function removeSize(itemId: string, size: string) {
     const lines = form.getValues("lines");
     const idx = lines.findIndex(
-      (l) => l.rosterEntryId === rosterEntryId && l.size === size,
+      (l) => l.itemId === itemId && l.size === size,
     );
     if (idx === -1) return;
     const cur = Number.parseInt(lines[idx].qty, 10) || 0;
@@ -346,7 +347,7 @@ function OrderForm({
           if (run.namesMode === "fixed") {
             return {
               designId: line.designId as Id<"designs">,
-              rosterEntryId: line.rosterEntryId as Id<"rosterEntries">,
+              itemId: line.itemId as Id<"orderItems">,
               size: line.size,
               qty,
             };
@@ -363,9 +364,7 @@ function OrderForm({
       setSubmitted(true);
     } catch (err) {
       setSubmitError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.",
+        userMessage(err, "Something went wrong. Please try again."),
       );
     } finally {
       setPending(false);
@@ -751,14 +750,14 @@ function RosterGrid({
   designs: PublicDesign[];
   singleDesign: boolean;
   lines: LineValues[];
-  onAdd: (designId: string, rosterEntryId: string, size: string) => void;
-  onRemove: (rosterEntryId: string, size: string) => void;
+  onAdd: (designId: string, itemId: string, size: string) => void;
+  onRemove: (itemId: string, size: string) => void;
 }) {
   const sizes = useMemo(() => sortSizes(run.sizeOptions), [run.sizeOptions]);
 
-  const qtyFor = (rosterEntryId: string, size: string) => {
+  const qtyFor = (itemId: string, size: string) => {
     const line = lines.find(
-      (l) => l.rosterEntryId === rosterEntryId && l.size === size,
+      (l) => l.itemId === itemId && l.size === size,
     );
     if (!line) return 0;
     const n = Number.parseInt(line.qty, 10);

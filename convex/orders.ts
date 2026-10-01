@@ -1,11 +1,11 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { getCurrentUserOrNull, requireCurrentUser } from "./_auth";
 import { assetSummariesByDesign } from "./_designAssets";
+import { isListLocked } from "./_orderItems";
 import { overviewOf } from "../lib/designBlock";
-import { isLocked } from "../lib/jerseyRun/lock";
 
 // Server-side guards. Mirror lib/order.ts so the client and server cap
 // values the same way — defense in depth against a hand-rolled client that
@@ -88,23 +88,6 @@ async function normalizeOrderFields(
   };
 }
 
-// Is this order frozen? An order is locked exactly when its jersey run is
-// (R-06) — including the lazy past-deadline case, which no scheduler has
-// materialized, so it only exists if you resolve it on read. Orders with no
-// run yet are never locked. The read (`getMyOrder`) and the write guard
-// (`updateOrder`) both go through here so the UI and the server can't
-// disagree about whether an edit is possible.
-async function isOrderLocked(
-  ctx: QueryCtx,
-  orderId: Id<"orders">,
-): Promise<boolean> {
-  const run = await ctx.db
-    .query("jerseyRuns")
-    .withIndex("by_order", (q) => q.eq("orderId", orderId))
-    .unique();
-  return run !== null && isLocked(run);
-}
-
 // One of the captain's orders with linked designs (and their file URLs)
 // resolved server-side so the detail page can render download links in a
 // single round-trip. Stage derivation stays on the client so the same
@@ -164,7 +147,7 @@ export const getMyOrder = query({
       })),
     );
 
-    return { order, designs, locked: await isOrderLocked(ctx, orderId) };
+    return { order, designs, locked: await isListLocked(ctx, order) };
   },
 });
 
@@ -215,10 +198,10 @@ export const updateOrder = mutation({
     if (!order || order.captainId !== user._id)
       throw new ConvexError("You don't have access to this order.");
 
-    // Once the order's jersey run is locked (R-06), the order details —
-    // including which designs it links — are frozen along with the
-    // roster/order-entry rows.
-    if (await isOrderLocked(ctx, orderId))
+    // Once the order list is locked, the order details — including which
+    // designs it links — are frozen along with its items. `isListLocked` is
+    // the one lock rule, so `getMyOrder.locked` above can't disagree.
+    if (await isListLocked(ctx, order))
       throw new ConvexError("This order's jersey run is locked.");
 
     const fields = await normalizeOrderFields(ctx, user._id, args);

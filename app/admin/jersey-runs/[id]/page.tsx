@@ -170,7 +170,7 @@ export default function AdminJerseyRunDetailPage({ params }: PageProps) {
 }
 
 type EntryRow = {
-  _id: Id<"orderEntries">;
+  _id: Id<"orderItems">;
   submitterName: string;
   submitterEmail: string;
   designTitle: string;

@@ -14,14 +14,13 @@ import { getCurrentUserOrNull, requireCurrentUser } from "./_auth";
 import {
   isListLocked,
   loadItems,
-  loadOrderForm,
   requireListWriter,
+  summarizeOrder,
 } from "./_orderItems";
 import {
   checkItemName,
   checkItemSize,
   submittersOf,
-  summarize,
 } from "../lib/orderItem";
 import {
   checkRosterDesignation,
@@ -95,26 +94,11 @@ export const listForOrder = query({
     if (!isOwner && !user.isAdmin)
       throw new ConvexError("You don't have access to this order.");
 
-    const items = await loadItems(ctx, orderId);
-    const form = await loadOrderForm(ctx, orderId);
+    const { form, summary } = await summarizeOrder(ctx, order);
     const locked = await isListLocked(ctx, order);
 
-    // Titles for the linked designs and for any unlinked design that still
-    // has items on it, so "removed designs" can name them.
-    const designIds = new Set<Id<"designs">>(order.designIds);
-    for (const item of items) designIds.add(item.designId);
-    const titles: Record<string, string> = {};
-    for (const designId of designIds) {
-      const design = await ctx.db.get(designId);
-      titles[designId] = design?.title ?? "Deleted design";
-    }
-
     return {
-      ...summarize(items, {
-        designIds: order.designIds,
-        titles,
-        namesMode: form?.namesMode ?? null,
-      }),
+      ...summary,
       locked,
       canEdit: user.isAdmin || (isOwner && !locked),
       form: form ? { runId: form._id, namesMode: form.namesMode } : null,

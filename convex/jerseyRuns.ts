@@ -25,7 +25,8 @@ import {
   isLocked,
   statusAfterUnlock,
 } from "../lib/jerseyRun/lock";
-import { qtyByDesign } from "./_orderEntries";
+import { loadItems, summarizeOrder } from "./_orderItems";
+import { rosterSlotKey } from "../lib/rosterEntry/rules";
 
 // Get the jersey run linked to one of the captain's orders. Returns null
 // if no run exists yet — the order detail page uses that to show the
@@ -56,14 +57,43 @@ export const getByOrder = query({
   },
 });
 
+type PickerEntry = {
+  _id: Id<"orderItems">;
+  name: string;
+  number: string | undefined;
+};
+
+// The fixed-mode picker for one design: the order's live named items, one
+// entry per player (`rosterSlotKey`, so "Lee #4" and "Lee #9" are two), the
+// oldest item standing for repeats. Only `_id`, name and number leave the
+// server — never a size, letter, submitter or answer.
+function pickerFor(
+  items: readonly Doc<"orderItems">[],
+  designId: Id<"designs">,
+): PickerEntry[] {
+  const seen = new Set<string>();
+  const picker: PickerEntry[] = [];
+  const named = items
+    .filter((i) => i.designId === designId)
+    .sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
+  for (const item of named) {
+    if (item.name === undefined) continue;
+    const key = rosterSlotKey(item.name, item.number);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picker.push({ _id: item._id, name: item.name, number: item.number });
+  }
+  return picker;
+}
+
 // Public — used by the fan submission form (R-02) and the captain's run
 // detail view. Returns the run plus the captain's display name and the
 // order's team name so the public page can render a friendly header
 // without exposing captain email or other PII. Also returns the order's
-// designs, each with its seeded roster slots, so the form can show a
+// designs, each with its picker list (`pickerFor`), so the form can show a
 // per-design picker (collapsing to one implicit choice for a single-
-// design order) and, in fixed mode, let the fan pick a pre-seeded name.
-// Only slot name/number are exposed — never submitter emails or other PII.
+// design order) and, in fixed mode, let the fan pick a player the captain
+// added — whether before or after the form existed.
 // `effectiveStatus` (R-06) is the lazily-resolved status, so the public
 // form and captain run-detail view can show "locked" the moment the
 // deadline passes without a scheduler having touched the row yet.
@@ -76,18 +106,12 @@ export const getPublic = query({
     const order = await ctx.db.get(run.orderId);
     const captain = await ctx.db.get(run.captainId);
 
-    const rosterEntries = await ctx.db
-      .query("rosterEntries")
-      .withIndex("by_run", (q) => q.eq("runId", jerseyRunId))
-      .collect();
+    const items = order ? await loadItems(ctx, order._id) : [];
 
     const designs = await Promise.all(
       (order?.designIds ?? []).map(async (designId) => {
         const design = await ctx.db.get(designId);
-        const roster = rosterEntries
-          .filter((e) => e.designId === designId)
-          .sort((a, b) => a.createdAt - b.createdAt)
-          .map((e) => ({ _id: e._id, name: e.name, number: e.number }));
+        const roster = pickerFor(items, designId);
         return {
           _id: designId,
           title: design?.title ?? "Untitled design",
@@ -176,7 +200,7 @@ export const create = mutation({
 // Switch how the public form collects names (M-05). Write-once at create
 // until now; the control lives on the order page beside the designs it
 // affects, and switching is safe in both directions — fan-typed names are
-// already `rosterEntries`, so open → fixed promotes them into the picker
+// already named order items, so open → fixed promotes them into the picker
 // list and fixed → open only loosens a constraint. Neither loses data,
 // hence no confirmation. Locked runs reject like every other roster write.
 export const setNamesMode = mutation({
@@ -238,14 +262,14 @@ function normalizeEmail(email: string): string {
 }
 
 // Issue 3-08 / R-07. Returns the jerseys the signed-in user has ordered
-// across every run — their own order entries, matched by normalized
-// submitter email (the same lowercasing the submit path stores). Each
-// entry is joined with its run, the linked order's team name, its design
-// title, and (when it fills a slot) the roster name/number, so the portal
-// dashboard renders each jersey card without a follow-up roundtrip. Skips
-// orphaned entries whose run/order/design has been deleted — better to
-// omit than leak a half-populated card. Cached lookups keep this
-// O(unique runs+designs) rather than O(entries). Newest first.
+// across every run — their own live, sized order items, matched by
+// normalized submitter email (the same lowercasing the submit path stores).
+// Each is joined with its run, the linked order's team name, its design
+// title, and its name/number, so the portal dashboard renders each jersey
+// card without a follow-up roundtrip. Skips orphaned items whose
+// run/order/design has been deleted — better to omit than leak a
+// half-populated card. Cached lookups keep this O(unique runs+designs)
+// rather than O(items). Newest first.
 export const listMyResponses = query({
   args: {},
   handler: async (ctx) => {
@@ -254,19 +278,22 @@ export const listMyResponses = query({
     const email = normalizeEmail(identity.email);
     if (email.length === 0) return [];
 
-    const entries = await ctx.db
-      .query("orderEntries")
-      .withIndex("by_submitterEmail", (q) => q.eq("submitterEmail", email))
-      .collect();
+    // Not `loadItems` (that reads by order), so removed items are skipped
+    // here; so are Needs-size ones, since a jersey card shows its size.
+    const items = (
+      await ctx.db
+        .query("orderItems")
+        .withIndex("by_submitterEmail", (q) => q.eq("submitterEmail", email))
+        .collect()
+    ).filter((i) => i.removedAt === undefined && i.size !== undefined);
 
     const runCache = new Map<string, Doc<"jerseyRuns"> | null>();
     const orderCache = new Map<string, Doc<"orders"> | null>();
     const designTitleCache = new Map<string, string>();
-    const rosterCache = new Map<string, Doc<"rosterEntries"> | null>();
 
     const joined: Array<{
       entry: {
-        _id: Id<"orderEntries">;
+        _id: Id<"orderItems">;
         designTitle: string;
         name: string | undefined;
         number: string | undefined;
@@ -278,7 +305,8 @@ export const listMyResponses = query({
       teamName: string;
     }> = [];
 
-    for (const entry of entries) {
+    for (const entry of items) {
+      if (entry.runId === undefined || entry.size === undefined) continue;
       let run = runCache.get(entry.runId) ?? null;
       if (!runCache.has(entry.runId)) {
         run = await ctx.db.get(entry.runId);
@@ -298,26 +326,12 @@ export const listMyResponses = query({
         designTitleCache.set(entry.designId, design?.title ?? "Untitled design");
       }
 
-      let name: string | undefined;
-      let number: string | undefined;
-      if (entry.rosterEntryId) {
-        if (!rosterCache.has(entry.rosterEntryId)) {
-          rosterCache.set(
-            entry.rosterEntryId,
-            await ctx.db.get(entry.rosterEntryId),
-          );
-        }
-        const slot = rosterCache.get(entry.rosterEntryId);
-        name = slot?.name;
-        number = slot?.number;
-      }
-
       joined.push({
         entry: {
           _id: entry._id,
           designTitle: designTitleCache.get(entry.designId)!,
-          name,
-          number,
+          name: entry.name,
+          number: entry.number,
           size: entry.size,
           qty: entry.qty,
           createdAt: entry.createdAt,
@@ -331,11 +345,11 @@ export const listMyResponses = query({
   },
 });
 
-// Captain or admin view of every jersey ordered on a run — the order
-// entries (R-01 model) that replaced the flat jerseyRunResponses table.
-// Used by the captain dashboard (2-10) and admin oversight (3-02). Each
-// entry is enriched with its design title and, when it fills a slot, the
-// roster name/number (blank/bulk lines carry neither). Returns the run +
+// Captain or admin view of every jersey ordered on a run's order — the
+// order's live, sized items (a Needs-size player isn't a jersey yet), in
+// the entry shape the responses and admin run pages render; `_id` is the
+// item id. Each is enriched with its design title; name/number/letter come
+// off the item (blank/bulk jerseys carry none). Returns the run +
 // linked order so the dashboard shows team name + deadline without a
 // follow-up query. Newest first — fresh submissions at the top. Throws on
 // access violation so the UI can show a 403; null if the run or order has
@@ -353,55 +367,40 @@ export const listOrderEntries = query({
     if (run.captainId !== user._id && !user.isAdmin)
       throw new ConvexError("You don't have access to this jersey run.");
 
-    const rawEntries = await ctx.db
-      .query("orderEntries")
-      .withIndex("by_run", (q) => q.eq("runId", jerseyRunId))
-      .collect();
+    const sized = (await loadItems(ctx, order._id)).flatMap((item) =>
+      item.size === undefined ? [] : [{ ...item, size: item.size }],
+    );
 
-    // Resolve each referenced design title and roster slot once.
+    // Resolve each referenced design title once.
     const designTitles = new Map(
       await Promise.all(
-        [...new Set(rawEntries.map((e) => e.designId))].map(
+        [...new Set(sized.map((e) => e.designId))].map(
           async (id) =>
             [id, (await ctx.db.get(id))?.title ?? "Untitled design"] as const,
         ),
       ),
     );
-    const rosterIds = [
-      ...new Set(
-        rawEntries
-          .map((e) => e.rosterEntryId)
-          .filter((id): id is Id<"rosterEntries"> => id !== undefined),
-      ),
-    ];
-    const rosters = new Map(
-      await Promise.all(
-        rosterIds.map(async (id) => [id, await ctx.db.get(id)] as const),
-      ),
-    );
 
-    const entries = rawEntries
+    const entries = sized
       .sort((a, b) => b.createdAt - a.createdAt)
-      .map((e) => {
-        const slot = e.rosterEntryId ? rosters.get(e.rosterEntryId) : null;
-        return {
-          _id: e._id,
-          submitterName: e.submitterName,
-          submitterEmail: e.submitterEmail,
-          designId: e.designId,
-          designTitle: designTitles.get(e.designId) ?? "Untitled design",
-          name: slot?.name,
-          number: slot?.number,
-          // The letter, off the same slot the name comes from (M-09) — the
-          // by-roster view renders it beside the name.
-          designation: slot?.designation,
-          size: e.size,
-          qty: e.qty,
-          source: e.source,
-          customAnswers: e.customAnswers ?? {},
-          createdAt: e.createdAt,
-        };
-      });
+      .map((e) => ({
+        _id: e._id,
+        // A captain's item has no sender; the views show a blank, as for a
+        // legacy line with no name.
+        submitterName: e.submitterName ?? "",
+        submitterEmail: e.submitterEmail ?? "",
+        designId: e.designId,
+        designTitle: designTitles.get(e.designId) ?? "Untitled design",
+        name: e.name,
+        number: e.number,
+        // The by-roster view renders the letter beside the name (M-09).
+        designation: e.designation,
+        size: e.size,
+        qty: e.qty,
+        source: e.source,
+        customAnswers: e.customAnswers ?? {},
+        createdAt: e.createdAt,
+      }));
 
     return { run, order, entries };
   },
@@ -437,11 +436,8 @@ export const _closeRun = internalMutation({
     const captain = await ctx.db.get(run.captainId);
     if (!order || !captain) return null;
 
-    const entries = await ctx.db
-      .query("orderEntries")
-      .withIndex("by_run", (q) => q.eq("runId", jerseyRunId))
-      .collect();
-    const jerseyCount = entries.reduce((sum, e) => sum + e.qty, 0);
+    // The order's production total, the same number the captain's list shows.
+    const { summary: list } = await summarizeOrder(ctx, order);
 
     return {
       jerseyRunId,
@@ -450,7 +446,7 @@ export const _closeRun = internalMutation({
       captainEmail: captain.email,
       captainName: captain.name,
       deadline: run.deadline,
-      responseCount: jerseyCount,
+      responseCount: list.summary.itemCount,
     };
   },
 });
@@ -477,9 +473,9 @@ export const closeRunByAdmin = mutation({
 });
 
 // Freeze the confirmed production basis (R-06). Captain or admin only.
-// Takes a Σ-qty-by-design snapshot the same way orderEntries.countsByRun
-// computes it, so the frozen number matches what the captain saw live
-// right before locking. Works on a run whose deadline has already passed
+// Takes a Σ-qty-by-design snapshot from the same `summarize` the captain's
+// list reads, so the frozen number matches what the captain saw live
+// right before locking (it stays until L-06 retires the snapshot). Works on a run whose deadline has already passed
 // (lazily "locked" but never materialized) — this is how that state gets
 // written to the DB with a snapshot.
 export const lock = mutation({
@@ -497,13 +493,22 @@ export const lock = mutation({
     const order = await ctx.db.get(run.orderId);
     if (!order) throw new ConvexError("Order not found.");
 
-    // Same rollup orderEntries.countsByRun serves live, so the frozen basis
-    // provably matches what the captain saw the moment before locking (A-08).
-    const { total, byDesign } = await qtyByDesign(ctx, run, order);
+    // Same read model `orderItems.listForOrder` serves live, so the frozen
+    // basis provably matches what the captain saw before locking (A-08).
+    const { summary: list } = await summarizeOrder(ctx, order);
+    const byDesign = list.designs.map((d) => ({
+      designId: d.designId,
+      title: d.title,
+      total: d.summary.itemCount,
+    }));
 
     await ctx.db.patch(jerseyRunId, {
       status: "locked",
-      lockSnapshot: { lockedAt: Date.now(), total, byDesign },
+      lockSnapshot: {
+        lockedAt: Date.now(),
+        total: list.summary.itemCount,
+        byDesign,
+      },
     });
     return jerseyRunId;
   },

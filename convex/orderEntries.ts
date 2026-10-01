@@ -1,11 +1,12 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   requireCurrentUser,
   requireOrderOwnership,
 } from "./_auth";
 import { qtyByDesign, type QtyByDesign } from "./_orderEntries";
+import { isListLocked, LIST_LOCKED_MESSAGE, loadItems } from "./_orderItems";
 import {
   checkQty,
   checkSize,
@@ -13,10 +14,10 @@ import {
   checkSubmitterName,
 } from "../lib/orderEntry/rules";
 import {
-  checkRosterName,
   checkRosterNumber,
-  rosterMatchKey,
+  rosterSlotKey,
 } from "../lib/rosterEntry/rules";
+import { checkItemName, submittersOf, summarize } from "../lib/orderItem";
 import { checkCustomAnswer, isJerseyRunClosed } from "../lib/jerseyRunResponse/rules";
 import { isLocked } from "../lib/jerseyRun/lock";
 
@@ -131,35 +132,22 @@ export const countsByRun = query({
   },
 });
 
-// The submitters who ordered a given design on a run, summed by qty and
-// grouped by normalized email — the "affected people" naming both the
-// remove-warning (R-05) and the persistent removed-design indicator read.
-// A submitter is one person who placed one or more order entries on the
-// design; `qty` is their Σ across those entries. Sorted by display name so
-// the warning reads in a stable order. Roster slots with no order entries
-// have no submitter, so a not-yet-filled design names nobody.
+// The submitters who ordered a given design, summed by qty and grouped by
+// normalized email — the "affected people" naming both the remove-warning
+// (R-05) and the persistent removed-design indicator read. `entryCount` is
+// the design's live items and `total` their Σ qty. Sorted by display name so
+// the warning reads in a stable order. A captain's item has no submitter, so
+// a design nobody has ordered on names nobody.
 type DesignSubmitter = { name: string; email: string; qty: number };
 
-function summarizeDesignSubmitters(
-  entries: Array<{ submitterName: string; submitterEmail: string; qty: number }>,
+function summarizeDesignItems(
+  items: readonly Doc<"orderItems">[],
 ): { entryCount: number; total: number; submitters: DesignSubmitter[] } {
-  const byEmail = new Map<string, DesignSubmitter>();
-  let total = 0;
-  for (const e of entries) {
-    total += e.qty;
-    const existing = byEmail.get(e.submitterEmail);
-    if (existing) existing.qty += e.qty;
-    else
-      byEmail.set(e.submitterEmail, {
-        name: e.submitterName,
-        email: e.submitterEmail,
-        qty: e.qty,
-      });
-  }
-  const submitters = [...byEmail.values()].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
-  return { entryCount: entries.length, total, submitters };
+  const submitters = submittersOf(items)
+    .map((s) => ({ name: s.name ?? "", email: s.email, qty: s.qty }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const total = items.reduce((sum, i) => sum + i.qty, 0);
+  return { entryCount: items.length, total, submitters };
 }
 
 // Preview the fallout of removing one design from the order (R-05). Given
@@ -167,11 +155,10 @@ function summarizeDesignSubmitters(
 // would drop from the count — the soft, resolvable warning the order page
 // (O-08) shows before the captain saves the removal. Non-destructive and
 // design-agnostic: it works whether the design is still linked (the
-// pre-removal preview) or already removed, since it only reads order
-// entries by `designId`. Empty (no submitters, total 0) when nothing was
-// ordered on the design — there's nobody to orphan. Captain or admin only;
-// a stable empty shape for a missing run/order so the consumer never
-// null-checks.
+// pre-removal preview) or already removed, since it only reads the order's
+// items by `designId`. Keyed by run until L-04 re-keys the UI by order.
+// Captain or admin only; a stable empty shape for a missing run/order so the
+// consumer never null-checks.
 export const affectedByDesignRemoval = query({
   args: { runId: v.id("jerseyRuns"), designId: v.id("designs") },
   handler: async (ctx, { runId, designId }) => {
@@ -193,23 +180,20 @@ export const affectedByDesignRemoval = query({
     const design = await ctx.db.get(designId);
     const title = design?.title ?? "Untitled design";
 
-    const entries = (
-      await ctx.db
-        .query("orderEntries")
-        .withIndex("by_run", (q) => q.eq("runId", runId))
-        .collect()
-    ).filter((e) => e.designId === designId);
+    const items = (await loadItems(ctx, run.orderId)).filter(
+      (i) => i.designId === designId,
+    );
 
-    return { designId, title, ...summarizeDesignSubmitters(entries) };
+    return { designId, title, ...summarizeDesignItems(items) };
   },
 });
 
-// Every design that still has order entries on the run but is no longer in
-// the order's design list (R-05) — the "removed" designs, kept visible
+// Every design that still has live items on the run's order but is no longer
+// in the order's design list (R-05) — the "removed" designs, kept visible
 // rather than deleted. "Removed" is the derived state (a design no longer
-// in `order.designIds`), so no data is destroyed and no per-entry flag is
+// in `order.designIds`), so no data is destroyed and no per-item flag is
 // stored: dropping the design from the order is the whole action, and these
-// rows simply fall out of `countsByRun` while staying readable here. Each
+// rows simply fall out of `summary.itemCount` while staying readable here. Each
 // removed design carries its affected submitters and dropped-jersey count
 // so the order page can render a clear "removed" section naming who's
 // affected. Sorted by title for a stable order. Captain or admin only;
@@ -228,28 +212,23 @@ export const removedDesigns = query({
     if (!order) return [];
     const linked = new Set<string>(order.designIds);
 
-    const entries = await ctx.db
-      .query("orderEntries")
-      .withIndex("by_run", (q) => q.eq("runId", runId))
-      .collect();
-
-    // Bucket the run's order entries by design, keeping only designs the
+    // Bucket the order's live items by design, keeping only designs the
     // order no longer links — those are the removed ones.
-    const entriesByDesign = new Map<string, typeof entries>();
-    for (const e of entries) {
-      if (linked.has(e.designId)) continue;
-      const bucket = entriesByDesign.get(e.designId) ?? [];
-      bucket.push(e);
-      entriesByDesign.set(e.designId, bucket);
+    const itemsByDesign = new Map<Id<"designs">, Doc<"orderItems">[]>();
+    for (const item of await loadItems(ctx, order._id)) {
+      if (linked.has(item.designId)) continue;
+      const bucket = itemsByDesign.get(item.designId) ?? [];
+      bucket.push(item);
+      itemsByDesign.set(item.designId, bucket);
     }
 
     const removed = await Promise.all(
-      [...entriesByDesign.entries()].map(async ([designId, designEntries]) => {
-        const design = await ctx.db.get(designId as Id<"designs">);
+      [...itemsByDesign.entries()].map(async ([designId, designItems]) => {
+        const design = await ctx.db.get(designId);
         return {
-          designId: designId as Id<"designs">,
+          designId,
           title: design?.title ?? "Untitled design",
-          ...summarizeDesignSubmitters(designEntries),
+          ...summarizeDesignItems(designItems),
         };
       }),
     );
@@ -257,15 +236,24 @@ export const removedDesigns = query({
   },
 });
 
-// Public — no auth. The fan submission path (R-02), replacing the legacy
-// jerseyRuns.submitResponse. One submission carries the fan's identity
-// plus 1..N jersey lines spanning the order's designs. Each line becomes
-// one order entry; a named line attaches to (or mints) a roster slot,
-// while a blank line is a bulk/spare jersey with no slot. Grouping is
-// emergent — every line carries the same normalized submitter email, so a
-// returning fan's later submission joins their existing group with no
-// batch id. Re-validates everything the client checked, since this is the
-// one surface anyone on the internet can hit.
+// Public — no auth. The order form's write path (R-02), moved onto order
+// items by L-02 (docs/architecture/0004-order-items.md, "Must answer 3").
+// One submission carries the player's identity plus 1..N jersey lines
+// spanning the order's designs, and writes only `orderItems`:
+//
+// - Fill before insert. A line whose design + player key matches a fillable
+//   item (live, no size, no submitter) fills the oldest one: size, qty,
+//   submitter, answers and `runId` are set, `source` is left alone. Filled
+//   ids go into a Set so two lines never fill the same row.
+// - Otherwise it inserts a `fan` item. Fixed mode copies the picked item's
+//   name / number / letter (someone already sized it, or the same player
+//   picked two sizes); open mode takes the typed name / number, and a blank
+//   name keeps the number.
+//
+// Nothing is merged or rejected for repeating a player (JCC Q7). Grouping by
+// submitter is emergent from the normalized email. Re-validates everything
+// the client checked, since this is the one surface anyone on the internet
+// can hit, and can never change a size already set or remove anything.
 export const submitOrder = mutation({
   args: {
     jerseyRunId: v.id("jerseyRuns"),
@@ -275,9 +263,9 @@ export const submitOrder = mutation({
     lines: v.array(
       v.object({
         designId: v.id("designs"),
-        // An explicit slot pick (the fixed-mode picker). When present we
-        // attach to it directly; otherwise we match/mint by name+number.
-        rosterEntryId: v.optional(v.id("rosterEntries")),
+        // An explicit pick (the fixed-mode picker). When present the line is
+        // that player; otherwise it is matched by the typed name + number.
+        itemId: v.optional(v.id("orderItems")),
         name: v.optional(v.string()),
         number: v.optional(v.string()),
         size: v.string(),
@@ -293,6 +281,8 @@ export const submitOrder = mutation({
 
     const order = await ctx.db.get(run.orderId);
     if (!order) throw new ConvexError("Order not found.");
+    if (await isListLocked(ctx, order))
+      throw new ConvexError(LIST_LOCKED_MESSAGE);
 
     const nameCheck = checkSubmitterName(args.submitterName);
     if (!nameCheck.ok) throw new ConvexError(nameCheck.error);
@@ -315,38 +305,31 @@ export const submitOrder = mutation({
     }
     const hasAnswers = Object.keys(customAnswers).length > 0;
 
-    // Existing roster slots on the run, keyed for attach-on-match. New
-    // slots minted mid-submission are added to the map so two lines that
-    // name the same player resolve to one slot.
-    const existingRoster = await ctx.db
-      .query("rosterEntries")
-      .withIndex("by_run", (q) => q.eq("runId", args.jerseyRunId))
-      .collect();
-    const slotByKey = new Map<string, Id<"rosterEntries">>();
-    for (const r of existingRoster)
-      slotByKey.set(rosterMatchKey(r.designId, r.name, r.number), r._id);
-
-    // Which submitter emails already sit on each slot — drives open-mode
-    // collision detection (a *different* fan claiming the same slot).
-    const priorEntries = await ctx.db
-      .query("orderEntries")
-      .withIndex("by_run", (q) => q.eq("runId", args.jerseyRunId))
-      .collect();
-    const emailsBySlot = new Map<string, Set<string>>();
-    for (const e of priorEntries) {
-      if (!e.rosterEntryId) continue;
-      const set = emailsBySlot.get(e.rosterEntryId) ?? new Set<string>();
-      set.add(e.submitterEmail);
-      emailsBySlot.set(e.rosterEntryId, set);
-    }
+    // The order's live items, oldest first: the fill candidates. Filled ids
+    // are tracked so two lines in this submission never fill the same row;
+    // rows inserted here are sized, so they are never candidates anyway.
+    const existing = (await loadItems(ctx, order._id)).sort(
+      (a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime,
+    );
+    const filled = new Set<Id<"orderItems">>();
+    const isFillable = (item: Doc<"orderItems">) =>
+      item.removedAt === undefined &&
+      item.size === undefined &&
+      item.submitterEmail === undefined &&
+      !filled.has(item._id);
 
     const now = Date.now();
+    const submission = {
+      submitterName: nameCheck.value,
+      submitterEmail: emailCheck.value,
+      customAnswers: hasAnswers ? customAnswers : undefined,
+      runId: run._id,
+      updatedAt: now,
+    };
     const results: Array<{
-      orderEntryId: Id<"orderEntries">;
+      itemId: Id<"orderItems">;
       designId: Id<"designs">;
-      rosterEntryId: Id<"rosterEntries"> | undefined;
-      attached: boolean;
-      collision: boolean;
+      filled: boolean;
     }> = [];
 
     for (const line of args.lines) {
@@ -357,95 +340,88 @@ export const submitOrder = mutation({
       if (!sizeCheck.ok) throw new ConvexError(sizeCheck.error);
       const qtyCheck = checkQty(line.qty);
       if (!qtyCheck.ok) throw new ConvexError(qtyCheck.error);
+      const sized = { size: sizeCheck.value, qty: qtyCheck.value };
 
-      let rosterEntryId: Id<"rosterEntries"> | undefined;
-      let attached = false;
-
-      if (line.rosterEntryId) {
-        // Explicit pick (fixed-mode dropdown) — validate it belongs here.
-        const slot = await ctx.db.get(line.rosterEntryId);
-        if (!slot || slot.runId !== args.jerseyRunId)
-          throw new ConvexError("That player slot isn't on this run.");
-        if (slot.designId !== line.designId)
-          throw new ConvexError("That player slot is on a different design.");
-        rosterEntryId = slot._id;
-        attached = true;
+      // Who this line is: a picked player, or the typed name / number.
+      let player: Pick<Doc<"orderItems">, "name" | "number" | "designation">;
+      let target: Doc<"orderItems"> | undefined;
+      if (line.itemId) {
+        const picked = await ctx.db.get(line.itemId);
+        if (
+          !picked ||
+          picked.removedAt !== undefined ||
+          picked.orderId !== order._id ||
+          picked.name === undefined
+        )
+          throw new ConvexError(
+            "That player is no longer on this order. Refresh the page and pick again.",
+          );
+        if (picked.designId !== line.designId)
+          throw new ConvexError("That player is on a different design.");
+        player = {
+          name: picked.name,
+          number: picked.number,
+          designation: picked.designation,
+        };
+        if (isFillable(picked)) target = picked;
       } else {
         const numberCheck = checkRosterNumber(line.number);
         if (!numberCheck.ok) throw new ConvexError(numberCheck.error);
-
-        const rawName = (line.name ?? "").trim();
-        if (rawName.length > 0) {
-          const rosterNameCheck = checkRosterName(line.name ?? "");
-          if (!rosterNameCheck.ok)
-            throw new ConvexError(rosterNameCheck.error);
-          const key = rosterMatchKey(
-            line.designId,
-            rosterNameCheck.value,
-            numberCheck.value,
+        const itemNameCheck = checkItemName(line.name);
+        if (!itemNameCheck.ok) throw new ConvexError(itemNameCheck.error);
+        player = { name: itemNameCheck.value, number: numberCheck.value };
+        const name = itemNameCheck.value;
+        if (name !== undefined) {
+          const key = rosterSlotKey(name, numberCheck.value);
+          target = existing.find(
+            (item) =>
+              item.designId === line.designId &&
+              item.name !== undefined &&
+              rosterSlotKey(item.name, item.number) === key &&
+              isFillable(item),
           );
-          const matched = slotByKey.get(key);
-          if (matched) {
-            rosterEntryId = matched;
-            attached = true;
-          } else {
-            rosterEntryId = await ctx.db.insert("rosterEntries", {
-              runId: args.jerseyRunId,
-              orderId: run.orderId,
-              designId: line.designId,
-              name: rosterNameCheck.value,
-              number: numberCheck.value,
-              source: "fan",
-              createdAt: now,
-            });
-            slotByKey.set(key, rosterEntryId);
-          }
         }
-        // No name → blank/bulk line: rosterEntryId stays undefined.
       }
 
-      // Open-mode collision: attaching to a slot another submitter already
-      // claims. Fixed mode expects shared seeded slots, so it never flags.
-      let collision = false;
-      if (attached && rosterEntryId && run.namesMode === "open") {
-        const claimants = emailsBySlot.get(rosterEntryId);
-        if (claimants && [...claimants].some((e) => e !== emailCheck.value))
-          collision = true;
+      if (target) {
+        await ctx.db.patch(target._id, { ...sized, ...submission });
+        filled.add(target._id);
+        results.push({ itemId: target._id, designId: line.designId, filled: true });
+      } else {
+        const itemId = await ctx.db.insert("orderItems", {
+          orderId: order._id,
+          designId: line.designId,
+          ...player,
+          ...sized,
+          source: "fan",
+          ...submission,
+          createdAt: now,
+        });
+        results.push({ itemId, designId: line.designId, filled: false });
       }
-
-      const orderEntryId = await ctx.db.insert("orderEntries", {
-        runId: args.jerseyRunId,
-        designId: line.designId,
-        rosterEntryId,
-        size: sizeCheck.value,
-        qty: qtyCheck.value,
-        source: "fan",
-        submitterName: nameCheck.value,
-        submitterEmail: emailCheck.value,
-        customAnswers: hasAnswers ? customAnswers : undefined,
-        createdAt: now,
-      });
-
-      if (rosterEntryId) {
-        const set = emailsBySlot.get(rosterEntryId) ?? new Set<string>();
-        set.add(emailCheck.value);
-        emailsBySlot.set(rosterEntryId, set);
-      }
-
-      results.push({
-        orderEntryId,
-        designId: line.designId,
-        rosterEntryId,
-        attached,
-        collision,
-      });
     }
+
+    // Collisions come from the same rule the captain's list shows
+    // (`summarize`), read back after this submission's writes.
+    const colliding = new Set<string>();
+    const after = summarize(await loadItems(ctx, order._id), {
+      designIds: order.designIds,
+      titles: {},
+      namesMode: run.namesMode,
+    });
+    for (const design of after.designs)
+      for (const item of design.items)
+        if (item.collision) colliding.add(item._id);
+    const items = results.map((r) => ({
+      ...r,
+      collision: colliding.has(r.itemId),
+    }));
 
     return {
       submitterEmail: emailCheck.value,
-      created: results.length,
-      collisions: results.filter((r) => r.collision).length,
-      entries: results,
+      created: items.length,
+      collisions: items.filter((r) => r.collision).length,
+      items,
     };
   },
 });
