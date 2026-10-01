@@ -415,7 +415,10 @@ Rough cost: 3 L × ~$5 + 2 M × ~$3 + 1 S × ~$1.5 ≈ $22 of Claude runs.
   - `copyToDesign` keeps its dedupe against the target design. It means "make
     sure these players are on that kit too", and running it twice must not
     double the list.
-- **Q8: pending** (JCC asked for a clearer explanation).
+- **Q8 = A: only sized items count.** Design line `3 items · 1 needs a size`,
+  footer `6 items`; the item count always equals the size chips, the order
+  total, admin count and CSV. As designed (rule 5); the mockup's "4 items" /
+  "7 items" are superseded.
 
 ## New questions for JCC (`needs_decision`)
 

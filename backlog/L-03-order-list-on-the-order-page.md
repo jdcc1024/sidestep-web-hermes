@@ -30,10 +30,9 @@ edit those files, not the page.
 - `OrderList`: heading `Order list`, help line, one group per design (thumb,
   title, `3 items · 1 needs a size`, size chips), rows, `+ Add item` and
   `Paste a list` per design, empty-design state, footer
-  `6 items · S×1 M×2 …` · `1 needs a size`. Counts follow **rule 5** (Q8 = A):
-  sized Σ qty as items, unsized as "needs a size". (Mockup frame 1 counts the
-  Needs-size row as an item. If JCC picks Q8 = B, "items" = all rows' Σ qty,
-  and only these strings change.)
+  `6 items · S×1 M×2 …` · `1 needs a size`. Counts follow **rule 5** (JCC confirmed Q8 = A at Gate 1):
+  sized Σ qty as items, unsized as "needs a size". Mockup frame 1's "4 items" / "7 items" are
+  superseded: the item count must always equal the sum of the size chips.
 - Row: `<Name> #<Number>` + C/A badge (reuse `RosterDesignation`), subline
   `Added by you` / `Added by <submitter first name>` (a player-filled captain
   row shows the player), size or `Needs size` pill, qty `×n` when > 1,
@@ -74,6 +73,7 @@ become unused.
 - [ ] Removing a sized item shows `Removed … (M)` + `Undo`; Undo restores the same row (name, number, size, qty, letter, "Added by") in the same position (§8.5)
 - [ ] An order with **no order form** shows `+ Add item` and `Paste a list`, and adding works; no deadline field appears anywhere in that flow (§8.6)
 - [ ] An item saved without a size shows `Needs size`; the design line and footer say `1 needs a size`; it is not in the item count (§8.7)
+- [ ] For every design and the footer, the item count equals the sum of that scope's size chips (Q8 = A)
 - [ ] When `canEdit` is false, no add / paste / copy / edit / remove control renders; `Download CSV` renders and downloads (§8.9)
 - [ ] No text in the list, sheet or toasts contains `CONVEX`, `ConvexError`, `Request ID` or a path (mock a raw rejection) (§8.10)
 - [ ] Every control is reachable by Tab with a visible focus ring; row menu buttons have accessible names like `Edit Sidestep #72`; all tap targets ≥ 40×40 px (§8.11)
