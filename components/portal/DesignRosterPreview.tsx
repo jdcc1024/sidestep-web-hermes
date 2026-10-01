@@ -6,7 +6,7 @@ import { DesignationBadge } from "./RosterDesignation";
 // showed jerseys somebody ordered — this renders the design's *roster*: a
 // captain-seeded player nobody has ordered for is a muted "not yet filled"
 // row rather than an absence, which is the feedback the order page was
-// missing. Fed by `rosterRowsByDesign` over `rosterEntries.listForRun`, the
+// missing. Fed by `itemRosterRows` over `orderItems.listForOrder` (L-02), the
 // same read the roster editor uses, so the card and the editor can't drift.
 //
 // UI-only, no query of its own — the page owns the read and hands rows down.

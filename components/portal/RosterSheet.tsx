@@ -18,6 +18,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { jerseyLabel, type RosterSlotRead } from "@/lib/jerseyBreakdown";
 import { ROW_TRANSITION } from "@/lib/motion";
+import { userMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
 import {
   ROSTER_NAME_MAX_LENGTH,
@@ -59,15 +60,29 @@ import {
 // from the card the captain is already reading.
 //
 // No query of its own on purpose: the page hands down the slots it already
-// read for the card preview (M-01's `rosterEntries.listForRun`), so the
-// preview and the editor cannot drift back into the disagreement M-01 fixed.
-// Writes go straight to the mutations and Convex re-pushes the read.
+// read for the card preview (`orderItems.listForOrder`, mapped by
+// `lib/orderItem/views`), so the preview and the editor cannot drift back
+// into the disagreement M-01 fixed. Writes go straight to the `orderItems`
+// mutations, keyed by the order rather than a run (L-02), so the sheet works
+// before an order form exists; Convex re-pushes the read.
 
-// A slot as the sheet needs it — M-01's read plus the branded id the
-// mutations take.
+// A slot as the sheet needs it: one named order item, in M-01's read shape
+// plus the branded id the mutations take. `qty` is the item's own quantity,
+// which `sizes` can't carry for a Needs-size item.
 export type RosterSheetSlot = Omit<RosterSlotRead, "_id"> & {
-  _id: Id<"rosterEntries">;
+  _id: Id<"orderItems">;
+  qty?: number;
 };
+
+const FALLBACK_ERROR = "Something went wrong. Please try again.";
+
+// `orderItems.update` is a full replace of the editable fields: an omitted
+// size clears it. So an edit to the name, number or letter sends the item's
+// current size and qty back unchanged.
+function sizeAndQtyOf(slot: RosterSheetSlot): { size?: string; qty: number } {
+  const sized = slot.sizes[0];
+  return { size: sized?.size, qty: slot.qty ?? sized?.qty ?? 1 };
+}
 
 // The order's *other* designs — the sources the mirror can pull from (M-04).
 export type RosterCopySource = {
@@ -76,14 +91,14 @@ export type RosterCopySource = {
 };
 
 export function RosterSheet({
-  runId,
+  orderId,
   designId,
   designTitle,
   slots,
   otherDesigns,
   locked,
 }: {
-  runId: Id<"jerseyRuns">;
+  orderId: Id<"orders">;
   designId: Id<"designs">;
   designTitle: string;
   slots: readonly RosterSheetSlot[];
@@ -134,7 +149,7 @@ export function RosterSheet({
 
         {pasting ? (
           <PasteRoster
-            runId={runId}
+            orderId={orderId}
             designId={designId}
             slots={slots}
             onDone={() => setPasting(false)}
@@ -202,7 +217,7 @@ export function RosterSheet({
 
             {!locked && (
               <SheetFooter className="border-t border-border">
-                <AddSlotRow runId={runId} designId={designId} />
+                <AddSlotRow orderId={orderId} designId={designId} />
                 {/* The two bulk ways in, under the one-at-a-time row they're
                     shortcuts for. Both wrap at 375px rather than shrink. */}
                 <div className="flex flex-wrap items-center gap-1">
@@ -216,7 +231,7 @@ export function RosterSheet({
                     Paste a list
                   </Button>
                   <CopyRosterMenu
-                    runId={runId}
+                    orderId={orderId}
                     designId={designId}
                     otherDesigns={otherDesigns}
                   />
@@ -237,15 +252,15 @@ export function RosterSheet({
 // to undo. Renders nothing on a one-design order, where it would be an
 // affordance with no possible target.
 function CopyRosterMenu({
-  runId,
+  orderId,
   designId,
   otherDesigns,
 }: {
-  runId: Id<"jerseyRuns">;
+  orderId: Id<"orders">;
   designId: Id<"designs">;
   otherDesigns: readonly RosterCopySource[];
 }) {
-  const copyToDesign = useMutation(api.rosterEntries.copyToDesign);
+  const copyToDesign = useMutation(api.orderItems.copyToDesign);
   const [busy, setBusy] = useState(false);
 
   if (otherDesigns.length === 0) return null;
@@ -254,7 +269,7 @@ function CopyRosterMenu({
     setBusy(true);
     try {
       const result = await copyToDesign({
-        runId,
+        orderId,
         sourceDesignId,
         targetDesignId: designId,
       });
@@ -263,7 +278,7 @@ function CopyRosterMenu({
       toast.success(describeRosterCopy(result));
     } catch (err) {
       toast.error("Could not copy the roster", {
-        description: err instanceof Error ? err.message : undefined,
+        description: userMessage(err, FALLBACK_ERROR),
       });
     } finally {
       setBusy(false);
@@ -295,20 +310,20 @@ function CopyRosterMenu({
 
 // The bulk-paste flow (M-03): parse, preview, confirm. The parser is pure
 // and lives in `lib/rosterEntry`, so the rows shown here and the array sent
-// to `createMany` are literally the same object — there is no undo, and the
+// to `addMany` are literally the same object — there is no undo, and the
 // count on the button is the promise this screen has to keep.
 function PasteRoster({
-  runId,
+  orderId,
   designId,
   slots,
   onDone,
 }: {
-  runId: Id<"jerseyRuns">;
+  orderId: Id<"orders">;
   designId: Id<"designs">;
   slots: readonly RosterSheetSlot[];
   onDone: () => void;
 }) {
-  const createMany = useMutation(api.rosterEntries.createMany);
+  const createMany = useMutation(api.orderItems.addMany);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -318,7 +333,7 @@ function PasteRoster({
   async function onConfirm() {
     setBusy(true);
     try {
-      await createMany({ runId, designId, players: additions });
+      await createMany({ orderId, designId, rows: additions });
       toast.success(
         `Added ${additions.length} player${additions.length === 1 ? "" : "s"}`,
       );
@@ -327,7 +342,7 @@ function PasteRoster({
       // Stays on the paste screen: the block is still in the box, so the
       // captain can fix a row and try again rather than re-copying it.
       toast.error("Could not add players", {
-        description: err instanceof Error ? err.message : undefined,
+        description: userMessage(err, FALLBACK_ERROR),
       });
     } finally {
       setBusy(false);
@@ -439,13 +454,13 @@ function PastePreviewRow({ row }: { row: RosterPasteRow }) {
 }
 
 function AddSlotRow({
-  runId,
+  orderId,
   designId,
 }: {
-  runId: Id<"jerseyRuns">;
+  orderId: Id<"orders">;
   designId: Id<"designs">;
 }) {
-  const create = useMutation(api.rosterEntries.create);
+  const create = useMutation(api.orderItems.add);
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [adding, setAdding] = useState(false);
@@ -458,17 +473,19 @@ function AddSlotRow({
     }
     setAdding(true);
     try {
+      // A new player lands as Needs size, one jersey.
       await create({
-        runId,
+        orderId,
         designId,
         name: name.trim(),
         number: number.trim() || undefined,
+        qty: 1,
       });
       setName("");
       setNumber("");
     } catch (err) {
       toast.error("Could not add player", {
-        description: err instanceof Error ? err.message : undefined,
+        description: userMessage(err, FALLBACK_ERROR),
       });
     } finally {
       setAdding(false);
@@ -528,8 +545,8 @@ function SlotRow({
   slot: RosterSheetSlot;
   locked: boolean;
 }) {
-  const update = useMutation(api.rosterEntries.update);
-  const remove = useMutation(api.rosterEntries.remove);
+  const update = useMutation(api.orderItems.update);
+  const remove = useMutation(api.orderItems.remove);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(slot.name);
   const [number, setNumber] = useState(slot.number ?? "");
@@ -550,15 +567,16 @@ function SlotRow({
     setBusy(true);
     try {
       await update({
-        rosterEntryId: slot._id,
+        itemId: slot._id,
         name: name.trim(),
         number: number.trim() || undefined,
         designation,
+        ...sizeAndQtyOf(slot),
       });
       setEditing(false);
     } catch (err) {
       toast.error("Could not save player", {
-        description: err instanceof Error ? err.message : undefined,
+        description: userMessage(err, FALLBACK_ERROR),
       });
     } finally {
       setBusy(false);
@@ -568,10 +586,11 @@ function SlotRow({
   async function onRemove() {
     setBusy(true);
     try {
-      await remove({ rosterEntryId: slot._id });
+      // The whole item goes, sized or not (UX §7.4).
+      await remove({ itemId: slot._id });
     } catch (err) {
       toast.error("Could not remove player", {
-        description: err instanceof Error ? err.message : undefined,
+        description: userMessage(err, FALLBACK_ERROR),
       });
       // Only on failure: a successful remove drops the row entirely, so
       // clearing `busy` there would set state on an unmounted component.

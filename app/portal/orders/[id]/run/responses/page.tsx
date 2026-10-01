@@ -151,7 +151,7 @@ function CollectedViews({
 
   // The derived views are scoped to the designs the order still carries, the
   // same way the order detail page scopes them (C-01), so their numbers
-  // reconcile with `orderEntries.countsByRun`. The raw table below stays
+  // reconcile with the order list's `summary.itemCount`. The raw table below stays
   // unscoped on purpose — it's the receipt for what was actually submitted.
   const scoped = entriesForDesigns(entries, designs);
 

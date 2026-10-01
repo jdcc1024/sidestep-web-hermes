@@ -21,11 +21,12 @@ import {
   type RosterSheetSlot,
 } from "@/components/portal/RosterSheet";
 import { SizeBreakdown } from "@/components/portal/SizeBreakdown";
+import type { RosterRow } from "@/lib/jerseyBreakdown";
 import {
-  entriesForDesigns,
-  rosterRowsByDesign,
-  type RosterRow,
-} from "@/lib/jerseyBreakdown";
+  itemBreakdownEntries,
+  itemRosterRows,
+  itemSlots,
+} from "@/lib/orderItem/views";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -72,29 +73,11 @@ export default function OrderDetailPage({ params }: PageProps) {
   // gone through Run Setup ("first collect") — saving an order never creates
   // one, so null here is the common starting state, not an error.
   const run = useQuery(api.jerseyRuns.getByOrder, { orderId });
-  // The live production total, derived from the roster rows (O-07, reading
-  // R-04's `countsByRun`). Skipped until a run exists — before that there are
-  // no rows, so the total is simply 0. This replaces `estimatedQuantity` as
-  // the order's real quantity; the estimate stays only as an intake seed.
-  const counts = useQuery(
-    api.orderEntries.countsByRun,
-    run ? { runId: run._id } : "skip",
-  );
-  // The jerseys behind that total (C-01) — every collected entry, which is
-  // what the order-wide size run is a projection of. Same gating as the
-  // counts: no run means nothing was collected.
-  const collected = useQuery(
-    api.jerseyRuns.listOrderEntries,
-    run ? { jerseyRunId: run._id } : "skip",
-  );
-  // The roster itself (M-01) — every slot on every design, seeded-unfilled
-  // included, with the sizes ordered against it. This is what the design
-  // cards render: the entries above can only describe jerseys somebody
-  // ordered, so on their own they hide a seeded player nobody ordered for.
-  const roster = useQuery(
-    api.rosterEntries.listForRun,
-    run ? { runId: run._id } : "skip",
-  );
+  // The order's list (L-02): every item on every design, with or without a
+  // form. The header total, per-design counts, size chips, card rows, roster
+  // sheet and CSV all come from this one subscription, so an edit updates
+  // every one of them in the same render and they can't disagree (§7.9).
+  const list = useQuery(api.orderItems.listForOrder, { orderId });
 
   if (result.status === "loading") return <Loading />;
   if (result.status === "not-found") return <NotFound />;
@@ -105,31 +88,20 @@ export default function OrderDetailPage({ params }: PageProps) {
   const stage = deriveCustomerStage(order.internalStages);
   const tone = chipToneForStage(stage);
 
-  // 0 is the resting total: an empty roster, a run still loading, or no run
-  // yet all read as "nothing collected", never as the stale estimate.
-  const total = counts?.total ?? 0;
-  const countByDesign = new Map(
-    (counts?.byDesign ?? []).map((d) => [d.designId, d.total] as const),
+  // The live production total (O-07): Σ qty of sized items on the linked
+  // designs. 0 is the resting total — an empty list or one still loading
+  // reads as "nothing collected", never as the stale intake estimate.
+  const total = list?.summary.itemCount ?? 0;
+  const listByDesign = new Map(
+    (list?.designs ?? []).map((d) => [d.designId, d] as const),
   );
-
-  // Scoped to the designs the order still carries, so the size chips
-  // reconcile with the counts above — entries on a since-removed design keep
-  // their own section further down (O-08). `listForRun` applies the same
-  // scoping server-side, so the per-design rows need no filtering here.
-  const entries = entriesForDesigns(collected?.entries ?? [], designs);
-  const rowsByDesign = new Map(
-    rosterRowsByDesign(roster?.designs ?? []).map(
-      (view) => [view.designId, view.rows] as const,
-    ),
-  );
-  // The same read again, unflattened: the card renders rows, the sheet (M-02)
-  // edits slots, and both come from this one query so they can't disagree.
-  const slotsByDesign = new Map(
-    (roster?.designs ?? []).map((d) => [d.designId, d.entries] as const),
-  );
-  // A locked run freezes the roster (R-06's lazy auto-lock, so this is
-  // reachable with no lock control anywhere): the sheet opens read-only.
-  const runLocked = run?.effectiveStatus === "locked";
+  // Items on a since-removed design are already out of `designs` (they keep
+  // their own section further down, O-08), so the chips reconcile with the
+  // counts above.
+  const entries = list ? itemBreakdownEntries(list) : [];
+  // The server's verdict on whether the captain may edit; before it loads,
+  // the order's own lock flag.
+  const listLocked = list ? !list.canEdit : locked;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -266,7 +238,7 @@ export default function OrderDetailPage({ params }: PageProps) {
           <NamesModeControl
             runId={run._id}
             namesMode={run.namesMode}
-            locked={runLocked}
+            locked={run.effectiveStatus === "locked"}
           />
         )}
 
@@ -278,28 +250,31 @@ export default function OrderDetailPage({ params }: PageProps) {
           <NoDesigns orderId={orderId} locked={locked} />
         ) : (
           <div className="mt-4 space-y-4">
-            {designs.map((design) => (
-              <DesignSection
-                key={design._id}
-                design={design}
-                teamName={order.teamName}
-                count={countByDesign.get(design._id) ?? 0}
-                rows={rowsByDesign.get(design._id) ?? []}
-                runId={run?._id ?? null}
-                slots={slotsByDesign.get(design._id) ?? []}
-                // Everything this design could pull a roster from (M-04) —
-                // the order's designs minus itself, since copying a design
-                // onto itself is the one thing the mutation rejects.
-                otherDesigns={designs
-                  .filter((other) => other._id !== design._id)
-                  .map((other) => ({
-                    designId: other._id,
-                    title: other.title,
-                  }))}
-                namesMode={run?.namesMode ?? null}
-                locked={runLocked}
-              />
-            ))}
+            {designs.map((design) => {
+              const designList = listByDesign.get(design._id);
+              return (
+                <DesignSection
+                  key={design._id}
+                  design={design}
+                  teamName={order.teamName}
+                  count={designList?.summary.itemCount ?? 0}
+                  rows={designList ? itemRosterRows(designList) : []}
+                  orderId={orderId}
+                  slots={designList ? itemSlots(designList) : []}
+                  // Everything this design could pull a roster from (M-04) —
+                  // the order's designs minus itself, since copying a design
+                  // onto itself is the one thing the mutation rejects.
+                  otherDesigns={designs
+                    .filter((other) => other._id !== design._id)
+                    .map((other) => ({
+                      designId: other._id,
+                      title: other.title,
+                    }))}
+                  namesMode={run?.namesMode ?? null}
+                  locked={listLocked}
+                />
+              );
+            })}
           </div>
         )}
       </section>
@@ -319,16 +294,16 @@ export default function OrderDetailPage({ params }: PageProps) {
 
 // Each linked design renders as its own section under the one order timeline
 // (O-05). It carries the design's silhouette specs, its own collected count
-// — Σ qty over the roster rows tagged with this design (O-07) — and, since
-// M-01, the design's roster: every player slot, ordered against or not. M-02
-// puts the editor for that roster behind a button here, so seeding a team no
-// longer means hunting for Run Setup.
+// — Σ qty of this design's sized items (O-07) — and, since M-01, the
+// design's roster: every player, sized or not. M-02 puts the editor for that
+// roster behind a button here; since L-02 items hang off the order, so the
+// editor is there whether or not an order form exists yet.
 function DesignSection({
   design,
   teamName,
   count,
   rows,
-  runId,
+  orderId,
   slots,
   otherDesigns,
   namesMode,
@@ -341,7 +316,7 @@ function DesignSection({
   teamName: string;
   count: number;
   rows: RosterRow[];
-  runId: Id<"jerseyRuns"> | null;
+  orderId: Id<"orders">;
   slots: readonly RosterSheetSlot[];
   otherDesigns: readonly RosterCopySource[];
   namesMode: "open" | "fixed" | null;
@@ -422,34 +397,25 @@ function DesignSection({
 
         <DesignRosterPreview rows={rows} />
 
-        {/* Roster entries hang off a run, so there is nothing to edit until
-            one exists — the card sends the captain to Collect rather than
-            opening an editor whose every write would reject. */}
-        {runId ? (
-          <div className="flex flex-wrap gap-2">
-            <RosterSheet
-              runId={runId}
-              designId={design._id}
-              designTitle={design.title}
-              slots={slots}
-              otherDesigns={otherDesigns}
-              locked={locked}
-            />
-            {/* Export sits beside the editor and stays available on a locked
-                run — reading the roster out is the one thing a frozen run
-                should never stop the captain doing. Fed the same `rows` the
-                preview above renders (M-08). */}
-            <RosterExportButton
-              teamName={teamName}
-              designTitle={design.title}
-              rows={rows}
-            />
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Start collecting below to start building this design&apos;s roster.
-          </p>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <RosterSheet
+            orderId={orderId}
+            designId={design._id}
+            designTitle={design.title}
+            slots={slots}
+            otherDesigns={otherDesigns}
+            locked={locked}
+          />
+          {/* Export sits beside the editor and stays available on a locked
+              order — reading the roster out is the one thing a frozen list
+              should never stop the captain doing. Fed the same `rows` the
+              preview above renders (M-08). */}
+          <RosterExportButton
+            teamName={teamName}
+            designTitle={design.title}
+            rows={rows}
+          />
+        </div>
       </CardContent>
     </Card>
   );
