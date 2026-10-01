@@ -4,7 +4,7 @@
 // (`internal._migrations.backfillOrderItems`). Spec: backlog/L-01 "Backfill",
 // docs/architecture/0004-order-items.md "Must answer 2" mapping table.
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import schema from "./schema";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -13,7 +13,9 @@ import { overviewBlocks } from "../lib/designBlock";
 const modules = import.meta.glob("./**/*.*s");
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
-type T = ReturnType<typeof convexTest>;
+// TestConvex<typeof schema>, not ReturnType<typeof convexTest>: the bare
+// ReturnType widens the data model away, so custom indexes don't typecheck.
+type T = TestConvex<typeof schema>;
 
 // The issue's fixture: a slot with 2 entries, an empty slot with a letter, a
 // blank entry with qty 3, and an entry on a since-removed design → 5 items.

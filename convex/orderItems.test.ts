@@ -7,7 +7,7 @@
 // named after it. Written before the build: every test here should fail only
 // because `convex/orderItems.ts` / the `orderItems` table don't exist yet.
 import { describe, expect, it } from "vitest";
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { ConvexError } from "convex/values";
 import schema from "./schema";
 import { api } from "./_generated/api";
@@ -18,7 +18,9 @@ import { ROSTER_PASTE_MAX_ROWS } from "../lib/rosterEntry/paste";
 const modules = import.meta.glob("./**/*.*s");
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
-type T = ReturnType<typeof convexTest>;
+// TestConvex<typeof schema>, not ReturnType<typeof convexTest>: the bare
+// ReturnType widens the data model away, so custom indexes don't typecheck.
+type T = TestConvex<typeof schema>;
 
 // ── seeding ────────────────────────────────────────────────────────────────
 
@@ -175,7 +177,8 @@ async function expectUserError(fn: () => Promise<unknown>): Promise<string> {
     caught = err;
   }
   expect(caught, "expected a ConvexError rejection").toBeInstanceOf(ConvexError);
-  const data = (caught as ConvexError<unknown>).data;
+  // Typed as string for the compiler only; the runtime check below is real.
+  const data: unknown = (caught as ConvexError<string>).data;
   expect(typeof data).toBe("string");
   return data as string;
 }
