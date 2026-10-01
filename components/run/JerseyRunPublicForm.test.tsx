@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import type { Id } from "@/convex/_generated/dataModel";
 
 // submitOrder is the new fan submission mutation (R-02). Typed via the
@@ -35,7 +36,7 @@ type PublicData = {
   designs: {
     _id: Id<"designs">;
     title: string;
-    roster: { _id: Id<"rosterEntries">; name: string; number?: string }[];
+    roster: { _id: Id<"orderItems">; name: string; number?: string }[];
   }[];
 };
 
@@ -200,7 +201,7 @@ describe("JerseyRunPublicForm", () => {
           _id: HOME,
           title: "Home",
           roster: [
-            { _id: "slot_1" as Id<"rosterEntries">, name: "Gretzky", number: "99" },
+            { _id: "slot_1" as Id<"orderItems">, name: "Gretzky", number: "99" },
           ],
         },
       ],
@@ -244,8 +245,8 @@ describe("JerseyRunPublicForm", () => {
       submitterEmail: "pat@example.com",
       customAnswers: {},
       lines: [
-        { designId: HOME, rosterEntryId: "slot_1", size: "M", qty: 2 },
-        { designId: HOME, rosterEntryId: "slot_1", size: "L", qty: 1 },
+        { designId: HOME, itemId: "slot_1", size: "M", qty: 2 },
+        { designId: HOME, itemId: "slot_1", size: "L", qty: 1 },
       ],
     });
   });
@@ -278,7 +279,7 @@ describe("JerseyRunPublicForm", () => {
   // a picker list free.
   it("presents the roster as a picker after the captain switches to fixed", () => {
     const fanTyped = [
-      { _id: "slot_1" as Id<"rosterEntries">, name: "Gretzky", number: "99" },
+      { _id: "slot_1" as Id<"orderItems">, name: "Gretzky", number: "99" },
     ];
     publicData = {
       ...singleDesignOpen(),
@@ -354,5 +355,67 @@ describe("JerseyRunPublicForm", () => {
       await screen.findByText(/add at least one jersey/i),
     ).toBeInTheDocument();
     expect(submitOrder).not.toHaveBeenCalled();
+  });
+});
+
+// ─── L-02 (initiative 0004): no raw server text on the error line (§8.10) ──
+//
+// The Convex client wraps every server error's `message` in the function
+// path, request id and stack. The form's error line must show the customer
+// copy a ConvexError carries, or a plain fallback, and never that wrapper.
+describe("Public form error line never shows [CONVEX, Request ID, ConvexError or a file path (§8.10)", () => {
+  const FORBIDDEN = /\[CONVEX|Request ID|ConvexError|\.\.\/convex\/|\.tsx?\b/i;
+  const RAW =
+    "[CONVEX M(orderEntries:submitOrder)] [Request ID: 3f9c2a7d1b] Server Error\n" +
+    "Uncaught ConvexError: boom\n    at handler (../convex/orderEntries.ts:312:11)";
+
+  beforeEach(() => {
+    submitOrder.mockReset();
+    publicData = singleDesignOpen();
+  });
+
+  async function fillAndSubmit() {
+    const user = userEvent.setup();
+    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
+    await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
+    await user.type(screen.getByLabelText(/name on jersey/i), "Alex");
+    await user.click(screen.getByRole("radio", { name: "M" }));
+    await user.click(screen.getByRole("button", { name: /^submit$/i }));
+    await waitFor(() => expect(submitOrder).toHaveBeenCalledTimes(1));
+    return screen.findByRole("alert");
+  }
+
+  it("shows the generic fallback, not the raw message, when submitOrder rejects with a plain Error", async () => {
+    submitOrder.mockRejectedValueOnce(new Error(RAW));
+
+    const alert = await fillAndSubmit();
+
+    expect(alert).toHaveTextContent("Something went wrong. Please try again.");
+    expect(alert.textContent).not.toMatch(FORBIDDEN);
+    expect(screen.queryByText(/you're in/i)).toBeNull();
+  });
+
+  it("shows the ConvexError's customer copy, not its wrapped client message", async () => {
+    const err = new ConvexError("This order is locked for production.");
+    // What the browser actually receives: the data is clean, the message isn't.
+    err.message = RAW;
+    submitOrder.mockRejectedValueOnce(err);
+
+    const alert = await fillAndSubmit();
+
+    expect(alert).toHaveTextContent("This order is locked for production.");
+    expect(alert.textContent).not.toMatch(FORBIDDEN);
+  });
+
+  it("falls back for a ConvexError whose data is not a string", async () => {
+    submitOrder.mockRejectedValueOnce(
+      new ConvexError({ code: "LOCKED", detail: RAW }),
+    );
+
+    const alert = await fillAndSubmit();
+
+    expect(alert).toHaveTextContent("Something went wrong. Please try again.");
+    expect(alert.textContent).not.toMatch(FORBIDDEN);
   });
 });

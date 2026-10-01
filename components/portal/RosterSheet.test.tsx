@@ -6,24 +6,25 @@ import userEvent from "@testing-library/user-event";
 import { getFunctionName } from "convex/server";
 
 // One stub per mutation, told apart by function name so a test can assert
-// "create was called with this designId" without guessing which of the three
-// roster mutations fired.
+// "create was called with this designId" without guessing which of the
+// roster mutations fired. L-02: the sheet writes order items, keyed by the
+// order rather than a run, so it works before a form exists (§7.3).
 const { create, createMany, copyToDesign, update, remove } = vi.hoisted(() => ({
   create: vi.fn(async (_args: unknown) => "slot_new"),
   createMany: vi.fn(async (_args: unknown) => ["slot_a", "slot_b"]),
   copyToDesign: vi.fn(async (_args: unknown) => ({ copied: 2, skipped: 0 })),
-  update: vi.fn(async (_args: unknown) => "slot_1"),
-  remove: vi.fn(async (_args: unknown) => "slot_1"),
+  update: vi.fn(async (_args: unknown) => null),
+  remove: vi.fn(async (_args: unknown) => null),
 }));
 
 vi.mock("convex/react", () => ({
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const name = getFunctionName(ref);
-    if (name === "rosterEntries:create") return create;
-    if (name === "rosterEntries:createMany") return createMany;
-    if (name === "rosterEntries:copyToDesign") return copyToDesign;
-    if (name === "rosterEntries:update") return update;
-    if (name === "rosterEntries:remove") return remove;
+    if (name === "orderItems:add") return create;
+    if (name === "orderItems:addMany") return createMany;
+    if (name === "orderItems:copyToDesign") return copyToDesign;
+    if (name === "orderItems:update") return update;
+    if (name === "orderItems:remove") return remove;
     throw new Error(`Unexpected mutation: ${name}`);
   },
 }));
@@ -36,16 +37,17 @@ vi.mock("sonner", () => ({
   toast: { error: toastError, success: toastSuccess },
 }));
 
+import { ConvexError } from "convex/values";
 import type { Id } from "@/convex/_generated/dataModel";
 import { RosterSheet, type RosterSheetSlot } from "./RosterSheet";
 
-const RUN_ID = "run_1" as Id<"jerseyRuns">;
+const ORDER_ID = "order_1" as Id<"orders">;
 const DESIGN_ID = "design_home" as Id<"designs">;
 const AWAY_ID = "design_away" as Id<"designs">;
 
 function slot(overrides: Partial<RosterSheetSlot> = {}): RosterSheetSlot {
   return {
-    _id: "slot_gretzky" as Id<"rosterEntries">,
+    _id: "slot_gretzky" as Id<"orderItems">,
     name: "Gretzky",
     number: "99",
     source: "captain",
@@ -66,7 +68,7 @@ function sheetElement(
 ) {
   return (
     <RosterSheet
-      runId={RUN_ID}
+      orderId={ORDER_ID}
       designId={DESIGN_ID}
       designTitle="Home kit"
       slots={[slot()]}
@@ -99,8 +101,8 @@ beforeEach(() => {
   create.mockResolvedValue("slot_new");
   createMany.mockResolvedValue(["slot_a", "slot_b"]);
   copyToDesign.mockResolvedValue({ copied: 2, skipped: 0 });
-  update.mockResolvedValue("slot_1");
-  remove.mockResolvedValue("slot_1");
+  update.mockResolvedValue(null);
+  remove.mockResolvedValue(null);
 });
 
 describe("RosterSheet — opening", () => {
@@ -110,7 +112,7 @@ describe("RosterSheet — opening", () => {
       slots: [
         slot(),
         slot({
-          _id: "slot_sosa" as Id<"rosterEntries">,
+          _id: "slot_sosa" as Id<"orderItems">,
           name: "Sosa",
           number: "25",
           sizes: [{ size: "S", qty: 2 }],
@@ -161,10 +163,11 @@ describe("RosterSheet — adding", () => {
     await user.click(sheet.getByRole("button", { name: /^add$/i }));
 
     expect(create).toHaveBeenCalledWith({
-      runId: RUN_ID,
+      orderId: ORDER_ID,
       designId: DESIGN_ID,
       name: "Lemieux",
       number: "66",
+      qty: 1,
     });
     expect(sheet.getByLabelText(/player name/i)).toHaveValue("");
     expect(sheet.getByLabelText(/player number/i)).toHaveValue("");
@@ -179,10 +182,11 @@ describe("RosterSheet — adding", () => {
     await user.click(sheet.getByRole("button", { name: /^add$/i }));
 
     expect(create).toHaveBeenCalledWith({
-      runId: RUN_ID,
+      orderId: ORDER_ID,
       designId: DESIGN_ID,
       name: "Lemieux",
       number: undefined,
+      qty: 1,
     });
   });
 
@@ -201,7 +205,7 @@ describe("RosterSheet — adding", () => {
 
   it("surfaces a rejected create as a readable toast", async () => {
     const user = userEvent.setup();
-    create.mockRejectedValueOnce(new Error("This jersey run is locked."));
+    create.mockRejectedValueOnce(new ConvexError("This order is locked."));
     renderSheet({ slots: [] });
 
     const sheet = await openSheet(user);
@@ -210,13 +214,13 @@ describe("RosterSheet — adding", () => {
 
     expect(toastError).toHaveBeenCalledWith(
       expect.stringMatching(/could not add/i),
-      expect.objectContaining({ description: "This jersey run is locked." }),
+      expect.objectContaining({ description: "This order is locked." }),
     );
   });
 });
 
 describe("RosterSheet — editing and removing", () => {
-  it("saves an edited name and number against the slot's id", async () => {
+  it("saves an edited name and number against the item's id, keeping its size and qty", async () => {
     const user = userEvent.setup();
     renderSheet();
 
@@ -227,11 +231,35 @@ describe("RosterSheet — editing and removing", () => {
     await user.type(name, "Howe");
     await user.click(sheet.getByRole("button", { name: /^save$/i }));
 
-    expect(update).toHaveBeenCalledWith({
-      rosterEntryId: "slot_gretzky",
-      name: "Howe",
-      number: "99",
-    });
+    // orderItems.update is a full replace of the editable fields (an omitted
+    // optional clears it), so renaming a sized player must send the size and
+    // qty back unchanged, or the rename silently drops their jersey size.
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: "slot_gretzky",
+        name: "Howe",
+        number: "99",
+        size: "L",
+        qty: 1,
+      }),
+    );
+  });
+
+  it("keeps a Needs-size player's size empty when renaming them", async () => {
+    const user = userEvent.setup();
+    renderSheet({ slots: [slot({ filled: false, sizes: [], total: 0 })] });
+
+    const sheet = await openSheet(user);
+    await user.click(sheet.getByRole("button", { name: /edit gretzky/i }));
+    const name = sheet.getByLabelText(/edit name/i);
+    await user.clear(name);
+    await user.type(name, "Howe");
+    await user.click(sheet.getByRole("button", { name: /^save$/i }));
+
+    expect(update).toHaveBeenCalledTimes(1);
+    const args = update.mock.calls[0][0] as Record<string, unknown>;
+    expect(args).toMatchObject({ itemId: "slot_gretzky", name: "Howe", qty: 1 });
+    expect(args.size).toBeUndefined();
   });
 
   it("leaves the slot alone when the edit is cancelled", async () => {
@@ -257,7 +285,22 @@ describe("RosterSheet — editing and removing", () => {
     const sheet = await openSheet(user);
     await user.click(sheet.getByRole("button", { name: /remove gretzky/i }));
 
-    expect(remove).toHaveBeenCalledWith({ rosterEntryId: "slot_gretzky" });
+    expect(remove).toHaveBeenCalledWith({ itemId: "slot_gretzky" });
+  });
+
+  // L-02 / UX §7.4: an item is the jersey, so removing a sized player just
+  // removes it. There is no "remove those first" step any more.
+  it("removes a player who already has a size, with no error", async () => {
+    const user = userEvent.setup();
+    renderSheet({
+      slots: [slot({ filled: true, sizes: [{ size: "L", qty: 1 }], total: 1 })],
+    });
+
+    const sheet = await openSheet(user);
+    await user.click(sheet.getByRole("button", { name: /remove gretzky/i }));
+
+    expect(remove).toHaveBeenCalledWith({ itemId: "slot_gretzky" });
+    await waitFor(() => expect(toastError).not.toHaveBeenCalled());
   });
 
   // M-06 tried dimming these until the row was hovered; M-07 reverted it on
@@ -277,11 +320,9 @@ describe("RosterSheet — editing and removing", () => {
     ).toBeInTheDocument();
   });
 
-  it("surfaces the server's 'slot has orders on it' rejection as a toast", async () => {
+  it("surfaces a rejected remove as a readable toast", async () => {
     const user = userEvent.setup();
-    remove.mockRejectedValueOnce(
-      new Error("This slot has orders on it — remove those first."),
-    );
+    remove.mockRejectedValueOnce(new ConvexError("This order is locked."));
     renderSheet();
 
     const sheet = await openSheet(user);
@@ -290,7 +331,7 @@ describe("RosterSheet — editing and removing", () => {
     expect(toastError).toHaveBeenCalledWith(
       expect.stringMatching(/could not remove/i),
       expect.objectContaining({
-        description: "This slot has orders on it — remove those first.",
+        description: "This order is locked.",
       }),
     );
   });
@@ -303,12 +344,12 @@ describe("RosterSheet — editing and removing", () => {
 describe("RosterSheet — rows across a re-read", () => {
   const gretzky = slot();
   const sosa = slot({
-    _id: "slot_sosa" as Id<"rosterEntries">,
+    _id: "slot_sosa" as Id<"orderItems">,
     name: "Sosa",
     number: "25",
   });
   const bure = slot({
-    _id: "slot_bure" as Id<"rosterEntries">,
+    _id: "slot_bure" as Id<"orderItems">,
     name: "Bure",
     number: "10",
   });
@@ -319,7 +360,7 @@ describe("RosterSheet — rows across a re-read", () => {
     const sheet = await openSheet(user);
 
     await user.click(sheet.getByRole("button", { name: /remove sosa/i }));
-    expect(remove).toHaveBeenCalledWith({ rosterEntryId: "slot_sosa" });
+    expect(remove).toHaveBeenCalledWith({ itemId: "slot_sosa" });
 
     rerender(sheetElement({ slots: [gretzky, bure] }));
 
@@ -420,9 +461,9 @@ describe("RosterSheet — bulk paste", () => {
     await user.click(sheet.getByRole("button", { name: /add 2 players/i }));
 
     expect(createMany).toHaveBeenCalledWith({
-      runId: RUN_ID,
+      orderId: ORDER_ID,
       designId: DESIGN_ID,
-      players: [
+      rows: [
         { name: "Gretzky", number: "99" },
         { name: "Bo", number: undefined },
       ],
@@ -450,9 +491,9 @@ describe("RosterSheet — bulk paste", () => {
 
     await user.click(sheet.getByRole("button", { name: /add 1 player$/i }));
     expect(createMany).toHaveBeenCalledWith({
-      runId: RUN_ID,
+      orderId: ORDER_ID,
       designId: DESIGN_ID,
-      players: [{ name: "Lemieux", number: "66" }],
+      rows: [{ name: "Lemieux", number: "66" }],
     });
   });
 
@@ -484,7 +525,7 @@ describe("RosterSheet — bulk paste", () => {
 
   it("surfaces a rejected commit as a toast and keeps the paste on screen", async () => {
     const user = userEvent.setup();
-    createMany.mockRejectedValueOnce(new Error("This jersey run is locked."));
+    createMany.mockRejectedValueOnce(new ConvexError("This order is locked."));
     renderSheet({ slots: [] });
 
     const sheet = await openSheet(user);
@@ -493,7 +534,7 @@ describe("RosterSheet — bulk paste", () => {
 
     expect(toastError).toHaveBeenCalledWith(
       expect.stringMatching(/could not add/i),
-      expect.objectContaining({ description: "This jersey run is locked." }),
+      expect.objectContaining({ description: "This order is locked." }),
     );
     expect(sheet.getByLabelText(/paste roster rows/i)).toBeInTheDocument();
   });
@@ -555,7 +596,7 @@ describe("RosterSheet — mirror", () => {
     await pickSource(sheet, user, /away kit/i);
 
     expect(copyToDesign).toHaveBeenCalledWith({
-      runId: RUN_ID,
+      orderId: ORDER_ID,
       sourceDesignId: AWAY_ID,
       targetDesignId: DESIGN_ID,
     });
@@ -586,7 +627,7 @@ describe("RosterSheet — mirror", () => {
 
   it("surfaces a rejected copy as a readable toast", async () => {
     const user = userEvent.setup();
-    copyToDesign.mockRejectedValueOnce(new Error("This jersey run is locked."));
+    copyToDesign.mockRejectedValueOnce(new ConvexError("This order is locked."));
     renderSheet();
 
     const sheet = await openSheet(user);
@@ -594,7 +635,7 @@ describe("RosterSheet — mirror", () => {
 
     expect(toastError).toHaveBeenCalledWith(
       expect.stringMatching(/could not copy/i),
-      expect.objectContaining({ description: "This jersey run is locked." }),
+      expect.objectContaining({ description: "This order is locked." }),
     );
   });
 });
@@ -616,7 +657,7 @@ describe("RosterSheet — captain designations", () => {
       slots: [
         slot({ designation: "C" }),
         slot({
-          _id: "slot_bure" as Id<"rosterEntries">,
+          _id: "slot_bure" as Id<"orderItems">,
           name: "Bure",
           number: "10",
         }),
@@ -643,12 +684,16 @@ describe("RosterSheet — captain designations", () => {
     await user.click(sheet.getByRole("radio", { name: /captain \(c\)/i }));
     await user.click(sheet.getByRole("button", { name: /^save$/i }));
 
-    expect(update).toHaveBeenCalledWith({
-      rosterEntryId: "slot_gretzky",
-      name: "Gretzky",
-      number: "99",
-      designation: "C",
-    });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: "slot_gretzky",
+        name: "Gretzky",
+        number: "99",
+        designation: "C",
+        size: "L",
+        qty: 1,
+      }),
+    );
   });
 
   it("takes a letter back off", async () => {
@@ -666,12 +711,16 @@ describe("RosterSheet — captain designations", () => {
     await user.click(sheet.getByRole("radio", { name: /no letter/i }));
     await user.click(sheet.getByRole("button", { name: /^save$/i }));
 
-    expect(update).toHaveBeenCalledWith({
-      rosterEntryId: "slot_gretzky",
+    expect(update).toHaveBeenCalledTimes(1);
+    const args = update.mock.calls[0][0] as Record<string, unknown>;
+    expect(args).toMatchObject({
+      itemId: "slot_gretzky",
       name: "Gretzky",
       number: "99",
-      designation: undefined,
+      size: "L",
+      qty: 1,
     });
+    expect(args.designation).toBeUndefined();
   });
 
   it("forgets a letter picked and then cancelled", async () => {

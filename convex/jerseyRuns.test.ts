@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { overviewBlocks } from "../lib/designBlock";
 
@@ -48,6 +48,42 @@ async function seedCaptainWithOrder(
 }
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
+
+// An order item written straight into the table (L-02: every reader below
+// reads `orderItems`, the legacy roster/order entry tables are dead).
+// Defaults to a sized fan jersey with no name.
+async function insertItem(
+  t: ReturnType<typeof convexTest>,
+  orderId: Id<"orders">,
+  designId: Id<"designs">,
+  fields: Partial<{
+    name: string;
+    number: string;
+    designation: "C" | "A";
+    size: string;
+    qty: number;
+    source: "captain" | "fan";
+    submitterName: string;
+    submitterEmail: string;
+    customAnswers: Record<string, string>;
+    runId: Id<"jerseyRuns">;
+    removedAt: number;
+    createdAt: number;
+  }> = {},
+): Promise<Id<"orderItems">> {
+  const createdAt = fields.createdAt ?? Date.now();
+  return t.run((ctx) =>
+    ctx.db.insert("orderItems", {
+      orderId,
+      designId,
+      qty: 1,
+      source: "fan",
+      ...fields,
+      createdAt,
+      updatedAt: createdAt,
+    }),
+  );
+}
 
 // "Start collecting" (M-05) takes a deadline and nothing else: sizes are a
 // fixed catalog, names mode is switched afterwards on the order page, and
@@ -511,18 +547,18 @@ describe("jerseyRuns.lock / unlock (R-06)", () => {
       }),
     );
     await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
-    await t.run((ctx) =>
-      ctx.db.insert("orderEntries", {
-        runId,
-        designId,
-        size: "M",
-        qty: 3,
-        source: "captain",
-        submitterName: "Sam",
-        submitterEmail: "sam@example.com",
-        createdAt: Date.now(),
-      }),
-    );
+    await insertItem(t, orderId, designId, {
+      size: "M",
+      qty: 3,
+      source: "captain",
+    });
+    // A Needs-size player and a removed jersey: neither is in the count.
+    await insertItem(t, orderId, designId, { name: "Bure", source: "captain" });
+    await insertItem(t, orderId, designId, {
+      size: "L",
+      qty: 5,
+      removedAt: Date.now(),
+    });
 
     await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
 
@@ -535,7 +571,7 @@ describe("jerseyRuns.lock / unlock (R-06)", () => {
     expect(run?.lockSnapshot?.lockedAt).toBeTypeOf("number");
   });
 
-  it("freezes exactly the live count: lockSnapshot total/byDesign equals a prior countsByRun (A-08)", async () => {
+  it("freezes exactly the live count: lockSnapshot total/byDesign equals the live listForOrder summary (A-08, L-02)", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
     const runId = await asUser.mutation(
@@ -568,28 +604,56 @@ describe("jerseyRuns.lock / unlock (R-06)", () => {
         [homeId, 3],
         [awayId, 4],
       ] as const) {
-        await ctx.db.insert("orderEntries", {
-          runId,
+        await ctx.db.insert("orderItems", {
+          orderId,
           designId,
           size: "M",
           qty,
           source: "captain",
-          submitterName: "Sam",
-          submitterEmail: "sam@example.com",
           createdAt: Date.now(),
+          updatedAt: Date.now(),
         });
       }
+      // Excluded from both: a removed jersey and a Needs-size player.
+      await ctx.db.insert("orderItems", {
+        orderId,
+        designId: homeId,
+        size: "L",
+        qty: 7,
+        source: "captain",
+        removedAt: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("orderItems", {
+        orderId,
+        designId: awayId,
+        name: "Bure",
+        qty: 1,
+        source: "captain",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
     });
 
     // The number the captain sees live, right before locking.
-    const live = await asUser.query(api.orderEntries.countsByRun, { runId });
+    const live = await asUser.query(api.orderItems.listForOrder, { orderId });
+    expect(live!.summary.itemCount).toBe(9);
 
     await asUser.mutation(api.jerseyRuns.lock, { jerseyRunId: runId });
     const run = await t.run((ctx) => ctx.db.get(runId));
 
-    // One source of arithmetic, so the frozen basis is the live count exactly.
-    expect(run?.lockSnapshot?.total).toBe(live.total);
-    expect(run?.lockSnapshot?.byDesign).toEqual(live.byDesign);
+    // One source of arithmetic (`summarize`), so the frozen basis is the
+    // live count exactly.
+    expect(run?.lockSnapshot?.total).toBe(live!.summary.itemCount);
+    expect(run?.lockSnapshot?.byDesign).toEqual(
+      live!.designs.map((d) => ({
+        designId: d.designId,
+        title: d.title,
+        total: d.summary.itemCount,
+      })),
+    );
+    expect(run?.lockSnapshot?.total).toBe(9);
   });
 
   it("admin can lock a captain's run", async () => {
@@ -741,7 +805,7 @@ describe("jerseyRuns.getPublic", () => {
   it("returns the order's designs with seeded roster slots for the form", async () => {
     const t = convexTest(schema, modules);
     const now = Date.now();
-    const { runId, homeId, awayId } = await t.run(async (ctx) => {
+    const { runId, orderId, homeId, awayId } = await t.run(async (ctx) => {
       const userId = await ctx.db.insert("users", {
         clerkId: "cap",
         email: "cap@example.com",
@@ -784,16 +848,14 @@ describe("jerseyRuns.getPublic", () => {
         status: "open",
         createdAt: now,
       });
-      await ctx.db.insert("rosterEntries", {
-        runId,
-        orderId,
-        designId: homeId,
-        name: "Gretzky",
-        number: "99",
-        source: "captain",
-        createdAt: now,
-      });
-      return { runId, homeId, awayId };
+      return { runId, orderId, homeId, awayId };
+    });
+    // L-02: the picker is the order's named items (a captain's Needs-size
+    // player), not a run-scoped roster table.
+    const gretzkyId = await insertItem(t, orderId, homeId, {
+      name: "Gretzky",
+      number: "99",
+      source: "captain",
     });
 
     const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
@@ -802,15 +864,198 @@ describe("jerseyRuns.getPublic", () => {
     expect(data!.designs.map((d) => d.title)).toEqual(["Home", "Away"]);
     const home = data!.designs.find((d) => d._id === homeId);
     expect(home!.roster).toEqual([
-      { _id: expect.anything(), name: "Gretzky", number: "99" },
+      { _id: gretzkyId, name: "Gretzky", number: "99" },
     ]);
     const away = data!.designs.find((d) => d._id === awayId);
     expect(away!.roster).toHaveLength(0);
   });
 });
 
+// ─── L-02 (initiative 0004): getPublic reads order items ───────────────────
+
+// The public chain: captain → Home + Away designs → order → open run.
+async function seedPublicRun(
+  t: ReturnType<typeof convexTest>,
+  namesMode: "open" | "fixed" = "fixed",
+) {
+  const now = Date.now();
+  return t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", {
+      clerkId: "cap",
+      email: "cap@example.com",
+      name: "Cap",
+      isAdmin: false,
+      createdAt: now,
+    });
+    const homeId = await ctx.db.insert("designs", {
+      ownerId: userId,
+      title: "Home",
+      blocks: overviewBlocks("h"),
+      createdAt: now,
+      updatedAt: now,
+    });
+    const orderId = await ctx.db.insert("orders", {
+      captainId: userId,
+      teamName: "Wildcats",
+      sport: "Hockey",
+      estimatedQuantity: 10,
+      hasOwnDesign: false,
+      designIds: [homeId],
+      internalStages: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+    const runId = await ctx.db.insert("jerseyRuns", {
+      orderId,
+      captainId: userId,
+      sizeOptions: ["M", "L"],
+      namesMode,
+      customQuestions: [{ id: "q1", label: "Pickup?" }],
+      deadline: now + 7 * ONE_DAY,
+      status: "open",
+      createdAt: now,
+    });
+    return { userId, homeId, orderId, runId };
+  });
+}
+
+describe("getPublic exposes only _id, name, number per picker entry; removed and unnamed items are absent", () => {
+  it("returns exactly { _id, name, number } for a named item, with no size, letter, submitter or answers", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, homeId, runId } = await seedPublicRun(t);
+    const id = await insertItem(t, orderId, homeId, {
+      name: "Jordan Lee",
+      number: "4",
+      designation: "C",
+      size: "M",
+      qty: 2,
+      submitterName: "Jordan's Mum",
+      submitterEmail: "mum@example.com",
+      customAnswers: { q1: "Gym" },
+      runId,
+    });
+
+    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    const roster = data!.designs[0].roster;
+    expect(roster).toEqual([{ _id: id, name: "Jordan Lee", number: "4" }]);
+    expect(Object.keys(roster[0]).sort()).toEqual(["_id", "name", "number"]);
+    expect(JSON.stringify(data)).not.toMatch(/mum@example\.com|Jordan's Mum|Gym/);
+  });
+
+  it("leaves out removed items and items with no name", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, homeId, runId } = await seedPublicRun(t);
+    const kept = await insertItem(t, orderId, homeId, {
+      name: "Kept",
+      number: "1",
+      source: "captain",
+    });
+    await insertItem(t, orderId, homeId, {
+      name: "Removed",
+      number: "2",
+      source: "captain",
+      removedAt: Date.now(),
+    });
+    // A blank jersey (number only, and a bulk line with neither).
+    await insertItem(t, orderId, homeId, { number: "3", size: "M" });
+    await insertItem(t, orderId, homeId, { size: "L", qty: 4 });
+
+    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    expect(data!.designs[0].roster).toEqual([
+      { _id: kept, name: "Kept", number: "1" },
+    ]);
+  });
+
+  it("dedupes the same player by name + number (case/space-insensitive), oldest item wins", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, homeId, runId } = await seedPublicRun(t);
+    const oldest = await insertItem(t, orderId, homeId, {
+      name: "Gretzky",
+      number: "99",
+      source: "captain",
+      createdAt: 1_000,
+    });
+    // The same player ordered twice more (two jerseys, Q7): still one pick.
+    await insertItem(t, orderId, homeId, {
+      name: " gretzky ",
+      number: "99",
+      size: "M",
+      createdAt: 2_000,
+    });
+    await insertItem(t, orderId, homeId, {
+      name: "Gretzky",
+      number: "99",
+      size: "L",
+      createdAt: 3_000,
+    });
+
+    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    expect(data!.designs[0].roster).toEqual([
+      { _id: oldest, name: "Gretzky", number: "99" },
+    ]);
+  });
+
+  it("lists Lee #4 and Lee #9 as two separate picks (same name, different number)", async () => {
+    const t = convexTest(schema, modules);
+    const { orderId, homeId, runId } = await seedPublicRun(t);
+    const lee4 = await insertItem(t, orderId, homeId, {
+      name: "Lee",
+      number: "4",
+      source: "captain",
+      createdAt: 1_000,
+    });
+    const lee9 = await insertItem(t, orderId, homeId, {
+      name: "Lee",
+      number: "9",
+      source: "captain",
+      createdAt: 2_000,
+    });
+
+    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    expect(data!.designs[0].roster).toEqual([
+      { _id: lee4, name: "Lee", number: "4" },
+      { _id: lee9, name: "Lee", number: "9" },
+    ]);
+  });
+
+  it("offers players the captain added before the form existed, and nobody from another order", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId, homeId, runId } = await seedPublicRun(t);
+    // No runId: added on the order page before "Make an order form".
+    const early = await insertItem(t, orderId, homeId, {
+      name: "Early",
+      number: "7",
+      source: "captain",
+      createdAt: 1,
+    });
+    const otherOrderId = await t.run((ctx) =>
+      ctx.db.insert("orders", {
+        captainId: userId,
+        teamName: "Other",
+        sport: "Hockey",
+        estimatedQuantity: 1,
+        hasOwnDesign: false,
+        designIds: [homeId],
+        internalStages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    await insertItem(t, otherOrderId, homeId, {
+      name: "Stranger",
+      number: "8",
+      source: "captain",
+    });
+
+    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    expect(data!.designs[0].roster).toEqual([
+      { _id: early, name: "Early", number: "7" },
+    ]);
+  });
+});
+
 describe("jerseyRuns.listOrderEntries (R-07)", () => {
-  it("returns the run's order entries joined with design title and slot name/number, newest first", async () => {
+  it("returns the order's sized items as entries, joined with design title and name/number, newest first (L-02)", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
     const runId = await asUser.mutation(
@@ -830,44 +1075,27 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
     await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
 
     const now = Date.now();
-    const rosterId = await t.run((ctx) =>
-      ctx.db.insert("rosterEntries", {
-        runId,
-        orderId,
-        designId,
-        name: "Gretzky",
-        number: "99",
-        source: "captain",
-        createdAt: now,
-      }),
-    );
-    // A named fan line attached to the slot…
-    await t.run((ctx) =>
-      ctx.db.insert("orderEntries", {
-        runId,
-        designId,
-        rosterEntryId: rosterId,
-        size: "L",
-        qty: 2,
-        source: "fan",
-        submitterName: "Sam",
-        submitterEmail: "sam@example.com",
-        createdAt: now,
-      }),
-    );
-    // …and a later blank/bulk line with no slot.
-    await t.run((ctx) =>
-      ctx.db.insert("orderEntries", {
-        runId,
-        designId,
-        size: "M",
-        qty: 3,
-        source: "captain",
-        submitterName: "Cap",
-        submitterEmail: "captain@example.com",
-        createdAt: now + 1,
-      }),
-    );
+    // A named fan jersey that filled a captain's player…
+    const gretzkyId = await insertItem(t, orderId, designId, {
+      name: "Gretzky",
+      number: "99",
+      designation: "C",
+      size: "L",
+      qty: 2,
+      source: "captain",
+      submitterName: "Sam",
+      submitterEmail: "sam@example.com",
+      customAnswers: { q1: "Gym" },
+      runId,
+      createdAt: now,
+    });
+    // …and a later blank/bulk line.
+    const blankId = await insertItem(t, orderId, designId, {
+      size: "M",
+      qty: 3,
+      source: "captain",
+      createdAt: now + 1,
+    });
 
     const data = await asUser.query(api.jerseyRuns.listOrderEntries, {
       jerseyRunId: runId,
@@ -876,19 +1104,59 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
     expect(data!.entries).toHaveLength(2);
     // Newest first: the blank captain line leads and carries no name/number.
     expect(data!.entries[0]).toMatchObject({
+      _id: blankId,
       designTitle: "Home",
       size: "M",
       qty: 3,
     });
     expect(data!.entries[0].name).toBeUndefined();
     expect(data!.entries[0].number).toBeUndefined();
-    const gretzky = data!.entries.find((e) => e.name === "Gretzky");
-    expect(gretzky).toMatchObject({
+    // `_id` is the item id; name/number/letter come off the item itself.
+    expect(data!.entries[1]).toMatchObject({
+      _id: gretzkyId,
+      name: "Gretzky",
       number: "99",
+      designation: "C",
+      designId,
       designTitle: "Home",
       size: "L",
       qty: 2,
+      source: "captain",
+      submitterName: "Sam",
+      submitterEmail: "sam@example.com",
+      customAnswers: { q1: "Gym" },
     });
+  });
+
+  it("excludes removed items, and Needs-size items (an entry is a sized jersey)", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const designId = await t.run((ctx) =>
+      ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Home",
+        blocks: overviewBlocks("h"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
+    const live = await insertItem(t, orderId, designId, { size: "M" });
+    await insertItem(t, orderId, designId, {
+      size: "L",
+      qty: 5,
+      removedAt: Date.now(),
+    });
+    await insertItem(t, orderId, designId, { name: "Bure", source: "captain" });
+
+    const data = await asUser.query(api.jerseyRuns.listOrderEntries, {
+      jerseyRunId: runId,
+    });
+    expect(data!.entries.map((e) => e._id)).toEqual([live]);
   });
 
   it("rejects a caller who is neither the captain nor an admin", async () => {
@@ -910,7 +1178,7 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
 });
 
 describe("jerseyRuns.listMyResponses (R-07)", () => {
-  it("returns only the signed-in user's own order entries, joined with run + team", async () => {
+  it("returns only the signed-in user's own items, joined with run + team (L-02)", async () => {
     const t = convexTest(schema, modules);
     // seedCaptainWithOrder signs in as captain@example.com.
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
@@ -929,40 +1197,118 @@ describe("jerseyRuns.listMyResponses (R-07)", () => {
     );
     await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
 
-    await t.run((ctx) =>
-      ctx.db.insert("orderEntries", {
-        runId,
-        designId,
-        size: "M",
-        qty: 1,
-        source: "fan",
-        submitterName: "Cap",
-        submitterEmail: "captain@example.com",
-        createdAt: Date.now(),
-      }),
-    );
-    // A different fan's entry on the same run — must not leak into my list.
-    await t.run((ctx) =>
-      ctx.db.insert("orderEntries", {
-        runId,
-        designId,
-        size: "L",
-        qty: 1,
-        source: "fan",
-        submitterName: "Other",
-        submitterEmail: "other@example.com",
-        createdAt: Date.now(),
-      }),
-    );
+    const mineId = await insertItem(t, orderId, designId, {
+      name: "Gretzky",
+      number: "99",
+      size: "M",
+      submitterName: "Cap",
+      submitterEmail: "captain@example.com",
+      runId,
+    });
+    // A different fan's item on the same order — must not leak into my list.
+    await insertItem(t, orderId, designId, {
+      size: "L",
+      submitterName: "Other",
+      submitterEmail: "other@example.com",
+      runId,
+    });
 
     const mine = await asUser.query(api.jerseyRuns.listMyResponses, {});
     expect(mine).toHaveLength(1);
     expect(mine[0].teamName).toBe("Falcons");
-    expect(mine[0].entry).toMatchObject({ size: "M", designTitle: "Home" });
+    expect(mine[0].run._id).toBe(runId);
+    expect(mine[0].entry).toMatchObject({
+      _id: mineId,
+      size: "M",
+      designTitle: "Home",
+      name: "Gretzky",
+      number: "99",
+    });
+  });
+
+  it("leaves out an item the captain removed", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const designId = await t.run((ctx) =>
+      ctx.db.insert("designs", {
+        ownerId: userId,
+        title: "Home",
+        blocks: overviewBlocks("h"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
+    const kept = await insertItem(t, orderId, designId, {
+      size: "M",
+      submitterName: "Cap",
+      submitterEmail: "captain@example.com",
+      runId,
+    });
+    await insertItem(t, orderId, designId, {
+      size: "L",
+      submitterName: "Cap",
+      submitterEmail: "captain@example.com",
+      runId,
+      removedAt: Date.now(),
+    });
+
+    const mine = await asUser.query(api.jerseyRuns.listMyResponses, {});
+    expect(mine.map((m) => m.entry._id)).toEqual([kept]);
   });
 
   it("returns [] for an unauthenticated caller", async () => {
     const t = convexTest(schema, modules);
     expect(await t.query(api.jerseyRuns.listMyResponses, {})).toEqual([]);
+  });
+});
+
+// L-02: the closure email's count is the order's production total, the same
+// `summary.itemCount` the captain's list shows.
+describe("jerseyRuns._closeRun counts order items (L-02)", () => {
+  it("reports responseCount = listForOrder summary.itemCount, excluding removed and Needs-size items", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
+    const runId = await asUser.mutation(
+      api.jerseyRuns.create,
+      validRunArgs(orderId),
+    );
+    const [homeId, awayId] = await t.run(async (ctx) => {
+      const ids = [];
+      for (const title of ["Home", "Away"])
+        ids.push(
+          await ctx.db.insert("designs", {
+            ownerId: userId,
+            title,
+            blocks: overviewBlocks(title),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          }),
+        );
+      await ctx.db.patch(orderId, { designIds: ids });
+      return ids;
+    });
+    // Counted: 2 + 3 (one added before the form, with no runId).
+    await insertItem(t, orderId, homeId, { size: "M", qty: 2, runId });
+    await insertItem(t, orderId, awayId, { size: "L", qty: 3, source: "captain" });
+    // Not counted: a removed jersey and a Needs-size player.
+    await insertItem(t, orderId, homeId, {
+      size: "XL",
+      qty: 4,
+      removedAt: Date.now(),
+    });
+    await insertItem(t, orderId, homeId, { name: "Bure", source: "captain" });
+
+    const live = await asUser.query(api.orderItems.listForOrder, { orderId });
+    const closed = await t.mutation(internal.jerseyRuns._closeRun, {
+      jerseyRunId: runId,
+    });
+
+    expect(closed?.responseCount).toBe(5);
+    expect(closed?.responseCount).toBe(live!.summary.itemCount);
   });
 });

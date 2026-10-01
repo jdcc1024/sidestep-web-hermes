@@ -26,6 +26,12 @@ async function seedUser(
   );
 }
 
+// L-02: the fixtures seed `orderItems` directly; the legacy tables are no
+// longer written by any path.
+async function allItems(t: ReturnType<typeof convexTest>) {
+  return t.run((ctx) => ctx.db.query("orderItems").collect());
+}
+
 describe("_devSeed:seedPortalFixtures", () => {
   it("should give the named account one order with a run and one without", async () => {
     const t = convexTest(schema, modules);
@@ -52,7 +58,7 @@ describe("_devSeed:seedPortalFixtures", () => {
     expect(runsForNoRunOrder).toEqual([]);
   });
 
-  it("should give the run enough roster and order entries to render a breakdown", async () => {
+  it("should give the run's order enough items to render a breakdown (L-02)", async () => {
     const t = convexTest(schema, modules);
     await seedUser(t);
 
@@ -60,33 +66,64 @@ describe("_devSeed:seedPortalFixtures", () => {
       email: SNAP_EMAIL,
     });
 
-    const roster = await t.run((ctx) =>
-      ctx.db.query("rosterEntries").collect(),
+    const items = (await allItems(t)).filter(
+      (i) => i.orderId === result.orderWithRunId,
     );
-    const entries = await t.run((ctx) =>
-      ctx.db.query("orderEntries").collect(),
-    );
+    expect(items.length).toBeGreaterThan(0);
 
-    expect(roster.length).toBeGreaterThan(0);
-    expect(entries.length).toBeGreaterThan(0);
+    // Every item hangs off a design the account owns, or the order page
+    // joins to nothing and renders blank anyway.
+    expect(items.every((i) => result.designIds.includes(i.designId))).toBe(true);
+    expect(items.every((i) => i.removedAt === undefined)).toBe(true);
 
-    // Every row hangs off the seeded run and a design the account owns, or the
-    // responses page joins to nothing and renders blank anyway.
-    expect(roster.every((r) => r.runId === result.runId)).toBe(true);
-    expect(roster.every((r) => r.orderId === result.orderWithRunId)).toBe(true);
-    expect(entries.every((e) => e.runId === result.runId)).toBe(true);
+    // At least one named jersey (a player) and at least one unnamed sized
+    // jersey (a blank/spare): an empty tab photographs as a bug report.
+    const sized = items.filter((i) => i.size !== undefined);
+    expect(sized.some((i) => i.name !== undefined)).toBe(true);
+    expect(sized.some((i) => i.name === undefined)).toBe(true);
+    // At least one came in through the form, with a submitter and the runId.
     expect(
-      entries.every((e) => result.designIds.includes(e.designId)),
+      items.some(
+        (i) => i.runId === result.runId && i.submitterEmail !== undefined,
+      ),
     ).toBe(true);
 
-    // At least one fan line attached to a roster slot (the "By roster" view)
-    // and at least one blank/spare line (the "By fan" view) — C-02 has three
-    // tabs and an empty one photographs as a bug report.
-    expect(entries.some((e) => e.rosterEntryId !== undefined)).toBe(true);
-    expect(entries.some((e) => e.rosterEntryId === undefined)).toBe(true);
-
     // More than one size, so the size-breakdown chip row has something to say.
-    expect(new Set(entries.map((e) => e.size)).size).toBeGreaterThan(1);
+    expect(new Set(sized.map((i) => i.size)).size).toBeGreaterThan(1);
+  });
+
+  it("should give the order with no run 2 captain items, one of them Needs size (L-02)", async () => {
+    const t = convexTest(schema, modules);
+    await seedUser(t);
+
+    const result = await t.mutation(internal._devSeed.seedPortalFixtures, {
+      email: SNAP_EMAIL,
+    });
+
+    const items = (await allItems(t)).filter(
+      (i) => i.orderId === result.orderWithoutRunId,
+    );
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => i.source === "captain")).toBe(true);
+    expect(items.every((i) => i.runId === undefined)).toBe(true);
+    expect(items.every((i) => i.submitterEmail === undefined)).toBe(true);
+    expect(items.filter((i) => i.size === undefined)).toHaveLength(1);
+    expect(items.filter((i) => i.size !== undefined)).toHaveLength(1);
+  });
+
+  it("should write no legacy roster or order entry rows (L-02)", async () => {
+    const t = convexTest(schema, modules);
+    await seedUser(t);
+
+    await t.mutation(internal._devSeed.seedPortalFixtures, {
+      email: SNAP_EMAIL,
+    });
+
+    const legacy = await t.run(async (ctx) => ({
+      roster: (await ctx.db.query("rosterEntries").collect()).length,
+      entries: (await ctx.db.query("orderEntries").collect()).length,
+    }));
+    expect(legacy).toEqual({ roster: 0, entries: 0 });
   });
 
   it("should link both orders to designs the account owns", async () => {
@@ -110,6 +147,10 @@ describe("_devSeed:seedPortalFixtures", () => {
         order.designIds.every((id) => result.designIds.includes(id)),
       ).toBe(true);
     }
+    // Every item sits on a design its own order links.
+    const byOrder = new Map(orders.map((o) => [o._id, o]));
+    for (const item of await allItems(t))
+      expect(byOrder.get(item.orderId)!.designIds).toContain(item.designId);
   });
 
   it("should be idempotent — a second run adds nothing", async () => {
@@ -124,6 +165,7 @@ describe("_devSeed:seedPortalFixtures", () => {
         designs: (await ctx.db.query("designs").collect()).length,
         orders: (await ctx.db.query("orders").collect()).length,
         runs: (await ctx.db.query("jerseyRuns").collect()).length,
+        items: (await ctx.db.query("orderItems").collect()).length,
         roster: (await ctx.db.query("rosterEntries").collect()).length,
         entries: (await ctx.db.query("orderEntries").collect()).length,
       }));
@@ -173,6 +215,9 @@ describe("_devSeed:seedPortalFixtures", () => {
         .collect(),
     );
     expect(mine).toHaveLength(1);
+    expect(
+      (await allItems(t)).some((i) => i.orderId === foreignOrderId),
+    ).toBe(false);
   });
 
   it("should refuse to invent a user when the email is unknown", async () => {
@@ -218,9 +263,10 @@ describe("_devSeed:seedPortalFixtures", () => {
   });
 });
 
-// M-01: the design-card roster preview's overflow cap can only be judged
-// against a card that overflows, and its muted "not yet filled" row only
-// against slots nobody has ordered for. seedPortalFixtures produces neither.
+// M-01: the design-card roster preview can only be judged against a card
+// with a full roster, and its muted "not yet filled" row only against players
+// nobody has sized. seedPortalFixtures produces neither. L-02: a "player" is
+// a named order item; an unfilled one is a named item with no size.
 describe("_devSeed:seedLargeRoster", () => {
   async function seedBase(t: ReturnType<typeof convexTest>) {
     await seedUser(t);
@@ -229,7 +275,17 @@ describe("_devSeed:seedLargeRoster", () => {
     });
   }
 
-  it("should top the home design up to a full roster of unfilled slots", async () => {
+  function namedOn(
+    items: Awaited<ReturnType<typeof allItems>>,
+    designId: string,
+  ) {
+    return items.filter(
+      (i) =>
+        i.designId === designId && i.name !== undefined && i.removedAt === undefined,
+    );
+  }
+
+  it("should top the home design up to fifteen named items, the added ones Needs size", async () => {
     const t = convexTest(schema, modules);
     const base = await seedBase(t);
 
@@ -240,20 +296,13 @@ describe("_devSeed:seedLargeRoster", () => {
     expect(result.total).toBe(15);
     expect(result.designId).toBe(base.designIds[0]);
 
-    const onDesign = await t.run(async (ctx) =>
-      (await ctx.db.query("rosterEntries").collect()).filter(
-        (r) => r.designId === result.designId,
-      ),
-    );
+    const onDesign = namedOn(await allItems(t), result.designId);
     expect(onDesign).toHaveLength(15);
+    expect(onDesign.every((i) => i.orderId === base.orderWithRunId)).toBe(true);
 
-    // The added slots must be unordered, or the card photographs as fully
+    // The added players must be unsized, or the card photographs as fully
     // filled and the muted treatment never appears.
-    const entries = await t.run((ctx) => ctx.db.query("orderEntries").collect());
-    const filled = new Set(
-      entries.map((e) => e.rosterEntryId).filter(Boolean) as string[],
-    );
-    expect(onDesign.filter((r) => !filled.has(r._id))).toHaveLength(
+    expect(onDesign.filter((i) => i.size === undefined).length).toBeGreaterThanOrEqual(
       15 - result.before,
     );
   });
@@ -271,22 +320,29 @@ describe("_devSeed:seedLargeRoster", () => {
     expect(second.total).toBe(15);
   });
 
-  it("should leave the already-filled slots and their jerseys alone", async () => {
+  it("should leave the existing items alone, and the away design's roster as it was", async () => {
     const t = convexTest(schema, modules);
     const base = await seedBase(t);
-    const before = await t.run((ctx) => ctx.db.query("orderEntries").collect());
+    const before = await allItems(t);
 
     await t.mutation(internal._devSeed.seedLargeRoster, { email: SNAP_EMAIL });
 
-    const after = await t.run((ctx) => ctx.db.query("orderEntries").collect());
-    expect(after).toEqual(before);
-    // …and the away design keeps exactly the roster it had.
-    const away = await t.run(async (ctx) =>
-      (await ctx.db.query("rosterEntries").collect()).filter(
-        (r) => r.designId === base.designIds[1],
-      ),
+    const after = await allItems(t);
+    const byId = new Map(after.map((i) => [i._id, i]));
+    for (const item of before) expect(byId.get(item._id)).toEqual(item);
+    expect(namedOn(after, base.designIds[1])).toHaveLength(
+      namedOn(before, base.designIds[1]).length,
     );
-    expect(away).toHaveLength(1);
+  });
+
+  it("should write no legacy roster rows", async () => {
+    const t = convexTest(schema, modules);
+    await seedBase(t);
+
+    await t.mutation(internal._devSeed.seedLargeRoster, { email: SNAP_EMAIL });
+
+    const roster = await t.run((ctx) => ctx.db.query("rosterEntries").collect());
+    expect(roster).toEqual([]);
   });
 
   it("should refuse before the base fixtures exist", async () => {

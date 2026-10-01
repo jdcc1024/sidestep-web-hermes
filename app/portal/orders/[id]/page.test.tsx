@@ -13,23 +13,31 @@ import userEvent from "@testing-library/user-event";
 
 // Queries are told apart by function name, not args shape, so the page can
 // grow another query without silently re-pointing one of these stubs. The
-// page reads its order, the run behind the collect CTA, the derived roster
-// counts (O-07), the collected entries behind the size breakdown (C-01), the
-// unified per-design roster behind the card previews (M-01), and (through
-// RemovedDesigns) the O-08 receipt.
+// page reads its order, the run behind the collect CTA and names mode, the
+// order's items (L-02: one `orderItems.listForOrder` subscription behind the
+// total, per-design counts, size chips, roster preview, sheet and CSV), and
+// (through RemovedDesigns) the O-08 receipt.
 let orderResult: unknown = undefined;
 let runResult: unknown = null;
-let countsResult: unknown = undefined;
-let entriesResult: unknown = undefined;
-let rosterResult: unknown = undefined;
+let itemsResult: unknown = undefined;
 let removedResult: unknown = [];
+// Every query name the page subscribed to, so a test can pin "one list".
+const queried = new Set<string>();
 // Convex's view of auth (B-03). Settled-and-signed-in is the resting state;
 // the flash tests below rewind it to the token-attach window.
 let auth = { isLoading: false, isAuthenticated: true };
 
-// The roster sheet (M-02) writes through the rosterEntries mutations; the
-// page itself never calls one, so a shared no-op stub is enough.
+// The roster sheet (M-02) writes through the orderItems mutations; the page
+// itself never calls one, so a shared no-op stub is enough.
 const mutationStub = vi.fn(async (_args?: unknown) => undefined);
+
+// L-02: the legacy readers are gone from this page. A stub that answered them
+// would let a half-migrated page pass on stale numbers, so they throw.
+const LEGACY_READERS = new Set([
+  "orderEntries:countsByRun",
+  "jerseyRuns:listOrderEntries",
+  "rosterEntries:listForRun",
+]);
 
 vi.mock("convex/react", async () => {
   const { getFunctionName } = await import("convex/server");
@@ -37,10 +45,11 @@ vi.mock("convex/react", async () => {
     useMutation: () => mutationStub,
     useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
       const name = getFunctionName(ref);
-      if (name === "jerseyRuns:listOrderEntries") return entriesResult;
+      queried.add(name);
+      if (LEGACY_READERS.has(name))
+        throw new Error(`L-02: the order page must not read ${name}`);
+      if (name === "orderItems:listForOrder") return itemsResult;
       if (name.startsWith("jerseyRuns:")) return runResult;
-      if (name.startsWith("rosterEntries:")) return rosterResult;
-      if (name === "orderEntries:countsByRun") return countsResult;
       if (name.startsWith("orderEntries:")) return removedResult;
       return orderResult;
     },
@@ -49,9 +58,62 @@ vi.mock("convex/react", async () => {
 });
 
 import type { Id } from "@/convex/_generated/dataModel";
+import { summarize, type SummaryItem } from "@/lib/orderItem/summary";
 import OrderDetailPage from "./page";
 
 const ORDER_ID = "order_1" as Id<"orders">;
+
+const TITLES: Record<string, string> = {
+  design_home: "Home kit",
+  design_away: "Away kit",
+  design_warmup: "Warmup",
+};
+
+type FixtureItem = Partial<SummaryItem> & { designId?: string };
+
+// What `orderItems.listForOrder` returns for these items, built with the real
+// `summarize` read model so the fixture can't drift from the server's shape.
+// The linked designs are the current `orderResult`'s; an item on any other
+// design lands in `removedDesigns`, as it does on the server.
+function setItems(
+  items: FixtureItem[],
+  opts: {
+    locked?: boolean;
+    namesMode?: "open" | "fixed" | null;
+  } = {},
+) {
+  const order = orderResult as { designs: { _id: string }[]; locked?: boolean };
+  const designIds = order.designs.map((d) => d._id);
+  const full = items.map((item, i) => ({
+    _id: `item_${i}`,
+    designId: "design_home",
+    qty: 1,
+    source: "captain" as const,
+    createdAt: 1_000 + i,
+    ...item,
+  }));
+  const run = runResult as
+    | { _id: string; namesMode?: "open" | "fixed" }
+    | null;
+  const namesMode =
+    opts.namesMode !== undefined
+      ? opts.namesMode
+      : run
+        ? (run.namesMode ?? "open")
+        : null;
+  const locked = opts.locked ?? order.locked ?? false;
+  itemsResult = {
+    ...summarize(full, { designIds, titles: TITLES, namesMode }),
+    locked,
+    canEdit: !locked,
+    form: run ? { runId: run._id, namesMode: namesMode ?? "open" } : null,
+  };
+}
+
+// N sized jerseys on one design, unnamed (a bulk line).
+function sized(designId: string, size: string, qty: number): FixtureItem {
+  return { designId, size, qty };
+}
 
 function design(overrides: Record<string, unknown> = {}) {
   return {
@@ -108,10 +170,9 @@ afterEach(() => {
   vi.clearAllMocks();
   orderResult = undefined;
   runResult = null;
-  countsResult = undefined;
-  entriesResult = undefined;
-  rosterResult = undefined;
+  itemsResult = undefined;
   removedResult = [];
+  queried.clear();
   auth = { isLoading: false, isAuthenticated: true };
 });
 
@@ -251,10 +312,7 @@ describe("/portal/orders/[id] — order total derived from the roster (O-07)", (
     // estimatedQuantity is 12, but eight jerseys have actually been collected.
     orderResult = orderWith([design()]);
     runResult = RUN;
-    countsResult = {
-      total: 8,
-      byDesign: [{ designId: "design_home", title: "Home kit", total: 8 }],
-    };
+    setItems([sized("design_home", "M", 5), sized("design_home", "L", 3)]);
     await renderPage();
 
     // The derived total (8) is the headline number; the estimate (12) is
@@ -270,13 +328,7 @@ describe("/portal/orders/[id] — order total derived from the roster (O-07)", (
       design({ _id: "design_away" as Id<"designs">, title: "Away kit" }),
     ]);
     runResult = RUN;
-    countsResult = {
-      total: 15,
-      byDesign: [
-        { designId: "design_home", title: "Home kit", total: 9 },
-        { designId: "design_away", title: "Away kit", total: 6 },
-      ],
-    };
+    setItems([sized("design_home", "M", 9), sized("design_away", "L", 6)]);
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
@@ -291,7 +343,7 @@ describe("/portal/orders/[id] — order total derived from the roster (O-07)", (
   it("reads 0 for an empty roster and never falls back to the estimate", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
-    countsResult = { total: 0, byDesign: [{ designId: "design_home", title: "Home kit", total: 0 }] };
+    setItems([]);
     await renderPage();
 
     expect(screen.getByText(/0 collected/i)).toBeInTheDocument();
@@ -301,21 +353,97 @@ describe("/portal/orders/[id] — order total derived from the roster (O-07)", (
     expect(section.queryByText("12")).toBeNull();
   });
 
-  it("reads 0 before a run exists, seeding the total from nothing", async () => {
-    // No run yet → no roster → the total is 0, not the intake estimate.
+  it("reads 0 while the list is still loading, never the estimate", async () => {
     orderResult = orderWith([design()]);
     runResult = null;
-    countsResult = undefined;
+    itemsResult = undefined;
     await renderPage();
 
     expect(screen.getByText(/0 collected/i)).toBeInTheDocument();
   });
+
+  // L-02 / UX §7.3: items exist before any form, so they count before one.
+  it("counts the captain's sized items on an order with no form yet", async () => {
+    orderResult = orderWith([design()]);
+    runResult = null;
+    setItems([sized("design_home", "M", 2), sized("design_home", "L", 1)]);
+    await renderPage();
+
+    expect(screen.getByText(/3 collected/i)).toBeInTheDocument();
+    expect(within(sectionFor("Home kit")).getByText("3")).toBeInTheDocument();
+  });
+
+  // UX §7.5: a Needs-size item is not a jersey for production yet.
+  it("leaves Needs-size and removed-design items out of the total", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([
+      sized("design_home", "M", 2),
+      { designId: "design_home", name: "Bure", number: "10" },
+      sized("design_warmup", "L", 4),
+    ]);
+    await renderPage();
+
+    expect(screen.getByText(/2 collected/i)).toBeInTheDocument();
+  });
 });
 
-// The design cards read the unified roster (M-01), not the collected
-// entries — so a seeded player nobody has ordered for shows up here, which
-// is the disagreement between this page and the roster editor that the read
-// exists to end.
+// L-02 (§7.9): total, per-design counts, size chips, roster preview and CSV
+// all come from one `orderItems.listForOrder` subscription, so they can't
+// disagree.
+describe("/portal/orders/[id] — one order list behind every count (L-02, §7.9)", () => {
+  const RUN = {
+    _id: "run_1" as Id<"jerseyRuns">,
+    deadline: Date.parse("2026-04-01T12:00:00Z"),
+    status: "open",
+    effectiveStatus: "open" as const,
+  };
+
+  it("subscribes to orderItems.listForOrder and none of the legacy readers", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([{ name: "Gretzky", number: "99", size: "L" }]);
+    await renderPage();
+
+    expect(queried.has("orderItems:listForOrder")).toBe(true);
+    for (const legacy of LEGACY_READERS) expect(queried.has(legacy)).toBe(false);
+  });
+
+  it("shows the same number in the header, the design count, the chips and the preview rows", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([
+      { name: "Gretzky", number: "99", size: "L", qty: 2 },
+      { name: "Sosa", number: "25", size: "S" },
+      sized("design_home", "M", 2),
+      { name: "Bure", number: "10" },
+    ]);
+    await renderPage();
+
+    // 2 + 1 + 2 sized; Bure needs a size and counts nowhere.
+    expect(screen.getByText(/5 collected/i)).toBeInTheDocument();
+    const home = within(sectionFor("Home kit"));
+    expect(home.getByText("5")).toBeInTheDocument();
+    const chips = within(screen.getByRole("list", { name: /size breakdown/i }));
+    expect(chips.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "S ×1",
+      "M ×2",
+      "L ×2",
+    ]);
+    expect(home.getByRole("listitem", { name: /gretzky #99/i })).toHaveTextContent(
+      "L ×2",
+    );
+    expect(home.getByRole("listitem", { name: /sosa #25/i })).toHaveTextContent("S");
+    expect(home.getByRole("listitem", { name: /bure #10/i })).toHaveTextContent(
+      /not yet filled/i,
+    );
+  });
+});
+
+// The design cards read the order's items (M-01, re-plumbed by L-02): a
+// player the captain added who has no size yet still shows up here, muted,
+// which is the disagreement between this page and the roster editor that the
+// read exists to end.
 describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
   const RUN = {
     _id: "run_1" as Id<"jerseyRuns">,
@@ -324,71 +452,17 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
     effectiveStatus: "open" as const,
   };
 
-  function slot(overrides: Record<string, unknown> = {}) {
-    return {
-      _id: "slot_gretzky",
-      name: "Gretzky",
-      number: "99",
-      source: "captain",
-      filled: true,
-      collision: false,
-      sizes: [{ size: "L", qty: 1 }],
-      total: 1,
-      ...overrides,
-    };
-  }
-
-  function designRoster(overrides: Record<string, unknown> = {}) {
-    return {
-      designId: "design_home",
-      title: "Home kit",
-      entries: [],
-      blankSizes: [],
-      ...overrides,
-    };
-  }
-
-  it("lists each design's roster with the sizes ordered against each slot", async () => {
+  it("lists each design's roster with the sizes ordered against each player", async () => {
     orderResult = orderWith([
       design(),
       design({ _id: "design_away" as Id<"designs">, title: "Away kit" }),
     ]);
     runResult = RUN;
-    countsResult = {
-      total: 3,
-      byDesign: [
-        { designId: "design_home", title: "Home kit", total: 2 },
-        { designId: "design_away", title: "Away kit", total: 1 },
-      ],
-    };
-    rosterResult = {
-      runId: RUN._id,
-      designs: [
-        designRoster({
-          entries: [
-            slot(),
-            slot({
-              _id: "slot_sosa",
-              name: "Sosa",
-              number: "25",
-              sizes: [{ size: "S", qty: 1 }],
-            }),
-          ],
-        }),
-        designRoster({
-          designId: "design_away",
-          title: "Away kit",
-          entries: [
-            slot({
-              _id: "slot_luongo",
-              name: "Luongo",
-              number: "1",
-              sizes: [{ size: "M", qty: 1 }],
-            }),
-          ],
-        }),
-      ],
-    };
+    setItems([
+      { name: "Gretzky", number: "99", size: "L" },
+      { name: "Sosa", number: "25", size: "S" },
+      { designId: "design_away", name: "Luongo", number: "1", size: "M" },
+    ]);
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
@@ -397,7 +471,7 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
     expect(
       home.getByRole("listitem", { name: /sosa #25/i }),
     ).toHaveTextContent("S");
-    // The away slot belongs to the away design's section, not this one.
+    // The away player belongs to the away design's section, not this one.
     expect(home.queryByText(/luongo/i)).toBeNull();
 
     expect(
@@ -407,51 +481,24 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
     ).toHaveTextContent("M");
   });
 
-  it("shows a seeded player nobody has ordered for, muted", async () => {
-    // The whole reason for this slice: the count says 0 and the card still
-    // proves the captain's seeding saved.
+  it("shows a Needs-size player nobody has ordered for, muted", async () => {
+    // The count says 0 and the card still proves the captain's entry saved.
     orderResult = orderWith([design()]);
     runResult = RUN;
-    countsResult = {
-      total: 0,
-      byDesign: [{ designId: "design_home", title: "Home kit", total: 0 }],
-    };
-    rosterResult = {
-      runId: RUN._id,
-      designs: [
-        designRoster({
-          entries: [
-            slot({
-              name: "Bure",
-              number: "10",
-              filled: false,
-              sizes: [],
-              total: 0,
-            }),
-          ],
-        }),
-      ],
-    };
+    setItems([{ name: "Bure", number: "10" }]);
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
     const bure = home.getByRole("listitem", { name: /bure #10/i });
     expect(within(bure).getByText(/not yet filled/i)).toBeInTheDocument();
-    // The rollup still reads honestly — nothing has been *collected*.
+    // The rollup still reads honestly — nothing has a size yet.
     expect(home.getByText(/no jerseys collected yet/i)).toBeInTheDocument();
   });
 
   it("shows the design's bulk jerseys as a blank line with its quantity", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
-    countsResult = {
-      total: 4,
-      byDesign: [{ designId: "design_home", title: "Home kit", total: 4 }],
-    };
-    rosterResult = {
-      runId: RUN._id,
-      designs: [designRoster({ blankSizes: [{ size: "XL", qty: 4 }] })],
-    };
+    setItems([sized("design_home", "XL", 4)]);
     await renderPage();
 
     const blank = within(sectionFor("Home kit")).getByRole("listitem", {
@@ -461,26 +508,13 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
     expect(blank).toHaveTextContent("×4");
   });
 
-  it("keeps the empty treatment for a design with no roster at all", async () => {
+  it("keeps the empty treatment for a design with no items at all", async () => {
     orderResult = orderWith([
       design(),
       design({ _id: "design_away" as Id<"designs">, title: "Away kit" }),
     ]);
     runResult = RUN;
-    countsResult = {
-      total: 1,
-      byDesign: [
-        { designId: "design_home", title: "Home kit", total: 1 },
-        { designId: "design_away", title: "Away kit", total: 0 },
-      ],
-    };
-    rosterResult = {
-      runId: RUN._id,
-      designs: [
-        designRoster({ entries: [slot()] }),
-        designRoster({ designId: "design_away", title: "Away kit" }),
-      ],
-    };
+    setItems([{ name: "Gretzky", number: "99", size: "L" }]);
     await renderPage();
 
     const away = within(sectionFor("Away kit"));
@@ -491,27 +525,10 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
   it("reconciles each design's rows with the count already shown", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
-    countsResult = {
-      total: 5,
-      byDesign: [{ designId: "design_home", title: "Home kit", total: 5 }],
-    };
-    rosterResult = {
-      runId: RUN._id,
-      designs: [
-        designRoster({
-          entries: [
-            slot({ sizes: [{ size: "L", qty: 3 }], total: 3 }),
-            slot({
-              _id: "slot_sosa",
-              name: "Sosa",
-              number: "25",
-              sizes: [{ size: "S", qty: 2 }],
-              total: 2,
-            }),
-          ],
-        }),
-      ],
-    };
+    setItems([
+      { name: "Gretzky", number: "99", size: "L", qty: 3 },
+      { name: "Sosa", number: "25", size: "S", qty: 2 },
+    ]);
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
@@ -528,27 +545,12 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
   it("shows a fifteen-player roster in full (M-06)", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
-    countsResult = {
-      total: 0,
-      byDesign: [{ designId: "design_home", title: "Home kit", total: 0 }],
-    };
-    rosterResult = {
-      runId: RUN._id,
-      designs: [
-        designRoster({
-          entries: Array.from({ length: 15 }, (_, i) =>
-            slot({
-              _id: `slot_${i}`,
-              name: `Player ${i}`,
-              number: `${i}`,
-              filled: false,
-              sizes: [],
-              total: 0,
-            }),
-          ),
-        }),
-      ],
-    };
+    setItems(
+      Array.from({ length: 15 }, (_, i) => ({
+        name: `Player ${i}`,
+        number: `${i}`,
+      })),
+    );
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
@@ -561,10 +563,37 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
     expect(home.queryByText(/\bmore\b/i)).toBeNull();
   });
 
-  it("renders no roster before a run exists", async () => {
+  it("leaves removed-design items out of every linked design's preview", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([
+      { name: "Gretzky", number: "99", size: "L" },
+      { designId: "design_warmup", name: "Stray", number: "7", size: "M" },
+    ]);
+    await renderPage();
+
+    expect(
+      within(sectionFor("Home kit")).queryByRole("listitem", { name: /stray/i }),
+    ).toBeNull();
+  });
+
+  // L-02 / UX §7.3: items exist before a form, so the preview does too.
+  it("renders the captain's items before a form exists", async () => {
     orderResult = orderWith([design()]);
     runResult = null;
-    rosterResult = undefined;
+    setItems([{ name: "Gretzky", number: "99", size: "L" }]);
+    await renderPage();
+
+    const home = within(sectionFor("Home kit"));
+    expect(
+      home.getByRole("listitem", { name: /gretzky #99/i }),
+    ).toHaveTextContent("L");
+  });
+
+  it("renders no roster before the list has loaded", async () => {
+    orderResult = orderWith([design()]);
+    runResult = null;
+    itemsResult = undefined;
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
@@ -573,10 +602,9 @@ describe("/portal/orders/[id] — per-design roster preview (M-01)", () => {
   });
 });
 
-// Roster editing lives on the card now (M-02): the preview above is the
-// summary, the sheet behind this button is the whole roster. Before a run
-// exists there is nothing to edit — roster entries carry a runId — so the
-// card points at collecting instead of opening an editor that can't write.
+// Roster editing lives on the card (M-02): the preview above is the summary,
+// the sheet behind this button is the whole roster. Since L-02 an item hangs
+// off the order, not a run, so the sheet is there before any form exists.
 describe("/portal/orders/[id] — roster sheet on the design card (M-02)", () => {
   const RUN = {
     _id: "run_1" as Id<"jerseyRuns">,
@@ -585,31 +613,13 @@ describe("/portal/orders/[id] — roster sheet on the design card (M-02)", () =>
     effectiveStatus: "open" as const,
   };
 
-  function rosterWith(entries: Record<string, unknown>[]) {
-    return {
-      runId: RUN._id,
-      designs: [
-        { designId: "design_home", title: "Home kit", entries, blankSizes: [] },
-      ],
-    };
-  }
-
-  const GRETZKY = {
-    _id: "slot_gretzky",
-    name: "Gretzky",
-    number: "99",
-    source: "captain",
-    filled: true,
-    collision: false,
-    sizes: [{ size: "L", qty: 1 }],
-    total: 1,
-  };
+  const GRETZKY: FixtureItem = { name: "Gretzky", number: "99", size: "L" };
 
   it("opens the design's whole roster from a Manage roster button", async () => {
     const user = userEvent.setup();
     orderResult = orderWith([design()]);
     runResult = RUN;
-    rosterResult = rosterWith([GRETZKY]);
+    setItems([GRETZKY]);
     await renderPage();
 
     await user.click(
@@ -623,22 +633,65 @@ describe("/portal/orders/[id] — roster sheet on the design card (M-02)", () =>
     expect(sheet.getByLabelText(/add player name/i)).toBeInTheDocument();
   });
 
-  it("points at collecting instead of the sheet before a run exists", async () => {
+  // L-02 acceptance: "On an order with no run, the captain can open the
+  // roster sheet and add a player (§7.3)."
+  it("opens the sheet and adds a player on an order with no form yet", async () => {
+    const user = userEvent.setup();
     orderResult = orderWith([design()]);
     runResult = null;
-    rosterResult = undefined;
+    setItems([]);
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
-    expect(home.queryByRole("button", { name: /roster/i })).toBeNull();
-    expect(home.getByText(/building this design/i)).toBeInTheDocument();
+    expect(home.queryByText(/start collecting below/i)).toBeNull();
+    await user.click(home.getByRole("button", { name: /manage roster/i }));
+
+    const sheet = within(await screen.findByRole("dialog"));
+    await user.type(sheet.getByLabelText(/add player name/i), "Lemieux");
+    await user.type(sheet.getByLabelText(/add player number/i), "66");
+    await user.click(sheet.getByRole("button", { name: /^add$/i }));
+
+    await waitFor(() =>
+      expect(mutationStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderId: ORDER_ID,
+          designId: "design_home",
+          name: "Lemieux",
+          number: "66",
+        }),
+      ),
+    );
+    expect(mutationStub).not.toHaveBeenCalledWith(
+      expect.objectContaining({ runId: expect.anything() }),
+    );
   });
 
-  it("opens read-only once the run has locked", async () => {
+  // L-02 acceptance: "removing a sized player succeeds (§7.4)".
+  it("removes a sized player by its item id", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([GRETZKY]);
+    await renderPage();
+
+    await user.click(
+      within(sectionFor("Home kit")).getByRole("button", {
+        name: /manage roster/i,
+      }),
+    );
+    const sheet = within(await screen.findByRole("dialog"));
+    await user.click(sheet.getByRole("button", { name: /remove gretzky/i }));
+
+    await waitFor(() =>
+      expect(mutationStub).toHaveBeenCalledWith({ itemId: "item_0" }),
+    );
+  });
+
+  it("opens read-only once the order has locked", async () => {
     const user = userEvent.setup();
     orderResult = orderWith([design()], { locked: true });
     runResult = { ...RUN, status: "open", effectiveStatus: "locked" };
-    rosterResult = rosterWith([GRETZKY]);
+    setItems([GRETZKY], { locked: true });
     await renderPage();
 
     await user.click(
@@ -665,30 +718,12 @@ describe("/portal/orders/[id] — export a design's roster (M-08)", () => {
     effectiveStatus: "open" as const,
   };
 
-  const GRETZKY = {
-    _id: "slot_gretzky",
-    name: "Gretzky",
-    number: "99",
-    source: "captain",
-    filled: true,
-    collision: false,
-    sizes: [{ size: "L", qty: 1 }],
-    total: 1,
-  };
-
-  function rosterWith(entries: Record<string, unknown>[]) {
-    return {
-      runId: RUN._id,
-      designs: [
-        { designId: "design_home", title: "Home kit", entries, blankSizes: [] },
-      ],
-    };
-  }
+  const GRETZKY: FixtureItem = { name: "Gretzky", number: "99", size: "L" };
 
   it("puts Export CSV beside Manage roster on the design card", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
-    rosterResult = rosterWith([GRETZKY]);
+    setItems([GRETZKY]);
     await renderPage();
 
     const home = within(sectionFor("Home kit"));
@@ -696,10 +731,10 @@ describe("/portal/orders/[id] — export a design's roster (M-08)", () => {
     expect(home.getByRole("button", { name: /export csv/i })).toBeEnabled();
   });
 
-  it("still offers the export once the run has locked", async () => {
+  it("still offers the export once the order has locked", async () => {
     orderResult = orderWith([design()], { locked: true });
     runResult = { ...RUN, status: "open", effectiveStatus: "locked" };
-    rosterResult = rosterWith([GRETZKY]);
+    setItems([GRETZKY], { locked: true });
     await renderPage();
 
     expect(
@@ -707,21 +742,22 @@ describe("/portal/orders/[id] — export a design's roster (M-08)", () => {
     ).toBeEnabled();
   });
 
-  it("has nothing to export before a run exists", async () => {
+  // L-02: the captain's items are exportable before a form exists.
+  it("offers the export on an order with no form yet", async () => {
     orderResult = orderWith([design()]);
     runResult = null;
-    rosterResult = undefined;
+    setItems([GRETZKY]);
     await renderPage();
 
     expect(
-      within(sectionFor("Home kit")).queryByRole("button", { name: /export csv/i }),
-    ).toBeNull();
+      within(sectionFor("Home kit")).getByRole("button", { name: /export csv/i }),
+    ).toBeEnabled();
   });
 
   it("disables the export on a design whose roster is still empty", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
-    rosterResult = rosterWith([]);
+    setItems([]);
     await renderPage();
 
     expect(
@@ -740,15 +776,6 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
     status: "open",
     effectiveStatus: "open" as const,
   };
-
-  function rosterWith(entries: Record<string, unknown>[]) {
-    return {
-      runId: RUN._id,
-      designs: [
-        { designId: "design_home", title: "Home kit", entries, blankSizes: [] },
-      ],
-    };
-  }
 
   it("starts a run from a deadline alone — no sizes, no names mode", async () => {
     const user = userEvent.setup();
@@ -805,7 +832,7 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
     const user = userEvent.setup();
     orderResult = orderWith([design()]);
     runResult = RUN;
-    rosterResult = rosterWith([]);
+    setItems([]);
     await renderPage();
 
     await user.click(screen.getByRole("radio", { name: /fixed roster/i }));
@@ -824,7 +851,7 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
     const user = userEvent.setup();
     orderResult = orderWith([design()]);
     runResult = { ...RUN, namesMode: "fixed" as const };
-    rosterResult = rosterWith([]);
+    setItems([]);
     await renderPage();
 
     await user.click(
@@ -850,7 +877,7 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
   it("warns that nobody can order a fixed-mode design with no players", async () => {
     orderResult = orderWith([design()]);
     runResult = { ...RUN, namesMode: "fixed" as const };
-    rosterResult = rosterWith([]);
+    setItems([]);
     await renderPage();
 
     const warning = within(sectionFor("Home kit")).getByRole("note", {
@@ -868,18 +895,7 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
   it("drops the warning once the design has a player", async () => {
     orderResult = orderWith([design()]);
     runResult = { ...RUN, namesMode: "fixed" as const };
-    rosterResult = rosterWith([
-      {
-        _id: "slot_gretzky",
-        name: "Gretzky",
-        number: "99",
-        source: "captain",
-        filled: false,
-        collision: false,
-        sizes: [],
-        total: 0,
-      },
-    ]);
+    setItems([{ name: "Gretzky", number: "99" }]);
     await renderPage();
 
     expect(
@@ -892,7 +908,7 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
   it("does not warn an open-mode design with no players", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
-    rosterResult = rosterWith([]);
+    setItems([]);
     await renderPage();
 
     expect(
@@ -911,38 +927,17 @@ describe("/portal/orders/[id] — size breakdown across the order (C-01)", () =>
     effectiveStatus: "open" as const,
   };
 
-  function entry(overrides: Record<string, unknown> = {}) {
-    return {
-      designId: "design_home",
-      designTitle: "Home kit",
-      name: "Gretzky",
-      number: "99",
-      size: "L",
-      qty: 1,
-      ...overrides,
-    };
-  }
-
   it("shows the combined size breakdown across every design", async () => {
     orderResult = orderWith([
       design(),
       design({ _id: "design_away" as Id<"designs">, title: "Away kit" }),
     ]);
     runResult = RUN;
-    countsResult = {
-      total: 6,
-      byDesign: [
-        { designId: "design_home", title: "Home kit", total: 4 },
-        { designId: "design_away", title: "Away kit", total: 2 },
-      ],
-    };
-    entriesResult = {
-      entries: [
-        entry({ size: "M", qty: 3 }),
-        entry({ name: "Sosa", number: "25", size: "S", qty: 1 }),
-        entry({ designId: "design_away", designTitle: "Away kit", size: "M", qty: 2 }),
-      ],
-    };
+    setItems([
+      { name: "Gretzky", number: "99", size: "M", qty: 3 },
+      { name: "Sosa", number: "25", size: "S" },
+      sized("design_away", "M", 2),
+    ]);
     await renderPage();
 
     const breakdown = within(screen.getByRole("list", { name: /size breakdown/i }));
@@ -953,23 +948,19 @@ describe("/portal/orders/[id] — size breakdown across the order (C-01)", () =>
     ]);
   });
 
-  it("shows no size breakdown before anything has been collected", async () => {
+  it("shows no size breakdown before anything has a size", async () => {
     orderResult = orderWith([design()]);
     runResult = RUN;
-    countsResult = {
-      total: 0,
-      byDesign: [{ designId: "design_home", title: "Home kit", total: 0 }],
-    };
-    entriesResult = { entries: [] };
+    setItems([{ name: "Bure", number: "10" }]);
     await renderPage();
 
     expect(screen.queryByRole("list", { name: /size breakdown/i })).toBeNull();
   });
 
-  it("shows no size breakdown before a run exists", async () => {
+  it("shows no size breakdown before the list has loaded", async () => {
     orderResult = orderWith([design()]);
     runResult = null;
-    entriesResult = undefined;
+    itemsResult = undefined;
     await renderPage();
 
     expect(screen.queryByRole("list", { name: /size breakdown/i })).toBeNull();
@@ -980,22 +971,10 @@ describe("/portal/orders/[id] — size breakdown across the order (C-01)", () =>
     // not inflate the size run of the designs the order still carries.
     orderResult = orderWith([design()]);
     runResult = RUN;
-    countsResult = {
-      total: 1,
-      byDesign: [{ designId: "design_home", title: "Home kit", total: 1 }],
-    };
-    entriesResult = {
-      entries: [
-        entry(),
-        entry({
-          designId: "design_warmup",
-          designTitle: "Warmup",
-          name: "Bure",
-          number: "10",
-          size: "M",
-        }),
-      ],
-    };
+    setItems([
+      { name: "Gretzky", number: "99", size: "L" },
+      { designId: "design_warmup", name: "Bure", number: "10", size: "M" },
+    ]);
     await renderPage();
 
     const breakdown = within(screen.getByRole("list", { name: /size breakdown/i }));
