@@ -9,7 +9,9 @@
 ## Description
 
 Initiative 0004, phase 1. UX §4 ("Order form card", "Errors"), §6
-(terminology, Q4 = A: captain-facing copy only, code names unchanged), §8.
+(terminology), §8. JCC Q4 = B: the captain-facing copy changes **here**, and the
+code rename (`jerseyRuns` → `orderForms`) is **L-07**, after L-06. This issue
+keeps today's code names.
 Design: `docs/architecture/0004-order-items.md` (Must answer 6).
 
 ### 1. Order form card (replaces "Collect from your team")
@@ -75,5 +77,5 @@ that reads those trees and fails on `/\b(err|error|e)\.message\b/` (allow
 ## Notes
 
 - Files likely touched: `app/portal/orders/[id]/page.tsx` (section wiring only), new `components/portal/order/OrderFormCard.tsx` (+ test), `components/portal/StartCollecting.tsx` (+ test), `components/portal/JerseyRunSetup.tsx` (+ test), `components/portal/NamesModeControl.tsx`, `app/portal/page.tsx`, `app/portal/orders/[id]/edit/page.tsx`, `components/portal/DesignRemoval.tsx`, `components/portal/OrderForm.tsx`, `components/portal/DesignForm.tsx` (errors only), `lib/jerseyRunDeadline.ts` (+ test), `lib/userMessage.guard.test.ts`, responses route deletion.
-- Q4 = B (rename code too) is **not** this issue: it would be a separate L-07 after L-06.
+- Q4 = B (JCC, Gate 1): the code rename is **not** this issue. It's `backlog/L-07-rename-jersey-runs-to-order-forms.md`, after L-06. New files here use today's code names (`jerseyRunId`, `api.jerseyRuns.*`), and L-07 renames them.
 - Q1 = C (deadline locks everything): the form-card help text must add that the list locks at the deadline. Copy from UX at that point.

@@ -9,8 +9,9 @@
 ## Description
 
 Initiative 0004, phase 1, last slice. **This is the only issue that depends on
-JCC's Gate 1 answers to Q1, Q2 and Q5.** It is written for the recommended
-answers (Q1 = A, Q2 = A, Q5 = "Email us"). Alternatives are at the end.
+JCC's Gate 1 answers to Q1, Q2 and Q5.** JCC approved the recommended
+answers at Gate 1 (2026-10-01): Q1 = A, Q2 = A, Q5 = A ("Email us" =
+`mailto:info@sidestep.design`). The alternatives at the end are kept for the record.
 Design: `docs/architecture/0004-order-items.md` (Must answer 4, 5).
 
 ### 1. The lock rule (Q1 = A)
@@ -76,7 +77,7 @@ by `convex/jerseyRunActions.ts` (`info@sidestep.design`) — move it to a shared
 - [ ] While confirmed: captain `add/update/remove/restore/addMany/copyToDesign` and `orders.updateOrder` are rejected; `submitOrder` is rejected; **admin** edits succeed from the admin order page and the captain's view updates live (§7.8)
 - [ ] Unchecking the stage unlocks the list for the captain
 - [ ] Extending a closed form's deadline to a future date reopens the public form
-- [ ] Locked note copy matches Q5; "Email us" is a working `mailto:` link; no raw error text anywhere in the lock paths (§8.10)
+- [ ] Locked note copy matches Q5 = A; "Email us" is a working link with `href="mailto:info@sidestep.design"`, keyboard focusable; no raw error text anywhere in the lock paths (§8.10)
 - [ ] After `retireLegacyRosterTables` on dev, the schema push succeeds with the legacy tables removed; all order pages and the public form work on the seeded fixtures
 - [ ] The grep in section 5 is clean
 - [ ] All tests pass; no regressions
@@ -84,12 +85,12 @@ by `convex/jerseyRunActions.ts` (`info@sidestep.design`) — move it to a shared
 ## Dependencies
 
 - Blocked by: L-05
-- Blocked by JCC decisions Q1, Q2, Q5 (Gate 1)
+- Blocked by JCC decisions Q1, Q2, Q5 (Gate 1): answered A, A, A on 2026-10-01
 
 ## Notes
 
 - Files likely touched: `lib/orderItem/{lock,checks}.ts` (+ tests), `convex/_orderItems.ts`, `lib/jerseyRun/lock.ts` (+ test), `convex/jerseyRuns.ts` (+ test), `convex/admin.ts` (+ test), `app/admin/orders/[id]/page.tsx` (+ test), `components/portal/OrderLocked.tsx`, `convex/_migrations.ts` (+ test), `convex/schema.ts`, deletions in section 5.
-- If this runs past ~20 files, split section 5 into an L-07 (no behaviour change) and ship 1–4 here.
+- If this runs past ~20 files, split section 5 into an L-06b (no behaviour change) and ship 1–4 here. (L-07 is taken by the `jerseyRuns` → `orderForms` rename, which runs after this.)
 
 ### If JCC answers differently
 

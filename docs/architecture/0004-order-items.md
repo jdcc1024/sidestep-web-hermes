@@ -5,7 +5,7 @@ UX spec: `docs/ux/0004-order-items.md` (§7 rules = requirements, §8 = acceptan
 Mockup: `docs/ux/0004-order-items/mockup.html`
 Replaces: the rosterEntry/orderEntry split and the run lock from
 `docs/prd/roster-manager-and-lock.md` (R-01..R-07)
-Issues: `backlog/L-01-…` … `L-06-…`
+Issues: `backlog/L-01-…` … `L-07-…`
 
 ## Decision
 
@@ -15,6 +15,8 @@ it: design, optional name / number / C-A letter, size **or none**, qty ≥ 1,
 who created it, and (when it came through the order form) the submitter and
 their answers. The run (`jerseyRuns`, "order form" in the UI) stops owning
 data. It is a way in: an optional, 0..1 link plus deadline that writes items.
+(After L-07 the code calls it what the UI does: `jerseyRuns` → `orderForms`,
+JCC Q4 = B. This note uses the pre-L-07 names, which L-01..L-06 build on.)
 
 Removal is a soft delete (`removedAt`), so Undo is one patch on the same row.
 Every reader goes through one server helper (`loadItems` → `summarize`), so
@@ -345,14 +347,23 @@ the stack on its own**: L-02..L-05 run on today's lock rule until L-06.
 | L-04 | Paste a list with sizes; removal warning covers form-less orders | L-03 | S–M (~8) | none |
 | L-05 | Order form card, captain wording, no raw errors | L-04 | M (~16, mostly copy) | Q4, Q6, Q1 = C (copy) |
 | L-06 | List locks when confirmed; admin edits the same list; retire the old tables | L-05 | L (~18) | **Q1, Q2, Q5** |
+| L-07 | Rename `jerseyRuns` → `orderForms` in code and data (Q4 = B), no behaviour change | L-06 | L (~50, mechanical) | none |
 
 `app/portal/orders/[id]/page.tsx` is touched by L-02..L-05 (a hotspot), which
 is why the chain is linear and not a fan-out. L-03 splits the page into
 section components so L-04/L-05 edit those, not the page. If L-06 runs past
-~20 files, its legacy-table retirement (no behaviour) moves to an L-07 with
+~20 files, its legacy-table retirement (no behaviour) moves to an L-06b with
 no other change.
 
-Rough cost: 3 L × ~$5 + 2 M × ~$3 + 1 S × ~$1.5 ≈ $22 of Claude runs.
+L-07 is last (PM decision P5): L-06 has already deleted the legacy tables and
+`lockSnapshot`, so the rename touches fewer files and L-01..L-06 stay valid
+as written with today's names. It's over the ~20-file guideline because it's
+one mechanical rename. Splitting it would leave the schema and the code
+disagreeing between issues. Its fallback split is at its commit 3 (lib and
+component file names).
+
+Rough cost: 4 L × ~$5 + 2 M × ~$3 + 1 S × ~$1.5 ≈ $27 of Claude runs
+(L-07 ≈ $5 of that; precedent: a ~120-file mechanical refactor cost ~$3.5).
 
 ## Trace: UX §7 rules and §8 criteria → issues
 
@@ -389,14 +400,31 @@ Rough cost: 3 L × ~$5 + 2 M × ~$3 + 1 S × ~$1.5 ≈ $22 of Claude runs.
 | Q1 lock | A: confirmed stage locks; deadline closes the form only | **B** "Send my list": L-06 adds `orders.listSentAt`, captain `orderItems.sendList` (runs `listProblems` per Q2) and admin reopen; `isListLocked` = `listSentAt` set; `lockSnapshot` still retires. **C** deadline locks everything: L-06 keeps `lib/jerseyRun/lock.ts` as is, `isListLocked` = run locked, drops the confirm gate; L-05's form-card copy says the deadline locks the list. Only L-06 (+ L-05 copy for C) changes. |
 | Q2 confirm with Needs size | A: reject, naming the items | B: L-06 drops the gate; `listProblems` shows as a warning on the admin page instead |
 | Q3 notify player | A: no | B: new issue after L-06 (Resend email on captain edit/remove of a `fan` item; S–M) |
-| Q4 terminology | A: captain copy only | **B** code rename: `orderItems` is already neutral, so only `jerseyRuns` → `orderForms` (table, API paths, ~55 files mention it, mechanical; public `/run/[id]` URLs kept). New L-07 after L-06, M–L, ~$5. C: L-05 drops its wording sweep |
+| Q4 terminology | A: captain copy only (**JCC chose B**, see below) | **B** code rename: `orderItems` is already neutral, so only `jerseyRuns` → `orderForms` (table, API paths, ~55 files mention it, mechanical; public `/run/[id]` URLs kept). New L-07 after L-06, M–L, ~$5. C: L-05 drops its wording sweep |
 | Q5 contact route | "Email us" | L-06 locked-note copy only |
 | Q6 Responses page (new) | A: retire | L-05 section 3 becomes rename + relink |
 | Q7 fixed-mode repeat flag (new) | A: open mode only, as today | B: one condition in `summarize` (L-02) |
 | Q8 what "items" counts (new) | A: rule 5, sized only | B: L-03 display strings only |
 
-## JCC decisions (Gate 1, via ss-architect Discord, 2026-09-30)
+## JCC decisions (Gate 1, approved 2026-10-01)
 
+Full record: `~/sidestep/docs/gates/0004-gate1.md` → "JCC decisions".
+
+- **Q1 = A, Q2 = A, Q3 = A** as designed: the list locks when "Order Size
+  Confirmed" is checked and the deadline only closes the form (L-06). It can't
+  be confirmed while any item needs a size (L-06). No email to players when
+  the captain edits their item.
+- **Q4 = B: rename the code too.** Captain copy changes in L-05 as designed.
+  The code rename is a new issue, **L-07**
+  (`backlog/L-07-rename-jersey-runs-to-order-forms.md`), after L-06.
+  `jerseyRuns` → `orderForms` everywhere: table, `Id<>`, API paths,
+  `jerseyRunId`/`runId` → `orderFormId`, libs, components, tests. Public URLs
+  (`/run/[id]`, `/admin/jersey-runs`) and all user-visible copy stay. Dev
+  data moves with an internal copy-and-repoint migration. Convex can't rename
+  a table or keep `_id`s, so form ids change. That's harmless on dev with no
+  production, and it's the reason to rename before launch.
+- **Q5 = A: "Email us" is `mailto:info@sidestep.design`** (L-06 locked note,
+  UX §4).
 - **Q6 = A: retire the Responses page.** L-05 deletes the route; links and the
   closure email go to the order page.
 - **Q7 = A, plus a rule: repeats are allowed.** Fixed mode never flags, as
@@ -420,7 +448,7 @@ Rough cost: 3 L × ~$5 + 2 M × ~$3 + 1 S × ~$1.5 ≈ $22 of Claude runs.
   total, admin count and CSV. As designed (rule 5); the mockup's "4 items" /
   "7 items" are superseded.
 
-## New questions for JCC (`needs_decision`)
+## New questions for JCC (answered at Gate 1, kept for the record)
 
 - **Q6. The Responses page** (`/portal/orders/[id]/run/responses`: by-design /
   by-player / by-submitter tables, estimated price). After L-03 the order list
