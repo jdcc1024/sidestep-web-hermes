@@ -395,6 +395,28 @@ Rough cost: 3 L × ~$5 + 2 M × ~$3 + 1 S × ~$1.5 ≈ $22 of Claude runs.
 | Q7 fixed-mode repeat flag (new) | A: open mode only, as today | B: one condition in `summarize` (L-02) |
 | Q8 what "items" counts (new) | A: rule 5, sized only | B: L-03 display strings only |
 
+## JCC decisions (Gate 1, via ss-architect Discord, 2026-09-30)
+
+- **Q6 = A: retire the Responses page.** L-05 deletes the route; links and the
+  closure email go to the order page.
+- **Q7 = A, plus a rule: repeats are allowed.** Fixed mode never flags, as
+  today. JCC added that the list must take:
+  - **same name, different number** as two separate players (shared last
+    names). `rosterSlotKey` already includes the number, so these never match,
+    fill each other, collide or dedupe. L-02 and L-04 pin it with tests.
+  - **the same name + number more than once** as more than one item (one player
+    ordering two jerseys). `add` and `addMany` already don't dedupe. **Paste
+    changes (L-04):** a row that matches an existing item, or one repeated
+    earlier in the paste, is no longer skipped. It is added, and the preview
+    says so (`Jordan Lee #4 is already on the list — adds another.`) so an
+    accidental double paste is visible before Confirm. The open-mode collision
+    flag (two *different* emails, same name + number) stays: it's a warning on
+    the row, never a block.
+  - `copyToDesign` keeps its dedupe against the target design. It means "make
+    sure these players are on that kit too", and running it twice must not
+    double the list.
+- **Q8: pending** (JCC asked for a clearer explanation).
+
 ## New questions for JCC (`needs_decision`)
 
 - **Q6. The Responses page** (`/portal/orders/[id]/run/responses`: by-design /

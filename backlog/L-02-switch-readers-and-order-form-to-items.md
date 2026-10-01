@@ -61,7 +61,9 @@ each order with a run, old `orderEntries.countsByRun.total` vs new
 - [ ] `JerseyRunPublicForm.test.tsx` and `submitOrder.test.ts` pass with only the id rename (§7.10)
 - [ ] Open mode: a player line matching a captain's Needs-size item (same design, name, number; case/space-insensitive) fills that item (size, qty, submitter set; same `_id`); a non-matching line inserts a `fan` item (§7.6)
 - [ ] Fixed mode: picking a Needs-size item fills it; picking an already-sized item, or picking one item in two sizes in one submission, inserts additional items with the same name / number / letter, and none is silently merged (§7.6)
-- [ ] Open mode collision: two different emails on the same design + name + number → both items `collision: true` in `listForOrder`; same email twice → no collision; fixed mode → never (§7.6)
+- [ ] Open mode collision: two different emails on the same design + name + number → both items `collision: true` in `listForOrder`; same email twice → no collision; fixed mode → never (§7.6; JCC Q7 = A)
+- [ ] Same name, different number (`Lee #4`, `Lee #9`): two separate items; neither fills the other's Needs-size item; no collision in either mode; `getPublic`'s picker lists both
+- [ ] Same name + number submitted twice (same or different email, either mode) produces two items; nothing is merged or rejected
 - [ ] `submitOrder` is rejected when `isListLocked`, and when the form is closed
 - [ ] `getPublic` exposes only `_id`, `name`, `number` per picker entry; removed and unnamed items are absent
 - [ ] Order page total, per-design counts, size chips, roster preview and CSV export all come from the single `listForOrder` subscription (§7.9); existing page tests pass
@@ -81,4 +83,4 @@ each order with a run, old `orderEntries.countsByRun.total` vs new
 - Files likely touched: `convex/orderEntries.ts`, `convex/submitOrder.test.ts`, `convex/orderEntries.test.ts`, `convex/jerseyRuns.ts` (+ test), `convex/admin.ts` (+ test), `convex/orders.ts`, `convex/_devSeed.ts` (+ test), `components/run/JerseyRunPublicForm.tsx` (+ test), `components/portal/RosterSheet.tsx` (+ test), `app/portal/orders/[id]/page.tsx` (+ test), `lib/orderItem/views.ts` (+ test).
 - Leave `convex/rosterEntries.ts`, `orderEntries.create/listByRun/countsByRun` and `convex/_orderEntries.ts` in place, unused. L-06 deletes them with the tables. Don't widen this diff.
 - `listMyResponses` must filter `removedAt` itself: it reads `by_submitterEmail`, not `loadItems`.
-- If JCC answers Q7 = B (flag fixed-mode repeats), change the one `namesMode === "open"` condition in `summarize` (L-01's file) here.
+- JCC answered Q7 = A: keep the `namesMode === "open"` condition in `summarize` as designed.

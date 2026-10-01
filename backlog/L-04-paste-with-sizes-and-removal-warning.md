@@ -24,8 +24,14 @@ Extend the paste parser (`lib/rosterEntry/paste.ts`, moved to
   Needs size, and the preview names it: `Row 4: "XXXL" isn't a size we make — added as Needs size.`
   It is not rejected (rule 7).
 - Rows with more than 3 cells stay invalid as today.
-- Dedupe against existing items / within the paste is unchanged, keyed by name
-  + number (`rosterSlotKey`), not size.
+- **Repeats are added, not skipped (JCC, Gate 1 Q7).** A row whose name +
+  number (`rosterSlotKey`) matches a live item on this design, or a row
+  earlier in the same paste, is still added. The preview marks it with a
+  note, not an error: `Jordan Lee #4 is already on the list — adds another.`
+  (or `… is in this paste twice — adds both.`), and the summary counts them
+  (`2 repeats`). The `existing` / `duplicate` statuses become notes on a
+  `new` row; they no longer exclude it from `additions`.
+- Same name, different number is two different players: no note.
 - The preview summary adds: `3 need a size`. The confirm button reads
   `Add 14 items`.
 - The commit calls `orderItems.addMany` with `size` per row.
@@ -44,7 +50,10 @@ Delete the two run-keyed queries.
 
 - [ ] Pasting `Sidestep\t72\tM` + `Jordan Lee\t4` + `Sam\t12\tXXXL` previews 3 items: one sized M, two Needs size; the XXXL row is named with its reason; confirming adds all three (§7.7, §8.8)
 - [ ] `xxl`, ` l `, `2xl` parse as `2XL`, `L`, `2XL`
-- [ ] A two-column paste behaves exactly as before (existing paste tests pass unchanged, apart from wording)
+- [ ] A two-column paste behaves as before, except repeats (existing paste tests pass, with the repeat cases updated as below)
+- [ ] Pasting `Jordan Lee\t4` onto a design that already has Jordan Lee #4 previews it with the "already on the list — adds another" note and Confirm adds it: the design now has two Jordan Lee #4 items
+- [ ] A paste containing `Lee\t4` twice adds two items, and the preview notes the repeat
+- [ ] `Lee\t4` and `Lee\t9` (same name, different numbers) are two items with no repeat note
 - [ ] The preview at 375 wide doesn't scroll horizontally (§8.2); its controls meet §8.11 (focus, labels, ≥ 40px)
 - [ ] No preview or error text contains `CONVEX`, `ConvexError`, `Request ID` or a path (§8.10)
 - [ ] On an order with **no order form** and 2 captain items on "Away Kit", unlinking Away Kit on the edit page warns about 2 items; after saving, the order page's removed-designs section lists them
