@@ -165,6 +165,35 @@ export default defineSchema({
     // on the unified model now.
     .index("by_submitterEmail", ["submitterEmail"]),
 
+  // One order list the captain owns (initiative 0004, L-01): an item is one
+  // jersey line on the order — design, optional name / number / letter, a size
+  // or none ("Needs size"), a qty. It replaces the rosterEntries / orderEntries
+  // split; those stay until L-06. The parent is the order, so items exist
+  // before any order form; `runId` only records which form a row came through.
+  // Soft-deleted via `removedAt`: read through `loadItems` in _orderItems.ts,
+  // the only `by_order` reader, which drops removed rows.
+  orderItems: defineTable({
+    orderId: v.id("orders"),
+    designId: v.id("designs"),
+    name: v.optional(v.string()), // absent = "No name"
+    number: v.optional(v.string()), // text: "01" ≠ "1"
+    designation: v.optional(v.union(v.literal("C"), v.literal("A"))),
+    size: v.optional(v.string()), // absent = "Needs size"
+    qty: v.number(), // integer 1..MAX_QTY
+    source: v.union(v.literal("captain"), v.literal("fan")), // who created the row
+    // Set only by the public form: no captain or admin mutation accepts these.
+    submitterName: v.optional(v.string()),
+    submitterEmail: v.optional(v.string()), // normalized lowercase
+    customAnswers: v.optional(v.record(v.string(), v.string())),
+    runId: v.optional(v.id("jerseyRuns")), // provenance only
+    removedAt: v.optional(v.number()), // soft delete; restore clears it
+    createdAt: v.number(), // display order; migrated rows keep legacy time
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.id("users")), // who last changed it (admin after lock)
+  })
+    .index("by_order", ["orderId"])
+    .index("by_submitterEmail", ["submitterEmail"]),
+
   intakes: defineTable({
     name: v.string(),
     teamName: v.string(),
