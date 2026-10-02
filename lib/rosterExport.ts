@@ -1,17 +1,18 @@
-// The captain's per-design roster export (M-08). Pure — it takes the very
-// `RosterRow[]` the design card is already rendering (M-01's read, via
-// `rosterRowsByDesign`) and shapes it into the file, so the card and the
-// download cannot disagree about who is on a design.
+// The captain's per-design list export (M-08, retargeted by L-03). Pure — it
+// takes the very `ItemView[]` the order list renders for that design
+// (`orderItems.listForOrder`), so the list and the download cannot disagree
+// about what is on a design.
 //
-// The one real transformation is **expansion**. The card collapses repeats
-// into a chip — "L ×3" — because a captain reading a screen wants the roster
-// short. A CSV is read by whoever is making the garments, so it goes the
-// other way: one row per jersey, three identical rows for that chip. Every
-// row of this file is a thing to produce.
+// The one real transformation is **expansion**. The list shows an item's
+// quantity as "×3" because a captain reading a screen wants it short. A CSV is
+// read by whoever is making the garments, so it goes the other way: one row
+// per jersey, three identical rows for that item. Every row of this file is a
+// thing to produce.
 
 import { toCsv, csvSlug, isoDate } from "./csv";
-import type { RosterRow } from "./jerseyBreakdown";
+import { jerseyLabel } from "./jerseyBreakdown";
 import { sortSizes } from "./jerseyRun";
+import type { ItemView } from "./orderItem/summary";
 import { ROSTER_DESIGNATION_LABEL } from "./rosterEntry/rules";
 
 // Alphabetical is the default — a captain checking the file against the team
@@ -20,16 +21,16 @@ import { ROSTER_DESIGNATION_LABEL } from "./rosterEntry/rules";
 export const ROSTER_EXPORT_ORDERS = ["name", "size"] as const;
 export type RosterExportOrder = (typeof ROSTER_EXPORT_ORDERS)[number];
 
-export const ROSTER_EXPORT_ORDER_LABEL: Record<RosterExportOrder, string> = {
-  name: "Sorted by name",
-  size: "Grouped by size",
-};
-
 const HEADERS = ["Name", "Number", "Role", "Size"];
 
-// One garment (or one unfilled slot). `size` is "" for a seeded player nobody
-// has ordered for yet — they stay in the file, because a captain uses it to
-// see who still owes a size, and a missing row can't say that.
+type ExportItem = Pick<
+  ItemView,
+  "name" | "number" | "designation" | "size" | "qty"
+>;
+
+// One garment. `size` is "" for an item that still needs one — it stays in
+// the file, because a captain uses it to see who still owes a size, and a
+// missing row can't say that.
 type ExportRecord = {
   name: string;
   number: string;
@@ -39,37 +40,22 @@ type ExportRecord = {
   role: string;
   size: string;
   label: string;
+  // No name and no number: a bulk line.
   blank: boolean;
 };
 
-function expand(rows: readonly RosterRow[]): ExportRecord[] {
-  const records: ExportRecord[] = [];
-
-  for (const row of rows) {
-    const base = {
-      name: row.blank ? "" : (row.name ?? ""),
-      number: row.blank ? "" : (row.number ?? ""),
-      role: row.designation ? ROSTER_DESIGNATION_LABEL[row.designation] : "",
-      label: row.label,
-      blank: row.blank,
+function expand(items: readonly ExportItem[]): ExportRecord[] {
+  return items.flatMap((item) => {
+    const record: ExportRecord = {
+      name: item.name ?? "",
+      number: item.number ?? "",
+      role: item.designation ? ROSTER_DESIGNATION_LABEL[item.designation] : "",
+      size: item.size ?? "",
+      label: jerseyLabel(item.name, item.number),
+      blank: !item.name && !item.number,
     };
-
-    if (row.sizes.length === 0) {
-      records.push({ ...base, size: "" });
-      continue;
-    }
-
-    // Canonical size order here rather than at sort time, so a player's own
-    // rows read S → M → L under *either* ordering.
-    const bySize = new Map(row.sizes.map((s) => [s.size, s.qty] as const));
-    for (const size of sortSizes(row.sizes.map((s) => s.size))) {
-      for (let i = 0; i < (bySize.get(size) ?? 0); i++) {
-        records.push({ ...base, size });
-      }
-    }
-  }
-
-  return records;
+    return Array.from({ length: item.qty }, () => record);
+  });
 }
 
 function byLabel(a: ExportRecord, b: ExportRecord): number {
@@ -88,40 +74,49 @@ function blanksLast(a: ExportRecord, b: ExportRecord): number {
   return 0;
 }
 
+// Within one player, sizes in catalog order, so their rows read S → M → L
+// under *either* ordering. Stable sort keeps everything else as it was.
+function bySizeRank(rank: Map<string, number>) {
+  return (a: ExportRecord, b: ExportRecord) =>
+    (rank.get(a.size) ?? rank.size) - (rank.get(b.size) ?? rank.size);
+}
+
 function sortRecords(
   records: ExportRecord[],
   order: RosterExportOrder,
 ): ExportRecord[] {
-  if (order === "name") {
-    return records.sort((a, b) => blanksLast(a, b) || byLabel(a, b));
-  }
-
-  // Size groups in catalog order, with the sizeless rows — the unfilled slots
-  // — trailing every group. They have no size to file under, and putting them
-  // last keeps the top of the file a clean cut list.
+  // Catalog order for every size present, with the sizeless rows — the items
+  // that still need a size — ranked after all of them.
   const rank = new Map(
     sortSizes([...new Set(records.map((r) => r.size).filter(Boolean))]).map(
       (size, index) => [size, index] as const,
     ),
   );
-  const groupOf = (r: ExportRecord) =>
-    r.size ? (rank.get(r.size) ?? 0) : rank.size;
+  const sizeOrder = bySizeRank(rank);
 
+  if (order === "name") {
+    return records.sort(
+      (a, b) => blanksLast(a, b) || byLabel(a, b) || sizeOrder(a, b),
+    );
+  }
+
+  // Size groups in catalog order, Needs-size rows trailing every group: they
+  // have no size to file under, and putting them last keeps the top of the
+  // file a clean cut list.
   return records.sort(
-    (a, b) =>
-      groupOf(a) - groupOf(b) || blanksLast(a, b) || byLabel(a, b),
+    (a, b) => sizeOrder(a, b) || blanksLast(a, b) || byLabel(a, b),
   );
 }
 
 // Header plus one row per jersey. Exported alongside `buildRosterCsv` so the
 // shaping can be asserted as data rather than by parsing a string back.
 export function rosterExportRows(
-  rows: readonly RosterRow[],
+  items: readonly ExportItem[],
   order: RosterExportOrder,
 ): string[][] {
   return [
     HEADERS,
-    ...sortRecords(expand(rows), order).map((r) => [
+    ...sortRecords(expand(items), order).map((r) => [
       r.name,
       r.number,
       r.role,
@@ -131,10 +126,10 @@ export function rosterExportRows(
 }
 
 export function buildRosterCsv(
-  rows: readonly RosterRow[],
+  items: readonly ExportItem[],
   order: RosterExportOrder,
 ): string {
-  return toCsv(rosterExportRows(rows, order));
+  return toCsv(rosterExportRows(items, order));
 }
 
 // Team *and* design, because "home-kit" alone collides in a downloads folder
