@@ -11,7 +11,7 @@ import {
   ROSTER_PASTE_MAX_ROWS,
   parseRosterPaste,
   type RosterPasteRow,
-} from "@/lib/rosterEntry";
+} from "@/lib/orderItem";
 import { userMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -29,10 +29,10 @@ import {
 import { SAVE_FAILED, wrapTabWithin, type OrderItem } from "./shared";
 
 // `Paste a list` (M-03, moved here from the old per-design sheet by L-03):
-// parse, preview, confirm. The parser is pure and lives in `lib/rosterEntry`,
+// parse, preview, confirm. The parser is pure and lives in `lib/orderItem`,
 // so the rows shown here and the array sent to `addMany` are literally the
 // same object — the count on the button is the promise this screen keeps.
-// L-04 adds the size column.
+// L-04 added the size column, and repeats are added with a note (JCC Q7).
 export function PasteList({
   orderId,
   designId,
@@ -43,7 +43,7 @@ export function PasteList({
   orderId: Id<"orders">;
   designId: Id<"designs">;
   designTitle: string;
-  // The design's items, so a paste can't add a name that's already there.
+  // The design's items, so the preview can point out a name already there.
   items: readonly OrderItem[];
   className?: string;
 }) {
@@ -101,8 +101,6 @@ function PasteForm({
     () => parseRosterPaste(text, named),
     [text, named],
   );
-  const skipped = counts.existing + counts.duplicate + counts.invalid;
-
   async function onConfirm() {
     setBusy(true);
     try {
@@ -122,8 +120,9 @@ function PasteForm({
       <SheetHeader className="relative border-b border-border px-4 pt-4 pb-3 pr-14">
         <SheetTitle className="text-lg font-semibold">Paste a list</SheetTitle>
         <SheetDescription>
-          {designTitle}. Paste two columns, name and number, straight from Excel
-          or Google Sheets. Nothing is added until you confirm.
+          {designTitle}. Paste name, number and size straight from Excel or
+          Google Sheets. The size column is optional. Nothing is added until
+          you confirm.
         </SheetDescription>
         <SheetClose
           render={
@@ -145,7 +144,7 @@ function PasteForm({
           value={text}
           rows={4}
           aria-label="Paste your list"
-          placeholder={"Gretzky\t99\nLemieux\t66"}
+          placeholder={"Gretzky\t99\tL\nLemieux\t66"}
           className="max-h-40 font-mono text-sm"
           onChange={(e) => setText(e.target.value)}
         />
@@ -156,20 +155,26 @@ function PasteForm({
           </p>
         ) : rows.length === 0 ? (
           <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
-            Nothing pasted yet. Either column order works, we read whichever one
-            is the number.
+            Nothing pasted yet. Any column order works: we read whichever one
+            is the number, and whichever is the size.
           </p>
         ) : (
           <>
             <p className="text-sm font-medium">
               {[
                 `${counts.additions} to add`,
-                skipped > 0 ? `${skipped} skipped` : null,
+                counts.needSize > 0
+                  ? `${counts.needSize} ${counts.needSize === 1 ? "needs" : "need"} a size`
+                  : null,
+                counts.repeats > 0
+                  ? `${counts.repeats} repeat${counts.repeats === 1 ? "" : "s"}`
+                  : null,
+                counts.invalid > 0 ? `${counts.invalid} skipped` : null,
               ]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
-            {/* An excluded row keeps its place: the captain is checking the
+            {/* An unreadable row keeps its place: the captain is checking the
                 paste against what they copied, so a silently dropped line is
                 the one thing they couldn't verify. */}
             <ul aria-label="Paste preview" className="space-y-1.5">
@@ -210,8 +215,10 @@ function countOf(n: number): string {
   return `${n} item${n === 1 ? "" : "s"}`;
 }
 
+// Every piece wraps rather than truncates: at 375px a long name or note must
+// push the row taller, never the sheet wider (§8.2).
 function PreviewRow({ row }: { row: RosterPasteRow }) {
-  const excluded = row.status !== "new";
+  const excluded = row.status === "invalid";
   return (
     <li
       className={cn(
@@ -223,19 +230,28 @@ function PreviewRow({ row }: { row: RosterPasteRow }) {
     >
       <span
         className={cn(
-          "min-w-0 flex-1 truncate text-sm",
+          "min-w-0 flex-1 text-sm break-words",
           excluded ? "text-muted-foreground" : "font-medium text-foreground",
         )}
       >
-        {row.status === "invalid" ? row.raw : jerseyLabel(row.name, row.number)}
+        {excluded ? row.raw : jerseyLabel(row.name, row.number)}
       </span>
-      {row.problem && (
+      {excluded ? (
         <Badge
           variant="secondary"
           className="h-auto bg-muted whitespace-normal text-muted-foreground"
         >
           {row.problem}
         </Badge>
+      ) : row.size ? (
+        <Badge variant="secondary">{row.size}</Badge>
+      ) : (
+        <span className="text-xs text-muted-foreground">Needs size</span>
+      )}
+      {row.note && (
+        <p className="basis-full text-xs break-words text-muted-foreground">
+          {row.note}
+        </p>
       )}
     </li>
   );

@@ -9,7 +9,7 @@ import {
   checkRosterName,
   checkRosterNumber,
 } from "../lib/rosterEntry/rules";
-import { ROSTER_PASTE_MAX_ROWS } from "../lib/rosterEntry/paste";
+import { ROSTER_PASTE_MAX_ROWS } from "../lib/orderItem/paste";
 import { planRosterCopy } from "../lib/rosterEntry/mirror";
 import { isLocked } from "../lib/jerseyRun/lock";
 import { sortSizes } from "../lib/jerseyRun/rules";

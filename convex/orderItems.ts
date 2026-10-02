@@ -27,7 +27,7 @@ import {
   checkRosterNumber,
 } from "../lib/rosterEntry/rules";
 import { planRosterCopy } from "../lib/rosterEntry/mirror";
-import { ROSTER_PASTE_MAX_ROWS } from "../lib/rosterEntry/paste";
+import { ROSTER_PASTE_MAX_ROWS } from "../lib/orderItem/paste";
 import { checkQty, type CheckResult } from "../lib/orderEntry/rules";
 import { SIZE_OPTIONS } from "../lib/jerseyRun/rules";
 
