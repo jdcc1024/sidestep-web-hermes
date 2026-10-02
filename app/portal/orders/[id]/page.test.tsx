@@ -1954,7 +1954,7 @@ describe("/portal/orders/[id] — paste a list with sizes (L-04, UX §3 / §7.7 
     expect(dialog.textContent ?? "").not.toMatch(LEAKS);
     expect(dialog.textContent ?? "").toMatch(/already on the list/i);
 
-    await user.click(screen.getByRole("button", { name: /^add 4 items$/i }));
+    await user.click(screen.getByRole("button", { name: /^add 3 items$/i }));
     await waitFor(() => expect(toastError).toHaveBeenCalled());
     for (const text of toastTexts()) expect(text).not.toMatch(LEAKS);
     expect(toastTexts()).toContain(FALLBACK);
