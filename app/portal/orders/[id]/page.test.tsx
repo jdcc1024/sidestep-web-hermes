@@ -242,7 +242,7 @@ const isChipItem = (li: HTMLElement) =>
 
 // A row is a list item that is not a size chip.
 function rowsIn(scope: ReturnType<typeof within>): HTMLElement[] {
-  return scope.queryAllByRole("listitem").filter((li) => !isChipItem(li));
+  return scope.queryAllByRole("listitem").filter((li: HTMLElement) => !isChipItem(li));
 }
 
 function rowOf(scope: ReturnType<typeof within>, text: string): HTMLElement {
