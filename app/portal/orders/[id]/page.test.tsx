@@ -254,7 +254,7 @@ function rowOf(scope: ReturnType<typeof within>, text: string): HTMLElement {
 function chipsOf(scope: ReturnType<typeof within>): string[] {
   return within(scope.getByRole("list", { name: /size breakdown/i }))
     .getAllByRole("listitem")
-    .map((li) => (li.textContent ?? "").replace(/\s+/g, ""));
+    .map((li: HTMLElement) => (li.textContent ?? "").replace(/\s+/g, ""));
 }
 
 // The footer line: "6 items · S×1 M×2 …". Found by its text, which starts
