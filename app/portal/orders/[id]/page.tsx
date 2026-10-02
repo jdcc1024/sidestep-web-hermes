@@ -89,9 +89,9 @@ export default function OrderDetailPage({ params }: PageProps) {
         locked={locked}
       />
 
-      {/* Designs dropped from the order after people had already ordered
-          them (O-08). Renders nothing until that actually happens. */}
-      <RemovedDesigns runId={run?._id ?? null} />
+      {/* Designs dropped from the order while items were still on them
+          (O-08, L-04). Renders nothing until that actually happens. */}
+      <RemovedDesigns orderId={orderId} />
     </div>
   );
 }

@@ -99,13 +99,6 @@ export function OrderForm({ order }: { order?: EditableOrder } = {}) {
   const createOrder = useMutation(api.orders.createOrder);
   const updateOrder = useMutation(api.orders.updateOrder);
   const designs = useQuery(api.designs.listMyDesigns);
-  // Only an edit of an order that has already started collecting can orphan
-  // anyone, so the run lookup — and the whole removal-warning path — is
-  // skipped on New.
-  const run = useQuery(
-    api.jerseyRuns.getByOrder,
-    order ? { orderId: order._id } : "skip",
-  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -141,15 +134,15 @@ export function OrderForm({ order }: { order?: EditableOrder } = {}) {
   const hasLinkedDesign = linkedDesignCount(watched.designIds ?? []) >= 1;
 
   // Designs unchecked since the order was saved. Each gets its own warning
-  // naming who ordered it (O-08) — a preview, not a gate: the save path
-  // below is untouched, so removing is always possible.
-  const removals =
-    order && run
-      ? pendingDesignRemovals(
-          order.designIds as unknown as string[],
-          watched.designIds ?? [],
-        )
-      : [];
+  // counting the items that would drop (O-08, L-04) — order form or not. A
+  // preview, not a gate: the save path below is untouched, so removing is
+  // always possible. Only an edit has saved designs to remove.
+  const removals = order
+    ? pendingDesignRemovals(
+        order.designIds as unknown as string[],
+        watched.designIds ?? [],
+      )
+    : [];
 
   async function onSubmit(values: FormValues) {
     try {
@@ -315,12 +308,13 @@ export function OrderForm({ order }: { order?: EditableOrder } = {}) {
                   value={field.value}
                   onChange={field.onChange}
                 />
-                {run &&
+                {order &&
                   removals.map((designId) => (
                     <DesignRemovalWarning
                       key={designId}
-                      runId={run._id}
+                      orderId={order._id}
                       designId={designId as Id<"designs">}
+                      title={designs?.find((d) => d._id === designId)?.title}
                     />
                   ))}
                 {!hasLinkedDesign && (

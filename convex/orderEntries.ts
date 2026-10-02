@@ -17,7 +17,7 @@ import {
   checkRosterNumber,
   rosterSlotKey,
 } from "../lib/rosterEntry/rules";
-import { checkItemName, submittersOf, summarize } from "../lib/orderItem";
+import { checkItemName, summarize } from "../lib/orderItem";
 import { checkCustomAnswer, isJerseyRunClosed } from "../lib/jerseyRunResponse/rules";
 import { isLocked } from "../lib/jerseyRun/lock";
 
@@ -129,110 +129,6 @@ export const countsByRun = query({
     if (!order) return empty;
 
     return qtyByDesign(ctx, run, order);
-  },
-});
-
-// The submitters who ordered a given design, summed by qty and grouped by
-// normalized email — the "affected people" naming both the remove-warning
-// (R-05) and the persistent removed-design indicator read. `entryCount` is
-// the design's live items and `total` their Σ qty. Sorted by display name so
-// the warning reads in a stable order. A captain's item has no submitter, so
-// a design nobody has ordered on names nobody.
-type DesignSubmitter = { name: string; email: string; qty: number };
-
-function summarizeDesignItems(
-  items: readonly Doc<"orderItems">[],
-): { entryCount: number; total: number; submitters: DesignSubmitter[] } {
-  const submitters = submittersOf(items)
-    .map((s) => ({ name: s.name ?? "", email: s.email, qty: s.qty }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const total = items.reduce((sum, i) => sum + i.qty, 0);
-  return { entryCount: items.length, total, submitters };
-}
-
-// Preview the fallout of removing one design from the order (R-05). Given
-// a run + design, returns who ordered that design and how many jerseys
-// would drop from the count — the soft, resolvable warning the order page
-// (O-08) shows before the captain saves the removal. Non-destructive and
-// design-agnostic: it works whether the design is still linked (the
-// pre-removal preview) or already removed, since it only reads the order's
-// items by `designId`. Keyed by run until L-04 re-keys the UI by order.
-// Captain or admin only; a stable empty shape for a missing run/order so the
-// consumer never null-checks.
-export const affectedByDesignRemoval = query({
-  args: { runId: v.id("jerseyRuns"), designId: v.id("designs") },
-  handler: async (ctx, { runId, designId }) => {
-    const empty: {
-      designId: Id<"designs">;
-      title: string;
-      entryCount: number;
-      total: number;
-      submitters: DesignSubmitter[];
-    } = { designId, title: "Untitled design", entryCount: 0, total: 0, submitters: [] };
-
-    const run = await ctx.db.get(runId);
-    if (!run) return empty;
-
-    const user = await requireCurrentUser(ctx);
-    if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this jersey run.");
-
-    const design = await ctx.db.get(designId);
-    const title = design?.title ?? "Untitled design";
-
-    const items = (await loadItems(ctx, run.orderId)).filter(
-      (i) => i.designId === designId,
-    );
-
-    return { designId, title, ...summarizeDesignItems(items) };
-  },
-});
-
-// Every design that still has live items on the run's order but is no longer
-// in the order's design list (R-05) — the "removed" designs, kept visible
-// rather than deleted. "Removed" is the derived state (a design no longer
-// in `order.designIds`), so no data is destroyed and no per-item flag is
-// stored: dropping the design from the order is the whole action, and these
-// rows simply fall out of `summary.itemCount` while staying readable here. Each
-// removed design carries its affected submitters and dropped-jersey count
-// so the order page can render a clear "removed" section naming who's
-// affected. Sorted by title for a stable order. Captain or admin only;
-// [] for a missing run/order.
-export const removedDesigns = query({
-  args: { runId: v.id("jerseyRuns") },
-  handler: async (ctx, { runId }) => {
-    const run = await ctx.db.get(runId);
-    if (!run) return [];
-
-    const user = await requireCurrentUser(ctx);
-    if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this jersey run.");
-
-    const order = await ctx.db.get(run.orderId);
-    if (!order) return [];
-    const linked = new Set<string>(order.designIds);
-
-    // Bucket the order's live items by design, keeping only designs the
-    // order no longer links — those are the removed ones.
-    const itemsByDesign = new Map<Id<"designs">, Doc<"orderItems">[]>();
-    for (const item of await loadItems(ctx, order._id)) {
-      if (linked.has(item.designId)) continue;
-      const bucket = itemsByDesign.get(item.designId) ?? [];
-      bucket.push(item);
-      itemsByDesign.set(item.designId, bucket);
-    }
-
-    const removed = await Promise.all(
-      [...itemsByDesign.entries()].map(async ([designId, designItems]) => {
-        const design = await ctx.db.get(designId);
-        return {
-          designId,
-          title: design?.title ?? "Untitled design",
-          ...summarizeDesignItems(designItems),
-        };
-      }),
-    );
-    return removed.sort((a, b) => a.title.localeCompare(b.title));
   },
 });
 

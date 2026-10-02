@@ -5,53 +5,59 @@ import { AnimatePresence, motion } from "motion/react";
 import { TriangleAlert } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { describeSubmitters, jerseyCount } from "@/lib/designRemoval";
+import { describeSubmitters } from "@/lib/designRemoval";
 import { REVEAL_TRANSITION } from "@/lib/motion";
+import { itemCountText } from "@/lib/orderItem";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // The two halves of the relabel/remove design warning (O-08), reading the
-// R-05 queries in convex/orderEntries.ts.
+// order's items (L-04) — so an order with no order form, whose items the
+// captain added, warns just the same.
 //
 // Both are deliberately non-blocking: removing a design is a save away, and
 // neither surface can stop it. The warning is a *preview* of the fallout
-// (who ordered this, how many jerseys drop) and the removed-designs section
-// is the durable receipt afterwards — the entries are never deleted, they
-// just fall out of the production count.
+// (how many items drop, and which players sent some) and the removed-designs
+// section is the durable receipt afterwards — the items are never deleted,
+// they just fall out of the production count.
 //
-// Relabel needs no surface at all: order entries point at `designId`, so a
-// renamed design carries its submissions over and simply renders under its
-// new title everywhere.
+// Relabel needs no surface at all: items point at `designId`, so a renamed
+// design carries its items over and simply renders under its new title
+// everywhere.
 
 // Pre-save: shown in the order form for a design the captain has just
-// unchecked. Silent while loading and when nobody ordered the design —
-// there's no one to orphan, so there's nothing to warn about.
+// unchecked. Silent while loading and when the design has no items — there's
+// nothing to orphan, so there's nothing to warn about.
 export function DesignRemovalWarning({
-  runId,
+  orderId,
   designId,
+  title,
 }: {
-  runId: Id<"jerseyRuns">;
+  orderId: Id<"orders">;
   designId: Id<"designs">;
+  title?: string;
 }) {
-  const affected = useQuery(api.orderEntries.affectedByDesignRemoval, {
-    runId,
+  const affected = useQuery(api.orderItems.affectedByDesignRemoval, {
+    orderId,
     designId,
   });
 
-  if (affected === undefined || affected.submitters.length === 0) return null;
+  if (affected === undefined || affected.itemCount === 0) return null;
+
+  const submitters = describeSubmitters(affected.submitters);
 
   return (
     <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
       <TriangleAlert aria-hidden />
       <AlertTitle>
-        Removing “{affected.title}” drops {jerseyCount(affected.total)} from
-        your count
+        Removing {title ? `“${title}”` : "this design"} drops{" "}
+        {itemCountText(affected.itemCount)} from your order
       </AlertTitle>
       <AlertDescription className="text-amber-800 dark:text-amber-200/90">
-        {describeSubmitters(affected.submitters)} already picked it. Their
-        entries stay saved — they&apos;ll show as removed on the order page
-        instead of disappearing, so you can add the design back any time.
+        {submitters && `${submitters} sent items for it. `}
+        Nothing is deleted: the items stay saved and show as removed on the
+        order page, so you can link the design again any time.
       </AlertDescription>
     </Alert>
   );
@@ -70,19 +76,15 @@ export function DesignRemovalWarning({
 const SECTION_COLLAPSED = { height: 0, opacity: 0 };
 const SECTION_EXPANDED = { height: "auto", opacity: 1 };
 
+// `summarize` titles a design it couldn't load as "".
+const UNTITLED = "Untitled design";
+
 // Post-save: the durable "these designs were removed" section on the order
-// detail page. `runId` is nullable so the order page can hand over whatever
-// `jerseyRuns.getByOrder` returned — no run means nothing was ever
-// collected, so nothing to show.
-export function RemovedDesigns({
-  runId,
-}: {
-  runId: Id<"jerseyRuns"> | null | undefined;
-}) {
-  const removed = useQuery(
-    api.orderEntries.removedDesigns,
-    runId ? { runId } : "skip",
-  );
+// detail page. Reads the same `listForOrder` subscription as the order list,
+// so the two can't disagree about what's on the order.
+export function RemovedDesigns({ orderId }: { orderId: Id<"orders"> }) {
+  const removed = useQuery(api.orderItems.listForOrder, { orderId })
+    ?.removedDesigns;
 
   // Loading is not emptiness, and the difference is the animation. Bailing
   // here — rather than folding `undefined` in with `length === 0` below —
@@ -90,7 +92,8 @@ export function RemovedDesigns({
   // answer, so `initial={false}` can suppress the entrance for a section that
   // was removed long before this visit. A Convex query always resolves after
   // first paint; without the split, every page load would play the reveal.
-  if (!runId || removed === undefined) return null;
+  // A null list (signed out, order gone) has nothing to show either.
+  if (removed === undefined) return null;
 
   return (
     <AnimatePresence initial={false}>
@@ -118,7 +121,7 @@ export function RemovedDesigns({
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               These are off the order, so they don&apos;t count toward
-              production — but the submissions are still here. Nothing was
+              production — but their items are still here. Nothing was
               deleted.
             </p>
 
@@ -126,13 +129,13 @@ export function RemovedDesigns({
               {removed.map((design) => (
                 <Card
                   key={design.designId}
-                  aria-label={`Removed design: ${design.title}`}
+                  aria-label={`Removed design: ${design.title || UNTITLED}`}
                   className="border-dashed py-5"
                 >
                   <CardHeader className="gap-1.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <CardTitle className="text-base text-muted-foreground line-through">
-                        {design.title}
+                        {design.title || UNTITLED}
                       </CardTitle>
                       <Badge
                         className="border-transparent bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"
@@ -142,9 +145,11 @@ export function RemovedDesigns({
                     </div>
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground">
-                    {describeSubmitters(design.submitters)} ordered this —{" "}
-                    {jerseyCount(design.total)} no longer counted. Link the
-                    design again from Edit order to bring them back in.
+                    {design.submitters.length > 0 &&
+                      `${describeSubmitters(design.submitters)} sent items for this. `}
+                    The {itemCountText(design.itemCount)} on it no longer
+                    count. Link the design again from Edit order to bring them
+                    back in.
                   </CardContent>
                 </Card>
               ))}
