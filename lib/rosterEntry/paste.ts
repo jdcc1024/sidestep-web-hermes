@@ -184,7 +184,7 @@ export function parseRosterPaste(
       return {
         ...row,
         status: "existing" as const,
-        problem: "Already on this roster.",
+        problem: "Already on the list.",
       };
     if (seen.has(key))
       return {
