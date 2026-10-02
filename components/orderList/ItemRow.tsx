@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useIsPresent } from "motion/react";
 import { EllipsisIcon, TriangleAlertIcon } from "lucide-react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { itemAddedBy, itemLabel } from "@/lib/orderItem";
@@ -38,10 +38,16 @@ export function ItemRow({
   const label = itemLabel(item);
   const name = item.name?.trim();
   const number = item.number?.trim();
+  // A removed row stays in the DOM while it fades out. It is no longer on the
+  // list, so take it out of the accessibility tree and the tab order at once:
+  // a screen reader must not announce it and Tab must not land on its button.
+  const isPresent = useIsPresent();
 
   return (
     <motion.li
       ref={ref}
+      aria-hidden={isPresent ? undefined : true}
+      inert={!isPresent}
       // Position only: a removed row's neighbours slide up into the gap, but
       // animating a row's own size would scale-distort the text inside it.
       layout="position"
