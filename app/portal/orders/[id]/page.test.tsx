@@ -204,10 +204,12 @@ function orderWith(
 let mounted: { rerender: (ui: React.ReactElement) => void; ui: React.ReactElement } | null =
   null;
 
+let PARAMS_HC: Promise<{ id: string }> = Promise.resolve({ id: ORDER_ID });
 async function renderPage() {
+  PARAMS_HC = Promise.resolve({ id: ORDER_ID });
   const ui = (
     <Suspense fallback={<p>Loading page</p>}>
-      <OrderDetailPage params={Promise.resolve({ id: ORDER_ID })} />
+      <OrderDetailPage params={PARAMS_HC} />
     </Suspense>
   );
   await act(async () => {
@@ -218,7 +220,11 @@ async function renderPage() {
 
 async function refresh() {
   await act(async () => {
-    mounted!.rerender(mounted!.ui);
+    mounted!.rerender(
+      <Suspense fallback={<p>Loading page</p>}>
+        <OrderDetailPage params={PARAMS_HC} />
+      </Suspense>,
+    );
   });
 }
 
@@ -260,7 +266,7 @@ function chipsOf(scope: ReturnType<typeof within>): string[] {
 // The footer line: "6 items · S×1 M×2 …". Found by its text, which starts
 // with the item count.
 function footerText(count: number): string {
-  const el = listCard().getByText(new RegExp(`^${count} items?\\b.*[·•]`));
+  const el = listCard().getByText(new RegExp(`^${count} items?\\b.*×`));
   return (el.textContent ?? "").replace(/\s+/g, " ");
 }
 
