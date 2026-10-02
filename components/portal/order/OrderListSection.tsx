@@ -1,6 +1,9 @@
 import type { Id } from "@/convex/_generated/dataModel";
 import { OrderList } from "@/components/orderList/OrderList";
-import type { OrderListData } from "@/components/orderList/shared";
+import type {
+  CustomQuestion,
+  OrderListData,
+} from "@/components/orderList/shared";
 import type { OrderDesign } from "./shared";
 
 // The order list's place on the order page (L-03): straight after the
@@ -13,11 +16,13 @@ export function OrderListSection({
   teamName,
   designs,
   list,
+  customQuestions,
 }: {
   orderId: Id<"orders">;
   teamName: string;
   designs: readonly OrderDesign[];
   list: OrderListData | null | undefined;
+  customQuestions?: readonly CustomQuestion[];
 }) {
   return (
     <div className="mt-6">
@@ -26,6 +31,7 @@ export function OrderListSection({
         teamName={teamName}
         designs={designs}
         list={list}
+        customQuestions={customQuestions}
       />
     </div>
   );

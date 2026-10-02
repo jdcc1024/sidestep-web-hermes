@@ -12,7 +12,13 @@ import { CopyFromDesign } from "./CopyFromDesign";
 import { ItemRow } from "./ItemRow";
 import { ItemSheet } from "./ItemSheet";
 import { PasteList } from "./PasteList";
-import type { OrderItem, OrderListData, OrderListDesign } from "./shared";
+import {
+  CustomQuestionsProvider,
+  type CustomQuestion,
+  type OrderItem,
+  type OrderListData,
+  type OrderListDesign,
+} from "./shared";
 
 // The order list (initiative 0004, L-03): everything we'll make for the
 // order, one group per design, editable in place. The captain-facing heart of
@@ -28,6 +34,7 @@ export function OrderList({
   teamName,
   designs,
   list,
+  customQuestions = [],
 }: {
   orderId: Id<"orders">;
   // Names the CSV download.
@@ -37,11 +44,15 @@ export function OrderList({
   // `undefined` while loading (and `null` before auth attaches): nothing is
   // counted or offered until the real list is here.
   list: OrderListData | null | undefined;
+  // The order form's custom questions, so a player's answers show under the
+  // question's wording rather than its stored id. Empty with no form.
+  customQuestions?: readonly CustomQuestion[];
 }) {
   const headingId = useId();
   const byDesign = new Map((list?.designs ?? []).map((d) => [d.designId, d]));
 
   return (
+    <CustomQuestionsProvider value={customQuestions}>
     <section
       aria-labelledby={headingId}
       className="overflow-hidden rounded-xl bg-card text-sm text-card-foreground ring-1 ring-foreground/10"
@@ -86,6 +97,7 @@ export function OrderList({
         </>
       )}
     </section>
+    </CustomQuestionsProvider>
   );
 }
 

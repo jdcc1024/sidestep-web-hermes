@@ -1,3 +1,4 @@
+import { createContext, useContext } from "react";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -11,6 +12,17 @@ export type OrderListData = NonNullable<
 >;
 
 export type OrderItem = ItemView<Id<"orderItems">, Id<"designs">>;
+
+// The order form's custom questions. A player's answers are stored by question
+// id; the edit sheet shows the question's label, falling back to the stored
+// key when the form no longer has that question.
+export type CustomQuestion = { id: string; label: string };
+const CustomQuestionsContext = createContext<readonly CustomQuestion[]>([]);
+export const CustomQuestionsProvider = CustomQuestionsContext.Provider;
+export function useQuestionLabel(): (key: string) => string {
+  const questions = useContext(CustomQuestionsContext);
+  return (key) => questions.find((q) => q.id === key)?.label ?? key;
+}
 
 // The design a list group belongs to, as the order page already has it.
 export type OrderListDesign = {

@@ -70,6 +70,7 @@ export default function OrderDetailPage({ params }: PageProps) {
         teamName={order.teamName}
         designs={designs}
         list={list}
+        customQuestions={run?.customQuestions}
       />
 
       <CollectSection

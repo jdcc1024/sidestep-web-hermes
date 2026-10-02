@@ -40,6 +40,7 @@ import {
   UNDO_TOAST_MS,
   wrapTabWithin,
   type OrderItem,
+  useQuestionLabel,
 } from "./shared";
 
 // The one sheet behind `+ Add item` and a row's `Edit …` button (L-03, UX §4,
@@ -457,6 +458,7 @@ function ItemForm({
 // fields (UX frame 3), so the captain knows whose item it is before changing
 // it.
 function PlayerDetails({ item }: { item: OrderItem }) {
+  const questionLabel = useQuestionLabel();
   const who = [
     item.submitterName,
     item.submitterEmail,
@@ -473,7 +475,7 @@ function PlayerDetails({ item }: { item: OrderItem }) {
       {Object.entries(item.customAnswers).map(([question, answer]) => (
         <div key={question}>
           <dt className="text-xs font-medium text-muted-foreground">
-            {question}
+            {questionLabel(question)}
           </dt>
           <dd className="break-words">{answer}</dd>
         </div>
