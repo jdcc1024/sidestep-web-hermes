@@ -21,7 +21,6 @@ import { ConvexError } from "convex/values";
 let orderResult: unknown = undefined;
 let runResult: unknown = null;
 let itemsResult: unknown = undefined;
-let removedResult: unknown = [];
 // Every query name the page subscribed to, so a test can pin "one list".
 const queried = new Set<string>();
 // Convex's view of auth (B-03). Settled-and-signed-in is the resting state;
@@ -95,7 +94,10 @@ vi.mock("convex/react", async () => {
         throw new Error(`L-02: the order page must not read ${name}`);
       if (name === "orderItems:listForOrder") return itemsResult;
       if (name.startsWith("jerseyRuns:")) return runResult;
-      if (name.startsWith("orderEntries:")) return removedResult;
+      // L-04: nothing on this page may read the run-keyed removal queries any
+      // more (they're deleted). They answer an empty list here only so the
+      // pre-L-04 page renders; a test pins that the page never asks.
+      if (name.startsWith("orderEntries:")) return [];
       return orderResult;
     },
     useConvexAuth: () => auth,
@@ -329,7 +331,6 @@ afterEach(() => {
   orderResult = undefined;
   runResult = null;
   itemsResult = undefined;
-  removedResult = [];
   queried.clear();
   mounted = null;
   auth = { isLoading: false, isAuthenticated: true };
@@ -1592,7 +1593,7 @@ describe("/portal/orders/[id] — paste a list (L-03; behaviour moved from the r
     );
   });
 
-  it("flags rows already on the design, repeats, and rows it can't read — and excludes all three", async () => {
+  it("flags rows already on the design, repeats, and rows it can't read — adds the first two kinds with a note, excludes the unreadable one (L-04, Q7)", async () => {
     const user = userEvent.setup();
     orderResult = orderWith([design()]);
     runResult = RUN;
@@ -1601,21 +1602,25 @@ describe("/portal/orders/[id] — paste a list (L-03; behaviour moved from the r
 
     await pasteInto(user, "gretzky\t99\nLemieux\t66\nLEMIEUX\t66\n99");
 
-    expect(screen.getByText(/already/i)).toBeInTheDocument();
-    expect(screen.getByText(/repeated earlier/i)).toBeInTheDocument();
+    expect(screen.getByText(/already on the list/i)).toBeInTheDocument();
+    expect(screen.getByText(/in this paste twice/i)).toBeInTheDocument();
     expect(screen.getByText(/number but no name/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /add 1\b/i }));
+    await user.click(screen.getByRole("button", { name: /add 3\b/i }));
     await waitFor(() =>
       expect(addMany).toHaveBeenCalledWith({
         orderId: ORDER_ID,
         designId: "design_home",
-        rows: [{ name: "Lemieux", number: "66" }],
+        rows: [
+          { name: "gretzky", number: "99" },
+          { name: "Lemieux", number: "66" },
+          { name: "LEMIEUX", number: "66" },
+        ],
       }),
     );
   });
 
-  it("offers nothing to commit when every pasted row is already there", async () => {
+  it("offers a paste of only already-listed rows for adding, with the note (L-04, Q7: no longer 'nothing to add')", async () => {
     const user = userEvent.setup();
     orderResult = orderWith([design()]);
     runResult = RUN;
@@ -1624,8 +1629,9 @@ describe("/portal/orders/[id] — paste a list (L-03; behaviour moved from the r
 
     await pasteInto(user, "Gretzky\t99");
 
-    expect(screen.getByRole("button", { name: /nothing to add/i })).toBeDisabled();
-    expect(screen.getByText(/already/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add 1\b/i })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /nothing to add/i })).toBeNull();
+    expect(screen.getByText(/already on the list/i)).toBeInTheDocument();
   });
 
   it("refuses a paste past the batch bound instead of previewing it", async () => {
@@ -1707,6 +1713,300 @@ describe("/portal/orders/[id] — paste a list (L-03; behaviour moved from the r
         expect.objectContaining({ orderId: ORDER_ID, designId: "design_home" }),
       ),
     );
+  });
+});
+
+describe("/portal/orders/[id] — paste a list with sizes (L-04, UX §3 / §7.7 / §8.8)", () => {
+  async function pasteInto(user: ReturnType<typeof userEvent.setup>, text: string) {
+    await user.click(groupFor("Home kit").getByRole("button", { name: /^paste a list$/i }));
+    const box = await screen.findByRole("textbox", { name: /paste/i });
+    await user.click(box);
+    await user.paste(text);
+    return box;
+  }
+
+  function preview() {
+    return within(screen.getByRole("list", { name: /paste preview/i }));
+  }
+
+  async function open() {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([]);
+    await renderPage();
+  }
+
+  it("Pasting `Sidestep\\t72\\tM` + `Jordan Lee\\t4` + `Sam\\t12\\tXXXL` previews 3 items: one sized M, two Needs size; the XXXL row is named with its reason", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(user, "Sidestep\t72\tM\nJordan Lee\t4\nSam\t12\tXXXL");
+
+    expect(preview().getByText("Sidestep #72")).toBeInTheDocument();
+    expect(preview().getByText("Jordan Lee #4")).toBeInTheDocument();
+    expect(preview().getByText("Sam #12")).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /paste preview/i }).children).toHaveLength(3);
+    // The sized row shows its size; the bad-size row says why, naming the text.
+    expect(preview().getByText("M")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Row 3: "XXXL" isn['’]t a size we make — added as Needs size\./),
+    ).toBeInTheDocument();
+    // Summary: 3 to add, and how many need a size.
+    expect(screen.getByText(/3 to add/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 need a size/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^add 3 items$/i })).toBeEnabled();
+    expect(addMany).not.toHaveBeenCalled();
+  });
+
+  it("confirming adds all three through addMany with `size` per row", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(user, "Sidestep\t72\tM\nJordan Lee\t4\nSam\t12\tXXXL");
+    await user.click(screen.getByRole("button", { name: /^add 3 items$/i }));
+
+    await waitFor(() =>
+      expect(addMany).toHaveBeenCalledWith({
+        orderId: ORDER_ID,
+        designId: "design_home",
+        rows: [
+          { name: "Sidestep", number: "72", size: "M" },
+          { name: "Jordan Lee", number: "4", size: undefined },
+          { name: "Sam", number: "12", size: undefined },
+        ],
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: /paste/i })).toBeNull(),
+    );
+  });
+
+  it("`xxl`, ` l `, `2xl` are sent as `2XL`, `L`, `2XL`", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(user, "A\t1\txxl\nB\t2\t l \nC\t3\t2xl");
+    await user.click(screen.getByRole("button", { name: /^add 3 items$/i }));
+
+    await waitFor(() => expect(addMany).toHaveBeenCalled());
+    const { rows } = addMany.mock.calls[0][0] as { rows: { size?: string }[] };
+    expect(rows.map((r) => r.size)).toEqual(["2XL", "L", "2XL"]);
+    expect(screen.queryByText(/need a size/i)).toBeNull();
+  });
+
+  it("A two-column paste behaves as before: the sheet still says what to paste and the button counts", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(user, "Gretzky\t99\n66\tLemieux");
+
+    expect(preview().getByText("Gretzky #99")).toBeInTheDocument();
+    expect(preview().getByText("Lemieux #66")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^add 2 items$/i })).toBeEnabled();
+  });
+
+  it("the sheet's instructions mention the size column", async () => {
+    const user = userEvent.setup();
+    await open();
+    await user.click(groupFor("Home kit").getByRole("button", { name: /^paste a list$/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent ?? "").toMatch(/size/i);
+  });
+
+  it("Pasting `Jordan Lee\\t4` onto a design that already has Jordan Lee #4 previews the 'already on the list — adds another' note and Confirm adds it", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([{ name: "Jordan Lee", number: "4", size: "M" }]);
+    await renderPage();
+
+    await pasteInto(user, "Jordan Lee\t4");
+
+    expect(
+      screen.getByText("Jordan Lee #4 is already on the list — adds another."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/1 repeat\b/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^add 1 item$/i }));
+    await waitFor(() =>
+      expect(addMany).toHaveBeenCalledWith({
+        orderId: ORDER_ID,
+        designId: "design_home",
+        rows: [{ name: "Jordan Lee", number: "4", size: undefined }],
+      }),
+    );
+  });
+
+  it("A paste containing `Lee\\t4` twice adds two items, and the preview notes the repeat", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(user, "Lee\t4\nLee\t4");
+
+    expect(screen.getByText(/in this paste twice — adds both/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 repeat\b/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^add 2 items$/i }));
+    await waitFor(() =>
+      expect(addMany).toHaveBeenCalledWith({
+        orderId: ORDER_ID,
+        designId: "design_home",
+        rows: [
+          { name: "Lee", number: "4", size: undefined },
+          { name: "Lee", number: "4", size: undefined },
+        ],
+      }),
+    );
+  });
+
+  it("`Lee\\t4` and `Lee\\t9` are two items with no repeat note", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(user, "Lee\t4\nLee\t9");
+
+    expect(screen.queryByText(/already on the list|paste twice|repeat/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /^add 2 items$/i })).toBeEnabled();
+  });
+
+  it("a repeat is a note, not an error: no alert role, row stays in the 'to add' count", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([{ name: "Jordan Lee", number: "4", size: "M" }]);
+    await renderPage();
+
+    await pasteInto(user, "Jordan Lee\t4");
+
+    expect(screen.getByText(/1 to add/i)).toBeInTheDocument();
+    expect(screen.queryByText(/skipped/i)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("a row with more than 3 cells is still invalid and is not added", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(user, "Sidestep\t72\tM\tLeft wing\nBo\t5\tL");
+
+    expect(screen.getByRole("button", { name: /^add 1 item$/i })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /^add 1 item$/i }));
+    await waitFor(() =>
+      expect(addMany).toHaveBeenCalledWith({
+        orderId: ORDER_ID,
+        designId: "design_home",
+        rows: [{ name: "Bo", number: "5", size: "L" }],
+      }),
+    );
+  });
+
+  it("the preview at 375 wide can't scroll sideways: rows wrap and the list never overflows its sheet (§8.2, jsdom part; snap.mjs checks real width)", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(
+      user,
+      "A Very Long Hyphenated Surname-Smith The Third\t100\tXXXL\nJordan Lee\t4\tM",
+    );
+
+    const list = screen.getByRole("list", { name: /paste preview/i });
+    for (const li of Array.from(list.children)) {
+      // Wrapping, not a fixed or nowrap row that would force a scrollbar.
+      expect((li as HTMLElement).className).toMatch(/flex-wrap|wrap|truncate|break/);
+      expect((li as HTMLElement).className).not.toMatch(/whitespace-nowrap|overflow-x-(auto|scroll)|min-w-\[/);
+    }
+    const scroller = list.closest("[class*=overflow]") as HTMLElement | null;
+    expect(scroller?.className ?? "").not.toMatch(/overflow-x-(auto|scroll)/);
+  });
+
+  it("the preview's controls are labelled and keyboard reachable: textbox, Cancel, Add (§8.11)", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await pasteInto(user, "Sidestep\t72\tM\nSam\t12\tXXXL");
+
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByRole("textbox", { name: /paste/i })).toBeInTheDocument();
+    for (const name of [/^cancel$/i, /^add 2 items$/i, /^close$/i]) {
+      const button = dialog.getByRole("button", { name });
+      expect(button).not.toHaveAttribute("tabindex", "-1");
+      expect(button).toBeEnabled();
+    }
+    // ≥ 40px: Tailwind h-10 / h-11 / size-10 / min-h-10+ on every button.
+    for (const name of [/^cancel$/i, /^add 2 items$/i, /^close$/i]) {
+      expect(dialog.getByRole("button", { name }).className).toMatch(
+        /\b(h-1[0-9]|size-1[0-9]|min-h-1[0-9]|h-\[(4[0-9]|[5-9][0-9])px\])\b/,
+      );
+    }
+  });
+
+  it("no preview text, note or toast contains CONVEX, ConvexError, Request ID or a path (§8.10)", async () => {
+    const user = userEvent.setup();
+    addMany.mockRejectedValueOnce(
+      new Error("[CONVEX M(orderItems:addMany)] [Request ID: abc123] Server Error at ../convex/orderItems.ts:1"),
+    );
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([{ name: "Jordan Lee", number: "4", size: "M" }]);
+    await renderPage();
+
+    await pasteInto(user, "Jordan Lee\t4\nJordan Lee\t4\nSam\t12\tXXXL\n99\nX\t1\tM\tq");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent ?? "").not.toMatch(LEAKS);
+    expect(dialog.textContent ?? "").toMatch(/already on the list/i);
+
+    await user.click(screen.getByRole("button", { name: /^add 4 items$/i }));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    for (const text of toastTexts()) expect(text).not.toMatch(LEAKS);
+    expect(toastTexts()).toContain(FALLBACK);
+    expect(screen.getByRole("dialog").textContent ?? "").not.toMatch(LEAKS);
+  });
+
+  it("uses none of the retired words in the new notes (§8.13)", async () => {
+    const user = userEvent.setup();
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([{ name: "Jordan Lee", number: "4", size: "M" }]);
+    await renderPage();
+
+    await pasteInto(user, "Jordan Lee\t4\nJordan Lee\t4\nSam\t12\tXXXL");
+    expect(screen.getByRole("dialog").textContent ?? "").not.toMatch(FORBIDDEN_NEW_COPY);
+  });
+});
+
+describe("/portal/orders/[id] — removed designs read the order, not the run (L-04 §2)", () => {
+  const AWAY = "design_away";
+
+  it("On an order with no order form and 2 captain items on Away Kit, after the design is unlinked the order page's removed-designs section lists them", async () => {
+    orderResult = orderWith([design()]);
+    runResult = null;
+    setItems([
+      { name: "Gretzky", number: "99", size: "L" },
+      { designId: AWAY, name: "Lemieux", number: "66", size: "M" },
+      { designId: AWAY, name: "Bure", number: "10", size: "S" },
+    ]);
+    await renderPage();
+
+    const region = screen.getByRole("region", { name: /removed/i });
+    expect(region).toHaveTextContent(/Removed/);
+    expect(region).toHaveTextContent(/\b2 (items|jerseys)\b/);
+  });
+
+  it("never subscribes to the run-keyed orderEntries queries", async () => {
+    orderResult = orderWith([design()]);
+    runResult = RUN;
+    setItems([{ designId: AWAY, name: "Lemieux", number: "66", size: "M" }]);
+    await renderPage();
+
+    expect([...queried].filter((n) => n.startsWith("orderEntries:"))).toEqual([]);
+  });
+
+  it("shows no removed-designs section when every item is on a linked design", async () => {
+    orderResult = orderWith([design()]);
+    runResult = null;
+    setItems([{ name: "Gretzky", number: "99", size: "L" }]);
+    await renderPage();
+
+    expect(screen.queryByRole("region", { name: /removed/i })).toBeNull();
   });
 });
 

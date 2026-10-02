@@ -23,7 +23,10 @@ vi.mock("convex/react", async () => {
     useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
       const name = getFunctionName(ref);
       if (name.startsWith("jerseyRuns:")) return runResult;
-      if (name.startsWith("orderEntries:")) return affectedResult;
+      // L-04: the warning reads the order's items, so it works with no run.
+      if (name.startsWith("orderEntries:"))
+        throw new Error(`L-04: ${name} is deleted; read orderItems instead`);
+      if (name === "orderItems:affectedByDesignRemoval") return affectedResult;
       return designsResult;
     },
     useMutation: () => mutate,
@@ -145,15 +148,14 @@ describe("OrderForm — edit mode", () => {
 describe("OrderForm — removing a design with submissions", () => {
   const collectingRun = { _id: "run_1", deadline: 0, status: "open" };
   const affectedHomeKit = {
-    designId: "design_a",
-    title: "Home kit",
-    entryCount: 3,
-    total: 4,
+    itemCount: 4,
     submitters: [
       { name: "Ana Ruiz", email: "ana@x.com", qty: 2 },
       { name: "Ben Chu", email: "ben@x.com", qty: 2 },
     ],
   };
+  // Two captain-added items, no player ever submitted: the order-form-less case.
+  const affectedCaptainOnly = { itemCount: 2, submitters: [] };
 
   it("names the affected submitters when a linked design is unchecked", async () => {
     designsResult = [{ _id: "design_a", title: "Home kit", fileCount: 0 }];
@@ -167,7 +169,7 @@ describe("OrderForm — removing a design with submissions", () => {
     await user.click(screen.getByRole("checkbox", { name: /home kit/i }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Home kit");
+    expect(alert).toHaveTextContent(/\b4 (items|jerseys)\b/);
     expect(alert).toHaveTextContent("Ana Ruiz (2) and Ben Chu (2)");
   });
 
@@ -188,10 +190,24 @@ describe("OrderForm — removing a design with submissions", () => {
     expect(push).toHaveBeenCalledWith("/portal/orders/order_returned_id");
   });
 
-  it("stays quiet when the order has no run — nobody has submitted yet", async () => {
+  it("warns about captain items when the order has no order form (L-04: unlinking Away Kit warns about 2 items)", async () => {
+    designsResult = [{ _id: "design_a", title: "Away Kit", fileCount: 0 }];
+    runResult = null;
+    affectedResult = affectedCaptainOnly;
+    const user = userEvent.setup();
+    render(<OrderForm order={existingOrder} />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /away kit/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/\b2 (items|jerseys)\b/);
+  });
+
+  it("stays quiet when the design has no items to lose, with or without an order form", async () => {
     designsResult = [{ _id: "design_a", title: "Home kit", fileCount: 0 }];
     runResult = null;
-    affectedResult = affectedHomeKit;
+    affectedResult = { itemCount: 0, submitters: [] };
     const user = userEvent.setup();
     render(<OrderForm order={existingOrder} />);
 

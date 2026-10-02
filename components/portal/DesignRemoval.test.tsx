@@ -1,118 +1,175 @@
 // @vitest-environment jsdom
+// L-04 §2 acceptance tests (initiative 0004): the design-removal warning and
+// the removed-designs section read the ORDER's items, not the run's entries.
+// Contract the build must meet:
+//   <DesignRemovalWarning orderId designId />  → orderItems.affectedByDesignRemoval({ orderId, designId })
+//        result { itemCount, submitters: [{ name, email, qty }] }
+//   <RemovedDesigns orderId />                 → orderItems.listForOrder({ orderId }).removedDesigns
+//        entries { designId, title, itemCount, submitters }
+// Neither may touch `orderEntries.*` (those two queries are deleted).
+// The count noun ("items" or the old "jerseys") is the builder's call; the
+// number is not.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import type { Id } from "@/convex/_generated/dataModel";
 
-// Both components read exactly one query, so a single mutable result backs
-// the mock; each test stocks it before rendering.
-let queryResult: unknown = undefined;
+let affectedResult: unknown = undefined;
+let listResult: unknown = undefined;
+const calls: { name: string; args: unknown }[] = [];
 
-vi.mock("convex/react", () => ({
-  useQuery: () => queryResult,
-}));
+vi.mock("convex/react", async () => {
+  const { getFunctionName } = await import("convex/server");
+  return {
+    useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => {
+      const name = getFunctionName(ref);
+      calls.push({ name, args });
+      if (name.startsWith("orderEntries:"))
+        throw new Error(`L-04: ${name} is deleted; read orderItems instead`);
+      if (args === "skip") return undefined;
+      if (name === "orderItems:affectedByDesignRemoval") return affectedResult;
+      if (name === "orderItems:listForOrder") return listResult;
+      throw new Error(`unexpected query ${name}`);
+    },
+  };
+});
 
 import { DesignRemovalWarning, RemovedDesigns } from "./DesignRemoval";
 
-const runId = "run_1" as Id<"jerseyRuns">;
+const orderId = "order_1" as Id<"orders">;
 const designId = "design_a" as Id<"designs">;
 
 afterEach(() => {
-  queryResult = undefined;
+  affectedResult = undefined;
+  listResult = undefined;
+  calls.length = 0;
 });
 
-describe("DesignRemovalWarning", () => {
-  it("names the affected submitters and the jerseys that would drop", () => {
-    queryResult = {
-      designId,
-      title: "Home kit",
-      entryCount: 3,
-      total: 4,
+describe("DesignRemovalWarning reads orderItems.affectedByDesignRemoval({ orderId, designId })", () => {
+  it("asks the order-keyed query, with the order and the design", () => {
+    affectedResult = { itemCount: 0, submitters: [] };
+    render(<DesignRemovalWarning orderId={orderId} designId={designId} />);
+
+    const call = calls.find((c) => c.name === "orderItems:affectedByDesignRemoval");
+    expect(call?.args).toEqual({ orderId, designId });
+    expect(calls.some((c) => c.name.startsWith("orderEntries:"))).toBe(false);
+  });
+
+  it("names the affected submitters and the count that would drop", () => {
+    affectedResult = {
+      itemCount: 4,
       submitters: [
         { name: "Ana Ruiz", email: "ana@x.com", qty: 2 },
         { name: "Ben Chu", email: "ben@x.com", qty: 2 },
       ],
     };
-    render(<DesignRemovalWarning runId={runId} designId={designId} />);
+    render(<DesignRemovalWarning orderId={orderId} designId={designId} />);
 
     const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent("Home kit");
-    expect(alert).toHaveTextContent("4 jerseys");
+    expect(alert).toHaveTextContent(/\b4 (items|jerseys)\b/);
     expect(alert).toHaveTextContent("Ana Ruiz (2) and Ben Chu (2)");
   });
 
+  it("warns about captain-added items when nobody submitted (an order with no order form)", () => {
+    affectedResult = { itemCount: 2, submitters: [] };
+    render(<DesignRemovalWarning orderId={orderId} designId={designId} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/\b2 (items|jerseys)\b/);
+  });
+
+  it("counts one in the singular", () => {
+    affectedResult = { itemCount: 1, submitters: [] };
+    render(<DesignRemovalWarning orderId={orderId} designId={designId} />);
+
+    expect(screen.getByRole("alert").textContent ?? "").toMatch(
+      /\b1 (item|jersey)\b(?!s)/,
+    );
+  });
+
   it("reassures that nothing is deleted — the warning is soft, not a stop", () => {
-    queryResult = {
-      designId,
-      title: "Home kit",
-      entryCount: 1,
-      total: 1,
-      submitters: [{ name: "Ana Ruiz", email: "ana@x.com", qty: 1 }],
-    };
-    render(<DesignRemovalWarning runId={runId} designId={designId} />);
+    affectedResult = { itemCount: 2, submitters: [] };
+    render(<DesignRemovalWarning orderId={orderId} designId={designId} />);
 
     const alert = screen.getByRole("alert");
     expect(alert.textContent ?? "").toMatch(/stay|saved|keep/i);
-    // No confirm/block affordance — saving is never gated on this warning.
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("stays silent when the design has no submissions to orphan", () => {
-    queryResult = {
-      designId,
-      title: "Warmup",
-      entryCount: 0,
-      total: 0,
-      submitters: [],
-    };
-    render(<DesignRemovalWarning runId={runId} designId={designId} />);
+  it("stays silent when the design has no items to orphan", () => {
+    affectedResult = { itemCount: 0, submitters: [] };
+    render(<DesignRemovalWarning orderId={orderId} designId={designId} />);
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("renders nothing while the query is still loading", () => {
-    queryResult = undefined;
+    affectedResult = undefined;
     const { container } = render(
-      <DesignRemovalWarning runId={runId} designId={designId} />,
+      <DesignRemovalWarning orderId={orderId} designId={designId} />,
     );
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("uses no word from the retired list in its copy (§8.13)", () => {
+    affectedResult = { itemCount: 3, submitters: [] };
+    render(<DesignRemovalWarning orderId={orderId} designId={designId} />);
+
+    expect(screen.getByRole("alert").textContent ?? "").not.toMatch(
+      /roster|slot|jersey run|collected|responses|CONVEX|Request ID/i,
+    );
+  });
 });
 
-describe("RemovedDesigns", () => {
-  it("keeps removed designs visible with a removed indicator and who's affected", () => {
-    queryResult = [
-      {
-        designId,
-        title: "Away kit",
-        entryCount: 2,
-        total: 3,
-        submitters: [
-          { name: "Ana Ruiz", email: "ana@x.com", qty: 2 },
-          { name: "Ben Chu", email: "ben@x.com", qty: 1 },
-        ],
-      },
-    ];
-    render(<RemovedDesigns runId={runId} />);
+describe("RemovedDesigns reads orderItems.listForOrder({ orderId }).removedDesigns", () => {
+  const away = {
+    designId,
+    title: "Away Kit",
+    itemCount: 2,
+    submitters: [] as { name: string; email: string; qty: number }[],
+  };
+
+  it("asks the order-keyed list, never the run-keyed query", () => {
+    listResult = { removedDesigns: [] };
+    render(<RemovedDesigns orderId={orderId} />);
+
+    const call = calls.find((c) => c.name === "orderItems:listForOrder");
+    expect(call?.args).toEqual({ orderId });
+    expect(calls.some((c) => c.name.startsWith("orderEntries:"))).toBe(false);
+  });
+
+  it("lists a removed design that held only captain items (no order form, no submitters)", () => {
+    listResult = { removedDesigns: [away] };
+    render(<RemovedDesigns orderId={orderId} />);
 
     const region = screen.getByRole("region", { name: /removed/i });
-    expect(region).toHaveTextContent("Away kit");
+    expect(region).toHaveTextContent("Away Kit");
     expect(region).toHaveTextContent("Removed");
-    expect(region).toHaveTextContent("3 jerseys");
+    expect(region).toHaveTextContent(/\b2 (items|jerseys)\b/);
+  });
+
+  it("names submitters when players sent items", () => {
+    listResult = {
+      removedDesigns: [
+        {
+          ...away,
+          itemCount: 3,
+          submitters: [
+            { name: "Ana Ruiz", email: "ana@x.com", qty: 2 },
+            { name: "Ben Chu", email: "ben@x.com", qty: 1 },
+          ],
+        },
+      ],
+    };
+    render(<RemovedDesigns orderId={orderId} />);
+
+    const region = screen.getByRole("region", { name: /removed/i });
+    expect(region).toHaveTextContent(/\b3 (items|jerseys)\b/);
     expect(region).toHaveTextContent("Ana Ruiz (2) and Ben Chu (1)");
   });
 
-  it("says the entries are kept, not deleted", () => {
-    queryResult = [
-      {
-        designId,
-        title: "Away kit",
-        entryCount: 1,
-        total: 1,
-        submitters: [{ name: "Ana Ruiz", email: "ana@x.com", qty: 1 }],
-      },
-    ];
-    render(<RemovedDesigns runId={runId} />);
+  it("says the items are kept, not deleted", () => {
+    listResult = { removedDesigns: [away] };
+    render(<RemovedDesigns orderId={orderId} />);
 
     expect(
       screen.getByRole("region", { name: /removed/i }).textContent ?? "",
@@ -120,64 +177,44 @@ describe("RemovedDesigns", () => {
   });
 
   it("renders nothing when no design has been removed", () => {
-    queryResult = [];
-    const { container } = render(<RemovedDesigns runId={runId} />);
+    listResult = { removedDesigns: [] };
+    const { container } = render(<RemovedDesigns orderId={orderId} />);
 
     expect(container).toBeEmptyDOMElement();
   });
 
-  // The distinction the reveal rests on (N-08): *loading* and *empty* both
-  // render nothing, but only one of them can become populated in front of a
-  // captain who is watching. Collapsing them would replay the entrance on
-  // every page load, since a Convex query always resolves after first paint.
-  it("renders nothing while the removed-designs query is still loading", () => {
-    queryResult = undefined;
-    const { container } = render(<RemovedDesigns runId={runId} />);
+  it("renders nothing while loading, and when the list is null (signed out / not found)", () => {
+    listResult = undefined;
+    const a = render(<RemovedDesigns orderId={orderId} />);
+    expect(a.container).toBeEmptyDOMElement();
+    a.unmount();
 
-    expect(container).toBeEmptyDOMElement();
+    listResult = null;
+    const b = render(<RemovedDesigns orderId={orderId} />);
+    expect(b.container).toBeEmptyDOMElement();
   });
 
   it("reveals the section when a design is dropped while the page is open", async () => {
-    queryResult = [];
-    const { container, rerender } = render(<RemovedDesigns runId={runId} />);
+    listResult = { removedDesigns: [] };
+    const { container, rerender } = render(<RemovedDesigns orderId={orderId} />);
     expect(container).toBeEmptyDOMElement();
 
-    queryResult = [
-      {
-        designId,
-        title: "Away kit",
-        entryCount: 1,
-        total: 1,
-        submitters: [{ name: "Ana Ruiz", email: "ana@x.com", qty: 1 }],
-      },
-    ];
-    rerender(<RemovedDesigns runId={runId} />);
+    listResult = { removedDesigns: [away] };
+    rerender(<RemovedDesigns orderId={orderId} />);
 
     expect(
       await screen.findByRole("region", { name: /removed/i }),
-    ).toHaveTextContent("Away kit");
+    ).toHaveTextContent("Away Kit");
   });
 
-  // Absent, not transparent: linking the design back has to take the section
-  // out of the accessibility tree, not leave an invisible region behind.
   it("takes the section away again when the last removed design comes back", async () => {
-    queryResult = [
-      {
-        designId,
-        title: "Away kit",
-        entryCount: 1,
-        total: 1,
-        submitters: [{ name: "Ana Ruiz", email: "ana@x.com", qty: 1 }],
-      },
-    ];
-    const { rerender } = render(<RemovedDesigns runId={runId} />);
+    listResult = { removedDesigns: [away] };
+    const { rerender } = render(<RemovedDesigns orderId={orderId} />);
     expect(screen.getByRole("region", { name: /removed/i })).toBeInTheDocument();
 
-    queryResult = [];
-    rerender(<RemovedDesigns runId={runId} />);
+    listResult = { removedDesigns: [] };
+    rerender(<RemovedDesigns orderId={orderId} />);
 
-    // `waitFor` because the section leaves through `AnimatePresence` — the
-    // assertion is that it is gone, never how it got there.
     await waitFor(
       () =>
         expect(
@@ -185,23 +222,5 @@ describe("RemovedDesigns", () => {
         ).not.toBeInTheDocument(),
       { timeout: 3000 },
     );
-  });
-
-  // Stocked with data on purpose: with no run there is nothing to read, so
-  // the component must bail on the missing runId rather than on an empty
-  // query result (the real query is skipped and never resolves).
-  it("renders nothing when the order has no run yet", () => {
-    queryResult = [
-      {
-        designId,
-        title: "Away kit",
-        entryCount: 1,
-        total: 1,
-        submitters: [{ name: "Ana Ruiz", email: "ana@x.com", qty: 1 }],
-      },
-    ];
-    const { container } = render(<RemovedDesigns runId={null} />);
-
-    expect(container).toBeEmptyDOMElement();
   });
 });
