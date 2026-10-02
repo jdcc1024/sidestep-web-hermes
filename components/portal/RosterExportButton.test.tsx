@@ -4,31 +4,42 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { RosterExportButton } from "./RosterExportButton";
-import type { RosterRow } from "@/lib/jerseyBreakdown";
+import type { ItemView } from "@/lib/orderItem/summary";
 
+let nextId = 0;
+
+// One player's items (L-03: the button reads `ItemView[]`, the same items the
+// list renders): one item per size ordered, qty riding on the item.
 function slot(
   name: string,
   number: string,
   sizes: Array<{ size: string; qty: number }>,
   designation?: "C" | "A",
-): RosterRow {
-  return {
-    key: `slot_${name}`,
-    label: `${name} #${number}`,
-    name,
-    number,
-    designation,
-    blank: false,
-    filled: sizes.length > 0,
-    collision: false,
-    sizes,
-    total: sizes.reduce((sum, s) => sum + s.qty, 0),
+): ItemView[] {
+  const make = (size: string | undefined, qty: number): ItemView => {
+    nextId += 1;
+    return {
+      _id: `item_${nextId}`,
+      designId: "design_1",
+      name,
+      number,
+      designation,
+      size,
+      qty,
+      source: "captain",
+      customAnswers: {},
+      createdAt: nextId,
+      collision: false,
+    };
   };
+  return sizes.length === 0
+    ? [make(undefined, 1)]
+    : sizes.map(({ size, qty }) => make(size, qty));
 }
 
-const rows: RosterRow[] = [
-  slot("Ruiz", "7", [{ size: "L", qty: 2 }], "C"),
-  slot("Abbot", "4", [{ size: "S", qty: 1 }]),
+const items: ItemView[] = [
+  ...slot("Ruiz", "7", [{ size: "L", qty: 2 }], "C"),
+  ...slot("Abbot", "4", [{ size: "S", qty: 1 }]),
 ];
 
 // jsdom implements neither Blob URLs nor navigation, so we capture the anchor
@@ -57,7 +68,7 @@ afterEach(() => {
 });
 
 async function exportWith(label: RegExp) {
-  await userEvent.click(screen.getByRole("button", { name: /export csv/i }));
+  await userEvent.click(screen.getByRole("button", { name: /download csv/i }));
   await userEvent.click(await screen.findByRole("menuitem", { name: label }));
   await waitFor(() => expect(lastBlob).not.toBeNull());
   return lastBlob!.text();
@@ -66,10 +77,10 @@ async function exportWith(label: RegExp) {
 describe("RosterExportButton", () => {
   it("offers a by-name and a by-size export", async () => {
     render(
-      <RosterExportButton teamName="Falcons" designTitle="Home" rows={rows} />,
+      <RosterExportButton teamName="Falcons" designTitle="Home" items={items} />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /export csv/i }));
+    await userEvent.click(screen.getByRole("button", { name: /download csv/i }));
 
     expect(
       await screen.findByRole("menuitem", { name: /by name/i }),
@@ -81,7 +92,7 @@ describe("RosterExportButton", () => {
 
   it("downloads one row per jersey, alphabetically, when sorted by name", async () => {
     render(
-      <RosterExportButton teamName="Falcons" designTitle="Home" rows={rows} />,
+      <RosterExportButton teamName="Falcons" designTitle="Home" items={items} />,
     );
 
     const text = await exportWith(/by name/i);
@@ -93,7 +104,7 @@ describe("RosterExportButton", () => {
 
   it("downloads the same jerseys grouped by size when asked", async () => {
     render(
-      <RosterExportButton teamName="Falcons" designTitle="Home" rows={rows} />,
+      <RosterExportButton teamName="Falcons" designTitle="Home" items={items} />,
     );
 
     const text = await exportWith(/by size/i);
@@ -109,7 +120,7 @@ describe("RosterExportButton", () => {
       <RosterExportButton
         teamName="Vancouver Falcons"
         designTitle="Home Kit"
-        rows={rows}
+        items={items}
       />,
     );
 
@@ -126,7 +137,7 @@ describe("RosterExportButton", () => {
       <RosterExportButton
         teamName="Falcons"
         designTitle="Home"
-        rows={[slot("Muñoz", "9", [{ size: "M", qty: 1 }])]}
+        items={slot("Muñoz", "9", [{ size: "M", qty: 1 }])}
       />,
     );
 
@@ -137,11 +148,25 @@ describe("RosterExportButton", () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   });
 
-  it("has nothing to export when the design has no roster", async () => {
+  it("still downloads a Needs-size item, with a blank size", async () => {
     render(
-      <RosterExportButton teamName="Falcons" designTitle="Home" rows={[]} />,
+      <RosterExportButton
+        teamName="Falcons"
+        designTitle="Home"
+        items={slot("Bure", "10", [])}
+      />,
     );
 
-    expect(screen.getByRole("button", { name: /export csv/i })).toBeDisabled();
+    const text = await exportWith(/by name/i);
+
+    expect(text).toBe("Name,Number,Role,Size\r\nBure,10,,");
+  });
+
+  it("has nothing to download when the design has no items", async () => {
+    render(
+      <RosterExportButton teamName="Falcons" designTitle="Home" items={[]} />,
+    );
+
+    expect(screen.getByRole("button", { name: /download csv/i })).toBeDisabled();
   });
 });

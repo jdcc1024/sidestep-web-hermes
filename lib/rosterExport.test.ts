@@ -1,46 +1,54 @@
 import { describe, expect, it } from "vitest";
-import type { RosterRow } from "./jerseyBreakdown";
+import type { ItemView } from "./orderItem/summary";
 import {
   buildRosterCsv,
   rosterExportFilename,
   rosterExportRows,
 } from "./rosterExport";
 
+let nextId = 0;
+
+function item(
+  fields: Partial<ItemView> & { qty?: number },
+): ItemView {
+  nextId += 1;
+  return {
+    _id: `item_${nextId}`,
+    designId: "design_1",
+    qty: 1,
+    source: "captain",
+    customAnswers: {},
+    createdAt: nextId,
+    collision: false,
+    ...fields,
+  };
+}
+
+// One named player: an item per size ordered (qty rides on the item), or a
+// single Needs-size item when no size is given (L-03: items, not slots).
 function slot(
   name: string,
   number: string | undefined,
   sizes: Array<{ size: string; qty: number }>,
   designation?: "C" | "A",
-): RosterRow {
-  return {
-    key: `slot_${name}`,
-    label: number ? `${name} #${number}` : name,
-    name,
-    number,
-    designation,
-    blank: false,
-    filled: sizes.length > 0,
-    collision: false,
-    sizes,
-    total: sizes.reduce((sum, s) => sum + s.qty, 0),
-  };
+): ItemView[] {
+  if (sizes.length === 0) return [item({ name, number, designation })];
+  return sizes.map(({ size, qty }) =>
+    item({ name, number, designation, size, qty }),
+  );
 }
 
-function blank(sizes: Array<{ size: string; qty: number }>): RosterRow {
-  return {
-    key: "blank:design_1",
-    label: "Blank",
-    blank: true,
-    filled: true,
-    collision: false,
-    sizes,
-    total: sizes.reduce((sum, s) => sum + s.qty, 0),
-  };
+// Unnamed bulk lines: no name, no number.
+function blank(sizes: Array<{ size: string; qty: number }>): ItemView[] {
+  return sizes.map(({ size, qty }) => item({ size, qty }));
 }
+
+type Group = ItemView[];
+const flat = (groups: readonly Group[]): ItemView[] => groups.flat();
 
 // Data rows only — the header is asserted separately.
-function body(rows: readonly RosterRow[], order: "name" | "size" = "name") {
-  return rosterExportRows(rows, order).slice(1);
+function body(rows: readonly Group[], order: "name" | "size" = "name") {
+  return rosterExportRows(flat(rows), order).slice(1);
 }
 
 describe("rosterExportRows", () => {
@@ -48,7 +56,7 @@ describe("rosterExportRows", () => {
     expect(rosterExportRows([], "name")[0]).toEqual(["Name", "Number", "Role", "Size"]);
   });
 
-  it("should split a slot's joined label back into name and number columns", () => {
+  it("should put name and number in their own columns", () => {
     expect(body([slot("Gretzky", "99", [{ size: "L", qty: 1 }])])).toEqual([
       ["Gretzky", "99", "", "L"],
     ]);
@@ -77,11 +85,11 @@ describe("rosterExportRows", () => {
     ]);
   });
 
-  it("should export an unfilled slot once with an empty size", () => {
+  it("should export a Needs-size item once with a blank size", () => {
     expect(body([slot("Cole", "7", [])])).toEqual([["Cole", "7", "", ""]]);
   });
 
-  it("should leave the number empty for a slot that has none", () => {
+  it("should leave the number empty for an item that has none", () => {
     expect(body([slot("Cole", undefined, [{ size: "M", qty: 1 }])])).toEqual([
       ["Cole", "", "", "M"],
     ]);
@@ -202,7 +210,7 @@ describe("rosterExportRows", () => {
     ]);
   });
 
-  it("should trail the unfilled slots after every size group", () => {
+  it("should trail the Needs-size items after every size group", () => {
     const rows = body(
       [
         slot("Cole", "4", []),
@@ -222,13 +230,14 @@ describe("rosterExportRows", () => {
 
 describe("buildRosterCsv", () => {
   it("should emit a header and CRLF-terminated rows", () => {
-    expect(buildRosterCsv([slot("Ruiz", "7", [{ size: "L", qty: 2 }])], "name"))
-      .toBe("Name,Number,Role,Size\r\nRuiz,7,,L\r\nRuiz,7,,L");
+    expect(buildRosterCsv(slot("Ruiz", "7", [{ size: "L", qty: 2 }]), "name")).toBe(
+      "Name,Number,Role,Size\r\nRuiz,7,,L\r\nRuiz,7,,L",
+    );
   });
 
   it("should neutralize a name a spreadsheet would evaluate as a formula", () => {
     const csv = buildRosterCsv(
-      [slot("=cmd|calc", "7", [{ size: "L", qty: 1 }])],
+      slot("=cmd|calc", "7", [{ size: "L", qty: 1 }]),
       "name",
     );
 
@@ -237,14 +246,20 @@ describe("buildRosterCsv", () => {
 
   it("should quote a name containing a comma", () => {
     const csv = buildRosterCsv(
-      [slot("Ruiz, Ana", "7", [{ size: "L", qty: 1 }])],
+      slot("Ruiz, Ana", "7", [{ size: "L", qty: 1 }]),
       "name",
     );
 
     expect(csv).toContain('"Ruiz, Ana"');
   });
 
-  it("should still emit the header for a design with no roster", () => {
+  it("should export a Needs-size item with a blank size", () => {
+    expect(buildRosterCsv(slot("Cole", "4", []), "name")).toBe(
+      "Name,Number,Role,Size\r\nCole,4,,",
+    );
+  });
+
+  it("should still emit the header for a design with nothing on its list", () => {
     expect(buildRosterCsv([], "name")).toBe("Name,Number,Role,Size");
   });
 });
