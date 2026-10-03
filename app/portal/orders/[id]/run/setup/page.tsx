@@ -14,10 +14,10 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-// The run-management surface. Since M-05 the run is *created* on the order
-// page ("Start collecting", deadline only) — this page manages one that
-// already exists: share link, deadline, custom questions, and where to read
-// the responses. Rosters and the names-mode switch live with the designs.
+// Form settings: the order form (a "run" in code) is *made* on the order page
+// ("Make an order form", deadline only) — this page manages one that already
+// exists: share link, deadline, custom questions and names mode. The names
+// players pick from live on the order list.
 export default function RunSetupPage({ params }: PageProps) {
   const { id } = use(params);
   const orderId = id as Id<"orders">;
@@ -41,14 +41,15 @@ export default function RunSetupPage({ params }: PageProps) {
 
       <header className="mt-3">
         <p className="text-sm font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
-          Your run · {order.teamName}
+          Order form · {order.teamName}
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          Manage collecting
+          Form settings
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your shareable link, when it closes, and anything extra you want to
-          ask. Rosters live on your order page.
+          The link to share, the deadline, how players add their name, and
+          anything extra you want to ask. Everything players send lands on
+          your order list.
         </p>
       </header>
 

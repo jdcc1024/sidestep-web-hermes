@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,7 +16,10 @@ import {
   newQuestionId,
   parseDeadline,
   toJerseyRunPayload,
+  type NamesMode,
 } from "@/lib/jerseyRun";
+import { userMessage } from "@/lib/userMessage";
+import { absoluteUrl, copyLink } from "@/components/portal/CopyLinkButton";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,12 +38,12 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-// Run Setup is management-only since M-05. The run is created from the order
-// page ("Start collecting", deadline only); sizes are a fixed catalog nobody
-// is asked about, and names mode moved next to the designs it affects. What's
-// left here is genuinely the collection campaign: the share link, the
-// deadline, the custom questions the fan form asks, and where to read the
-// responses. No lock control — R-08 stays parked (PRD §5).
+// Form settings (a "run" in code). The order form is made from the order page
+// ("Make an order form", deadline only); sizes are a fixed catalog nobody is
+// asked about. What's managed here is the form itself: the share link, the
+// deadline, the custom questions it asks, and names mode (moved here from the
+// order page in L-05). What players send lands on the order list, so there is
+// no responses view. No lock control — R-08 stays parked (PRD §5).
 
 // Colocated zod schema. Constants reused from lib/jerseyRun so the client and
 // server cap values the same way (jerseyRuns.updateSettings enforces matching
@@ -93,6 +97,7 @@ type ManagedRun = {
   _id: Id<"jerseyRuns">;
   customQuestions: { id: string; label: string }[];
   deadline: number;
+  namesMode: NamesMode;
   effectiveStatus: "open" | "closed" | "locked";
 };
 
@@ -102,27 +107,27 @@ export function JerseyRunSetup({ orderId }: { orderId: Id<"orders"> }) {
   if (run === undefined) return <LoadingSkeleton />;
   if (run === null) return <NoRunYet orderId={orderId} />;
 
-  return <RunManagement run={run} orderId={orderId} />;
+  return <RunManagement run={run} />;
 }
 
-// Reachable by typing the URL before starting a run — the order page is the
-// only place a run is created now, and creating one implicitly from here is
-// exactly what M-05 removed.
+// Reachable by typing the URL before making a form — the order page is the
+// only place one is made, and making one implicitly from here is exactly
+// what M-05 removed.
 function NoRunYet({ orderId }: { orderId: Id<"orders"> }) {
   return (
     <div className="rounded-md border border-dashed border-border bg-muted/40 px-6 py-10 text-center">
       <p className="text-sm font-medium text-foreground">
-        You haven&apos;t started collecting yet
+        You haven&apos;t made an order form yet
       </p>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        Pick a deadline on your order page and we&apos;ll create the shareable
-        link — then come back here to manage it.
+        Make one from your order page and we&apos;ll give you a link to share.
+        Then come back here to change its settings.
       </p>
       <Link
         href={`/portal/orders/${orderId}`}
         className={cn(
-          buttonVariants({ size: "sm" }),
-          "mt-4 bg-teal-600 font-semibold text-white hover:bg-teal-700",
+          buttonVariants(),
+          "mt-4 h-10 bg-teal-600 px-3.5 font-semibold text-white hover:bg-teal-700",
         )}
       >
         Back to your order
@@ -131,74 +136,143 @@ function NoRunYet({ orderId }: { orderId: Id<"orders"> }) {
   );
 }
 
-const RUN_STATUS_LABEL: Record<ManagedRun["effectiveStatus"], string> = {
-  open: "Collecting",
-  closed: "Collection closed",
-  locked: "Roster locked",
-};
-
-function RunManagement({
-  run,
-  orderId,
-}: {
-  run: ManagedRun;
-  orderId: Id<"orders">;
-}) {
-  const shareUrl = useShareUrl(`/run/${run._id}`);
-  const locked = run.effectiveStatus !== "open";
+function RunManagement({ run }: { run: ManagedRun }) {
+  const open = run.effectiveStatus === "open";
 
   return (
     <div className="space-y-6">
-      <ShareLink url={shareUrl} />
-
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <Badge
           className={cn(
             "border-transparent",
-            run.effectiveStatus === "open"
+            open
               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200"
               : "bg-muted text-muted-foreground",
           )}
         >
-          {RUN_STATUS_LABEL[run.effectiveStatus]}
+          {open ? "Open" : "Closed"}
         </Badge>
-        <Link
-          href={`/portal/orders/${orderId}/run/responses`}
-          className="text-sm font-semibold text-primary hover:underline"
-        >
-          View responses →
-        </Link>
-        {/* Roster seeding and the names-mode switch live on the order page's
-            design cards (M-02, M-05) — this surface is the collection
-            campaign, not the team list. */}
-        <Link
-          href={`/portal/orders/${orderId}`}
-          className="text-sm font-semibold text-primary hover:underline"
-        >
-          Manage rosters →
-        </Link>
       </div>
+
+      {open && <ShareLink path={`/run/${run._id}`} />}
+
+      <NamesModeSetting run={run} />
 
       <Separator />
 
-      {locked ? (
-        <LockedSummary run={run} />
-      ) : (
-        <RunSettingsForm run={run} />
-      )}
+      {open ? <RunSettingsForm run={run} /> : <LockedSummary run={run} />}
     </div>
   );
 }
 
-// A closed or locked run rejects every edit server-side, so the form gives
-// way to what it was holding. Read-only, not disabled inputs: there's nothing
-// to type into and pretending otherwise invites a rejected save.
+// How the public form asks for names (M-05). Saves on change, apart from the
+// deadline/questions form: it's one choice, and in fixed mode the names on
+// each design in the order list *are* what players pick from. Switches
+// freely in both directions with no confirmation: player-typed names are
+// already items on the list, so open → fixed puts them in the picker and
+// fixed → open only loosens a constraint. Neither loses data (PRD §6). A
+// closed form rejects every write, so it only says what was chosen.
+//
+// Native radios, not the Base UI group: a wrapping <label> names a native
+// input reliably, and the choice is a plain two-way pick.
+function NamesModeSetting({ run }: { run: ManagedRun }) {
+  const setNamesMode = useMutation(api.jerseyRuns.setNamesMode);
+  // The choice shows as soon as it's made; the query catches up when the
+  // mutation lands, and a rejected save falls back to the stored mode.
+  const [pending, setPending] = useState<NamesMode | null>(null);
+  const selected = pending ?? run.namesMode;
+  const editable = run.effectiveStatus === "open";
+
+  async function onChange(next: NamesMode) {
+    if (next === selected) return;
+    setPending(next);
+    try {
+      await setNamesMode({ jerseyRunId: run._id, namesMode: next });
+    } catch (err) {
+      toast.error("Could not change how players add their name", {
+        description: userMessage(err, "Please try again."),
+      });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <fieldset className="min-w-0 space-y-3">
+      <legend className="text-sm font-medium text-foreground">
+        Names and numbers
+      </legend>
+      {editable ? (
+        <>
+          <p className="text-sm text-muted-foreground">
+            How players fill in their name on the form. Switch any time,
+            nothing on your list is lost either way.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {NAMES_MODE_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className="flex min-h-10 cursor-pointer items-start gap-3 rounded-md border border-input bg-background p-4 transition-colors hover:border-ring has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+              >
+                <input
+                  type="radio"
+                  name="names-mode"
+                  value={option.value}
+                  checked={selected === option.value}
+                  onChange={() => void onChange(option.value)}
+                  className="mt-0.5 size-4 shrink-0 accent-teal-600"
+                />
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="text-sm font-medium text-foreground">
+                    {option.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {option.hint}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-foreground">
+          {NAMES_MODE_OPTIONS.find((o) => o.value === run.namesMode)?.label}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
+const NAMES_MODE_OPTIONS: { value: NamesMode; label: string; hint: string }[] =
+  [
+    {
+      value: "open",
+      label: "Players type their own name and number",
+      hint: "Good when you don't have a team list yet.",
+    },
+    {
+      value: "fixed",
+      label: "Players pick their name from your list",
+      hint: "They choose from the names on each design in your order list.",
+    },
+  ];
+
+// A closed form rejects every edit server-side, so the form gives way to
+// what it was holding. Read-only, not disabled inputs: there's nothing to
+// type into and pretending otherwise invites a rejected save.
 function LockedSummary({ run }: { run: ManagedRun }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        This run is no longer collecting, so its settings are frozen. Contact
-        Sidestep if something needs to change.
+        This order form is closed, so its settings can&apos;t change. Need a
+        change? Email us at{" "}
+        <a
+          href="mailto:info@sidestep.design"
+          className="font-medium text-teal-700 underline underline-offset-4 hover:text-teal-800 focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none dark:text-teal-300 dark:hover:text-teal-200"
+        >
+          info@sidestep.design
+        </a>
+        .
       </p>
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <SummaryField label="Deadline" value={formatDeadline(run.deadline)} />
@@ -254,11 +328,10 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
         customQuestions: payload.customQuestions,
         deadline: payload.deadline,
       });
-      toast.success("Run updated");
+      toast.success("Form settings saved");
     } catch (err) {
       toast.error("Could not save your changes", {
-        description:
-          err instanceof Error ? err.message : "Please try again in a moment.",
+        description: userMessage(err, "Please try again in a moment."),
       });
     }
   }
@@ -281,10 +354,10 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
             <FormItem>
               <FormLabel>Deadline</FormLabel>
               <FormDescription>
-                Submissions close at the end of this day.
+                The form closes at the end of this day.
               </FormDescription>
               <FormControl>
-                <Input type="date" {...field} />
+                <Input type="date" className="h-10" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -311,7 +384,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
                     {questionsArray.fields.map((row, index) => (
                       <li
                         key={row.key}
-                        className="grid grid-cols-[1fr_auto_auto_auto] gap-2"
+                        className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-1 sm:gap-2"
                       >
                         <FormField
                           control={form.control}
@@ -322,6 +395,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
                                 placeholder="What do you want to ask?"
                                 maxLength={QUESTION_LABEL_MAX_LENGTH}
                                 aria-label={`Question ${index + 1}`}
+                                className="h-10"
                                 {...field}
                               />
                             </FormControl>
@@ -331,6 +405,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
                           type="button"
                           variant="ghost"
                           size="icon"
+                          className="size-10"
                           disabled={index === 0}
                           onClick={() => questionsArray.swap(index, index - 1)}
                           aria-label={`Move question ${index + 1} up`}
@@ -341,6 +416,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
                           type="button"
                           variant="ghost"
                           size="icon"
+                          className="size-10"
                           disabled={index === questionsArray.fields.length - 1}
                           onClick={() => questionsArray.swap(index, index + 1)}
                           aria-label={`Move question ${index + 1} down`}
@@ -351,6 +427,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
                           type="button"
                           variant="ghost"
                           size="icon"
+                          className="size-10"
                           onClick={() => questionsArray.remove(index)}
                           aria-label={`Remove question ${index + 1}`}
                         >
@@ -363,7 +440,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
+                  className="h-10"
                   disabled={atQuestionLimit}
                   onClick={() =>
                     questionsArray.append({
@@ -387,7 +464,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
           <p className="text-sm text-muted-foreground">
             Changes apply to everyone who opens your link from now on.
           </p>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" className="h-10" disabled={isSubmitting}>
             {isSubmitting ? "Saving…" : "Save changes"}
           </Button>
         </div>
@@ -396,48 +473,40 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
   );
 }
 
-// Builds the absolute URL on the client only — window is unavailable
-// during SSR, and a relative path is meaningless to paste into a chat.
-function useShareUrl(path: string): string {
-  if (typeof window === "undefined") return path;
-  return `${window.location.origin}${path}`;
-}
-
-function ShareLink({ url }: { url: string }) {
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied to clipboard");
-    } catch {
-      // Older browsers without the async clipboard API — select the
-      // input so the user can copy manually with Ctrl+C.
-      const input = document.getElementById(
-        "jersey-run-share-link",
-      ) as HTMLInputElement | null;
-      input?.select();
-    }
+function ShareLink({ path }: { path: string }) {
+  // Selecting the input is the fallback for browsers without the async
+  // clipboard API: the captain copies it with Ctrl+C.
+  function selectInput() {
+    const input = document.getElementById(
+      "order-form-share-link",
+    ) as HTMLInputElement | null;
+    input?.select();
   }
 
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Shareable link
+          Link to share
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Label htmlFor="jersey-run-share-link" className="sr-only">
-            Shareable link
+          <Label htmlFor="order-form-share-link" className="sr-only">
+            Link to share
           </Label>
           <Input
-            id="jersey-run-share-link"
+            id="order-form-share-link"
             readOnly
-            value={url}
+            value={absoluteUrl(path)}
             onFocus={(e) => e.currentTarget.select()}
-            className="flex-1"
+            className="h-10 min-w-0 flex-1"
           />
-          <Button type="button" onClick={copy}>
+          <Button
+            type="button"
+            className="h-10"
+            onClick={() => void copyLink(path, selectInput)}
+          >
             Copy link
           </Button>
         </div>

@@ -4,15 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DesignThumbnail } from "@/components/design/DesignThumbnail";
-import { NamesModeControl } from "@/components/portal/NamesModeControl";
-import type { OrderListData } from "@/components/orderList/shared";
 import { cn } from "@/lib/utils";
-import {
-  formatDate,
-  type OrderDesign,
-  type OrderRecord,
-  type OrderRun,
-} from "./shared";
+import { formatDate, type OrderDesign, type OrderRecord } from "./shared";
 
 // The order's details, below the list (L-03): the basics the captain entered
 // at intake, then each design's specs. What's *on* each design lives in the
@@ -22,24 +15,14 @@ export function OrderDetailsSection({
   order,
   designs,
   total,
-  run,
-  list,
   locked,
 }: {
   orderId: Id<"orders">;
   order: OrderRecord;
   designs: readonly OrderDesign[];
   total: number;
-  run: OrderRun | undefined;
-  list: OrderListData | null | undefined;
   locked: boolean;
 }) {
-  const named = new Set(
-    (list?.designs ?? [])
-      .filter((d) => d.items.some((item) => item.name))
-      .map((d) => d.designId),
-  );
-
   return (
     <>
       <Card aria-labelledby="specs-heading" className="mt-6 py-6 sm:mt-10">
@@ -58,8 +41,8 @@ export function OrderDetailsSection({
             {/* The live total is the real quantity (O-07); the intake estimate
                 sits beside it, plainly labelled as the seed it was. */}
             <Field
-              label="Collected"
-              value={`${total} jersey${total === 1 ? "" : "s"}`}
+              label="Items"
+              value={`${total} item${total === 1 ? "" : "s"}`}
             />
             <Field
               label="Estimated at intake"
@@ -112,33 +95,12 @@ export function OrderDetailsSection({
           )}
         </div>
 
-        {/* How the public form collects names (M-05). It sits by the designs
-            because in fixed mode a design's named items *are* the picker list
-            players choose from. Needs a run — there's no mode to switch
-            before one exists. L-05 moves it into the order form's settings. */}
-        {run && (
-          <NamesModeControl
-            runId={run._id}
-            namesMode={run.namesMode}
-            locked={run.effectiveStatus === "locked"}
-          />
-        )}
-
         {designs.length === 0 ? (
           <NoDesigns orderId={orderId} locked={locked} />
         ) : (
           <div className="mt-4 space-y-4">
             {designs.map((design) => (
-              <DesignCard
-                key={design._id}
-                design={design}
-                // In fixed mode the public form only offers the names already
-                // on the design, so a design with none takes no orders (M-05).
-                // Only once the list has loaded, so it can't flash.
-                unorderable={
-                  run?.namesMode === "fixed" && !!list && !named.has(design._id)
-                }
-              />
+              <DesignCard key={design._id} design={design} />
             ))}
           </div>
         )}
@@ -149,13 +111,7 @@ export function OrderDetailsSection({
 
 // Each linked design's own card under the one order timeline (O-05): its
 // picture, file count and silhouette specs.
-function DesignCard({
-  design,
-  unorderable,
-}: {
-  design: OrderDesign;
-  unorderable: boolean;
-}) {
+function DesignCard({ design }: { design: OrderDesign }) {
   const hasSpecs = design.jerseyStyle || design.neckline || design.sleeveStyle;
   return (
     <Card aria-label={`Design: ${design.title}`} className="py-6">
@@ -204,22 +160,6 @@ function DesignCard({
             The cut isn&apos;t decided yet — Sidestep will help you choose.
           </p>
         )}
-
-        {/* A warning, not a block: the captain is usually mid-way through
-            adding names, and blocking would fight that. Disappears with the
-            first named item. */}
-        {unorderable && (
-          <p
-            role="note"
-            aria-label={`Nobody can order ${design.title}`}
-            className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
-          >
-            <span className="font-semibold">Nobody can order this design.</span>{" "}
-            You&apos;re collecting from a fixed roster, and this design has no
-            players yet — add some in the order list above, or switch to open
-            names.
-          </p>
-        )}
       </CardContent>
     </Card>
   );
@@ -243,7 +183,7 @@ function NoDesigns({
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
         {locked
           ? "This order was locked without a design attached — contact Sidestep and we'll sort it out with you."
-          : "Attach at least one design to move this order forward and unlock collecting sizes from your team."}
+          : "Attach at least one design to move this order forward and start your order list."}
       </p>
       {!locked && (
         <Link

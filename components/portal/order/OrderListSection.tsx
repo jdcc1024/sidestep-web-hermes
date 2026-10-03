@@ -4,6 +4,7 @@ import type {
   CustomQuestion,
   OrderListData,
 } from "@/components/orderList/shared";
+import type { NamesMode } from "@/lib/jerseyRun";
 import type { OrderDesign } from "./shared";
 
 // The order list's place on the order page (L-03): straight after the
@@ -17,12 +18,14 @@ export function OrderListSection({
   designs,
   list,
   customQuestions,
+  namesMode,
 }: {
   orderId: Id<"orders">;
   teamName: string;
   designs: readonly OrderDesign[];
   list: OrderListData | null | undefined;
   customQuestions?: readonly CustomQuestion[];
+  namesMode?: NamesMode;
 }) {
   return (
     <div className="mt-6">
@@ -32,6 +35,7 @@ export function OrderListSection({
         designs={designs}
         list={list}
         customQuestions={customQuestions}
+        namesMode={namesMode}
       />
     </div>
   );

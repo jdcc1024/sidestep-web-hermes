@@ -8,8 +8,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { RemovedDesigns } from "@/components/portal/DesignRemoval";
-import { CollectSection } from "@/components/portal/order/CollectSection";
 import { OrderDetailsSection } from "@/components/portal/order/OrderDetailsSection";
+import { OrderFormCard } from "@/components/portal/order/OrderFormCard";
 import { OrderHeader } from "@/components/portal/order/OrderHeader";
 import { OrderListSection } from "@/components/portal/order/OrderListSection";
 import { ProgressSection } from "@/components/portal/order/ProgressSection";
@@ -21,7 +21,7 @@ type PageProps = {
 };
 
 // The captain's order page. It owns the reads and lays out the sections
-// (L-03): header → timeline → order list → collect card → order details →
+// (L-03): header → timeline → order list → order form card → order details →
 // removed designs. Each section is its own component under
 // `components/portal/order/`, so later slices edit a section, not this page.
 export default function OrderDetailPage({ params }: PageProps) {
@@ -31,9 +31,10 @@ export default function OrderDetailPage({ params }: PageProps) {
   // attached yet" — useOwnedResource keeps the second from rendering as the
   // first (B-03).
   const result = useOwnedResource(useQuery(api.orders.getMyOrder, { orderId }));
-  // Run state drives the collect card and the names-mode switch. A run only
-  // exists once the captain starts collecting — saving an order never creates
-  // one, so null here is the common starting state, not an error.
+  // The order form (a "run" in code) drives the order form card and the
+  // list's fixed-mode warning. One only exists once the captain makes it —
+  // saving an order never creates one, so null here is the common starting
+  // state, not an error.
   const run = useQuery(api.jerseyRuns.getByOrder, { orderId });
   // The order's list (L-02): every item on every design, with or without a
   // form. The header total, the order list's rows, chips, footer and CSV all
@@ -71,9 +72,10 @@ export default function OrderDetailPage({ params }: PageProps) {
         designs={designs}
         list={list}
         customQuestions={run?.customQuestions}
+        namesMode={run?.namesMode}
       />
 
-      <CollectSection
+      <OrderFormCard
         orderId={orderId}
         run={run}
         hasDesigns={designs.length > 0}
@@ -84,8 +86,6 @@ export default function OrderDetailPage({ params }: PageProps) {
         order={order}
         designs={designs}
         total={total}
-        run={run}
-        list={list}
         locked={locked}
       />
 

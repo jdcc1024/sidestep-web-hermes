@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { AnimatePresence } from "motion/react";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { NamesMode } from "@/lib/jerseyRun";
 import { itemCountText, sizeChip, type ItemSummary } from "@/lib/orderItem";
 import { DesignThumbnail } from "@/components/design/DesignThumbnail";
 import { RosterExportButton } from "@/components/portal/RosterExportButton";
@@ -35,6 +36,7 @@ export function OrderList({
   designs,
   list,
   customQuestions = [],
+  namesMode,
 }: {
   orderId: Id<"orders">;
   // Names the CSV download.
@@ -47,6 +49,8 @@ export function OrderList({
   // The order form's custom questions, so a player's answers show under the
   // question's wording rather than its stored id. Empty with no form.
   customQuestions?: readonly CustomQuestion[];
+  // The order form's names mode; absent with no form.
+  namesMode?: NamesMode;
 }) {
   const headingId = useId();
   const byDesign = new Map((list?.designs ?? []).map((d) => [d.designId, d]));
@@ -90,6 +94,7 @@ export function OrderList({
                 summary={designList?.summary ?? EMPTY_SUMMARY}
                 otherDesigns={designs.filter((d) => d._id !== design._id)}
                 canEdit={list.canEdit}
+                pickFromList={namesMode === "fixed"}
               />
             );
           })}
@@ -117,6 +122,7 @@ function DesignGroup({
   summary,
   otherDesigns,
   canEdit,
+  pickFromList,
 }: {
   orderId: Id<"orders">;
   teamName: string;
@@ -125,7 +131,13 @@ function DesignGroup({
   summary: ItemSummary;
   otherDesigns: readonly OrderListDesign[];
   canEdit: boolean;
+  pickFromList: boolean;
 }) {
+  // When players pick their name from the list (fixed mode, M-05), the public
+  // form only offers the names already on the design, so a design with none
+  // takes no orders.
+  const unorderable = pickFromList && !items.some((item) => item.name);
+
   return (
     <div
       role="group"
@@ -162,6 +174,22 @@ function DesignGroup({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* A warning, not a block: the captain is usually mid-way through
+          adding names, and blocking would fight that. Disappears with the
+          first named item. */}
+      {unorderable && (
+        <p
+          role="note"
+          aria-label={`Nobody can order ${design.title}`}
+          className="mx-4 my-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:mx-6 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+        >
+          <span className="font-semibold">Nobody can order this design.</span>{" "}
+          Players pick their name from your list, and this design has no
+          names on it yet. Add some here, or let players type their own in
+          Form settings.
+        </p>
       )}
 
       {items.length === 0 && (

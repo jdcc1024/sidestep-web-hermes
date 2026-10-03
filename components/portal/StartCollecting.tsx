@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { parseDeadline } from "@/lib/jerseyRun";
+import { userMessage } from "@/lib/userMessage";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,13 +21,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-// Run creation, moved onto the order page (M-05). With sizes gone and names
-// mode relocated, the old setup form was one field — sending a captain to a
-// separate page to fill it in was the disjointedness this slice removes.
-//
-// A deadline is the only decision: the run is created open, with the full
-// size catalog, and the captain switches names mode and edits questions
-// afterwards. Nothing creates a run implicitly — this button is the only path.
+// Making the order form (a "run" in code), from the order page's order form
+// card (M-05, L-05). A deadline is the only decision, and this dialog is the
+// only place it's asked on the order page: the form is created open, with the
+// full size catalog, and the captain changes names mode, questions and the
+// date afterwards in Form settings. Nothing creates a form implicitly — this
+// button is the only path.
 export function StartCollecting({ orderId }: { orderId: Id<"orders"> }) {
   const createRun = useMutation(api.jerseyRuns.create);
   const [open, setOpen] = useState(false);
@@ -49,16 +49,16 @@ export function StartCollecting({ orderId }: { orderId: Id<"orders"> }) {
     setBusy(true);
     try {
       await createRun({ orderId, deadline: ms });
-      // Convex is reactive — the collect card swaps to the run status on its
-      // own once the row lands.
+      // Convex is reactive — the order form card swaps to the form's status
+      // on its own once the row lands.
       setOpen(false);
       setDeadline("");
-      toast.success("You're collecting", {
-        description: "Share the link with your team to gather sizes.",
+      toast.success("Your order form is ready", {
+        description: "Copy the link and share it with your team.",
       });
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Please try again in a moment.",
+        userMessage(err, "Could not make the order form. Please try again."),
       );
     } finally {
       setBusy(false);
@@ -77,35 +77,36 @@ export function StartCollecting({ orderId }: { orderId: Id<"orders"> }) {
         render={
           <Button
             type="button"
-            size="lg"
-            className="bg-teal-600 font-semibold text-white hover:bg-teal-700"
+            className="h-10 bg-teal-600 px-3.5 font-semibold text-white hover:bg-teal-700"
           />
         }
       >
-        Start collecting
+        Make an order form
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Start collecting</DialogTitle>
+          <DialogTitle>Make an order form</DialogTitle>
           <DialogDescription>
-            Pick the day submissions close. We&apos;ll give you a link to share
-            with your team — you can change the date later.
+            Pick the last day players can send their name, number and size.
+            We&apos;ll give you a link to share with your team. You can change
+            the date later in Form settings.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
-          <Label htmlFor="start-collecting-deadline">Deadline</Label>
+          <Label htmlFor="order-form-deadline">Deadline</Label>
           <Input
-            id="start-collecting-deadline"
+            id="order-form-deadline"
             type="date"
             value={deadline}
+            className="h-10"
             onChange={(e) => {
               setDeadline(e.target.value);
               setError(null);
             }}
           />
           <p className="text-sm text-muted-foreground">
-            Submissions close at the end of this day.
+            The form closes at the end of this day.
           </p>
           {error && (
             <p role="alert" className="text-sm text-destructive">
@@ -115,9 +116,16 @@ export function StartCollecting({ orderId }: { orderId: Id<"orders"> }) {
         </div>
 
         <DialogFooter>
-          <DialogClose render={<Button variant="ghost">Cancel</Button>} />
-          <Button type="button" disabled={busy} onClick={() => void onStart()}>
-            {busy ? "Starting…" : "Start collecting"}
+          <DialogClose render={<Button variant="ghost" className="h-10" />}>
+            Cancel
+          </DialogClose>
+          <Button
+            type="button"
+            className="h-10"
+            disabled={busy}
+            onClick={() => void onStart()}
+          >
+            {busy ? "Making the form…" : "Make the form"}
           </Button>
         </DialogFooter>
       </DialogContent>
