@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify": "node scripts/verify.mjs",
-    "snap": "node scripts/snap.mjs"
+    "snap": "node scripts/snap.mjs",
+    "e2e": "playwright test",
+    "test:frozen": "vitest run --config vitest.frozen.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -40,6 +42,7 @@
   "devDependencies": {
     "@clerk/testing": "^2.2.10",
     "@edge-runtime/vm": "^5.0.0",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

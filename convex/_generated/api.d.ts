@@ -12,6 +12,7 @@ import type * as _auth from "../_auth.js";
 import type * as _designAssets from "../_designAssets.js";
 import type * as _designBlocks from "../_designBlocks.js";
 import type * as _devSeed from "../_devSeed.js";
+import type * as _e2e from "../_e2e.js";
 import type * as _migrations from "../_migrations.js";
 import type * as _orderEntries from "../_orderEntries.js";
 import type * as _orderItems from "../_orderItems.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   _designAssets: typeof _designAssets;
   _designBlocks: typeof _designBlocks;
   _devSeed: typeof _devSeed;
+  _e2e: typeof _e2e;
   _migrations: typeof _migrations;
   _orderEntries: typeof _orderEntries;
   _orderItems: typeof _orderItems;

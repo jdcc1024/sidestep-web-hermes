@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     // Project ignores: Node CLI tooling, not Next.js app code.
     "scripts/**",
     "convex/_generated/**",
+    // Playwright output (generated).
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 
