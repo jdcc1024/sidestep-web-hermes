@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { getCurrentUserOrNull, requireCurrentUser } from "./_auth";
 import { assetSummariesByDesign } from "./_designAssets";
-import { isListLocked } from "./_orderItems";
+import { isListLocked, LIST_LOCKED_MESSAGE } from "./_orderItems";
 import { overviewOf } from "../lib/designBlock";
 
 // Server-side guards. Mirror lib/order.ts so the client and server cap
@@ -202,7 +202,7 @@ export const updateOrder = mutation({
     // designs it links — are frozen along with its items. `isListLocked` is
     // the one lock rule, so `getMyOrder.locked` above can't disagree.
     if (await isListLocked(ctx, order))
-      throw new ConvexError("This order's jersey run is locked.");
+      throw new ConvexError(LIST_LOCKED_MESSAGE);
 
     const fields = await normalizeOrderFields(ctx, user._id, args);
 

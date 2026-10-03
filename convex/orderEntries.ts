@@ -40,11 +40,11 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
-    if (!run) throw new ConvexError("Jersey run not found.");
+    if (!run) throw new ConvexError("We couldn't find that order form.");
     const { order } = await requireOrderOwnership(ctx, run.orderId);
 
     if (isLocked(run))
-      throw new ConvexError("This jersey run is locked.");
+      throw new ConvexError("This order form is locked, so it can't be changed.");
 
     if (!order.designIds.includes(args.designId))
       throw new ConvexError("That design isn't part of this order.");
@@ -52,9 +52,9 @@ export const create = mutation({
     if (args.rosterEntryId) {
       const rosterEntry = await ctx.db.get(args.rosterEntryId);
       if (!rosterEntry || rosterEntry.runId !== args.runId)
-        throw new ConvexError("That player slot isn't on this run.");
+        throw new ConvexError("That item is no longer on this order.");
       if (rosterEntry.designId !== args.designId)
-        throw new ConvexError("That player slot is on a different design.");
+        throw new ConvexError("That item is on a different design.");
     }
 
     const sizeCheck = checkSize(args.size, run.sizeOptions);
@@ -94,7 +94,7 @@ export const listByRun = query({
 
     const user = await requireCurrentUser(ctx);
     if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this jersey run.");
+      throw new ConvexError("You don't have access to this order form.");
 
     return ctx.db
       .query("orderEntries")
@@ -123,7 +123,7 @@ export const countsByRun = query({
 
     const user = await requireCurrentUser(ctx);
     if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this jersey run.");
+      throw new ConvexError("You don't have access to this order form.");
 
     const order = await ctx.db.get(run.orderId);
     if (!order) return empty;

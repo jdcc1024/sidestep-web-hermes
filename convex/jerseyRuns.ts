@@ -210,10 +210,10 @@ export const setNamesMode = mutation({
   },
   handler: async (ctx, { jerseyRunId, namesMode }) => {
     const run = await ctx.db.get(jerseyRunId);
-    if (!run) throw new ConvexError("Jersey run not found.");
+    if (!run) throw new ConvexError("We couldn't find that order form.");
     await requireOrderOwnership(ctx, run.orderId);
 
-    if (isLocked(run)) throw new ConvexError("This jersey run is locked.");
+    if (isLocked(run)) throw new ConvexError("This order form is locked, so it can't be changed.");
 
     await ctx.db.patch(jerseyRunId, { namesMode });
     return jerseyRunId;
@@ -235,10 +235,10 @@ export const updateSettings = mutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.jerseyRunId);
-    if (!run) throw new ConvexError("Jersey run not found.");
+    if (!run) throw new ConvexError("We couldn't find that order form.");
     await requireOrderOwnership(ctx, run.orderId);
 
-    if (isLocked(run)) throw new ConvexError("This jersey run is locked.");
+    if (isLocked(run)) throw new ConvexError("This order form is locked, so it can't be changed.");
 
     if (args.deadline <= Date.now())
       throw new ConvexError("Deadline must be in the future.");
@@ -365,7 +365,7 @@ export const listOrderEntries = query({
     if (!order) return null;
 
     if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this jersey run.");
+      throw new ConvexError("You don't have access to this order form.");
 
     const sized = (await loadItems(ctx, order._id)).flatMap((item) =>
       item.size === undefined ? [] : [{ ...item, size: item.size }],
@@ -460,7 +460,7 @@ export const closeRunByAdmin = mutation({
     await requireAdmin(ctx);
 
     const run = await ctx.db.get(jerseyRunId);
-    if (!run) throw new ConvexError("Jersey run not found.");
+    if (!run) throw new ConvexError("We couldn't find that order form.");
     if (run.status === "closed") return { alreadyClosed: true };
 
     await ctx.scheduler.runAfter(
@@ -483,12 +483,12 @@ export const lock = mutation({
   handler: async (ctx, { jerseyRunId }) => {
     const user = await requireCurrentUser(ctx);
     const run = await ctx.db.get(jerseyRunId);
-    if (!run) throw new ConvexError("Jersey run not found.");
+    if (!run) throw new ConvexError("We couldn't find that order form.");
     if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this jersey run.");
+      throw new ConvexError("You don't have access to this order form.");
 
     if (!canLock(run))
-      throw new ConvexError("This jersey run is already locked.");
+      throw new ConvexError("This order form is already locked.");
 
     const order = await ctx.db.get(run.orderId);
     if (!order) throw new ConvexError("Order not found.");
@@ -526,16 +526,16 @@ export const unlock = mutation({
   handler: async (ctx, { jerseyRunId }) => {
     const user = await requireCurrentUser(ctx);
     const run = await ctx.db.get(jerseyRunId);
-    if (!run) throw new ConvexError("Jersey run not found.");
+    if (!run) throw new ConvexError("We couldn't find that order form.");
     if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this jersey run.");
+      throw new ConvexError("You don't have access to this order form.");
 
     if (effectiveStatus(run) !== "locked")
-      throw new ConvexError("This jersey run is not locked.");
+      throw new ConvexError("This order form is not locked.");
 
     if (!canUnlock(run, { isAdmin: user.isAdmin }))
       throw new ConvexError(
-        "The deadline has passed — ask an admin to unlock this run.",
+        "The deadline has passed. Email us and we'll unlock this order form.",
       );
 
     await ctx.db.patch(jerseyRunId, {
