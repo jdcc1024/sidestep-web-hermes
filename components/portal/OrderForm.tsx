@@ -21,6 +21,7 @@ import {
   type OrderMilestone,
 } from "@/lib/order";
 import { pendingDesignRemovals } from "@/lib/designRemoval";
+import { userMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
 import { DesignRemovalWarning } from "@/components/portal/DesignRemoval";
 import { Badge } from "@/components/ui/badge";
@@ -172,10 +173,7 @@ export function OrderForm({ order }: { order?: EditableOrder } = {}) {
       router.push(`/portal/orders/${orderId}`);
     } catch (err) {
       toast.error("Could not save your order", {
-        description:
-          err instanceof Error
-            ? err.message
-            : "Please try again in a moment.",
+        description: userMessage(err, "Please try again in a moment."),
       });
     }
   }

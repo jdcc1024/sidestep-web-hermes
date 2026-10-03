@@ -12,6 +12,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { UploadedFile } from "@/convex/_designAssets";
 import { TEXT_BODY_MAX_LENGTH, overviewBlocks } from "@/lib/designBlock";
+import { userMessage } from "@/lib/userMessage";
 import {
   CANVA_LINK_MAX_LENGTH,
   JERSEY_STYLE_MAX_LENGTH,
@@ -211,8 +212,10 @@ export function DesignForm() {
       );
       return storageId;
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Upload failed. Try again.";
+      const message = userMessage(
+        err,
+        "Could not upload that image. Please try again.",
+      );
       setPending((prev) =>
         prev.map((p) =>
           p.id === item.id ? { ...p, status: "failed", error: message } : p,
@@ -278,10 +281,10 @@ export function DesignForm() {
       });
       router.push(`/portal/designs/${designId}`);
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Something went wrong saving your design.";
+      const message = userMessage(
+        err,
+        "Could not save your design. Please try again.",
+      );
       setSubmitError(message);
       toast.error("Could not save your design", { description: message });
     }
