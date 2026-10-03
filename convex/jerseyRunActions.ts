@@ -15,7 +15,9 @@ const DEFAULT_FROM_EMAIL = "hello@sidestep.design";
 const DEFAULT_OPS_EMAIL = "info@sidestep.design";
 const DEFAULT_SITE_URL = "https://sidestep.design";
 
-// Build the absolute URL to the captain's dashboard. Falls back to the
+// Build the absolute URL to the captain's order page, where everything
+// players sent lands on the order list (L-05 retired the responses page).
+// Falls back to the
 // production origin so emails generated in unconfigured dev environments
 // still contain a clickable (if useless) link instead of "undefined/...".
 function dashboardUrl(orderId: string): string {
@@ -23,7 +25,7 @@ function dashboardUrl(orderId: string): string {
     /\/+$/,
     "",
   );
-  return `${base}/portal/orders/${orderId}/run/responses`;
+  return `${base}/portal/orders/${orderId}`;
 }
 
 async function sendEmail(

@@ -54,7 +54,7 @@ export function renderCaptainClosureEmail(
   ctx: ClosureEmailContext,
 ): ClosureEmail {
   const deadlineLabel = formatVancouverDate(ctx.deadline);
-  const subject = `Your ${ctx.teamName} jersey run has closed`;
+  const subject = `Your order form for ${ctx.teamName} closed`;
   const greetingName = ctx.captainName.trim() || "there";
   const responseLine =
     ctx.responseCount === 1
@@ -64,10 +64,10 @@ export function renderCaptainClosureEmail(
   const text = [
     `Hi ${greetingName},`,
     "",
-    `Your jersey run for ${ctx.teamName} closed on ${deadlineLabel}.`,
+    `Your order form for ${ctx.teamName} closed on ${deadlineLabel}.`,
     responseLine,
     "",
-    "Review responses and finalize the order here:",
+    "Everything they sent is on your order list. Check it and finish your order here:",
     ctx.dashboardUrl,
     "",
     "— Sidestep",
@@ -75,9 +75,9 @@ export function renderCaptainClosureEmail(
 
   const html = `<!doctype html><html><body style="font-family: system-ui, sans-serif; color: #111; line-height: 1.5;">
 <p>Hi ${escapeHtml(greetingName)},</p>
-<p>Your jersey run for <strong>${escapeHtml(ctx.teamName)}</strong> closed on ${escapeHtml(deadlineLabel)}.</p>
-<p>${escapeHtml(responseLine)}</p>
-<p><a href="${escapeHtml(ctx.dashboardUrl)}" style="color: #0d9488;">Review responses and finalize the order →</a></p>
+<p>Your order form for <strong>${escapeHtml(ctx.teamName)}</strong> closed on ${escapeHtml(deadlineLabel)}.</p>
+<p>${escapeHtml(responseLine)} Everything they sent is on your order list.</p>
+<p><a href="${escapeHtml(ctx.dashboardUrl)}" style="color: #0d9488;">Check your order list and finish your order →</a></p>
 <p>— Sidestep</p>
 </body></html>`;
 
