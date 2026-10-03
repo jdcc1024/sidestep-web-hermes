@@ -1,8 +1,8 @@
 // Atomic rules for roster entries — the name+number "player slot" on a
 // design (R-01). Constants, the `RosterSource` guard, per-field check
 // functions, and a `rosterMatchKey` used to attach a fan order to an
-// existing slot (R-02). Imported by both the form adapter (./form.ts)
-// and the Convex `rosterEntries` mutations so client and server can't
+// existing slot (R-02). Imported by both the client (order list, public
+// form) and the Convex order-item mutations so client and server can't
 // drift on caps or normalization.
 
 export const ROSTER_NAME_MAX_LENGTH = 80;

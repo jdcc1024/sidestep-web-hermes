@@ -159,7 +159,7 @@ export default function AdminJerseyRunsPage() {
 function RunStatusBadge({
   status,
 }: {
-  status: "open" | "closed" | "locked";
+  status: "open" | "closed";
 }) {
   if (status === "open") {
     return (

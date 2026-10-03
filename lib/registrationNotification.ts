@@ -14,9 +14,9 @@ import {
   primaryEmailOf,
   type ClerkUserPayload,
 } from "./clerkProfile";
+import { OPS_EMAIL as DEFAULT_OPS_EMAIL } from "./contact";
 
 const DEFAULT_FROM_EMAIL = "noreply@sidestep.design";
-const DEFAULT_OPS_EMAIL = "info@sidestep.design";
 
 export type ClerkRegistrationData = ClerkUserPayload & {
   // Set by <SignUp unsafeMetadata={{ registeredViaInvite: true }} /> when the

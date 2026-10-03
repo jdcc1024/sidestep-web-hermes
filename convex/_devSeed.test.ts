@@ -111,21 +111,6 @@ describe("_devSeed:seedPortalFixtures", () => {
     expect(items.filter((i) => i.size !== undefined)).toHaveLength(1);
   });
 
-  it("should write no legacy roster or order entry rows (L-02)", async () => {
-    const t = convexTest(schema, modules);
-    await seedUser(t);
-
-    await t.mutation(internal._devSeed.seedPortalFixtures, {
-      email: SNAP_EMAIL,
-    });
-
-    const legacy = await t.run(async (ctx) => ({
-      roster: (await ctx.db.query("rosterEntries").collect()).length,
-      entries: (await ctx.db.query("orderEntries").collect()).length,
-    }));
-    expect(legacy).toEqual({ roster: 0, entries: 0 });
-  });
-
   it("should link both orders to designs the account owns", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
@@ -166,8 +151,6 @@ describe("_devSeed:seedPortalFixtures", () => {
         orders: (await ctx.db.query("orders").collect()).length,
         runs: (await ctx.db.query("jerseyRuns").collect()).length,
         items: (await ctx.db.query("orderItems").collect()).length,
-        roster: (await ctx.db.query("rosterEntries").collect()).length,
-        entries: (await ctx.db.query("orderEntries").collect()).length,
       }));
     const after1 = await counts();
 
@@ -333,16 +316,6 @@ describe("_devSeed:seedLargeRoster", () => {
     expect(namedOn(after, base.designIds[1])).toHaveLength(
       namedOn(before, base.designIds[1]).length,
     );
-  });
-
-  it("should write no legacy roster rows", async () => {
-    const t = convexTest(schema, modules);
-    await seedBase(t);
-
-    await t.mutation(internal._devSeed.seedLargeRoster, { email: SNAP_EMAIL });
-
-    const roster = await t.run((ctx) => ctx.db.query("rosterEntries").collect());
-    expect(roster).toEqual([]);
   });
 
   it("should refuse before the base fixtures exist", async () => {

@@ -80,95 +80,19 @@ export default defineSchema({
       }),
     ),
     deadline: v.number(),
-    // `locked` (added in R-01) freezes the run as the confirmed production
-    // basis — the value is here now so the schema accepts it; the lock
-    // behaviour (manual + lazy auto-lock, freeze guards) is wired in R-06.
-    status: v.union(
-      v.literal("open"),
-      v.literal("closed"),
-      v.literal("locked"),
-    ),
-    // The confirmed-count snapshot taken at lock time (R-06) — Σ qty and
-    // the same grouped by design, same shape as orderEntries.countsByRun,
-    // so the order page reads a frozen number instead of a live one once
-    // locked. Cleared (not overwritten with zeros) on unlock, since an
-    // unlocked run has no frozen basis and live counts apply again.
-    lockSnapshot: v.optional(
-      v.object({
-        lockedAt: v.number(),
-        total: v.number(),
-        byDesign: v.array(
-          v.object({
-            designId: v.id("designs"),
-            title: v.string(),
-            total: v.number(),
-          }),
-        ),
-      }),
-    ),
+    // The order form's own state. The deadline closes it (lazily, see
+    // lib/jerseyRun/lock), and so can the closure cron. It never locks the
+    // list: that is the order's "Order Size Confirmed" stage (L-06).
+    status: v.union(v.literal("open"), v.literal("closed")),
     createdAt: v.number(),
   })
     .index("by_order", ["orderId"])
     .index("by_captain", ["captainId"]),
 
-  // The unified roster model (R-01). A `rosterEntry` is a name+number
-  // "player slot" on a design — `Home / #99 Gretzky`. A captain can seed
-  // one (source: captain), or a fan order creates/attaches to one
-  // (source: fan, in R-02). A roster entry with zero order entries is
-  // "not yet filled" — that state is derived, not stored. Carries both
-  // `runId` and `orderId` (the run is 1:1 with the order) so readers can
-  // load by either without a hop through the run.
-  rosterEntries: defineTable({
-    runId: v.id("jerseyRuns"),
-    orderId: v.id("orders"),
-    designId: v.id("designs"),
-    name: v.string(),
-    number: v.optional(v.string()),
-    // The letter this player wears — "C" for the captain, "A" for an assistant
-    // captain (M-09). Optional and usually absent; it's an extra thing to apply
-    // to the garment, which is why it reaches the exports. Stored as the letter
-    // rather than as a word so it can't be confused with `source` below, whose
-    // values also include "captain".
-    designation: v.optional(v.union(v.literal("C"), v.literal("A"))),
-    source: v.union(v.literal("captain"), v.literal("fan")),
-    createdAt: v.number(),
-  })
-    .index("by_run", ["runId"])
-    .index("by_design", ["designId"]),
-
-  // One jersey to produce (R-01): `{size, qty, submitter, source}`.
-  // `rosterEntryId` is optional — a blank/bulk line (a spare jersey) has
-  // no player slot. `designId` is denormalized from the roster entry so
-  // blank lines still group by design and per-design counts (R-04) are a
-  // simple group-by on the by_run index. The production total is
-  // Σ qty over these rows. `customAnswers` carries the run's custom-question
-  // answers (R-02): they describe the submitter, not the jersey, so every
-  // line from one submission shares the same record — denormalized onto
-  // each entry rather than split into a separate table.
-  orderEntries: defineTable({
-    runId: v.id("jerseyRuns"),
-    designId: v.id("designs"),
-    rosterEntryId: v.optional(v.id("rosterEntries")),
-    size: v.string(),
-    qty: v.number(),
-    source: v.union(v.literal("captain"), v.literal("fan")),
-    submitterName: v.string(),
-    submitterEmail: v.string(),
-    customAnswers: v.optional(v.record(v.string(), v.string())),
-    createdAt: v.number(),
-  })
-    .index("by_run", ["runId"])
-    .index("by_rosterEntry", ["rosterEntryId"])
-    // A captain/fan's own submissions across every run are read back by
-    // normalized submitter email (the portal "your responses" view, R-07),
-    // so the same email lookup the legacy jerseyRunResponses table had lives
-    // on the unified model now.
-    .index("by_submitterEmail", ["submitterEmail"]),
-
   // One order list the captain owns (initiative 0004, L-01): an item is one
   // jersey line on the order — design, optional name / number / letter, a size
-  // or none ("Needs size"), a qty. It replaces the rosterEntries / orderEntries
-  // split; those stay until L-06. The parent is the order, so items exist
+  // or none ("Needs size"), a qty. It replaced the R-01 player-slot and
+  // jersey-line tables, which L-06 retired. The parent is the order, so items exist
   // before any order form; `runId` only records which form a row came through.
   // Soft-deleted via `removedAt`: read through `loadItems` in _orderItems.ts,
   // the only `by_order` reader, which drops removed rows.

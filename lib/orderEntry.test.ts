@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  EMPTY_ORDER_ENTRY,
   MAX_QTY,
   SUBMITTER_NAME_MAX_LENGTH,
   checkQty,
@@ -8,10 +7,6 @@ import {
   checkSubmitterEmail,
   checkSubmitterName,
   isOrderSource,
-  toOrderEntryPayload,
-  toSubmitterPayload,
-  validateOrderEntry,
-  validateSubmitter,
 } from "./orderEntry";
 
 const SIZES = ["S", "M", "L"];
@@ -88,75 +83,5 @@ describe("checkSubmitterEmail", () => {
 
   it("rejects an empty email", () => {
     expect(checkSubmitterEmail("").ok).toBe(false);
-  });
-});
-
-describe("validateOrderEntry", () => {
-  it("has no errors for a valid line", () => {
-    expect(validateOrderEntry({ size: "M", qty: "2" }, SIZES)).toEqual({});
-  });
-
-  it("flags an empty line (default qty is valid, size is not)", () => {
-    const errors = validateOrderEntry({ ...EMPTY_ORDER_ENTRY }, SIZES);
-    expect(errors.size).toBeTruthy();
-    expect(errors.qty).toBeUndefined();
-  });
-
-  it("flags a non-numeric qty", () => {
-    expect(validateOrderEntry({ size: "M", qty: "lots" }, SIZES).qty).toBeTruthy();
-  });
-
-  it("flags a blank qty", () => {
-    expect(validateOrderEntry({ size: "M", qty: "" }, SIZES).qty).toBeTruthy();
-  });
-});
-
-describe("validateSubmitter", () => {
-  it("has no errors for a valid submitter", () => {
-    expect(
-      validateSubmitter({
-        submitterName: "Sam",
-        submitterEmail: "sam@example.com",
-      }),
-    ).toEqual({});
-  });
-
-  it("flags both fields when empty", () => {
-    const errors = validateSubmitter({
-      submitterName: "",
-      submitterEmail: "",
-    });
-    expect(errors.submitterName).toBeTruthy();
-    expect(errors.submitterEmail).toBeTruthy();
-  });
-});
-
-describe("toOrderEntryPayload", () => {
-  it("parses qty to a number and passes size through", () => {
-    expect(toOrderEntryPayload({ size: "L", qty: " 4 " }, SIZES)).toEqual({
-      size: "L",
-      qty: 4,
-    });
-  });
-
-  it("throws on an invalid line", () => {
-    expect(() => toOrderEntryPayload({ size: "ZZ", qty: "1" }, SIZES)).toThrow();
-  });
-});
-
-describe("toSubmitterPayload", () => {
-  it("trims the name and lowercases the email", () => {
-    expect(
-      toSubmitterPayload({
-        submitterName: "  Sam Fan ",
-        submitterEmail: " SAM@Example.com ",
-      }),
-    ).toEqual({ submitterName: "Sam Fan", submitterEmail: "sam@example.com" });
-  });
-
-  it("throws on an invalid submitter", () => {
-    expect(() =>
-      toSubmitterPayload({ submitterName: "", submitterEmail: "x" }),
-    ).toThrow();
   });
 });

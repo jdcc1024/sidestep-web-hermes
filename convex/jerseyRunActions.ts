@@ -10,9 +10,9 @@ import {
   type ClosureEmail,
   type ClosureEmailContext,
 } from "../lib/jerseyRunDeadline";
+import { OPS_EMAIL as DEFAULT_OPS_EMAIL } from "../lib/contact";
 
 const DEFAULT_FROM_EMAIL = "hello@sidestep.design";
-const DEFAULT_OPS_EMAIL = "info@sidestep.design";
 const DEFAULT_SITE_URL = "https://sidestep.design";
 
 // Build the absolute URL to the captain's order page, where everything

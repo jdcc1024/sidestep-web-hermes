@@ -4,19 +4,15 @@ import {
   MAX_CUSTOM_QUESTIONS,
   QUESTION_LABEL_MAX_LENGTH,
   SIZE_OPTIONS,
-  canLock,
-  canUnlock,
   effectiveStatus,
   isNamesMode,
   isSizeOption,
-  isLocked,
   newQuestionId,
   parseDeadline,
-  statusAfterUnlock,
   toJerseyRunPayload,
   validateJerseyRun,
+  type FormRun,
   type JerseyRunInput,
-  type LockableRun,
 } from "./jerseyRun";
 
 // Fixed "now" so deadline tests aren't flaky around midnight rollover.
@@ -221,95 +217,34 @@ describe("newQuestionId", () => {
   });
 });
 
-// R-06: the lock/freeze lazy-status resolver and its permission helpers.
-describe("effectiveStatus / isLocked / canLock (R-06)", () => {
+// The order form's lazy-status resolver. Since L-06 the deadline only closes
+// the form; nothing here locks (lib/orderItem/lock owns the list lock).
+describe("effectiveStatus (L-06: the deadline closes the form)", () => {
   const FUTURE = Date.parse("2026-06-15T23:59:59.999Z");
   const PAST = Date.parse("2026-05-01T23:59:59.999Z");
 
-  function run(overrides: Partial<LockableRun> = {}): LockableRun {
+  function run(overrides: Partial<FormRun> = {}): FormRun {
     return { status: "open", deadline: FUTURE, ...overrides };
   }
 
   it("stays open before the deadline", () => {
     expect(effectiveStatus(run(), NOW)).toBe("open");
-    expect(isLocked(run(), NOW)).toBe(false);
   });
 
-  it("auto-locks lazily once the deadline passes, with no manual action", () => {
-    expect(effectiveStatus(run({ deadline: PAST }), NOW)).toBe("locked");
-    expect(isLocked(run({ deadline: PAST }), NOW)).toBe(true);
+  it("closes lazily once the deadline passes, with no manual action", () => {
+    expect(effectiveStatus(run({ deadline: PAST }), NOW)).toBe("closed");
   });
 
   it("treats a deadline equal to now as still open (boundary)", () => {
     expect(effectiveStatus(run({ deadline: NOW }), NOW)).toBe("open");
   });
 
-  it("leaves an already-locked run locked regardless of deadline", () => {
-    expect(effectiveStatus(run({ status: "locked", deadline: FUTURE }), NOW)).toBe(
-      "locked",
-    );
-  });
-
-  it("does not lazily re-lock a closed run, even past its deadline", () => {
-    // A run explicitly moved to "closed" (e.g. an admin unlocking a
-    // past-deadline run) must not immediately flip back to "locked" on
-    // the very next read — otherwise "admin can always unlock" would be
-    // a no-op for any run whose deadline has already passed.
+  it("leaves a closed run closed, deadline passed or not", () => {
     expect(effectiveStatus(run({ status: "closed", deadline: PAST }), NOW)).toBe(
       "closed",
     );
-  });
-
-  it("canLock is true for open and closed runs, false once locked", () => {
-    expect(canLock(run())).toBe(true);
-    expect(canLock(run({ status: "closed" }))).toBe(true);
-    expect(canLock(run({ status: "locked" }))).toBe(false);
-  });
-
-  it("canLock is true for a lazily-locked (past-deadline, still 'open') run", () => {
-    // Locking such a run is how it gets materialized with a snapshot.
-    expect(canLock(run({ deadline: PAST }))).toBe(true);
-  });
-});
-
-describe("canUnlock / statusAfterUnlock (R-06)", () => {
-  const FUTURE = Date.parse("2026-06-15T23:59:59.999Z");
-  const PAST = Date.parse("2026-05-01T23:59:59.999Z");
-  const admin = { isAdmin: true };
-  const captain = { isAdmin: false };
-
-  function lockedRun(overrides: Partial<LockableRun> = {}): LockableRun {
-    return { status: "locked", deadline: FUTURE, ...overrides };
-  }
-
-  it("admin can always unlock a locked run, deadline passed or not", () => {
-    expect(canUnlock(lockedRun(), admin, NOW)).toBe(true);
-    expect(canUnlock(lockedRun({ deadline: PAST }), admin, NOW)).toBe(true);
-  });
-
-  it("captain can unlock only while the deadline hasn't passed", () => {
-    expect(canUnlock(lockedRun(), captain, NOW)).toBe(true);
-    expect(canUnlock(lockedRun({ deadline: PAST }), captain, NOW)).toBe(false);
-  });
-
-  it("nobody can unlock a run that isn't locked", () => {
-    expect(canUnlock({ status: "open", deadline: FUTURE }, admin, NOW)).toBe(
-      false,
-    );
     expect(
-      canUnlock({ status: "closed", deadline: FUTURE }, captain, NOW),
-    ).toBe(false);
-  });
-
-  it("reopens fully to 'open' when the deadline hasn't passed", () => {
-    expect(statusAfterUnlock(lockedRun(), NOW)).toBe("open");
-  });
-
-  it("reverts to 'closed' (not 'open') when the deadline has already passed", () => {
-    // Prevents the immediate lazy re-lock effectiveStatus would otherwise
-    // apply to an "open" run whose deadline is in the past.
-    expect(statusAfterUnlock(lockedRun({ deadline: PAST }), NOW)).toBe(
-      "closed",
-    );
+      effectiveStatus(run({ status: "closed", deadline: FUTURE }), NOW),
+    ).toBe("closed");
   });
 });

@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { use } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, FileDown } from "lucide-react";
+import { ArrowLeft, FileDown, Lock } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { ExportOrderButton } from "@/components/admin/ExportOrderButton";
 import { InlineEditField } from "@/components/InlineEditField";
 import { OrderStageChecklist } from "@/components/admin/OrderStageChecklist";
+import { OrderList } from "@/components/orderList/OrderList";
 import { validateQuantity, validateRequiredText } from "@/lib/adminRecords";
 import { overviewOf } from "@/lib/designBlock";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,10 @@ export default function AdminOrderDetailPage({
   const { id } = use(params);
   const orderId = id as Id<"orders">;
   const result = useQuery(api.admin.getOrder, { orderId });
+  // The same list, from the same query, the captain's order page reads (UX
+  // §7 rule 8). For an admin the server says `canEdit` whether or not the
+  // list is locked, so the controls stay; `locked` only drives the badge.
+  const list = useQuery(api.orderItems.listForOrder, { orderId });
   const updateOrder = useMutation(api.admin.updateOrder);
 
   if (result === undefined) {
@@ -226,6 +231,29 @@ export default function AdminOrderDetailPage({
           )}
         </CardContent>
       </Card>
+
+      <section aria-label="Order list" className="mt-6">
+        {list?.locked && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <Badge className="border-transparent bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100">
+              <Lock aria-hidden />
+              Locked for production
+            </Badge>
+            <span>
+              Order size confirmed. The captain can&apos;t change the list;
+              you still can.
+            </span>
+          </div>
+        )}
+        <OrderList
+          orderId={order._id}
+          teamName={order.teamName}
+          designs={designs}
+          list={list}
+          customQuestions={jerseyRun?.customQuestions}
+          namesMode={jerseyRun?.namesMode}
+        />
+      </section>
 
       <Card className="mt-6">
         <CardHeader>

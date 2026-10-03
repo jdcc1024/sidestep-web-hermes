@@ -8,20 +8,20 @@ import { convexTest } from "convex-test";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import * as orderEntries from "./orderEntries";
+import * as formModule from "./orderEntries";
 import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
 
-describe("the two run-keyed queries are deleted from convex/orderEntries.ts", () => {
+describe("the two run-keyed queries are deleted from the public form's module", () => {
   it("affectedByDesignRemoval and removedDesigns are no longer exported", () => {
-    const exported = orderEntries as Record<string, unknown>;
+    const exported = formModule as Record<string, unknown>;
     expect(exported.affectedByDesignRemoval).toBeUndefined();
     expect(exported.removedDesigns).toBeUndefined();
   });
 
-  it("submitOrder and the other order-entry functions are still there (no collateral deletion)", () => {
-    expect(orderEntries.submitOrder).toBeDefined();
+  it("submitOrder is still there (no collateral deletion)", () => {
+    expect(formModule.submitOrder).toBeDefined();
   });
 });
 

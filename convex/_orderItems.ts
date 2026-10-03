@@ -10,8 +10,12 @@ import { ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireCurrentUser } from "./_auth";
-import { isLocked } from "../lib/jerseyRun/lock";
-import { summarize } from "../lib/orderItem";
+import {
+  isListConfirmed,
+  listProblems,
+  needsSizeMessage,
+  summarize,
+} from "../lib/orderItem";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -31,7 +35,7 @@ export async function loadItems(
 }
 
 // Whether the order has any item at all, removed ones included. Only the
-// "already done?" checks need this (the backfill, the dev fixtures);
+// "already done?" checks need this (the dev fixtures);
 // everything else wants live items.
 export async function hasAnyItem(
   ctx: Ctx,
@@ -57,8 +61,8 @@ export async function loadOrderForm(
 
 // The order's live items run through the single read model (`summarize`),
 // with the titles and names mode it needs. Every count of an order — the
-// captain's list, the admin page and export, the closure email, the lock
-// snapshot — comes from here, so they can't disagree. `items` is returned
+// captain's list, the admin page and export, the closure email — comes from
+// here, so they can't disagree. `items` is returned
 // too for callers that need the raw rows alongside the summary.
 export async function summarizeOrder(ctx: Ctx, order: Doc<"orders">) {
   const items = await loadItems(ctx, order._id);
@@ -82,16 +86,30 @@ export async function summarizeOrder(ctx: Ctx, order: Doc<"orders">) {
   return { items, form, summary };
 }
 
-// The one lock predicate for the list. Today's rule (L-01..L-05): the order's
-// form exists and is effectively locked (stored `locked`, or `open` past its
-// deadline). L-06 replaces this body; keep every lock decision going through
-// here so that is a one-function change.
+// The one lock predicate for the list (L-06, Q1 = A): JCC has checked the
+// order's "Order Size Confirmed" stage. The order form's deadline plays no
+// part. Async and ctx-taking although today's rule only reads the order, so
+// every lock decision keeps going through here if the rule changes again.
 export async function isListLocked(
-  ctx: Ctx,
+  _ctx: Ctx,
   order: Doc<"orders">,
 ): Promise<boolean> {
-  const form = await loadOrderForm(ctx, order._id);
-  return form !== null && isLocked(form);
+  return isListConfirmed(order);
+}
+
+// The confirm gate (L-06, Q2 = A): the message that refuses confirming the
+// order size while a live item on the order's current designs has no size,
+// or null when it may be confirmed. Admin copy.
+export async function confirmBlocker(
+  ctx: Ctx,
+  order: Doc<"orders">,
+): Promise<string | null> {
+  const current = new Set<Id<"designs">>(order.designIds);
+  const items = (await loadItems(ctx, order._id))
+    .filter((item) => current.has(item.designId))
+    .sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
+  const problems = listProblems(items);
+  return problems.length > 0 ? needsSizeMessage(problems) : null;
 }
 
 // The write guard for every captain/admin list mutation. Admin status comes

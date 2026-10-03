@@ -61,15 +61,14 @@ export function OrderFormCard({
   );
 }
 
-// `effectiveStatus` (R-06) is the lazily resolved status: a form stored
-// "open" past its deadline is already closed, and reading `status` here would
-// show "Open" on a form whose submissions all reject. Closed and locked read
-// the same to a captain (Q1 = A: the deadline closes the form; the list
-// locks later, and the list says so itself).
+// `effectiveStatus` is the lazily resolved status: a form stored "open" past
+// its deadline is already closed, and reading `status` here would show "Open"
+// on a form whose submissions all reject. The deadline only closes the form;
+// the list locks when the order size is confirmed, and says so itself (L-06).
 type RunSummary = {
   _id: Id<"jerseyRuns">;
   deadline: number;
-  effectiveStatus: "open" | "closed" | "locked";
+  effectiveStatus: "open" | "closed";
 };
 
 function FormStatus({

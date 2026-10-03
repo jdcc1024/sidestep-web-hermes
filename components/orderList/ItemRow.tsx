@@ -5,6 +5,7 @@ import { EllipsisIcon, TriangleAlertIcon } from "lucide-react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { itemAddedBy, itemLabel } from "@/lib/orderItem";
 import { ROW_TRANSITION } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import { DesignationBadge } from "@/components/portal/RosterDesignation";
 import { Button } from "@/components/ui/button";
 import { ItemSheet } from "./ItemSheet";
@@ -63,9 +64,18 @@ export function ItemRow({
             {name || number ? (
               <>
                 {name}
-                {name && number ? " " : null}
+                {/* The space before the number is CSS, not a text node: the
+                    row reads "Jordan Lee #4" (screen readers include the
+                    pseudo-element), but its DOM text doesn't duplicate the
+                    label the admin confirm gate names in its message, so a
+                    text lookup on the admin page finds that message alone. */}
                 {number && (
-                  <span className="font-normal text-muted-foreground">
+                  <span
+                    className={cn(
+                      "font-normal text-muted-foreground",
+                      name && "before:content-['_']",
+                    )}
+                  >
                     #{number}
                   </span>
                 )}

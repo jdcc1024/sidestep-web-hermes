@@ -18,14 +18,13 @@ import {
   QUESTION_LABEL_MAX_LENGTH,
   SIZE_OPTIONS,
 } from "../lib/jerseyRun/rules";
+import { effectiveStatus } from "../lib/jerseyRun/lock";
 import {
-  canLock,
-  canUnlock,
-  effectiveStatus,
-  isLocked,
-  statusAfterUnlock,
-} from "../lib/jerseyRun/lock";
-import { loadItems, summarizeOrder } from "./_orderItems";
+  isListLocked,
+  LIST_LOCKED_MESSAGE,
+  loadItems,
+  summarizeOrder,
+} from "./_orderItems";
 import { rosterSlotKey } from "../lib/rosterEntry/rules";
 
 // Get the jersey run linked to one of the captain's orders. Returns null
@@ -33,9 +32,9 @@ import { rosterSlotKey } from "../lib/rosterEntry/rules";
 // "set up jersey run" CTA instead of the run details. Throws if the
 // caller doesn't own the order (a stronger signal than "not found", so
 // the UI can distinguish a missing run from an access violation).
-// `effectiveStatus` (R-06) is the lazily-resolved status (accounting for
-// a passed deadline) so the order page (O-06) can render read-only
-// without recomputing the lock rule itself.
+// `effectiveStatus` is the lazily-resolved status (a passed deadline reads
+// as closed) so the order page doesn't recompute the rule itself;
+// `listLocked` says whether the settings can still change.
 export const getByOrder = query({
   args: { orderId: v.id("orders") },
   handler: async (ctx, { orderId }) => {
@@ -53,7 +52,13 @@ export const getByOrder = query({
       .unique();
     if (!run) return null;
 
-    return { ...run, effectiveStatus: effectiveStatus(run) };
+    // `listLocked`: the order's list is confirmed, so the form's settings
+    // are frozen with it (the same rule `updateSettings` enforces).
+    return {
+      ...run,
+      effectiveStatus: effectiveStatus(run),
+      listLocked: await isListLocked(ctx, order),
+    };
   },
 });
 
@@ -94,9 +99,9 @@ function pickerFor(
 // per-design picker (collapsing to one implicit choice for a single-
 // design order) and, in fixed mode, let the fan pick a player the captain
 // added — whether before or after the form existed.
-// `effectiveStatus` (R-06) is the lazily-resolved status, so the public
-// form and captain run-detail view can show "locked" the moment the
-// deadline passes without a scheduler having touched the row yet.
+// `effectiveStatus` is the lazily-resolved status, so the public form shows
+// as closed the moment the deadline passes without a scheduler having
+// touched the row yet.
 export const getPublic = query({
   args: { jerseyRunId: v.id("jerseyRuns") },
   handler: async (ctx, { jerseyRunId }) => {
@@ -123,6 +128,8 @@ export const getPublic = query({
     return {
       run,
       effectiveStatus: effectiveStatus(run),
+      // The list is confirmed, so `submitOrder` refuses even an open form.
+      listLocked: order ? await isListLocked(ctx, order) : false,
       teamName: order?.teamName ?? "",
       captainName: captain?.name ?? "",
       designs,
@@ -180,8 +187,8 @@ export const create = mutation({
     if (args.deadline <= Date.now())
       throw new ConvexError("Deadline must be in the future.");
 
-    // A fixed-mode run seeds its named slots through the roster sheet on the
-    // design cards (rosterEntries, M-02). Every run starts open — the mode
+    // A fixed-mode run picks from the named items on the order list. Every
+    // run starts open — the mode
     // only matters once there are slots to pick from, and by then the
     // captain is on the order page where the control lives.
     return ctx.db.insert("jerseyRuns", {
@@ -202,7 +209,8 @@ export const create = mutation({
 // affects, and switching is safe in both directions — fan-typed names are
 // already named order items, so open → fixed promotes them into the picker
 // list and fixed → open only loosens a constraint. Neither loses data,
-// hence no confirmation. Locked runs reject like every other roster write.
+// hence no confirmation. A confirmed (locked) list rejects it like every
+// other captain list write.
 export const setNamesMode = mutation({
   args: {
     jerseyRunId: v.id("jerseyRuns"),
@@ -211,9 +219,10 @@ export const setNamesMode = mutation({
   handler: async (ctx, { jerseyRunId, namesMode }) => {
     const run = await ctx.db.get(jerseyRunId);
     if (!run) throw new ConvexError("We couldn't find that order form.");
-    await requireOrderOwnership(ctx, run.orderId);
+    const { order } = await requireOrderOwnership(ctx, run.orderId);
 
-    if (isLocked(run)) throw new ConvexError("This order form is locked, so it can't be changed.");
+    if (await isListLocked(ctx, order))
+      throw new ConvexError(LIST_LOCKED_MESSAGE);
 
     await ctx.db.patch(jerseyRunId, { namesMode });
     return jerseyRunId;
@@ -224,7 +233,9 @@ export const setNamesMode = mutation({
 // deadline, so this is where a captain moves the date or adds the custom
 // questions the fan form asks. Sizes and names mode are deliberately absent:
 // the first isn't a captain decision any more, the second has its own
-// mutation next to the designs it affects.
+// mutation next to the designs it affects. The deadline must be in the
+// future, so saving always (re)opens the form: extending a closed form's
+// deadline is how a captain reopens it (L-06). A confirmed list rejects it.
 export const updateSettings = mutation({
   args: {
     jerseyRunId: v.id("jerseyRuns"),
@@ -236,9 +247,10 @@ export const updateSettings = mutation({
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.jerseyRunId);
     if (!run) throw new ConvexError("We couldn't find that order form.");
-    await requireOrderOwnership(ctx, run.orderId);
+    const { order } = await requireOrderOwnership(ctx, run.orderId);
 
-    if (isLocked(run)) throw new ConvexError("This order form is locked, so it can't be changed.");
+    if (await isListLocked(ctx, order))
+      throw new ConvexError(LIST_LOCKED_MESSAGE);
 
     if (args.deadline <= Date.now())
       throw new ConvexError("Deadline must be in the future.");
@@ -246,6 +258,7 @@ export const updateSettings = mutation({
     await ctx.db.patch(args.jerseyRunId, {
       deadline: args.deadline,
       customQuestions: cleanCustomQuestions(args.customQuestions),
+      status: "open",
     });
     return args.jerseyRunId;
   },
@@ -469,79 +482,5 @@ export const closeRunByAdmin = mutation({
       { jerseyRunId },
     );
     return { alreadyClosed: false };
-  },
-});
-
-// Freeze the confirmed production basis (R-06). Captain or admin only.
-// Takes a Σ-qty-by-design snapshot from the same `summarize` the captain's
-// list reads, so the frozen number matches what the captain saw live
-// right before locking (it stays until L-06 retires the snapshot). Works on a run whose deadline has already passed
-// (lazily "locked" but never materialized) — this is how that state gets
-// written to the DB with a snapshot.
-export const lock = mutation({
-  args: { jerseyRunId: v.id("jerseyRuns") },
-  handler: async (ctx, { jerseyRunId }) => {
-    const user = await requireCurrentUser(ctx);
-    const run = await ctx.db.get(jerseyRunId);
-    if (!run) throw new ConvexError("We couldn't find that order form.");
-    if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this order form.");
-
-    if (!canLock(run))
-      throw new ConvexError("This order form is already locked.");
-
-    const order = await ctx.db.get(run.orderId);
-    if (!order) throw new ConvexError("Order not found.");
-
-    // Same read model `orderItems.listForOrder` serves live, so the frozen
-    // basis provably matches what the captain saw before locking (A-08).
-    const { summary: list } = await summarizeOrder(ctx, order);
-    const byDesign = list.designs.map((d) => ({
-      designId: d.designId,
-      title: d.title,
-      total: d.summary.itemCount,
-    }));
-
-    await ctx.db.patch(jerseyRunId, {
-      status: "locked",
-      lockSnapshot: {
-        lockedAt: Date.now(),
-        total: list.summary.itemCount,
-        byDesign,
-      },
-    });
-    return jerseyRunId;
-  },
-});
-
-// Reverse a lock (R-06). Admin can always unlock; a captain only while
-// the run's deadline hasn't passed (PRD §6). A run unlocked before its
-// deadline reopens fully ("open"); one unlocked after its deadline goes
-// to "closed" instead, so the unlock actually sticks — see
-// lib/jerseyRun/lock.ts for why "open" would instantly re-lock there.
-// The frozen snapshot is cleared: an unlocked run has no confirmed basis,
-// live counts apply again.
-export const unlock = mutation({
-  args: { jerseyRunId: v.id("jerseyRuns") },
-  handler: async (ctx, { jerseyRunId }) => {
-    const user = await requireCurrentUser(ctx);
-    const run = await ctx.db.get(jerseyRunId);
-    if (!run) throw new ConvexError("We couldn't find that order form.");
-    if (run.captainId !== user._id && !user.isAdmin)
-      throw new ConvexError("You don't have access to this order form.");
-
-    if (effectiveStatus(run) !== "locked")
-      throw new ConvexError("This order form is not locked.");
-
-    if (!canUnlock(run, { isAdmin: user.isAdmin }))
-      throw new ConvexError(
-        "The deadline has passed. Email us and we'll unlock this order form.",
-      );
-
-    await ctx.db.patch(jerseyRunId, {
-      status: statusAfterUnlock(run),
-      lockSnapshot: undefined,
-    });
-    return jerseyRunId;
   },
 });

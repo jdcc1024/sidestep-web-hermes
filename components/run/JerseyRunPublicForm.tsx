@@ -68,7 +68,7 @@ type PublicRun = {
   sizeOptions: string[];
   customQuestions: { id: string; label: string }[];
   deadline: number;
-  status: "open" | "closed" | "locked";
+  status: "open" | "closed";
 };
 
 export function JerseyRunPublicForm({
@@ -89,7 +89,9 @@ export function JerseyRunPublicForm({
     status: data.run.status,
   };
 
-  if (isJerseyRunClosed(run)) {
+  // A confirmed list takes no more submissions either (L-06): the server
+  // refuses them, so the form shows closed rather than inviting a rejection.
+  if (isJerseyRunClosed(run) || data.listLocked) {
     return (
       <ClosedState teamName={data.teamName} captainName={data.captainName} />
     );

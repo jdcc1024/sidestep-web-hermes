@@ -30,11 +30,7 @@ describe("isJerseyRunClosed", () => {
     expect(isJerseyRunClosed(openRun({ status: "closed" }), NOW)).toBe(true);
   });
 
-  it("is closed when status is locked", () => {
-    expect(isJerseyRunClosed(openRun({ status: "locked" }), NOW)).toBe(true);
-  });
-
-  it("is closed when the deadline has passed (lazy auto-lock)", () => {
+  it("is closed when the deadline has passed (lazy close)", () => {
     const past = Date.parse("2026-05-01T23:59:59.999Z");
     expect(isJerseyRunClosed(openRun({ deadline: past }), NOW)).toBe(true);
   });

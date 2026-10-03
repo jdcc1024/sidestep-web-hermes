@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  EMPTY_ROSTER_ENTRY,
   ROSTER_DESIGNATION_LABEL,
   ROSTER_NAME_MAX_LENGTH,
   ROSTER_NUMBER_MAX_LENGTH,
@@ -13,8 +12,6 @@ import {
   planRosterCopy,
   rosterMatchKey,
   rosterSlotKey,
-  toRosterEntryPayload,
-  validateRosterEntry,
 } from "./rosterEntry";
 
 describe("isRosterSource", () => {
@@ -273,57 +270,5 @@ describe("describeRosterCopy", () => {
     expect(describeRosterCopy({ copied: 0, skipped: 0 })).toMatch(
       /no players/i,
     );
-  });
-});
-
-describe("validateRosterEntry", () => {
-  it("has no errors for a valid entry", () => {
-    expect(validateRosterEntry({ name: "Gretzky", number: "99" })).toEqual({});
-  });
-
-  it("flags a blank name", () => {
-    expect(validateRosterEntry({ ...EMPTY_ROSTER_ENTRY }).name).toBeTruthy();
-  });
-
-  it("allows a blank number (number is optional)", () => {
-    expect(
-      validateRosterEntry({ name: "Bo", number: "" }).number,
-    ).toBeUndefined();
-  });
-
-  it("allows a valid designation and none at all", () => {
-    expect(
-      validateRosterEntry({ name: "Bo", number: "", designation: "C" }),
-    ).toEqual({});
-    expect(
-      validateRosterEntry({ name: "Bo", number: "", designation: "" }),
-    ).toEqual({});
-  });
-
-  it("flags a designation that isn't a letter anyone wears", () => {
-    expect(
-      validateRosterEntry({ name: "Bo", number: "", designation: "Z" })
-        .designation,
-    ).toBeTruthy();
-  });
-});
-
-describe("toRosterEntryPayload", () => {
-  it("trims name and normalizes a blank number to undefined", () => {
-    expect(toRosterEntryPayload({ name: "  Bo  ", number: "  " })).toEqual({
-      name: "Bo",
-      number: undefined,
-      designation: undefined,
-    });
-  });
-
-  it("carries a designation through, and normalizes none of one", () => {
-    expect(
-      toRosterEntryPayload({ name: "Gretzky", number: "99", designation: "c" }),
-    ).toEqual({ name: "Gretzky", number: "99", designation: "C" });
-  });
-
-  it("throws on an invalid (empty) name", () => {
-    expect(() => toRosterEntryPayload({ name: "", number: "1" })).toThrow();
   });
 });

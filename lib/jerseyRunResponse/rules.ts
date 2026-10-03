@@ -3,7 +3,7 @@
 // order-entry model (convex/orderEntries.ts). What survives here is the
 // grain both the public form and that mutation still share: the
 // `isJerseyRunClosed` gate (a run stops accepting submissions once it's
-// closed/locked) and the custom-answer length rule. Kept in one module so
+// closed) and the custom-answer length rule. Kept in one module so
 // the client form and the Convex mutation can't drift on that behavior.
 
 import { effectiveStatus } from "../jerseyRun/lock";
@@ -17,7 +17,7 @@ export type JerseyRunForResponse = {
   sizeOptions: string[];
   customQuestions: { id: string; label: string }[];
   deadline: number;
-  status: "open" | "closed" | "locked";
+  status: "open" | "closed";
 };
 
 // Discriminated result for a single field check. `ok: true` carries the
@@ -31,9 +31,8 @@ export function isJerseyRunClosed(
   run: Pick<JerseyRunForResponse, "status" | "deadline">,
   now: number = Date.now(),
 ): boolean {
-  // A locked run (manually, or lazily once its deadline passes — R-06)
-  // is also closed to new submissions: it's the confirmed production
-  // basis.
+  // Closed by status, or lazily once its deadline passes. Whether the list
+  // behind it is confirmed is a separate check the server makes (L-06).
   return effectiveStatus(run, now) !== "open";
 }
 

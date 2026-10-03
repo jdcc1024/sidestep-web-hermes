@@ -63,6 +63,23 @@ async function seedDesign(
 }
 
 // One uploaded file on a design. Storage ids in convex-test are opaque
+// JCC checks "Order Size Confirmed": the list (and the order details) lock
+// (L-06). Written directly, not through the admin confirm gate.
+async function confirmOrderSize(
+  t: ReturnType<typeof convexTest>,
+  orderId: Id<"orders">,
+) {
+  await t.run(async (ctx) => {
+    const order = await ctx.db.get(orderId);
+    await ctx.db.patch(orderId, {
+      internalStages: [
+        ...(order?.internalStages ?? []),
+        { name: "Order Size Confirmed", completedAt: Date.now() },
+      ],
+    });
+  });
+}
+
 // strings from ctx.storage.store — no real bytes needed, the main-image
 // resolver keys off content type and `createdAt`.
 async function seedAsset(
@@ -310,24 +327,11 @@ describe("orders.updateOrder", () => {
     ).rejects.toThrow(/Not authenticated/);
   });
 
-  it("rejects updating an order once its jersey run is locked (R-06)", async () => {
+  it("rejects updating an order once its order size is confirmed (L-06)", async () => {
     const t = convexTest(schema, modules);
-    const { userId, asUser } = await seedCaptain(t);
+    const { asUser } = await seedCaptain(t);
     const orderId = await seedOrder(t, asUser);
-    const now = Date.now();
-    const runId = await t.run((ctx) =>
-      ctx.db.insert("jerseyRuns", {
-        orderId,
-        captainId: userId,
-        sizeOptions: ["S", "M", "L"],
-        namesMode: "open",
-        customQuestions: [],
-        deadline: now + 7 * 24 * 60 * 60 * 1000,
-        status: "locked",
-        lockSnapshot: { lockedAt: now, total: 0, byDesign: [] },
-        createdAt: now,
-      }),
-    );
+    await confirmOrderSize(t, orderId);
 
     await expect(
       asUser.mutation(api.orders.updateOrder, {
@@ -339,13 +343,14 @@ describe("orders.updateOrder", () => {
         designIds: [],
       }),
     ).rejects.toThrow(/locked/i);
-    // Sanity: the run really is the one we just locked, not a stray guard.
-    expect((await t.run((ctx) => ctx.db.get(runId)))?.status).toBe("locked");
+    expect((await t.run((ctx) => ctx.db.get(orderId)))?.teamName).not.toBe(
+      "Renamed FC",
+    );
   });
 
-  // Auto-lock is lazy (R-06) — no scheduler flips the row — so the freeze
-  // has to bite on a run that is still stored "open" past its deadline.
-  it("rejects updating an order whose run has lazily auto-locked (O-06)", async () => {
+  // The deadline only closes the order form (L-06, Q1 = A): a form stored
+  // "open" past its deadline must not freeze the order details.
+  it("allows updating an order whose form deadline has passed (L-06)", async () => {
     const t = convexTest(schema, modules);
     const { userId, asUser } = await seedCaptain(t);
     const orderId = await seedOrder(t, asUser);
@@ -372,11 +377,14 @@ describe("orders.updateOrder", () => {
         hasOwnDesign: VALID_ORDER.hasOwnDesign,
         designIds: [],
       }),
-    ).rejects.toThrow(/locked/i);
+    ).resolves.toBe(orderId);
+    expect((await t.run((ctx) => ctx.db.get(orderId)))?.teamName).toBe(
+      "Renamed FC",
+    );
   });
 
   // The freeze is scoped to the order: a design is reusable across orders,
-  // so one locked run must not make the design record itself read-only.
+  // so one confirmed order must not make the design record itself read-only.
   it("leaves the linked design editable in its own surface while the order is frozen", async () => {
     const t = convexTest(schema, modules);
     const { userId, asUser } = await seedCaptain(t);
@@ -386,20 +394,7 @@ describe("orders.updateOrder", () => {
       ...VALID_ORDER,
       designIds: [designId],
     });
-    const now = Date.now();
-    await t.run((ctx) =>
-      ctx.db.insert("jerseyRuns", {
-        orderId,
-        captainId: userId,
-        sizeOptions: ["S", "M", "L"],
-        namesMode: "open",
-        customQuestions: [],
-        deadline: now + 7 * 24 * 60 * 60 * 1000,
-        status: "locked",
-        lockSnapshot: { lockedAt: now, total: 0, byDesign: [] },
-        createdAt: now,
-      }),
-    );
+    await confirmOrderSize(t, orderId);
 
     await asUser.mutation(api.designs.updateDesign, {
       designId,
@@ -553,7 +548,7 @@ describe("orders.getMyOrder", () => {
       t: ReturnType<typeof convexTest>,
       orderId: Id<"orders">,
       captainId: Id<"users">,
-      run: { status: "open" | "closed" | "locked"; deadline: number },
+      run: { status: "open" | "closed"; deadline: number },
     ) {
       return t.run((ctx) =>
         ctx.db.insert("jerseyRuns", {
@@ -593,24 +588,27 @@ describe("orders.getMyOrder", () => {
       );
     });
 
-    it("reads locked once the run is locked", async () => {
+    it("reads locked once the order size is confirmed, form or not (L-06)", async () => {
       const t = convexTest(schema, modules);
       const { userId, asUser } = await seedCaptain(t);
-      const orderId = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
-      await seedRun(t, orderId, userId, {
-        status: "locked",
+      const withForm = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
+      await seedRun(t, withForm, userId, {
+        status: "open",
         deadline: Date.now() + 7 * DAY,
       });
+      const formless = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
 
-      expect((await asUser.query(api.orders.getMyOrder, { orderId }))?.locked).toBe(
-        true,
-      );
+      for (const orderId of [withForm, formless]) {
+        await confirmOrderSize(t, orderId);
+        expect(
+          (await asUser.query(api.orders.getMyOrder, { orderId }))?.locked,
+        ).toBe(true);
+      }
     });
 
-    // Lazy auto-lock (R-06): nothing materializes the status, so the read
-    // has to resolve it — otherwise the page would still offer Edit on an
-    // order whose mutations already reject.
-    it("reads locked for an open run whose deadline has passed", async () => {
+    // The deadline only closes the form (L-06, Q1 = A), so an open run past
+    // its deadline leaves the order editable.
+    it("reads unlocked for an open run whose deadline has passed", async () => {
       const t = convexTest(schema, modules);
       const { userId, asUser } = await seedCaptain(t);
       const orderId = await asUser.mutation(api.orders.createOrder, VALID_ORDER);
@@ -620,12 +618,12 @@ describe("orders.getMyOrder", () => {
       });
 
       expect((await asUser.query(api.orders.getMyOrder, { orderId }))?.locked).toBe(
-        true,
+        false,
       );
     });
 
     // A closed run is done collecting but not yet confirmed — the captain
-    // can still fix the team name or swap a design before locking.
+    // can still fix the team name or swap a design before JCC confirms.
     it("reads unlocked for a closed run", async () => {
       const t = convexTest(schema, modules);
       const { userId, asUser } = await seedCaptain(t);

@@ -13,7 +13,7 @@ import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { overviewBlocks } from "../lib/designBlock";
-import { ROSTER_PASTE_MAX_ROWS } from "../lib/rosterEntry/paste";
+import { ROSTER_PASTE_MAX_ROWS } from "../lib/orderItem/paste";
 
 const modules = import.meta.glob("./**/*.*s");
 const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -84,7 +84,7 @@ async function seedRun(
   orderId: Id<"orders">,
   captainId: Id<"users">,
   opts: {
-    status?: "open" | "closed" | "locked";
+    status?: "open" | "closed";
     namesMode?: "open" | "fixed";
     deadline?: number;
   } = {},
@@ -101,6 +101,20 @@ async function seedRun(
       createdAt: Date.now(),
     }),
   );
+}
+
+// JCC checks "Order Size Confirmed", which locks the list (L-06). Written
+// directly, not through the admin confirm gate.
+async function confirmOrderSize(t: T, orderId: Id<"orders">) {
+  await t.run(async (ctx) => {
+    const order = await ctx.db.get(orderId);
+    await ctx.db.patch(orderId, {
+      internalStages: [
+        ...(order?.internalStages ?? []),
+        { name: "Order Size Confirmed", completedAt: Date.now() },
+      ],
+    });
+  });
 }
 
 // A captain (non-admin) with their own order, plus an admin, in one world.
@@ -238,20 +252,6 @@ describe("orderItems table and indexes exist (§7.1)", () => {
     expect(item?.qty).toBe(1);
     expect(item?.name).toBeUndefined();
     expect(item?.size).toBeUndefined();
-  });
-
-  it("leaves the legacy tables in the schema", () => {
-    const tables = Object.keys(
-      (schema as unknown as { tables: Record<string, unknown> }).tables,
-    );
-    expect(tables).toEqual(
-      expect.arrayContaining([
-        "orderItems",
-        "rosterEntries",
-        "orderEntries",
-        "jerseyRuns",
-      ]),
-    );
   });
 });
 
@@ -801,14 +801,14 @@ describe("Captain of order X cannot add/update/remove/restore/copyToDesign/listF
 });
 
 describe('When isListLocked is true: captain writes are rejected with a message containing no "jersey run"/"roster"; admin add/update/remove/restore succeed (§7.8)', () => {
-  // Today's rule (L-01..L-05): the order's run is effectively locked —
-  // stored `locked`, or `open` past its deadline.
-  async function seedLocked(t: T, how: "stored" | "deadline" = "stored") {
+  // The rule since L-06 (Q1 = A): JCC has checked "Order Size Confirmed".
+  // The order's form stays open, so nothing here leans on the form.
+  async function seedLocked(t: T) {
     const world = await seedWorld(t, ["Home", "Away"]);
     const runId = await seedRun(t, world.orderId, world.captain.userId, {
-      status: how === "stored" ? "locked" : "open",
-      deadline: how === "stored" ? Date.now() + ONE_DAY : Date.now() - ONE_DAY,
+      deadline: Date.now() + ONE_DAY,
     });
+    await confirmOrderSize(t, world.orderId);
     const item = await insertFanItem(t, world.orderId, world.designId, {
       runId,
     });
@@ -891,13 +891,18 @@ describe('When isListLocked is true: captain writes are rejected with a message 
     expect(await countItems(t, orderId)).toBe(2);
   });
 
-  it("also locks when an open run's deadline has passed (today's lazy rule)", async () => {
+  it("does not lock when only the form's deadline has passed (L-06: the deadline closes the form)", async () => {
     const t = convexTest(schema, modules);
-    const { captain, orderId, designId } = await seedLocked(t, "deadline");
-    const message = await expectUserError(() =>
-      captain.as.mutation(api.orderItems.add, { orderId, designId, qty: 1 }),
-    );
-    expectCustomerCopy(message);
+    const { captain, orderId, designId } = await seedWorld(t);
+    await seedRun(t, orderId, captain.userId, {
+      deadline: Date.now() - ONE_DAY,
+    });
+    const id = await captain.as.mutation(api.orderItems.add, {
+      orderId,
+      designId,
+      qty: 1,
+    });
+    expect((await getItem(t, id))?.orderId).toBe(orderId);
   });
 
   it("lets an admin add, update, remove and restore on the locked order", async () => {
@@ -950,9 +955,9 @@ describe("listForOrder returns canEdit: false, locked: true to a captain on a lo
     const t = convexTest(schema, modules);
     const { captain, admin, orderId, designId } = await seedWorld(t);
     const runId = await seedRun(t, orderId, captain.userId, {
-      status: "locked",
       namesMode: "fixed",
     });
+    await confirmOrderSize(t, orderId);
     await insertFanItem(t, orderId, designId, { runId });
 
     const asCaptain = (await captain.as.query(api.orderItems.listForOrder, {

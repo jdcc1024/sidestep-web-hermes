@@ -12,7 +12,7 @@ const FALLBACK = "Something went wrong. Try again.";
 // What the browser client actually throws for a server-side ConvexError in
 // dev: the message carries the function path, request id and stack.
 const RAW =
-  "[CONVEX M(rosterEntries:remove)] [Request ID: 4f2a9c1e] Server Error Uncaught ConvexError: This slot has orders on it — remove those first. at handler (../convex/rosterEntries.ts:231:11)";
+  "[CONVEX M(orderItems:remove)] [Request ID: 4f2a9c1e] Server Error Uncaught ConvexError: This order is locked for production. at handler (../convex/orderItems.ts:231:11)";
 
 describe("userMessage returns the ConvexError string data; returns the fallback for a plain Error whose message contains [CONVEX, Request ID or ConvexError (§8.10)", () => {
   it("returns the string data of a ConvexError", () => {

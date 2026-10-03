@@ -260,7 +260,7 @@ function JerseyCell({ name, number }: { name?: string; number?: string }) {
 function RunStatusBadge({
   status,
 }: {
-  status: "open" | "closed" | "locked";
+  status: "open" | "closed";
 }) {
   if (status === "open") {
     return (

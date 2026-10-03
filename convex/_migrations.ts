@@ -1,7 +1,6 @@
 import { internalMutation } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { prepareBlocks } from "./_designBlocks";
-import { hasAnyItem, loadOrderForm } from "./_orderItems";
 
 /**
  * One-off backfill for designs created before the D-02 block model (D-02
@@ -102,122 +101,42 @@ export const dropFixedRoster = internalMutation({
   },
 });
 
-/**
- * Backfill for initiative 0004 (L-01): copies each order's legacy
- * `rosterEntries` (player slots) + `orderEntries` (jerseys) into `orderItems`,
- * the one order list. Mapping (docs/architecture/0004-order-items.md, "Must
- * answer 2"):
- *
- * - orderEntry on a slot → name / number / letter from the slot; size, qty,
- *   submitter, answers, source and createdAt from the entry. A slot with 3
- *   entries becomes 3 items sharing a name: they are 3 jerseys.
- * - orderEntry with no slot (a blank line) → no name / number / letter, the
- *   rest as above.
- * - slot with no entries ("not yet filled") → name / number / letter, no size
- *   (Needs size), qty 1, source from the slot, no submitter.
- * - entries on a since-unlinked design → copied as-is; the read model lists
- *   them under removed designs.
- *
- * Every item carries the run as `runId` (provenance). The legacy tables are
- * only read, never modified: L-06 deletes them.
- *
- * Run with:
- *   npx convex run _migrations:backfillOrderItems
- *
- * Idempotent per order: an order that already has any `orderItems` row
- * (removed ones included) is skipped, so it's safe to run more than once.
- * One transaction over every order, which is fine for the dev fixtures it is
- * written for (there is no production deployment yet). Returns the number of
- * orders backfilled and items created.
+/*
+ * History: `backfillOrderItems` (initiative 0004, L-01) copied each order's
+ * legacy player slots and jersey lines (the R-01 `rosterEntries` /
+ * `orderEntries` tables) into `orderItems`, the one order list. It ran on the
+ * dev deployment and was removed in L-06 together with the tables it read.
  */
-export const backfillOrderItems = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const orders = await ctx.db.query("orders").collect();
-    let ordersBackfilled = 0;
-    let itemsCreated = 0;
 
-    for (const order of orders) {
-      if (await hasAnyItem(ctx, order._id)) continue;
-      const run = await loadOrderForm(ctx, order._id);
-      if (!run) continue;
+// The two R-01 tables `retireLegacyRosterTables` empties. They are no longer
+// in schema.ts, so the generated types don't know them: the migration reads
+// and deletes their rows through an untyped view of `ctx.db`.
+const LEGACY_TABLES = ["rosterEntries", "orderEntries"] as const;
 
-      const slots = await ctx.db
-        .query("rosterEntries")
-        .withIndex("by_run", (q) => q.eq("runId", run._id))
-        .collect();
-      const entries = await ctx.db
-        .query("orderEntries")
-        .withIndex("by_run", (q) => q.eq("runId", run._id))
-        .collect();
-      const slotById = new Map(slots.map((slot) => [slot._id, slot]));
-      const filledSlots = new Set(entries.map((e) => e.rosterEntryId));
+// The run status L-06 retired; this migration is the one place that names it.
+const RETIRED_LOCKED_STATUS = "locked";
 
-      const player = (slot: Doc<"rosterEntries"> | undefined) =>
-        slot
-          ? {
-              name: slot.name,
-              number: slot.number,
-              designation: slot.designation,
-            }
-          : {};
-
-      for (const entry of entries) {
-        // A dangling slot reference reads as a blank line rather than failing
-        // the whole order.
-        const slot = entry.rosterEntryId
-          ? slotById.get(entry.rosterEntryId)
-          : undefined;
-        await ctx.db.insert("orderItems", {
-          orderId: order._id,
-          designId: entry.designId,
-          ...player(slot),
-          size: entry.size,
-          qty: entry.qty,
-          source: entry.source,
-          submitterName: entry.submitterName,
-          submitterEmail: entry.submitterEmail,
-          customAnswers: entry.customAnswers,
-          runId: run._id,
-          createdAt: entry.createdAt,
-          updatedAt: entry.createdAt,
-        });
-        itemsCreated++;
-      }
-
-      for (const slot of slots) {
-        if (filledSlots.has(slot._id)) continue;
-        await ctx.db.insert("orderItems", {
-          orderId: order._id,
-          designId: slot.designId,
-          ...player(slot),
-          qty: 1,
-          source: slot.source,
-          runId: run._id,
-          createdAt: slot.createdAt,
-          updatedAt: slot.createdAt,
-        });
-        itemsCreated++;
-      }
-
-      if (entries.length > 0 || slots.length > 0) ordersBackfilled++;
-    }
-
-    return { orders: ordersBackfilled, itemsCreated };
-  },
-});
+type LegacyDb = {
+  query: (table: string) => { collect: () => Promise<{ _id: string }[]> };
+  delete: (id: string) => Promise<void>;
+};
 
 /**
  * L-06: retire the legacy roster model. `orderItems` is the only list now
- * (backfilled by `backfillOrderItems` above), and the list locks on the
- * order's "Order Size Confirmed" stage, not on the order form. This empties
- * the two legacy tables, turns any stored `locked` run into `closed` (the
- * deadline only closes the form) and clears its `lockSnapshot`, so the schema
- * can then drop `rosterEntries`, `orderEntries`, `lockSnapshot` and the
- * `locked` status literal.
+ * (backfilled by `backfillOrderItems`, see the history note above), and the
+ * list locks on the order's "Order Size Confirmed" stage, not on the order
+ * form. This empties the two legacy tables, turns any stored `locked` run
+ * into `closed` (the deadline only closes the form) and clears its
+ * `lockSnapshot`, so the schema can then drop `rosterEntries`,
+ * `orderEntries`, `lockSnapshot` and the `locked` status literal.
  *
  * Run with:
  *   npx convex run _migrations:retireLegacyRosterTables
+ *
+ * Ran on dev 2026-10-03: {rosterEntries: 13, orderEntries: 26, runsPatched: 0};
+ * a second run was a no-op. The schema dropped the tables afterwards, so this
+ * now only finds rows on a deployment that still holds them (which its schema
+ * push would reject first). Kept as the record of what was done.
  *
  * Idempotent: a second run finds nothing to delete or patch. One transaction,
  * which is fine for the dev fixtures (there is no production deployment yet).
@@ -225,25 +144,38 @@ export const backfillOrderItems = internalMutation({
 export const retireLegacyRosterTables = internalMutation({
   args: {},
   handler: async (ctx) => {
-    let rosterEntries = 0;
-    for (const row of await ctx.db.query("rosterEntries").collect()) {
-      await ctx.db.delete(row._id);
-      rosterEntries++;
+    const db = ctx.db as unknown as LegacyDb;
+    const deleted: Record<(typeof LEGACY_TABLES)[number], number> = {
+      rosterEntries: 0,
+      orderEntries: 0,
+    };
+    for (const table of LEGACY_TABLES) {
+      for (const row of await db.query(table).collect()) {
+        await db.delete(row._id);
+        deleted[table]++;
+      }
     }
-    let orderEntries = 0;
-    for (const row of await ctx.db.query("orderEntries").collect()) {
-      await ctx.db.delete(row._id);
-      orderEntries++;
-    }
+
+    // `locked` and `lockSnapshot` are gone from the generated Doc type too;
+    // read them loosely, and patch through a cast like `dropFixedRoster`.
+    const patch = ctx.db.patch as (
+      id: Id<"jerseyRuns">,
+      value: Record<string, unknown>,
+    ) => Promise<void>;
     let runsPatched = 0;
     for (const run of await ctx.db.query("jerseyRuns").collect()) {
-      if (run.status !== "locked" && run.lockSnapshot === undefined) continue;
-      await ctx.db.patch(run._id, {
-        status: run.status === "locked" ? "closed" : run.status,
+      const legacy = run as Omit<typeof run, "status"> & {
+        status: string;
+        lockSnapshot?: unknown;
+      };
+      const wasLocked = legacy.status === RETIRED_LOCKED_STATUS;
+      if (!wasLocked && legacy.lockSnapshot === undefined) continue;
+      await patch(run._id, {
+        status: wasLocked ? "closed" : legacy.status,
         lockSnapshot: undefined,
       });
       runsPatched++;
     }
-    return { rosterEntries, orderEntries, runsPatched };
+    return { ...deleted, runsPatched };
   },
 });

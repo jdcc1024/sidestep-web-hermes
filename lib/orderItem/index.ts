@@ -2,7 +2,9 @@
 // the single read model, and the paste parser. Consumers import from
 // "@/lib/orderItem".
 
+export * from "./checks";
 export * from "./label";
+export * from "./lock";
 export * from "./paste";
 export * from "./rules";
 export * from "./summary";

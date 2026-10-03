@@ -14,7 +14,6 @@ import type * as _designBlocks from "../_designBlocks.js";
 import type * as _devSeed from "../_devSeed.js";
 import type * as _e2e from "../_e2e.js";
 import type * as _migrations from "../_migrations.js";
-import type * as _orderEntries from "../_orderEntries.js";
 import type * as _orderItems from "../_orderItems.js";
 import type * as _schemaSmokeTest from "../_schemaSmokeTest.js";
 import type * as _users from "../_users.js";
@@ -27,7 +26,6 @@ import type * as jerseyRuns from "../jerseyRuns.js";
 import type * as orderEntries from "../orderEntries.js";
 import type * as orderItems from "../orderItems.js";
 import type * as orders from "../orders.js";
-import type * as rosterEntries from "../rosterEntries.js";
 import type * as users from "../users.js";
 
 import type {
@@ -43,7 +41,6 @@ declare const fullApi: ApiFromModules<{
   _devSeed: typeof _devSeed;
   _e2e: typeof _e2e;
   _migrations: typeof _migrations;
-  _orderEntries: typeof _orderEntries;
   _orderItems: typeof _orderItems;
   _schemaSmokeTest: typeof _schemaSmokeTest;
   _users: typeof _users;
@@ -56,7 +53,6 @@ declare const fullApi: ApiFromModules<{
   orderEntries: typeof orderEntries;
   orderItems: typeof orderItems;
   orders: typeof orders;
-  rosterEntries: typeof rosterEntries;
   users: typeof users;
 }>;
 

@@ -3,9 +3,11 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { requireAdmin } from "./_auth";
 import { joinUsersById } from "./_users";
-import { summarizeOrder } from "./_orderItems";
+import { confirmBlocker, summarizeOrder } from "./_orderItems";
 import { INTERNAL_STAGES } from "../lib/orderStages";
+import { isListConfirmed } from "../lib/orderItem/lock";
 import {
+  assetSummariesByDesign,
   fileCountsByDesign,
   mainAssetOf,
   resolveDesignAssets,
@@ -82,10 +84,17 @@ export const getOrder = query({
     // Convex storage URLs are short-lived signed URLs — generated per query
     // so the admin can click through to the raw file. null is returned for
     // storage ids that no longer exist.
+    // `mainImage` is the thumbnail the order list shows per design, the same
+    // picture the captain's order page uses (L-06: admin edits that list).
+    const assetSummaries = await assetSummariesByDesign(
+      ctx,
+      linkedDesigns.map((d) => d._id),
+    );
     const designs = await Promise.all(
       linkedDesigns.map(async (design) => ({
         ...design,
         assets: await resolveDesignAssets(ctx, design._id),
+        mainImage: assetSummaries.get(design._id)?.mainImage ?? null,
       })),
     );
 
@@ -134,7 +143,7 @@ export const updateOrderStages = mutation({
     if (!order) throw new ConvexError("Order not found.");
 
     const seen = new Set<string>();
-    const internalStages = stages.map((stage) => {
+    const internalStages: Doc<"orders">["internalStages"] = stages.map((stage) => {
       if (!INTERNAL_STAGE_NAMES.has(stage.name))
         throw new ConvexError(`Unknown internal stage: ${stage.name}`);
       if (seen.has(stage.name))
@@ -145,6 +154,15 @@ export const updateOrderStages = mutation({
         ? { name: stage.name }
         : { name: stage.name, completedAt: stage.completedAt };
     });
+
+    // The confirm gate (L-06, Q2 = A): checking "Order Size Confirmed" locks
+    // the list, so it is refused while an item still needs a size. Only the
+    // not-confirmed → confirmed step is gated: unchecking is always allowed,
+    // and other stage edits on an already-confirmed order are unaffected.
+    if (!isListConfirmed(order) && isListConfirmed({ internalStages })) {
+      const blocker = await confirmBlocker(ctx, order);
+      if (blocker) throw new ConvexError(blocker);
+    }
 
     await ctx.db.patch(orderId, { internalStages, updatedAt: Date.now() });
   },

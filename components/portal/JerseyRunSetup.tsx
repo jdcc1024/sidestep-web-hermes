@@ -19,6 +19,7 @@ import {
   type NamesMode,
 } from "@/lib/jerseyRun";
 import { userMessage } from "@/lib/userMessage";
+import { OPS_EMAIL, OPS_MAILTO } from "@/lib/contact";
 import { absoluteUrl, copyLink } from "@/components/portal/CopyLinkButton";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -98,7 +99,9 @@ type ManagedRun = {
   customQuestions: { id: string; label: string }[];
   deadline: number;
   namesMode: NamesMode;
-  effectiveStatus: "open" | "closed" | "locked";
+  effectiveStatus: "open" | "closed";
+  // The order's list is confirmed: the settings are frozen with it (L-06).
+  listLocked: boolean;
 };
 
 export function JerseyRunSetup({ orderId }: { orderId: Id<"orders"> }) {
@@ -160,7 +163,11 @@ function RunManagement({ run }: { run: ManagedRun }) {
 
       <Separator />
 
-      {open ? <RunSettingsForm run={run} /> : <LockedSummary run={run} />}
+      {run.listLocked ? (
+        <LockedSummary run={run} />
+      ) : (
+        <RunSettingsForm run={run} />
+      )}
     </div>
   );
 }
@@ -170,8 +177,9 @@ function RunManagement({ run }: { run: ManagedRun }) {
 // each design in the order list *are* what players pick from. Switches
 // freely in both directions with no confirmation: player-typed names are
 // already items on the list, so open → fixed puts them in the picker and
-// fixed → open only loosens a constraint. Neither loses data (PRD §6). A
-// closed form rejects every write, so it only says what was chosen.
+// fixed → open only loosens a constraint. Neither loses data (PRD §6). Once
+// the list is confirmed every write is rejected, so it only says what was
+// chosen.
 //
 // Native radios, not the Base UI group: a wrapping <label> names a native
 // input reliably, and the choice is a plain two-way pick.
@@ -181,7 +189,7 @@ function NamesModeSetting({ run }: { run: ManagedRun }) {
   // mutation lands, and a rejected save falls back to the stored mode.
   const [pending, setPending] = useState<NamesMode | null>(null);
   const selected = pending ?? run.namesMode;
-  const editable = run.effectiveStatus === "open";
+  const editable = !run.listLocked;
 
   async function onChange(next: NamesMode) {
     if (next === selected) return;
@@ -257,20 +265,21 @@ const NAMES_MODE_OPTIONS: { value: NamesMode; label: string; hint: string }[] =
     },
   ];
 
-// A closed form rejects every edit server-side, so the form gives way to
-// what it was holding. Read-only, not disabled inputs: there's nothing to
-// type into and pretending otherwise invites a rejected save.
+// A confirmed list rejects every settings edit server-side, so the form gives
+// way to what it was holding. Read-only, not disabled inputs: there's nothing
+// to type into and pretending otherwise invites a rejected save. A merely
+// closed form keeps the editable form: a new deadline reopens it (L-06).
 function LockedSummary({ run }: { run: ManagedRun }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        This order form is closed, so its settings can&apos;t change. Need a
-        change? Email us at{" "}
+        Your list is confirmed, so the form&apos;s settings can&apos;t change.
+        Need a change? Email us at{" "}
         <a
-          href="mailto:info@sidestep.design"
+          href={OPS_MAILTO}
           className="font-medium text-teal-700 underline underline-offset-4 hover:text-teal-800 focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none dark:text-teal-300 dark:hover:text-teal-200"
         >
-          info@sidestep.design
+          {OPS_EMAIL}
         </a>
         .
       </p>
@@ -354,7 +363,9 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
             <FormItem>
               <FormLabel>Deadline</FormLabel>
               <FormDescription>
-                The form closes at the end of this day.
+                {run.effectiveStatus === "open"
+                  ? "The form closes at the end of this day."
+                  : "The form is closed. Pick a new date to open it again."}
               </FormDescription>
               <FormControl>
                 <Input type="date" className="h-10" {...field} />

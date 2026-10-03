@@ -427,8 +427,8 @@ async function ensureRun(
     // actually sees when a captain hasn't pre-seeded a roster.
     namesMode: "open",
     customQuestions: [{ id: "q-shorts", label: "Do you also want shorts?" }],
-    // Comfortably in the future: a past deadline would lazily resolve to
-    // "locked" (R-06) and every captain surface would photograph read-only.
+    // Comfortably in the future: a past deadline would lazily close the form,
+    // and the public-form capture would show the closed state.
     deadline: now + RUN_DEADLINE_DAYS * 24 * 60 * 60 * 1000,
     status: "open",
     createdAt: now,

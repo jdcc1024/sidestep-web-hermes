@@ -182,14 +182,6 @@ export const cleanup = internalMutation({
         .withIndex("by_order", (q) => q.eq("orderId", order._id))
         .collect();
       for (const run of runs) {
-        for (const table of ["rosterEntries", "orderEntries"] as const) {
-          const legacy = await ctx.db
-            .query(table)
-            .withIndex("by_run", (q) => q.eq("runId", run._id))
-            .collect();
-          for (const row of legacy) await ctx.db.delete(row._id);
-          rows += legacy.length;
-        }
         await ctx.db.delete(run._id);
         rows += 1;
       }

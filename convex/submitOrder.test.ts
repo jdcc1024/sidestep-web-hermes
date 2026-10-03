@@ -33,8 +33,10 @@ async function seedRun(
   opts: {
     namesMode?: "open" | "fixed";
     customQuestions?: { id: string; label: string }[];
-    status?: "open" | "closed" | "locked";
+    status?: "open" | "closed";
     deadlineOffset?: number;
+    // JCC has checked "Order Size Confirmed": the list is locked (L-06).
+    confirmed?: boolean;
   } = {},
 ) {
   const now = Date.now();
@@ -68,7 +70,12 @@ async function seedRun(
         estimatedQuantity: 12,
         hasOwnDesign: false,
         designIds: [homeId, awayId],
-        internalStages: [{ name: "Inquiry", completedAt: now }],
+        internalStages: [
+          { name: "Inquiry", completedAt: now },
+          ...(opts.confirmed
+            ? [{ name: "Order Size Confirmed", completedAt: now }]
+            : []),
+        ],
         createdAt: now,
         updatedAt: now,
       });
@@ -986,9 +993,9 @@ describe("submitOrder is rejected when isListLocked, and when the form is closed
     qty: 1,
   });
 
-  it("rejects a locked list with customer copy and writes nothing", async () => {
+  it("rejects a confirmed (locked) list with customer copy and writes nothing", async () => {
     const t = convexTest(schema, modules);
-    const { orderId, runId, homeId } = await seedRun(t, { status: "locked" });
+    const { orderId, runId, homeId } = await seedRun(t, { confirmed: true });
     const seeded = await insertItem(t, orderId, homeId, {
       name: "Gretzky",
       number: "99",
@@ -1002,6 +1009,7 @@ describe("submitOrder is rejected when isListLocked, and when the form is closed
         lines: [line(homeId)],
       }),
     );
+    expect(message).toMatch(/locked/i);
     expect(message).not.toMatch(/convex|request id|\.ts\b/i);
 
     const items = await allItems(t, orderId);
@@ -1010,7 +1018,7 @@ describe("submitOrder is rejected when isListLocked, and when the form is closed
     expect(items[0].size).toBeUndefined();
   });
 
-  it("rejects a list that locked lazily past its deadline", async () => {
+  it("rejects a form that closed lazily past its deadline", async () => {
     const t = convexTest(schema, modules);
     const { orderId, runId, homeId } = await seedRun(t, {
       deadlineOffset: -ONE_DAY,
@@ -1039,31 +1047,5 @@ describe("submitOrder is rejected when isListLocked, and when the form is closed
     );
     expect(message).toMatch(/closed/i);
     expect(await allItems(t, orderId)).toEqual([]);
-  });
-});
-
-// "Every read and every write of order content goes through orderItems":
-// the legacy tables keep their data (L-06 deletes them) but the form no
-// longer adds to them.
-describe("submitOrder writes only orderItems, never the legacy roster/order entry tables", () => {
-  it("leaves rosterEntries and orderEntries untouched", async () => {
-    const t = convexTest(schema, modules);
-    const { runId, homeId } = await seedRun(t);
-
-    await t.mutation(api.orderEntries.submitOrder, {
-      jerseyRunId: runId,
-      ...fan,
-      customAnswers: {},
-      lines: [
-        { designId: homeId, name: "Gretzky", number: "99", size: "L", qty: 1 },
-        { designId: homeId, size: "M", qty: 2 },
-      ],
-    });
-
-    const legacy = await t.run(async (ctx) => ({
-      roster: (await ctx.db.query("rosterEntries").collect()).length,
-      entries: (await ctx.db.query("orderEntries").collect()).length,
-    }));
-    expect(legacy).toEqual({ roster: 0, entries: 0 });
   });
 });

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -10,6 +9,7 @@ import {
   INTERNAL_STAGES,
   type InternalStage,
 } from "@/lib/orderStages";
+import { userMessage } from "@/lib/userMessage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -51,16 +51,13 @@ export function OrderStageChecklist({ orderId, internalStages }: Props) {
       return { name, completedAt: existing ?? null };
     });
 
+    // The checkboxes read straight from props, so a refused change (e.g. the
+    // confirm gate: "2 items need a size: …", L-06) leaves the box as it was
+    // and only the server's message shows.
     try {
       await updateStages({ orderId, stages });
     } catch (err) {
-      const message =
-        err instanceof ConvexError
-          ? String(err.data)
-          : err instanceof Error
-            ? err.message
-            : "Failed to update stage.";
-      setError(message);
+      setError(userMessage(err, "Couldn't update that stage. Try again."));
     } finally {
       setPending(null);
     }

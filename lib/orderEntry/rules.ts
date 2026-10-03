@@ -3,7 +3,7 @@
 // Owns the order-entry's own stored fields (size, qty, submitter); the
 // player-slot fields (name, number) live in lib/rosterEntry, and a
 // multi-line fan submission (R-02) composes the two. Imported by both
-// the form adapter (./form.ts) and the Convex `orderEntries` mutations.
+// the public order form and the Convex `submitOrder` / order-item mutations.
 
 export const SUBMITTER_NAME_MAX_LENGTH = 120;
 export const EMAIL_MAX_LENGTH = 254;
