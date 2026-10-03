@@ -47,15 +47,15 @@ export default function EditOrderPage({ params }: PageProps) {
       </Link>
       <header className="mt-3">
         <p className="text-sm font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">
-          {locked ? "Order locked" : "Edit order"}
+          {locked ? "Locked for production" : "Edit order"}
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           {order.teamName}
         </h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
           {locked
-            ? "Your roster is locked, so this order is now read-only."
-            : "Update your team details and the designs linked to this order. You can edit anytime before the roster is locked."}
+            ? "Your list is confirmed and we're making it now, so this order is read-only."
+            : "Update your team details and the designs linked to this order. You can edit anytime until it's locked for production."}
         </p>
       </header>
 

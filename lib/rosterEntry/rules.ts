@@ -68,7 +68,7 @@ export function checkRosterDesignation(
 export function checkRosterName(raw: string): CheckResult<string> {
   const name = raw.trim();
   if (name.length === 0)
-    return { ok: false, error: "Add a name for this player slot." };
+    return { ok: false, error: "Add a name for this item." };
   if (name.length > ROSTER_NAME_MAX_LENGTH)
     return {
       ok: false,

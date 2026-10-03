@@ -3,6 +3,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
+import { itemCountText } from "@/lib/orderItem";
 import { cn } from "@/lib/utils";
 import {
   chipToneForStage,
@@ -48,7 +49,7 @@ export function OrderHeader({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{order.sport}</Badge>
             <Badge variant="secondary" className="tabular-nums">
-              {total} collected
+              {itemCountText(total)}
             </Badge>
             <Badge variant="outline">
               Created {formatDate(order.createdAt)}

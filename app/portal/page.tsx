@@ -156,10 +156,10 @@ export default function PortalDashboardPage() {
             id="jersey-responses-heading"
             className="text-xl font-semibold text-foreground"
           >
-            Your jersey run responses
+            Jerseys you&apos;ve ordered
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Submissions you&apos;ve made to other captains&apos; jersey runs.
+            What you&apos;ve sent through other captains&apos; order forms.
           </p>
         </div>
         <div className="mt-4">
@@ -265,7 +265,7 @@ function JerseyResponseCard({ entry }: { entry: MyJerseyRunResponse }) {
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-lg font-semibold text-foreground">
-          {teamName || "Jersey run"}
+          {teamName || "Order form"}
         </h3>
         {run.status === "closed" && (
           <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
@@ -308,11 +308,11 @@ function EmptyJerseyRunResponses() {
         />
       </svg>
       <h3 className="mt-4 text-base font-semibold text-foreground">
-        You haven&apos;t submitted any jersey run responses yet
+        You haven&apos;t ordered through an order form yet
       </h3>
       <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
-        When a captain shares a jersey run link, your submissions will show up
-        here.
+        When a captain shares their team&apos;s order form with you, what you
+        send shows up here.
       </p>
     </div>
   );
