@@ -29,6 +29,16 @@ export type SeededOrder = { orderId: string; designId: string; teamName: string 
 export const seedOrder = (tag: string) =>
   run<SeededOrder>("_e2e:seedOrder", { email: email(), tag });
 
+export type SeedItem = { name?: string; number?: string; size?: string; qty?: number };
+
+/** Puts items on the seeded order's design. */
+export const seedItems = (tag: string, orderId: string, items: SeedItem[]) =>
+  run<{ count: number }>("_e2e:seedItems", { email: email(), tag, orderId, items });
+
+/** Checks or unchecks "Order Size Confirmed", bypassing the admin gate. */
+export const setConfirmed = (tag: string, orderId: string, confirmed: boolean) =>
+  run<{ ok: true }>("_e2e:setConfirmed", { email: email(), tag, orderId, confirmed });
+
 export const cleanup = (tag: string) =>
   run<{ orders: number; designs: number; rows: number }>("_e2e:cleanup", { email: email(), tag });
 

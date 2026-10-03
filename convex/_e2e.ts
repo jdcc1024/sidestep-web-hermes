@@ -77,6 +77,72 @@ export const seedOrder = internalMutation({
   },
 });
 
+// Test-only: puts items straight on an E2E order, so a test can start from
+// "a list with a sized and an unsized item" without driving the sheet.
+export const seedItems = internalMutation({
+  args: {
+    email: v.string(),
+    tag: v.string(),
+    orderId: v.id("orders"),
+    items: v.array(
+      v.object({
+        name: v.optional(v.string()),
+        number: v.optional(v.string()),
+        size: v.optional(v.string()),
+        qty: v.optional(v.number()),
+      }),
+    ),
+  },
+  handler: async (ctx, { email, tag, orderId, items }) => {
+    checkTag(tag);
+    const user = await userByEmail(ctx, email);
+    const order = await ctx.db.get(orderId);
+    if (!order || order.captainId !== user._id || !order.teamName.startsWith(`${PREFIX}${tag}`))
+      throw new ConvexError("Not an E2E order for this tag.");
+    const now = Date.now();
+    const designId = order.designIds[0];
+    for (const [i, item] of items.entries()) {
+      await ctx.db.insert("orderItems", {
+        orderId,
+        designId,
+        name: item.name,
+        number: item.number,
+        size: item.size,
+        qty: item.qty ?? 1,
+        source: "captain",
+        createdAt: now + i,
+        updatedAt: now + i,
+      });
+    }
+    return { count: items.length };
+  },
+});
+
+// Test-only: checks or unchecks "Order Size Confirmed" without the admin gate,
+// so captain-side lock tests don't depend on the account being an admin.
+export const setConfirmed = internalMutation({
+  args: {
+    email: v.string(),
+    tag: v.string(),
+    orderId: v.id("orders"),
+    confirmed: v.boolean(),
+  },
+  handler: async (ctx, { email, tag, orderId, confirmed }) => {
+    checkTag(tag);
+    const user = await userByEmail(ctx, email);
+    const order = await ctx.db.get(orderId);
+    if (!order || order.captainId !== user._id || !order.teamName.startsWith(`${PREFIX}${tag}`))
+      throw new ConvexError("Not an E2E order for this tag.");
+    const rest = order.internalStages.filter((s) => s.name !== "Order Size Confirmed");
+    await ctx.db.patch(orderId, {
+      internalStages: confirmed
+        ? [...rest, { name: "Order Size Confirmed", completedAt: Date.now() }]
+        : rest,
+    });
+    return { ok: true as const };
+  },
+});
+
 export type CleanupResult = { orders: number; designs: number; rows: number };
 
 // Deletes the named account's E2E rows: those carrying `tag`, plus (when
