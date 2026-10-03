@@ -206,3 +206,44 @@ export const backfillOrderItems = internalMutation({
     return { orders: ordersBackfilled, itemsCreated };
   },
 });
+
+/**
+ * L-06: retire the legacy roster model. `orderItems` is the only list now
+ * (backfilled by `backfillOrderItems` above), and the list locks on the
+ * order's "Order Size Confirmed" stage, not on the order form. This empties
+ * the two legacy tables, turns any stored `locked` run into `closed` (the
+ * deadline only closes the form) and clears its `lockSnapshot`, so the schema
+ * can then drop `rosterEntries`, `orderEntries`, `lockSnapshot` and the
+ * `locked` status literal.
+ *
+ * Run with:
+ *   npx convex run _migrations:retireLegacyRosterTables
+ *
+ * Idempotent: a second run finds nothing to delete or patch. One transaction,
+ * which is fine for the dev fixtures (there is no production deployment yet).
+ */
+export const retireLegacyRosterTables = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    let rosterEntries = 0;
+    for (const row of await ctx.db.query("rosterEntries").collect()) {
+      await ctx.db.delete(row._id);
+      rosterEntries++;
+    }
+    let orderEntries = 0;
+    for (const row of await ctx.db.query("orderEntries").collect()) {
+      await ctx.db.delete(row._id);
+      orderEntries++;
+    }
+    let runsPatched = 0;
+    for (const run of await ctx.db.query("jerseyRuns").collect()) {
+      if (run.status !== "locked" && run.lockSnapshot === undefined) continue;
+      await ctx.db.patch(run._id, {
+        status: run.status === "locked" ? "closed" : run.status,
+        lockSnapshot: undefined,
+      });
+      runsPatched++;
+    }
+    return { rosterEntries, orderEntries, runsPatched };
+  },
+});
