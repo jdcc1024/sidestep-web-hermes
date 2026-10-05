@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0004 mockup: one player, several sizes</title>
+<!--
+  UX mockup for docs/ux/0004-roster-sizes.md. Static, no build, no network.
+  Base tokens copied from the phase-1 mockup (docs/ux/0004-order-items/mockup.html):
+  Inter, teal-600/700, shadcn card radius and borders, amber notes. The size
+  counter copies the public form's fixed-mode SizeCounter (PublicOrderForm.tsx).
+  Frames: 1 order list, 2 add player with sizes, 3 same name joins the row,
+  4 edit player, 5 removed + undo, 6 paste, 7 public order form, 8 design fields.
+-->
+<style>
+  :root {
+    --bg:#fff; --muted:#f5f5f5; --fg:#0a0a0a; --muted-fg:#737373; --border:#e5e5e5;
+    --teal-50:#f0fdfa; --teal-100:#ccfbf1; --teal-600:#0d9488; --teal-700:#0f766e;
+    --amber-50:#fffbeb; --amber-300:#fcd34d; --amber-800:#92400e; --radius:10px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         color:var(--fg); background:#e9eef0; line-height:1.45; font-size:14px; }
+  :focus-visible { outline:2px solid var(--teal-600); outline-offset:2px; border-radius:6px; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+  .review { max-width:1260px; margin:0 auto; padding:24px 16px 64px; }
+  .review h1 { font-size:20px; margin:0 0 4px; }
+  .review > p { margin:0 0 4px; color:#444; }
+  .frames { display:flex; flex-wrap:wrap; gap:28px; margin-top:20px; align-items:flex-start; }
+  .frame-wrap { flex:0 1 375px; min-width:0; }
+  .frame-label { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#555; margin:0 0 8px; }
+  .phone { position:relative; width:100%; max-width:375px; min-height:640px; background:var(--bg); border:1px solid #cfd6d9;
+           border-radius:28px; overflow:hidden; box-shadow:0 12px 30px rgba(0,0,0,.12); }
+  .note { font-size:13px; color:#444; margin-top:10px; max-width:375px; }
+  .topbar { height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; border-bottom:1px solid var(--border); }
+  .logo { font-family:"Bebas Neue", Impact, "Arial Narrow", sans-serif; font-size:22px; letter-spacing:.04em; }
+  .avatar { width:28px; height:28px; border-radius:50%; background:#d4d4d4; }
+  .page { padding:16px; }
+  .back { color:var(--teal-700); font-weight:500; font-size:13px; text-decoration:none; }
+  h2.title { font-size:26px; font-weight:800; letter-spacing:-.02em; margin:0; }
+  .chip { display:inline-flex; align-items:center; gap:4px; height:22px; padding:0 8px; border-radius:999px; font-size:12px; font-weight:500;
+          background:var(--muted); color:#404040; border:1px solid transparent; }
+  .card { border:1px solid var(--border); border-radius:var(--radius); background:#fff; margin-top:14px; }
+  .card-h { padding:14px 14px 10px; }
+  .card-h h3 { margin:0; font-size:15px; font-weight:700; }
+  .card-h p { margin:4px 0 0; color:var(--muted-fg); font-size:13px; }
+  .kit { border-top:1px solid var(--border); }
+  .kit-h { display:flex; align-items:center; gap:10px; padding:12px 14px 6px; }
+  .thumb { width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg,#0f766e,#111); flex:none; }
+  .kit-h .name { font-weight:700; font-size:14px; }
+  .kit-h .count { color:var(--muted-fg); font-size:12px; }
+  .sizes { display:flex; flex-wrap:wrap; gap:4px; padding:0 14px 8px; }
+  .rows { list-style:none; margin:0; padding:0; }
+  .letter { display:inline-flex; width:18px; height:18px; border-radius:4px; background:#171717; color:#fff; font-size:10px; font-weight:700;
+            align-items:center; justify-content:center; margin-left:4px; vertical-align:1px; }
+  .size.need { font-weight:600; font-size:12px; color:var(--amber-800); background:#fef3c7; padding:2px 8px; border-radius:999px; }
+  .more { width:44px; height:44px; border:0; background:transparent; border-radius:8px; font-size:18px; color:#525252; cursor:pointer; }
+  .more:hover { background:var(--muted); }
+  .kit-actions { display:flex; gap:8px; padding:10px 14px 14px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:44px; padding:0 14px; border-radius:8px;
+         font:inherit; font-weight:600; font-size:14px; cursor:pointer; border:1px solid var(--border); background:#fff; color:var(--fg); }
+  .btn.primary { background:var(--teal-600); border-color:var(--teal-600); color:#fff; }
+  .btn.ghost { border-color:transparent; }
+  .btn.danger { color:#b91c1c; border-color:#fecaca; }
+  .btn.block { width:100%; }
+  .total { display:flex; justify-content:space-between; padding:12px 14px; border-top:1px solid var(--border); background:var(--muted);
+           border-radius:0 0 var(--radius) var(--radius); font-size:13px; }
+  .scrim { position:absolute; inset:0; background:rgba(0,0,0,.4); }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:18px 18px 0 0; padding:10px 16px 18px; }
+  .grab { width:40px; height:4px; border-radius:4px; background:#d4d4d4; margin:0 auto 10px; }
+  .sheet h3 { margin:0; font-size:17px; }
+  .sheet .sub { color:var(--muted-fg); font-size:13px; margin:2px 0 12px; }
+  label.f { display:block; font-weight:500; font-size:13px; margin:12px 0 4px; }
+  .hint { font-size:12px; color:var(--muted-fg); margin:-2px 0 6px; }
+  .input { height:44px; width:100%; border:1px solid var(--border); border-radius:8px; padding:0 12px; font:inherit; font-size:16px; background:#fff; }
+  .two { display:grid; grid-template-columns:1fr 92px; gap:10px; }
+  .seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .seg button { height:40px; padding:0 14px; border:0; border-right:1px solid var(--border); background:#fff; font:inherit; font-size:13px; cursor:pointer; }
+  .seg button:last-child { border-right:0; }
+  .seg button[aria-pressed="true"] { background:var(--teal-50); color:var(--teal-700); font-weight:600; }
+  .sheet-actions { display:flex; gap:8px; margin-top:16px; }
+  .sheet-actions .btn { flex:1; }
+  .sheet-actions.stack { flex-direction:column-reverse; }
+  .sheet-actions.stack .btn { flex:none; }
+  .meta { background:var(--muted); border-radius:8px; padding:10px 12px; font-size:12.5px; color:#404040; margin:0 0 4px; }
+  .meta dt { color:var(--muted-fg); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .meta dd { margin:2px 0 0; }
+  .toast { position:absolute; left:12px; right:12px; bottom:16px; background:#171717; color:#fff; border-radius:10px; padding:4px 4px 4px 14px;
+           display:flex; align-items:center; justify-content:space-between; font-size:13.5px; box-shadow:0 8px 20px rgba(0,0,0,.25); }
+  .toast button { background:transparent; border:0; color:#5eead4; font:inherit; font-weight:700; cursor:pointer; min-height:44px; padding:0 12px; }
+  .dim { opacity:.35; }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+</style>
+<style>
+  /* 0004 roster sizes additions */
+  .entry { display:flex; gap:8px; padding:8px 6px 10px 14px; border-top:1px solid #f0f0f0; }
+  .entry .who { flex:1; min-width:0; }
+  .entry .n { font-weight:500; overflow-wrap:anywhere; }
+  .entry .n .num { color:var(--muted-fg); font-weight:400; }
+  .entry .extra { font-size:12px; color:#525252; margin-top:1px; }
+  .entry .by { font-size:11.5px; color:var(--muted-fg); }
+  .entry .more { flex:none; align-self:flex-start; }
+  .szs { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:6px; }
+  .sz { display:inline-flex; align-items:center; height:24px; padding:0 8px; border-radius:6px; border:1px solid var(--border);
+        font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; background:#fff; }
+  .sz small { font-weight:500; color:var(--muted-fg); margin-left:2px; font-size:12px; }
+  .szs .tot { font-size:12px; color:var(--muted-fg); margin-left:4px; }
+  .blank-n { color:var(--muted-fg); font-style:normal; }
+
+  /* size counters: the public form's SizeCounter, at 44px */
+  .counters { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; }
+  .ctr { position:relative; display:flex; align-items:center; height:44px; border:1px solid var(--border); border-radius:8px; background:#fff; }
+  .ctr .lbl { flex:1; height:100%; border:0; background:transparent; font:inherit; font-weight:600; cursor:pointer; border-radius:8px; }
+  .ctr.on { border-color:var(--teal-600); background:var(--teal-50); }
+  .ctr.on .lbl { color:var(--teal-700); text-align:left; padding-left:8px; }
+  .ctr .minus { width:30px; height:100%; border:0; border-left:1px solid #99f6e4; background:transparent; font-size:17px; color:var(--teal-700); cursor:pointer; }
+  .ctr .badge { position:absolute; top:-7px; right:-5px; min-width:20px; height:20px; border-radius:999px; background:var(--teal-600); color:#fff;
+                font-size:11.5px; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0 5px; font-variant-numeric:tabular-nums; }
+  .ctr-sum { display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted-fg); margin-top:8px; }
+  .ctr-sum b { color:var(--fg); }
+  .info { margin:12px 0 0; padding:10px 12px; border-radius:8px; background:var(--teal-50); border:1px solid var(--teal-100); color:#134e4a; font-size:13px; }
+  .three { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .check { display:flex; align-items:center; gap:8px; font-size:13px; margin-top:6px; min-height:32px; }
+  .check input { width:18px; height:18px; accent-color:var(--teal-600); }
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:48px; border-top:1px solid #f0f0f0; padding:4px 0; }
+  .toggle-row:first-child { border-top:0; }
+  .toggle-row .t { font-weight:500; }
+  .toggle-row .s { font-size:12px; color:var(--muted-fg); }
+  .sw { width:44px; height:26px; border-radius:999px; background:#d4d4d4; position:relative; flex:none; border:0; cursor:pointer; }
+  .sw::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .15s; }
+  .sw[aria-checked="true"] { background:var(--teal-600); }
+  .sw[aria-checked="true"]::after { left:21px; }
+  .pv { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  .pv li { border:1px solid #f0f0f0; border-radius:8px; padding:8px 10px; }
+  .pv .top { display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .pv .nt { font-size:12px; color:var(--muted-fg); margin-top:2px; }
+  .pv li.bad { border-style:dashed; background:#fafafa; color:var(--muted-fg); }
+  .fieldset { border:1px solid var(--border); border-radius:12px; background:#fafafa; padding:14px; margin-top:12px; }
+  .fieldset .lg { display:flex; justify-content:space-between; font-weight:600; font-size:13.5px; }
+  .tag { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#555; background:#e5e5e5; border-radius:4px; padding:1px 6px; margin-left:6px; }
+</style>
+</head>
+<body>
+<div class="review">
+  <h1>0004 · One player, several sizes</h1>
+  <p>Mobile-first mockup for <code>docs/ux/0004-roster-sizes.md</code>. Static, so the buttons don't do anything. 375px phone frames.</p>
+  <p>Words used here are the <b>recommended</b> ones (doc §8, Q1): captains see <b>player</b> for a roster entry and <b>sizes</b> for its order items. Counts are in <b>jerseys</b> (Q2). Field names come from the design (Q3).</p>
+
+  <div class="frames">
+
+    <!-- 1 -->
+    <div class="frame-wrap">
+      <p class="frame-label">1 · Order list: one row per player, sizes under it</p>
+      <div class="phone">
+        <div class="topbar"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page">
+          <section class="card" aria-labelledby="ol1" style="margin-top:0">
+            <div class="card-h">
+              <h3 id="ol1">Order list</h3>
+              <p>Everything we'll make for this order. Add players yourself, or share the order form and let them add their own.</p>
+            </div>
+            <div class="kit">
+              <div class="kit-h"><span class="thumb"></span><div><div class="name">Home Kit</div><div class="count">3 players · 10 jerseys · 1 needs sizes</div></div></div>
+              <div class="sizes"><span class="chip">S×1</span><span class="chip">M×5</span><span class="chip">L×2</span><span class="chip">XL×2</span></div>
+              <ul class="rows">
+                <li class="entry">
+                  <div class="who">
+                    <div class="n">Sidestep <span class="num">#72</span></div>
+                    <div class="by">Added by you</div>
+                    <div class="szs" aria-label="Sizes for Sidestep #72"><span class="sz">S</span><span class="sz">M<small>×3</small></span><span class="sz">XL</span><span class="tot">5 jerseys</span></div>
+                  </div>
+                  <button class="more" aria-label="Edit Sidestep #72">⋯</button>
+                </li>
+                <li class="entry">
+                  <div class="who">
+                    <div class="n">Avery Quinn <span class="num">#7</span><span class="letter" title="Captain">C</span></div>
+                    <div class="by">Added by Avery</div>
+                    <div class="szs" aria-label="Sizes for Avery Quinn #7"><span class="sz">M</span><span class="sz">XL</span><span class="tot">2 jerseys</span></div>
+                  </div>
+                  <button class="more" aria-label="Edit Avery Quinn #7">⋯</button>
+                </li>
+                <li class="entry">
+                  <div class="who">
+                    <div class="n">Jordan Lee <span class="num">#4</span></div>
+                    <div class="by">Added by you</div>
+                    <div class="szs"><span class="size need">Needs sizes</span></div>
+                  </div>
+                  <button class="more" aria-label="Edit Jordan Lee #4">⋯</button>
+                </li>
+                <li class="entry">
+                  <div class="who">
+                    <div class="n"><span class="blank-n">Blank jerseys</span></div>
+                    <div class="by">Nothing printed · Added by you</div>
+                    <div class="szs" aria-label="Sizes for blank jerseys"><span class="sz">M</span><span class="sz">L<small>×2</small></span><span class="tot">3 jerseys</span></div>
+                  </div>
+                  <button class="more" aria-label="Edit blank jerseys">⋯</button>
+                </li>
+              </ul>
+              <div class="kit-actions"><button class="btn primary">+ Add player</button><button class="btn ghost">Paste a list</button></div>
+            </div>
+            <div class="total"><span><b>10 jerseys</b> · S×1 M×5 L×2 XL×2</span><span style="color:var(--amber-800);font-weight:600">1 player needs sizes</span></div>
+          </section>
+        </div>
+      </div>
+      <p class="note">One row per player. Sizes sit under the name as chips, quantity only when it's more than one, and the row total on the right of the chips. Chips wrap, so a player with 6 sizes gets a taller row, never a wider one. Blanks gather into one row per design.</p>
+    </div>
+
+    <!-- 2 -->
+    <div class="frame-wrap">
+      <p class="frame-label">2 · + Add player: 1 S, 3 M, 1 XL in one go</p>
+      <div class="phone" style="min-height:760px">
+        <div class="topbar dim"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="scrim"></div>
+        <div class="sheet" role="dialog" aria-labelledby="s2">
+          <div class="grab"></div>
+          <h3 id="s2">Add a player</h3>
+          <p class="sub">Home Kit</p>
+          <div class="two">
+            <div><label class="f" for="a1">Name on back</label><input class="input" id="a1" value="Sidestep"></div>
+            <div><label class="f" for="a2">Number</label><input class="input" id="a2" value="72" inputmode="numeric"></div>
+          </div>
+          <p class="hint" style="margin-top:6px">Leave anything blank you don't want printed.</p>
+          <label class="f" id="sz2">Sizes</label>
+          <p class="hint">Tap a size once for each jersey. Not sure yet? Skip it and we'll mark it "needs sizes".</p>
+          <div class="counters" role="group" aria-labelledby="sz2">
+            <div class="ctr"><button class="lbl" aria-label="Add one XS">XS</button></div>
+            <div class="ctr on"><button class="lbl" aria-label="Add one S, 1 so far">S</button><button class="minus" aria-label="Remove one S">−</button><span class="badge" aria-hidden="true">1</span></div>
+            <div class="ctr on"><button class="lbl" aria-label="Add one M, 3 so far">M</button><button class="minus" aria-label="Remove one M">−</button><span class="badge" aria-hidden="true">3</span></div>
+            <div class="ctr"><button class="lbl" aria-label="Add one L">L</button></div>
+            <div class="ctr on"><button class="lbl" aria-label="Add one XL, 1 so far">XL</button><button class="minus" aria-label="Remove one XL">−</button><span class="badge" aria-hidden="true">1</span></div>
+            <div class="ctr"><button class="lbl" aria-label="Add one 2XL">2XL</button></div>
+            <div class="ctr"><button class="lbl" aria-label="Add one 3XL">3XL</button></div>
+            <div class="ctr"><button class="lbl" aria-label="Add one 4XL">4XL</button></div>
+          </div>
+          <div class="ctr-sum" aria-live="polite"><span>S×1 · M×3 · XL×1</span><b>5 jerseys</b></div>
+          <label class="f">Captain letter</label>
+          <div class="seg"><button aria-pressed="true">None</button><button aria-pressed="false">C</button><button aria-pressed="false">A</button></div>
+          <div class="sheet-actions stack">
+            <button class="btn">Add and start another</button>
+            <button class="btn primary">Add Sidestep #72 · 5 jerseys</button>
+          </div>
+        </div>
+      </div>
+      <p class="note">The size grid replaces phase 1's single size + "How many" stepper. It's the counter the public form already uses in "pick from list" mode, made 44px tall. Name, number, then 5 taps on sizes, then Add. One sheet, one row.</p>
+    </div>
+
+    <!-- 3 -->
+    <div class="frame-wrap">
+      <p class="frame-label">3 · Same name and number again: sizes join the row</p>
+      <div class="phone" style="min-height:700px">
+        <div class="topbar dim"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="scrim"></div>
+        <div class="sheet" role="dialog" aria-labelledby="s3">
+          <div class="grab"></div>
+          <h3 id="s3">Add a player</h3>
+          <p class="sub">Home Kit</p>
+          <div class="two">
+            <div><label class="f" for="b1">Name on back</label><input class="input" id="b1" value="sidestep"></div>
+            <div><label class="f" for="b2">Number</label><input class="input" id="b2" value="72"></div>
+          </div>
+          <p class="info" role="status"><b>Sidestep #72 is already on Home Kit</b> (S, M×3, XL). The sizes you pick here get added to that row.</p>
+          <label class="f" id="sz3">Sizes</label>
+          <div class="counters" role="group" aria-labelledby="sz3">
+            <div class="ctr"><button class="lbl">XS</button></div>
+            <div class="ctr"><button class="lbl">S</button></div>
+            <div class="ctr"><button class="lbl">M</button></div>
+            <div class="ctr on"><button class="lbl">L</button><button class="minus" aria-label="Remove one L">−</button><span class="badge">1</span></div>
+            <div class="ctr"><button class="lbl">XL</button></div>
+            <div class="ctr"><button class="lbl">2XL</button></div>
+            <div class="ctr"><button class="lbl">3XL</button></div>
+            <div class="ctr"><button class="lbl">4XL</button></div>
+          </div>
+          <div class="ctr-sum"><span>L×1</span><b>1 jersey</b></div>
+          <div class="sheet-actions stack">
+            <button class="btn">Add and start another</button>
+            <button class="btn primary">Add 1 to Sidestep #72</button>
+          </div>
+        </div>
+      </div>
+      <p class="note">Match ignores case and extra spaces (phase 1's paste rule). No second row is ever created. The button names the row it lands on so there's no surprise. Toast after: "Added L to Sidestep #72".</p>
+    </div>
+
+    <!-- 4 -->
+    <div class="frame-wrap">
+      <p class="frame-label">4 · Edit a player: change sizes, remove</p>
+      <div class="phone" style="min-height:780px">
+        <div class="topbar dim"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="scrim"></div>
+        <div class="sheet" role="dialog" aria-labelledby="s4">
+          <div class="grab"></div>
+          <h3 id="s4">Edit player</h3>
+          <p class="sub">Home Kit</p>
+          <dl class="meta">
+            <dt>Sizes added by</dt>
+            <dd>You · S, M×2 · Oct 2</dd>
+            <dd>Riley Chen · M, XL · Oct 4, through the order form</dd>
+          </dl>
+          <div class="two">
+            <div><label class="f" for="c1">Name on back</label><input class="input" id="c1" value="Sidestep"></div>
+            <div><label class="f" for="c2">Number</label><input class="input" id="c2" value="72"></div>
+          </div>
+          <label class="f" id="sz4">Sizes</label>
+          <div class="counters" role="group" aria-labelledby="sz4">
+            <div class="ctr"><button class="lbl">XS</button></div>
+            <div class="ctr on"><button class="lbl">S</button><button class="minus" aria-label="Remove one S">−</button><span class="badge">1</span></div>
+            <div class="ctr on"><button class="lbl">M</button><button class="minus" aria-label="Remove one M">−</button><span class="badge">3</span></div>
+            <div class="ctr"><button class="lbl">L</button></div>
+            <div class="ctr on"><button class="lbl">XL</button><button class="minus" aria-label="Remove one XL">−</button><span class="badge">1</span></div>
+            <div class="ctr"><button class="lbl">2XL</button></div>
+            <div class="ctr"><button class="lbl">3XL</button></div>
+            <div class="ctr"><button class="lbl">4XL</button></div>
+          </div>
+          <div class="ctr-sum"><span>S×1 · M×3 · XL×1</span><b>5 jerseys</b></div>
+          <div class="sheet-actions stack">
+            <button class="btn danger">Remove player</button>
+            <button class="btn primary">Save</button>
+          </div>
+        </div>
+      </div>
+      <p class="note">Removing one size = tap its − until it's gone (the row keeps the player). "Remove player" takes the whole row, with Undo. Who-added-what is per size line, because a player's sizes can now come from more than one person.</p>
+    </div>
+
+    <!-- 5 -->
+    <div class="frame-wrap">
+      <p class="frame-label">5 · Removed, with Undo</p>
+      <div class="phone">
+        <div class="topbar"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page">
+          <section class="card" style="margin-top:0">
+            <div class="kit" style="border-top:0">
+              <div class="kit-h"><span class="thumb"></span><div><div class="name">Home Kit</div><div class="count">2 players · 5 jerseys · 1 needs sizes</div></div></div>
+              <ul class="rows">
+                <li class="entry"><div class="who"><div class="n">Avery Quinn <span class="num">#7</span><span class="letter">C</span></div><div class="by">Added by Avery</div><div class="szs"><span class="sz">M</span><span class="sz">XL</span><span class="tot">2 jerseys</span></div></div><button class="more" aria-label="Edit Avery Quinn #7">⋯</button></li>
+                <li class="entry"><div class="who"><div class="n">Jordan Lee <span class="num">#4</span></div><div class="by">Added by you</div><div class="szs"><span class="size need">Needs sizes</span></div></div><button class="more" aria-label="Edit Jordan Lee #4">⋯</button></li>
+                <li class="entry"><div class="who"><div class="n"><span class="blank-n">Blank jerseys</span></div><div class="by">Nothing printed · Added by you</div><div class="szs"><span class="sz">M</span><span class="sz">L<small>×2</small></span><span class="tot">3 jerseys</span></div></div><button class="more" aria-label="Edit blank jerseys">⋯</button></li>
+              </ul>
+            </div>
+          </section>
+        </div>
+        <div class="toast" role="status"><span>Removed Sidestep #72 (5 jerseys)</span><button>Undo</button></div>
+      </div>
+      <p class="note">Same pattern as phase 1: no confirm dialog, 8-second Undo, and Undo brings back the player with every size and who added it.</p>
+    </div>
+
+    <!-- 6 -->
+    <div class="frame-wrap">
+      <p class="frame-label">6 · Paste a list: repeats fold into one player</p>
+      <div class="phone" style="min-height:760px">
+        <div class="topbar dim"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="scrim"></div>
+        <div class="sheet" role="dialog" aria-labelledby="s6">
+          <div class="grab"></div>
+          <h3 id="s6">Paste a list</h3>
+          <p class="sub">Home Kit. Paste name, number and size straight from Excel or Google Sheets. One row per jersey, or add a "how many" column after the size. Nothing is added until you confirm.</p>
+          <textarea class="input" style="height:92px;padding:8px 12px;font-family:ui-monospace,monospace;font-size:13px" aria-label="Paste your list">Sidestep	72	S
+Sidestep	72	M	3
+Sidestep	72	XL
+Avery Quinn	7	L
+Priya Shah	19
+Mo	88	XXXS</textarea>
+          <p style="font-weight:600;margin:10px 0 0;font-size:13.5px">3 new players · 1 updated · 6 jerseys · 2 need sizes</p>
+          <ul class="pv" aria-label="Paste preview">
+            <li><div class="top"><b>Sidestep #72</b><span><span class="sz">S</span> <span class="sz">M<small>×3</small></span> <span class="sz">XL</span></span></div><div class="nt">3 rows, one player.</div></li>
+            <li><div class="top"><b>Avery Quinn #7</b><span><span class="sz">L</span></span></div><div class="nt">Already on your list with M, XL. Adds an L.</div></li>
+            <li><div class="top"><b>Priya Shah #19</b><span class="size need">Needs sizes</span></div></li>
+            <li><div class="top"><b>Mo #88</b><span class="size need">Needs sizes</span></div><div class="nt">Row 6: "XXXS" isn't a size we make, so Mo goes on without a size.</div></li>
+          </ul>
+          <div class="sheet-actions"><button class="btn ghost">Cancel</button><button class="btn primary">Add to Home Kit</button></div>
+        </div>
+      </div>
+      <p class="note">The preview groups by player, not by pasted line, so the captain checks it the way the list will look. The count line says what changes: new players, players getting more sizes, jerseys, and gaps.</p>
+    </div>
+
+    <!-- 7 -->
+    <div class="frame-wrap">
+      <p class="frame-label">7 · Player on the order form (type your own name)</p>
+      <div class="phone" style="min-height:720px">
+        <div class="topbar"><span class="logo">SIDESTEP</span><span class="avatar" style="visibility:hidden"></span></div>
+        <div class="page">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><h3 style="margin:0;font-size:17px">Your jerseys</h3><span style="color:var(--muted-fg);font-size:13px">5 jerseys</span></div>
+          <fieldset class="fieldset" style="margin-top:10px">
+            <legend class="sr-only">Jersey 1</legend>
+            <div class="lg"><span>Jersey 1</span><button class="btn ghost" style="height:32px;padding:0 6px;font-size:13px">Remove</button></div>
+            <div class="two">
+              <div><label class="f" for="d1">Name on back</label><input class="input" id="d1" value="Sidestep"></div>
+              <div><label class="f" for="d2">Number</label><input class="input" id="d2" value="72"></div>
+            </div>
+            <label class="f" id="sz7">Sizes <span style="color:#b91c1c">*</span></label>
+            <p class="hint">Tap a size once for each jersey you want with this name and number.</p>
+            <div class="counters" role="group" aria-labelledby="sz7">
+              <div class="ctr"><button class="lbl">XS</button></div>
+              <div class="ctr on"><button class="lbl">S</button><button class="minus" aria-label="Remove one S">−</button><span class="badge">1</span></div>
+              <div class="ctr on"><button class="lbl">M</button><button class="minus" aria-label="Remove one M">−</button><span class="badge">3</span></div>
+              <div class="ctr"><button class="lbl">L</button></div>
+              <div class="ctr on"><button class="lbl">XL</button><button class="minus" aria-label="Remove one XL">−</button><span class="badge">1</span></div>
+              <div class="ctr"><button class="lbl">2XL</button></div>
+              <div class="ctr"><button class="lbl">3XL</button></div>
+              <div class="ctr"><button class="lbl">4XL</button></div>
+            </div>
+          </fieldset>
+          <button class="btn block" style="margin-top:12px">+ Add a different name or number</button>
+          <p style="font-size:13px;color:var(--muted-fg);margin:14px 0 8px">Your captain will see your submission right away.</p>
+          <button class="btn primary block">Submit</button>
+        </div>
+      </div>
+      <p class="note">The open-mode jersey card swaps its one-size radio and Quantity box for the same counter grid. "Add another jersey" becomes "Add a different name or number", because more sizes of the same print no longer need a second card. Pick-from-list mode already works this way today.</p>
+    </div>
+
+    <!-- 8 -->
+    <div class="frame-wrap">
+      <p class="frame-label">8 · Design: what's printed on each jersey</p>
+      <div class="phone" style="min-height:700px">
+        <div class="topbar"><span class="logo">SIDESTEP</span><span class="avatar"></span></div>
+        <div class="page">
+          <a class="back" href="#">← Home Kit</a>
+          <h2 class="title" style="font-size:22px;margin-top:8px">Edit design</h2>
+          <section class="card">
+            <div class="card-h"><h3>Printed on each jersey</h3><p>Pick what changes from player to player. These become the boxes on your order list and order form.</p></div>
+            <div style="padding:0 14px 8px">
+              <div class="toggle-row"><div><div class="t">Name on back</div></div><button class="sw" role="switch" aria-checked="true" aria-label="Name on back"></button></div>
+              <div class="toggle-row"><div><div class="t">Number on back</div></div><button class="sw" role="switch" aria-checked="true" aria-label="Number on back"></button></div>
+              <div class="toggle-row"><div><div class="t">Number on front</div><div class="s">Usually the same as the back</div></div><button class="sw" role="switch" aria-checked="true" aria-label="Number on front"></button></div>
+              <div class="toggle-row"><div><div class="t">Captain letter (C / A)</div></div><button class="sw" role="switch" aria-checked="true" aria-label="Captain letter"></button></div>
+              <p class="hint" style="margin:8px 0 6px">[CONFIRM: full list of placements Sidestep offers, e.g. sleeve numbers]</p>
+            </div>
+          </section>
+          <p class="frame-label" style="margin:18px 0 6px">…and the add sheet for this design</p>
+          <div class="card" style="padding:12px 14px">
+            <label class="f" for="e1" style="margin-top:0">Name on back</label><input class="input" id="e1" value="Sidestep">
+            <div class="three">
+              <div><label class="f" for="e2">Number on back</label><input class="input" id="e2" value="72"></div>
+              <div><label class="f" for="e3">Number on front</label><input class="input" id="e3" value="72" disabled style="background:#f5f5f5;color:#737373"></div>
+            </div>
+            <label class="check"><input type="checkbox" checked> Same number on the front</label>
+          </div>
+        </div>
+      </div>
+      <p class="note">JCC's model: the design defines the custom pieces, and a player is one set of values for them. Default for every design that exists today: name on back, number on back, captain letter, which is exactly what phase 1 stores. The front number follows the back unless the box is unticked, so the usual case stays two boxes.</p>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
