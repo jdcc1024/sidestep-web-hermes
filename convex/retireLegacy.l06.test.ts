@@ -2,29 +2,37 @@
 /// <reference types="vite/client" />
 // L-06 §5 acceptance: `_migrations.retireLegacyRosterTables` empties the legacy
 // tables and un-locks stored runs; afterwards the schema no longer has them.
-// The migration test runs against the *current* schema (tables still present),
-// so it passes only if the function exists; the schema/grep tests then pin the
-// removal. They fail now for the right reason (not built yet).
+// A migration test needs pre-migration data, which the post-migration schema
+// can't hold, so the migration runs against `legacySchema`: today's tables
+// plus loose legacy `rosterEntries` / `orderEntries` / `jerseyRuns` shapes.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 import schema from "./schema";
 import { internal } from "./_generated/api";
 import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
 
-// Typed via a sibling reference so this file compiles (and `convex dev`
-// can push) before the migration exists; at runtime it's the real function
-// reference, and the test fails while it is missing.
-const retire = (
-  internal._migrations as unknown as {
-    retireLegacyRosterTables: typeof internal._migrations.backfillOrderItems;
-  }
-).retireLegacyRosterTables;
+const legacySchema = defineSchema({
+  ...schema.tables,
+  jerseyRuns: defineTable(v.any()).index("by_order", ["orderId"]).index("by_captain", ["captainId"]),
+  rosterEntries: defineTable(v.any()).index("by_run", ["runId"]).index("by_design", ["designId"]),
+  orderEntries: defineTable(v.any())
+    .index("by_run", ["runId"])
+    .index("by_rosterEntry", ["rosterEntryId"])
+    .index("by_submitterEmail", ["submitterEmail"]),
+});
 
-async function seedLegacy(t: ReturnType<typeof convexTest>) {
+const retire = internal._migrations.retireLegacyRosterTables;
+
+const legacyTest = () => convexTest(legacySchema, modules);
+type LegacyTest = ReturnType<typeof legacyTest>;
+
+async function seedLegacy(t: LegacyTest) {
   return t.run(async (ctx) => {
     const now = Date.now();
     const captainId = await ctx.db.insert("users", {
@@ -65,7 +73,7 @@ async function seedLegacy(t: ReturnType<typeof convexTest>) {
 
 describe("retireLegacyRosterTables (idempotent): deletes all rosterEntries and orderEntries rows, patches locked runs to closed, clears lockSnapshot", () => {
   it("empties the legacy tables, closes locked runs, keeps orderItems", async () => {
-    const t = convexTest(schema, modules);
+    const t = legacyTest();
     const { lockedRun, openRun, item } = await seedLegacy(t);
 
     await t.mutation(retire, {});
@@ -86,7 +94,7 @@ describe("retireLegacyRosterTables (idempotent): deletes all rosterEntries and o
   });
 
   it("is a no-op the second time", async () => {
-    const t = convexTest(schema, modules);
+    const t = legacyTest();
     const { lockedRun } = await seedLegacy(t);
     await t.mutation(retire, {});
     await t.mutation(retire, {});
@@ -133,6 +141,9 @@ describe("The legacy-model grep is clean (L-06 §5)", () => {
         const rel = path.relative(ROOT, file);
         // This file and the migration (its history comment) may name them.
         if (rel === "convex/retireLegacy.l06.test.ts" || rel === "convex/_migrations.ts") continue;
+        // Test files may name them: to assert they're gone, or to import the
+        // public form module, which keeps the orderEntries name until L-07.
+        if (/\.test\.tsx?$/.test(rel)) continue;
         // The public form's API module is still called orderEntries.
         const text = readFileSync(file, "utf8")
           .split("\n")

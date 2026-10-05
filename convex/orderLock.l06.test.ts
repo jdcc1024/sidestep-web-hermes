@@ -8,6 +8,8 @@
 // docs/ux/0004-order-items.md §7.2, §7.8, §8.9, §8.10.
 // One `describe` per acceptance criterion, named after it. Written before the
 // build: every test fails only because the lock is still "the run is locked".
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
 import { ConvexError } from "convex/values";
@@ -607,9 +609,10 @@ describe("Extending a closed form's deadline to a future date reopens the public
 
 describe("jerseyRuns.lock / unlock are deleted; a run never becomes locked (§1)", () => {
   it("the public API has no lock or unlock", () => {
-    const runs = api.jerseyRuns as unknown as Record<string, unknown>;
-    expect(runs.lock).toBeUndefined();
-    expect(runs.unlock).toBeUndefined();
+    // `api` is a Proxy (any property reads as a reference), so check the
+    // module's exports in source instead.
+    const src = readFileSync(path.resolve(__dirname, "jerseyRuns.ts"), "utf8");
+    expect(src).not.toMatch(/export const (lock|unlock)\b/);
   });
 
   it("a lapsed form reads as closed, never locked", async () => {
