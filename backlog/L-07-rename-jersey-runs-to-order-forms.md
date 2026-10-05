@@ -147,20 +147,14 @@ means two things. The public form's inner `function OrderForm` in
 - Server `ConvexError` strings such as `"Jersey run not found."` are copy, not
   identifiers. They stay unless L-05 already changed them.
 
-## Acceptance Criteria
+## Done when
+1. The existing E2E workflows (e2e/order-form, order-lock, portal.smoke) pass with only identifier/import renames in their files.
+2. A player opens a captain's /run/<id> link, submits a name, number and size, and the captain sees that item on the order page.
 
-- [ ] **Migration (commit 1)** unit test: fixture of 2 runs on 2 orders. Order 1 has a live item from the form, a **removed** item from the form, and a captain item with no `runId`. Order 2 has one form item. After the run: 2 `orderForms` rows whose fields equal the old runs' fields (apart from `_id` / `_creationTime`), each form item's `orderFormId` points at its own order's new form with `runId` unset (removed item included), the captain item is untouched, and `jerseyRuns` is empty. It returns `{ forms: 2, itemsRepointed: 3 }`. A second run returns `{ forms: 0, itemsRepointed: 0 }` and changes nothing.
-- [ ] **Dev data:** the handoff records the migration's return value, plus before/after counts: `jerseyRuns` before = `orderForms` after; items with `runId` before = items with `orderFormId` after; `listForOrder` `itemCount` per seeded order is unchanged.
-- [ ] **Residue grep 1, identifiers.** `grep -rnE "jerseyRun|JerseyRun|jersey_run|JERSEY_RUN" app components convex lib scripts --exclude-dir=_generated` returns matches **only** in comment lines of `convex/_migrations.ts` (allow-list). Spaced or hyphenated copy and URLs (`jersey run`, `jersey-runs`) don't match this pattern on purpose: they're out of scope.
-- [ ] **Residue grep 2, id fields.** `grep -rnw "runId" app components convex lib --exclude-dir=_generated --exclude='*.test.ts' --exclude='*.test.tsx'` is empty (allow-list: comment lines in `convex/_migrations.ts`).
-- [ ] **Residue grep 3, renamed exports.** `grep -rnwE "closeRunByAdmin|_closeRun|_listExpiredOpenRuns|closeRunWithNotification|closeExpiredRuns|listJerseyRuns|isRunExpired|RunStatus" app components convex lib --exclude-dir=_generated` is empty (allow-list: comment lines in `convex/_migrations.ts`).
-- [ ] **File names.** `find app components convex lib -iname '*jerseyrun*'` is empty. `app/admin/jersey-runs/` is allowed: it's a URL, and the pattern doesn't match it.
-- [ ] **Schema.** `orderForms` has the exact validator and indexes `jerseyRuns` had at L-06's head (`git diff` shows the key rename only). `jerseyRuns` is gone. `orderItems` has `orderFormId: v.optional(v.id("orderForms"))` and no `runId`.
-- [ ] **No behaviour change, Convex.** `git diff -M <L-06 head>..HEAD -- convex/` on non-test, non-migration files contains only renamed identifiers from the tables above. No auth call (`requireAdmin`, `requireListWriter`, ownership checks) and no validator is added, removed or reordered. No public function gains or loses an arg other than `jerseyRunId`/`runId` → `orderFormId`.
-- [ ] **No behaviour change, tests.** The test count at HEAD equals the count at L-06's head, because the migration test lives and dies inside this issue. In `*.test.*` files, `git diff -M --word-diff` changes only identifiers, import paths, file names and fake-id fixture strings (e.g. `"jersey_run_test_id"`): no expected value, user-visible string or assertion is changed.
-- [ ] **No copy change.** L-05's byte-identical snapshot of the public form (fixed + open fixtures) passes **unmodified**. The captain closure email test passes unmodified.
-- [ ] **URLs still work:** `/run/<id>` with a seeded form's new id loads and submits; `/portal/orders/[id]/run/setup` and `/admin/jersey-runs/[id]` render for the seeded fixtures (component tests or SDET manual check with screenshots).
-- [ ] `npm run verify` passes at **each** of the three commits (record the three test counts).
+## Logic
+- `_migrations.renameJerseyRunsToOrderForms` (commit 1 only): 2 runs on 2 orders become 2 orderForms with equal fields; every form item (removed ones included) points at its own order's new form with runId unset; a captain item with no runId is untouched; returns { forms: 2, itemsRepointed: 3 }; a second run returns zeros. Internal only (not on `api`). This test is deleted with the migration in commit 2.
+- Identifier residue guard (one lib/*.test.ts): greps 1–3 and the file-name check from Notes find nothing outside the comment allow-list in convex/_migrations.ts. Identifiers only; copy and URLs are out of scope.
+- Auth unchanged: one non-owner call to `orderForms.updateSettings` is rejected, and `orderEntries.submitOrder` with `orderFormId` on a closed form is rejected (existing tests renamed are fine if they already cover this).
 
 ## Dependencies
 
@@ -173,3 +167,19 @@ means two things. The public form's inner `function OrderForm` in
 - Use `git mv` for every file rename so `-M` review works.
 - Precedent: a ~120-file mechanical refactor cost about $3.5. Budget ~$5 and `--max-turns 150` here, because the dev migration run adds a few turns.
 - Security: no new function is public. The migration is `internalMutation`, CLI-only, and deleted in commit 2. The rename moves the public surface (`api.jerseyRuns.getPublic` → `api.orderForms.getPublic`, `orderEntries.submitOrder` arg `jerseyRunId` → `orderFormId`) without changing what it exposes. The client and server deploy together, so no old client keeps calling the old path (dev only).
+- Migration test fixture (Logic line 1): order 1 has a live item from the form, a **removed** item from the form, and a captain item with no `runId`; order 2 has one form item. "Equal fields" means apart from `_id` / `_creationTime`, and `jerseyRuns` is empty afterwards.
+
+### Residue checks (run by the Logic residue guard)
+
+1. **Grep 1, identifiers.** `grep -rnE "jerseyRun|JerseyRun|jersey_run|JERSEY_RUN" app components convex lib scripts --exclude-dir=_generated` matches **only** comment lines of `convex/_migrations.ts` (allow-list). Spaced or hyphenated copy and URLs (`jersey run`, `jersey-runs`) don't match this pattern on purpose: they're out of scope.
+2. **Grep 2, id fields.** `grep -rnw "runId" app components convex lib --exclude-dir=_generated --exclude='*.test.ts' --exclude='*.test.tsx'` is empty (allow-list: comment lines in `convex/_migrations.ts`).
+3. **Grep 3, renamed exports.** `grep -rnwE "closeRunByAdmin|_closeRun|_listExpiredOpenRuns|closeRunWithNotification|closeExpiredRuns|listJerseyRuns|isRunExpired|RunStatus" app components convex lib --exclude-dir=_generated` is empty (allow-list: comment lines in `convex/_migrations.ts`).
+- **File names.** `find app components convex lib -iname '*jerseyrun*'` is empty. `app/admin/jersey-runs/` is allowed: it's a URL, and the pattern doesn't match it.
+
+### Review checks (read the diff, not tests)
+
+- **Schema, key rename only.** `orderForms` has the exact validator and indexes `jerseyRuns` had at L-06's head (`git diff` shows the key rename only). `jerseyRuns` is gone. `orderItems` has `orderFormId: v.optional(v.id("orderForms"))` and no `runId`.
+- **No behaviour change, Convex.** `git diff -M <L-06 head>..HEAD -- convex/` on non-test, non-migration files contains only renamed identifiers from the tables above. No auth call (`requireAdmin`, `requireListWriter`, ownership checks) and no validator is added, removed or reordered. No public function gains or loses an arg other than `jerseyRunId`/`runId` → `orderFormId`.
+- **No behaviour change, tests.** In `*.test.*` files, `git diff -M --word-diff` changes only identifiers, import paths, file names and fake-id fixture strings (e.g. `"jersey_run_test_id"`): no expected value, user-visible string or assertion is changed.
+- **Dev data, in the build handoff.** The migration's return value, plus before/after counts: `jerseyRuns` before = `orderForms` after; items with `runId` before = items with `orderFormId` after; `listForOrder` `itemCount` per seeded order is unchanged.
+- **`npm run verify` green at each of the three commits** (record the three results in the handoff).

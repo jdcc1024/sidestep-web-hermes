@@ -133,16 +133,29 @@ Status lives on the orchestrator's board, not in the file.
 ## Description
 [What needs to be done]
 
-## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
+## Done when
+1. [One customer workflow, one sentence: who does what, what they see]
+2. [1–3 in total; each becomes a Playwright E2E step in `e2e/`]
+
+## Logic
+- `[convex fn or lib fn]`: [happy path]; [unauthorised call]; [one key unhappy path]
 
 ## Dependencies
 - Blocked by: [issue filename or "none"]
 
 ## Notes
-[Implementation hints, relevant PRD sections, etc.]
+[Implementation hints, relevant PRD sections, review checks read from the diff, etc.]
 ```
+
+- **Done when** lines become E2E steps. Every step also checks for no console
+  errors and no horizontal scroll at 375px, so don't list those.
+- **Logic** lines become `convex/*.test.ts` / `lib/*.test.ts` tests: logic,
+  auth, ownership, data invariants. `.tsx` render tests are frozen
+  (`npm run test:frozen`); don't ask for new ones.
+- No criteria that pin exact copy, snapshots, test counts or word-ban source
+  scans. Copy and layout are checked by eye from screenshots at review.
+- Things a reviewer checks by reading the diff (e.g. "no behaviour change") go
+  in `## Notes` as review checks, not tests.
 
 ### Task Prioritization Order
 
