@@ -1,21 +1,24 @@
-import { chromium, type FullConfig } from "@playwright/test";
-import { clerk, clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
+import { chromium, type Browser, type FullConfig } from "@playwright/test";
+import {
+  clerk,
+  clerkSetup,
+  setupClerkTestingToken,
+} from "@clerk/testing/playwright";
 import { mkdirSync } from "node:fs";
-import { sweepStale } from "./convex";
+import { captainConfigured, sweepStale } from "./convex";
 
-// Signs in once as the snap test user (SNAP_UID / SNAP_PWD in .env.local) and
-// saves the session for every test. Also sweeps E2E rows left behind by a run
-// that crashed before its own cleanup.
-export default async function globalSetup(config: FullConfig) {
-  const uid = process.env.SNAP_UID;
-  const pwd = process.env.SNAP_PWD;
-  if (!uid || !pwd) throw new Error("SNAP_UID and SNAP_PWD must be set in .env.local");
-
-  sweepStale();
-
-  await clerkSetup();
-  const baseURL = config.projects[0].use.baseURL!;
-  const browser = await chromium.launch();
+// Signs in once per test account and saves each session:
+//  - SNAP_UID / SNAP_PWD (an admin) → .auth/e2e-state.json, the default.
+//  - E2E_CAPTAIN_UID / E2E_CAPTAIN_PWD (a non-admin, optional) →
+//    .auth/e2e-captain.json, for checks of what a plain captain can't do.
+// Then sweeps E2E rows left behind by a run that crashed before cleanup.
+async function signIn(
+  browser: Browser,
+  baseURL: string,
+  uid: string,
+  pwd: string,
+  file: string,
+) {
   const context = await browser.newContext();
   await setupClerkTestingToken({ context });
   const page = await context.newPage();
@@ -24,9 +27,35 @@ export default async function globalSetup(config: FullConfig) {
     page,
     signInParams: { strategy: "password", identifier: uid, password: pwd },
   });
+  // Opening the portal creates the users row on first sign-in.
   await page.goto(`${baseURL}/portal`);
   await page.waitForURL(/\/portal/);
+  await page.waitForLoadState("networkidle");
+  await context.storageState({ path: file });
+  await context.close();
+}
+
+export default async function globalSetup(config: FullConfig) {
+  const uid = process.env.SNAP_UID;
+  const pwd = process.env.SNAP_PWD;
+  if (!uid || !pwd)
+    throw new Error("SNAP_UID and SNAP_PWD must be set in .env.local");
+
+  await clerkSetup();
+  const baseURL = config.projects[0].use.baseURL!;
   mkdirSync(".auth", { recursive: true });
-  await context.storageState({ path: ".auth/e2e-state.json" });
+  const browser = await chromium.launch();
+  await signIn(browser, baseURL, uid, pwd, ".auth/e2e-state.json");
+  if (captainConfigured()) {
+    await signIn(
+      browser,
+      baseURL,
+      process.env.E2E_CAPTAIN_UID!,
+      process.env.E2E_CAPTAIN_PWD!,
+      ".auth/e2e-captain.json",
+    );
+  }
   await browser.close();
+
+  sweepStale();
 }
