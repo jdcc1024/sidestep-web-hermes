@@ -89,6 +89,33 @@ export default defineSchema({
     .index("by_order", ["orderId"])
     .index("by_captain", ["captainId"]),
 
+  // L-07 widen step: verbatim copy of `jerseyRuns`, its new name.
+  // `_migrations:renameJerseyRunsToOrderForms` copies the rows across; the
+  // next commit removes `jerseyRuns`.
+  orderForms: defineTable({
+    orderId: v.id("orders"),
+    captainId: v.id("users"),
+    // Available sizes the fan can pick from on the public form.
+    // Stored on the run (not hard-coded) so captains can scope size
+    // options to what they expect their team to need.
+    sizeOptions: v.array(v.string()),
+    namesMode: v.union(v.literal("open"), v.literal("fixed")),
+    customQuestions: v.array(
+      v.object({
+        id: v.string(),
+        label: v.string(),
+      }),
+    ),
+    deadline: v.number(),
+    // The order form's own state. The deadline closes it (lazily, see
+    // lib/jerseyRun/lock), and so can the closure cron. It never locks the
+    // list: that is the order's "Order Size Confirmed" stage (L-06).
+    status: v.union(v.literal("open"), v.literal("closed")),
+    createdAt: v.number(),
+  })
+    .index("by_order", ["orderId"])
+    .index("by_captain", ["captainId"]),
+
   // One order list the captain owns (initiative 0004, L-01): an item is one
   // jersey line on the order — design, optional name / number / letter, a size
   // or none ("Needs size"), a qty. It replaced the R-01 player-slot and
@@ -110,6 +137,7 @@ export default defineSchema({
     submitterEmail: v.optional(v.string()), // normalized lowercase
     customAnswers: v.optional(v.record(v.string(), v.string())),
     runId: v.optional(v.id("jerseyRuns")), // provenance only
+    orderFormId: v.optional(v.id("orderForms")), // L-07: replaces runId
     removedAt: v.optional(v.number()), // soft delete; restore clears it
     createdAt: v.number(), // display order; migrated rows keep legacy time
     updatedAt: v.number(),

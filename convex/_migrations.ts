@@ -179,3 +179,56 @@ export const retireLegacyRosterTables = internalMutation({
     return { ...deleted, runsPatched };
   },
 });
+
+// More runs than this means a real deployment, not dev fixtures: page the
+// migration instead of running it in one transaction.
+const RENAME_MAX_RUNS = 500;
+
+/**
+ * L-07: rename `jerseyRuns` to `orderForms` in the data. Convex has no table
+ * rename and can't insert a row with a chosen `_id`, so each run is copied to
+ * a new `orderForms` row (every field kept, `createdAt` included), every
+ * `orderItems` row that came through it is re-pointed from `runId` to the new
+ * `orderFormId`, and the old row is deleted, all in one transaction.
+ *
+ * Run with:
+ *   npx convex run _migrations:renameJerseyRunsToOrderForms
+ *
+ * Idempotent: a second run finds `jerseyRuns` empty and returns zeros.
+ * Removed in L-07's next commit together with `jerseyRuns`.
+ */
+export const renameJerseyRunsToOrderForms = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const runs = await ctx.db.query("jerseyRuns").collect();
+    if (runs.length > RENAME_MAX_RUNS) {
+      throw new Error(
+        `renameJerseyRunsToOrderForms: ${runs.length} runs is over ${RENAME_MAX_RUNS}; paginate it first.`,
+      );
+    }
+    // `runId: undefined` deletes the field in a patch.
+    const patchItem = ctx.db.patch as (
+      id: Id<"orderItems">,
+      value: Record<string, unknown>,
+    ) => Promise<void>;
+    let itemsRepointed = 0;
+    for (const run of runs) {
+      const { _id, _creationTime, ...fields } = run;
+      void _creationTime;
+      const formId = await ctx.db.insert("orderForms", fields);
+      // The one allowed direct `by_order` read outside _orderItems.ts:
+      // `loadItems` drops removed rows, and those must be re-pointed too.
+      const items = await ctx.db
+        .query("orderItems")
+        .withIndex("by_order", (q) => q.eq("orderId", run.orderId))
+        .collect();
+      for (const item of items) {
+        if (item.runId !== _id) continue;
+        await patchItem(item._id, { orderFormId: formId, runId: undefined });
+        itemsRepointed++;
+      }
+      await ctx.db.delete(_id);
+    }
+    return { forms: runs.length, itemsRepointed };
+  },
+});
