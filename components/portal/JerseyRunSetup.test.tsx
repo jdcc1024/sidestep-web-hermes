@@ -8,7 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 // page, so what this surface reads back is either "no run yet" or an existing
 // run whose deadline and custom questions it edits.
 type ManagedRun = {
-  _id: Id<"jerseyRuns">;
+  _id: Id<"orderForms">;
   customQuestions: { id: string; label: string }[];
   deadline: number;
   effectiveStatus: "open" | "closed" | "locked";
@@ -18,7 +18,7 @@ const DEADLINE = Date.parse("2099-06-15T23:59:59.999Z");
 
 function openRun(overrides: Partial<ManagedRun> = {}): ManagedRun {
   return {
-    _id: "run_1" as Id<"jerseyRuns">,
+    _id: "run_1" as Id<"orderForms">,
     customQuestions: [],
     deadline: DEADLINE,
     effectiveStatus: "open",
@@ -101,11 +101,11 @@ describe("JerseyRunSetup — management only (M-05)", () => {
       expect(updateSettings).toHaveBeenCalledTimes(1);
     });
     const args = updateSettings.mock.calls[0][0] as {
-      jerseyRunId: string;
+      orderFormId: string;
       deadline: number;
       customQuestions: { label: string }[];
     };
-    expect(args.jerseyRunId).toBe("run_1");
+    expect(args.orderFormId).toBe("run_1");
     expect(args.deadline).toBe(Date.parse("2099-07-20T23:59:59.999Z"));
     expect(args.customQuestions.map((q) => q.label)).toEqual(["Allergies?"]);
   });

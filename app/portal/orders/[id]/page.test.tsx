@@ -70,7 +70,7 @@ vi.mock("sonner", () => ({
 // would let a half-migrated page pass on stale numbers, so they throw.
 const LEGACY_READERS = new Set([
   "orderEntries:countsByRun",
-  "jerseyRuns:listOrderEntries",
+  "orderForms:listOrderEntries",
   "rosterEntries:listForRun",
 ]);
 
@@ -93,7 +93,7 @@ vi.mock("convex/react", async () => {
       if (LEGACY_READERS.has(name))
         throw new Error(`L-02: the order page must not read ${name}`);
       if (name === "orderItems:listForOrder") return itemsResult;
-      if (name.startsWith("jerseyRuns:")) return runResult;
+      if (name.startsWith("orderForms:")) return runResult;
       // L-04: nothing on this page may read the run-keyed removal queries any
       // more (they're deleted). They answer an empty list here only so the
       // pre-L-04 page renders; a test pins that the page never asks.
@@ -153,7 +153,7 @@ function setItems(
     ...summarize(full, { designIds, titles: TITLES, namesMode }),
     locked,
     canEdit: !locked,
-    form: run ? { runId: run._id, namesMode: namesMode ?? "open" } : null,
+    form: run ? { orderFormId: run._id, namesMode: namesMode ?? "open" } : null,
   };
 }
 
@@ -314,7 +314,7 @@ const LEAKS = /CONVEX|ConvexError|Request ID|\/(?:app|convex|home|lib)\//;
 const FALLBACK = "Could not save that item. Please try again.";
 
 const RUN = {
-  _id: "run_1" as Id<"jerseyRuns">,
+  _id: "run_1" as Id<"orderForms">,
   deadline: Date.parse("2026-04-01T12:00:00Z"),
   status: "open",
   effectiveStatus: "open" as const,
@@ -941,7 +941,7 @@ describe("/portal/orders/[id] — add an item (L-03, UX §8.3, §8.6)", () => {
       ),
     );
     expect(addItem).not.toHaveBeenCalledWith(
-      expect.objectContaining({ runId: expect.anything() }),
+      expect.objectContaining({ orderFormId: expect.anything() }),
     );
   });
 
@@ -2517,7 +2517,7 @@ describe("/portal/orders/[id] — a refreshed query updates every scope at once 
 // names-mode switch sits beside the designs whose rosters it governs.
 describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
   const RUN = {
-    _id: "run_1" as Id<"jerseyRuns">,
+    _id: "run_1" as Id<"orderForms">,
     deadline: Date.parse("2099-04-01T12:00:00Z"),
     namesMode: "open" as const,
     status: "open",
@@ -2586,7 +2586,7 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
 
     await waitFor(() => {
       expect(mutationStub).toHaveBeenCalledWith({
-        jerseyRunId: RUN._id,
+        orderFormId: RUN._id,
         namesMode: "fixed",
       });
     });
@@ -2607,7 +2607,7 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
 
     await waitFor(() => {
       expect(mutationStub).toHaveBeenCalledWith({
-        jerseyRunId: RUN._id,
+        orderFormId: RUN._id,
         namesMode: "open",
       });
     });
@@ -2667,7 +2667,7 @@ describe("/portal/orders/[id] — start collecting & names mode (M-05)", () => {
 });
 describe("/portal/orders/[id] — frozen once the roster is locked (O-06)", () => {
   const RUN = {
-    _id: "run_1" as Id<"jerseyRuns">,
+    _id: "run_1" as Id<"orderForms">,
     deadline: Date.parse("2026-04-01T12:00:00Z"),
   };
 

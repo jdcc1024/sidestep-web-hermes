@@ -1,5 +1,5 @@
 // Pure helpers for jersey-run deadline enforcement (issue 3-01).
-// The cron action in convex/jerseyRunActions.ts wires these together;
+// The cron action in convex/orderFormActions.ts wires these together;
 // keeping the email rendering and "is it expired" decision in plain
 // functions lets us test them without a Convex harness.
 

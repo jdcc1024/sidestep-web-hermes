@@ -52,9 +52,9 @@ export async function hasAnyItem(
 export async function loadOrderForm(
   ctx: Ctx,
   orderId: Id<"orders">,
-): Promise<Doc<"jerseyRuns"> | null> {
+): Promise<Doc<"orderForms"> | null> {
   return ctx.db
-    .query("jerseyRuns")
+    .query("orderForms")
     .withIndex("by_order", (q) => q.eq("orderId", orderId))
     .unique();
 }

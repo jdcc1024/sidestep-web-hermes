@@ -37,7 +37,7 @@ const COLUMNS: ReadonlyArray<ColumnDef> = [
 ];
 
 export default function AdminJerseyRunsPage() {
-  const runs = useQuery(api.admin.listJerseyRuns);
+  const runs = useQuery(api.admin.listOrderForms);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [direction, setDirection] = useState<SortDirection>("desc");
 

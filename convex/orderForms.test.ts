@@ -83,7 +83,7 @@ async function insertItem(
     submitterName: string;
     submitterEmail: string;
     customAnswers: Record<string, string>;
-    runId: Id<"jerseyRuns">;
+    orderFormId: Id<"orderForms">;
     removedAt: number;
     createdAt: number;
   }> = {},
@@ -112,16 +112,16 @@ function validRunArgs(orderId: Id<"orders">) {
   };
 }
 
-describe("jerseyRuns.create", () => {
+describe("orderForms.create", () => {
   it("creates an open run for the captain's order", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
 
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
-    const row = await t.run((ctx) => ctx.db.get(runId));
+    const row = await t.run((ctx) => ctx.db.get(orderFormId));
     expect(row).toMatchObject({
       orderId,
       captainId: userId,
@@ -136,11 +136,11 @@ describe("jerseyRuns.create", () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
 
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
-    const row = await t.run((ctx) => ctx.db.get(runId));
+    const row = await t.run((ctx) => ctx.db.get(orderFormId));
     expect(row?.sizeOptions).toEqual([
       "XS",
       "S",
@@ -158,7 +158,7 @@ describe("jerseyRuns.create", () => {
     const { orderId, asUser } = await seedCaptainWithOrder(t);
 
     await expect(
-      asUser.mutation(api.jerseyRuns.create, {
+      asUser.mutation(api.orderForms.create, {
         ...validRunArgs(orderId),
         // @ts-expect-error the argument is gone from the mutation's validator
         sizeOptions: ["S"],
@@ -172,7 +172,7 @@ describe("jerseyRuns.create", () => {
   it("leaves a pre-existing run's narrower sizeOptions alone", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId } = await seedCaptainWithOrder(t);
-    const { runId, designId } = await t.run(async (ctx) => {
+    const { orderFormId, designId } = await t.run(async (ctx) => {
       const designId = await ctx.db.insert("designs", {
         ownerId: userId,
         title: "Home",
@@ -181,7 +181,7 @@ describe("jerseyRuns.create", () => {
         updatedAt: Date.now(),
       });
       await ctx.db.patch(orderId, { designIds: [designId] });
-      const runId = await ctx.db.insert("jerseyRuns", {
+      const orderFormId = await ctx.db.insert("orderForms", {
         orderId,
         captainId: userId,
         sizeOptions: ["S", "M", "L"],
@@ -191,12 +191,12 @@ describe("jerseyRuns.create", () => {
         status: "open",
         createdAt: Date.now(),
       });
-      return { runId, designId };
+      return { orderFormId, designId };
     });
 
     const submit = (size: string) =>
       t.mutation(api.orderEntries.submitOrder, {
-        jerseyRunId: runId,
+        orderFormId: orderFormId,
         submitterName: "Pat",
         submitterEmail: "pat@example.com",
         customAnswers: {},
@@ -205,7 +205,7 @@ describe("jerseyRuns.create", () => {
 
     await expect(submit("4XL")).rejects.toThrow();
     await expect(submit("M")).resolves.toBeTruthy();
-    expect((await t.run((ctx) => ctx.db.get(runId)))?.sizeOptions).toEqual([
+    expect((await t.run((ctx) => ctx.db.get(orderFormId)))?.sizeOptions).toEqual([
       "S",
       "M",
       "L",
@@ -215,31 +215,31 @@ describe("jerseyRuns.create", () => {
   it("rejects creating a second run for the same order", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    await asUser.mutation(api.jerseyRuns.create, validRunArgs(orderId));
+    await asUser.mutation(api.orderForms.create, validRunArgs(orderId));
 
     await expect(
-      asUser.mutation(api.jerseyRuns.create, validRunArgs(orderId)),
+      asUser.mutation(api.orderForms.create, validRunArgs(orderId)),
     ).rejects.toThrow(/already has a jersey run/);
   });
 
   // O-05: run creation is lazy — saving an order does not eagerly create a
   // run. The order detail page hands off to Run Setup, and only the first
-  // "collect" (jerseyRuns.create) brings a run into existence. This locks in
+  // "collect" (orderForms.create) brings a run into existence. This locks in
   // that contract: no run exists between order creation and the first collect.
   it("creates no run on order save; first collect creates exactly one", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
 
     // Order exists, but no run has been set up yet.
-    expect(await asUser.query(api.jerseyRuns.getByOrder, { orderId })).toBeNull();
+    expect(await asUser.query(api.orderForms.getByOrder, { orderId })).toBeNull();
 
     // First collect lazily creates the single run for the order.
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
-    const run = await asUser.query(api.jerseyRuns.getByOrder, { orderId });
-    expect(run?._id).toBe(runId);
+    const run = await asUser.query(api.orderForms.getByOrder, { orderId });
+    expect(run?._id).toBe(orderFormId);
   });
 
   it("rejects creating a run on someone else's order", async () => {
@@ -261,7 +261,7 @@ describe("jerseyRuns.create", () => {
     });
 
     await expect(
-      asOther.mutation(api.jerseyRuns.create, validRunArgs(orderId)),
+      asOther.mutation(api.orderForms.create, validRunArgs(orderId)),
     ).rejects.toThrow(/don't have access/);
   });
 });
@@ -270,26 +270,26 @@ describe("jerseyRuns.create", () => {
 // the order page beside the designs it affects, so it has to switch freely in
 // both directions — open→fixed promotes fan-typed names into the picker list,
 // fixed→open only loosens a constraint. Neither loses data.
-describe("jerseyRuns.setNamesMode", () => {
+describe("orderForms.setNamesMode", () => {
   it("switches open → fixed and back again", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
 
-    await asUser.mutation(api.jerseyRuns.setNamesMode, {
-      jerseyRunId: runId,
+    await asUser.mutation(api.orderForms.setNamesMode, {
+      orderFormId: orderFormId,
       namesMode: "fixed",
     });
-    expect((await t.run((ctx) => ctx.db.get(runId)))?.namesMode).toBe("fixed");
+    expect((await t.run((ctx) => ctx.db.get(orderFormId)))?.namesMode).toBe("fixed");
 
-    await asUser.mutation(api.jerseyRuns.setNamesMode, {
-      jerseyRunId: runId,
+    await asUser.mutation(api.orderForms.setNamesMode, {
+      orderFormId: orderFormId,
       namesMode: "open",
     });
-    expect((await t.run((ctx) => ctx.db.get(runId)))?.namesMode).toBe("open");
+    expect((await t.run((ctx) => ctx.db.get(orderFormId)))?.namesMode).toBe("open");
   });
 
   // The end-to-end half of the switch: what the public form actually reads.
@@ -298,8 +298,8 @@ describe("jerseyRuns.setNamesMode", () => {
   it("promotes fan-typed names into the public picker list after a switch to fixed", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const designId = await t.run(async (ctx) => {
@@ -316,25 +316,25 @@ describe("jerseyRuns.setNamesMode", () => {
 
     // A fan orders under open mode, typing their own name.
     await t.mutation(api.orderEntries.submitOrder, {
-      jerseyRunId: runId,
+      orderFormId: orderFormId,
       submitterName: "Pat",
       submitterEmail: "pat@example.com",
       customAnswers: {},
       lines: [{ designId, name: "Gretzky", number: "99", size: "M", qty: 1 }],
     });
 
-    const before = await t.query(api.jerseyRuns.getPublic, {
-      jerseyRunId: runId,
+    const before = await t.query(api.orderForms.getPublic, {
+      orderFormId: orderFormId,
     });
     expect(before!.run.namesMode).toBe("open");
 
-    await asUser.mutation(api.jerseyRuns.setNamesMode, {
-      jerseyRunId: runId,
+    await asUser.mutation(api.orderForms.setNamesMode, {
+      orderFormId: orderFormId,
       namesMode: "fixed",
     });
 
-    const after = await t.query(api.jerseyRuns.getPublic, {
-      jerseyRunId: runId,
+    const after = await t.query(api.orderForms.getPublic, {
+      orderFormId: orderFormId,
     });
     expect(after!.run.namesMode).toBe("fixed");
     expect(after!.designs[0].roster).toEqual([
@@ -345,15 +345,15 @@ describe("jerseyRuns.setNamesMode", () => {
   it("rejects a switch once the list is confirmed (L-06)", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     await confirmOrderSize(t, orderId);
 
     await expect(
-      asUser.mutation(api.jerseyRuns.setNamesMode, {
-        jerseyRunId: runId,
+      asUser.mutation(api.orderForms.setNamesMode, {
+        orderFormId: orderFormId,
         namesMode: "fixed",
       }),
     ).rejects.toThrow(/locked/i);
@@ -362,8 +362,8 @@ describe("jerseyRuns.setNamesMode", () => {
   it("rejects a switch from someone who doesn't own the order", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const { asUser: asStranger } = await seedCaptainWithOrder(
@@ -372,8 +372,8 @@ describe("jerseyRuns.setNamesMode", () => {
     );
 
     await expect(
-      asStranger.mutation(api.jerseyRuns.setNamesMode, {
-        jerseyRunId: runId,
+      asStranger.mutation(api.orderForms.setNamesMode, {
+        orderFormId: orderFormId,
         namesMode: "fixed",
       }),
     ).rejects.toThrow(/access/i);
@@ -382,25 +382,25 @@ describe("jerseyRuns.setNamesMode", () => {
 
 // The other half of M-05's split: creation takes only a deadline, so the
 // deadline and the custom questions are edited afterwards from /run/setup.
-describe("jerseyRuns.updateSettings", () => {
+describe("orderForms.updateSettings", () => {
   const questions = [{ id: "q1", label: "How should we deliver?" }];
 
   it("updates the deadline and the custom questions", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
 
     const deadline = Date.now() + 30 * ONE_DAY;
-    await asUser.mutation(api.jerseyRuns.updateSettings, {
-      jerseyRunId: runId,
+    await asUser.mutation(api.orderForms.updateSettings, {
+      orderFormId: orderFormId,
       deadline,
       customQuestions: questions,
     });
 
-    const run = await t.run((ctx) => ctx.db.get(runId));
+    const run = await t.run((ctx) => ctx.db.get(orderFormId));
     expect(run?.deadline).toBe(deadline);
     expect(run?.customQuestions).toEqual(questions);
   });
@@ -408,24 +408,24 @@ describe("jerseyRuns.updateSettings", () => {
   it("trims question labels and rejects a blank one", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const deadline = Date.now() + 30 * ONE_DAY;
 
-    await asUser.mutation(api.jerseyRuns.updateSettings, {
-      jerseyRunId: runId,
+    await asUser.mutation(api.orderForms.updateSettings, {
+      orderFormId: orderFormId,
       deadline,
       customQuestions: [{ id: "q1", label: "  Allergies?  " }],
     });
-    expect((await t.run((ctx) => ctx.db.get(runId)))?.customQuestions).toEqual([
+    expect((await t.run((ctx) => ctx.db.get(orderFormId)))?.customQuestions).toEqual([
       { id: "q1", label: "Allergies?" },
     ]);
 
     await expect(
-      asUser.mutation(api.jerseyRuns.updateSettings, {
-        jerseyRunId: runId,
+      asUser.mutation(api.orderForms.updateSettings, {
+        orderFormId: orderFormId,
         deadline,
         customQuestions: [{ id: "q1", label: "   " }],
       }),
@@ -435,14 +435,14 @@ describe("jerseyRuns.updateSettings", () => {
   it("rejects a deadline in the past", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
 
     await expect(
-      asUser.mutation(api.jerseyRuns.updateSettings, {
-        jerseyRunId: runId,
+      asUser.mutation(api.orderForms.updateSettings, {
+        orderFormId: orderFormId,
         deadline: Date.now() - 1000,
         customQuestions: [],
       }),
@@ -452,8 +452,8 @@ describe("jerseyRuns.updateSettings", () => {
   it("rejects edits once the list is confirmed (L-06) and from a non-owner", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const { asUser: asStranger } = await seedCaptainWithOrder(
@@ -463,8 +463,8 @@ describe("jerseyRuns.updateSettings", () => {
     const deadline = Date.now() + 30 * ONE_DAY;
 
     await expect(
-      asStranger.mutation(api.jerseyRuns.updateSettings, {
-        jerseyRunId: runId,
+      asStranger.mutation(api.orderForms.updateSettings, {
+        orderFormId: orderFormId,
         deadline,
         customQuestions: [],
       }),
@@ -472,8 +472,8 @@ describe("jerseyRuns.updateSettings", () => {
 
     await confirmOrderSize(t, orderId);
     await expect(
-      asUser.mutation(api.jerseyRuns.updateSettings, {
-        jerseyRunId: runId,
+      asUser.mutation(api.orderForms.updateSettings, {
+        orderFormId: orderFormId,
         deadline,
         customQuestions: [],
       }),
@@ -481,13 +481,13 @@ describe("jerseyRuns.updateSettings", () => {
   });
 });
 
-describe("jerseyRuns.closeRunByAdmin", () => {
+describe("orderForms.closeFormByAdmin", () => {
   it("schedules a close when an admin calls it on an open run", async () => {
     const t = convexTest(schema, modules);
     // Captain creates the run.
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
 
@@ -507,32 +507,32 @@ describe("jerseyRuns.closeRunByAdmin", () => {
       name: "Admin",
     });
 
-    const result = await asAdmin.mutation(api.jerseyRuns.closeRunByAdmin, {
-      jerseyRunId: runId,
+    const result = await asAdmin.mutation(api.orderForms.closeFormByAdmin, {
+      orderFormId: orderFormId,
     });
     expect(result).toEqual({ alreadyClosed: false });
   });
 
-  it("rejects closeRunByAdmin when caller is not an admin", async () => {
+  it("rejects closeFormByAdmin when caller is not an admin", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
 
     // Same captain (non-admin) tries to close.
     await expect(
-      asUser.mutation(api.jerseyRuns.closeRunByAdmin, { jerseyRunId: runId }),
+      asUser.mutation(api.orderForms.closeFormByAdmin, { orderFormId: orderFormId }),
     ).rejects.toThrow(/Admin access required/);
   });
 });
 
-describe("jerseyRuns.getPublic", () => {
+describe("orderForms.getPublic", () => {
   it("returns the order's designs with seeded roster slots for the form", async () => {
     const t = convexTest(schema, modules);
     const now = Date.now();
-    const { runId, orderId, homeId, awayId } = await t.run(async (ctx) => {
+    const { orderFormId, orderId, homeId, awayId } = await t.run(async (ctx) => {
       const userId = await ctx.db.insert("users", {
         clerkId: "cap",
         email: "cap@example.com",
@@ -565,7 +565,7 @@ describe("jerseyRuns.getPublic", () => {
         createdAt: now,
         updatedAt: now,
       });
-      const runId = await ctx.db.insert("jerseyRuns", {
+      const orderFormId = await ctx.db.insert("orderForms", {
         orderId,
         captainId: userId,
         sizeOptions: ["M", "L"],
@@ -575,7 +575,7 @@ describe("jerseyRuns.getPublic", () => {
         status: "open",
         createdAt: now,
       });
-      return { runId, orderId, homeId, awayId };
+      return { orderFormId, orderId, homeId, awayId };
     });
     // L-02: the picker is the order's named items (a captain's Needs-size
     // player), not a run-scoped roster table.
@@ -585,7 +585,7 @@ describe("jerseyRuns.getPublic", () => {
       source: "captain",
     });
 
-    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
     expect(data).not.toBeNull();
     expect(data!.teamName).toBe("Wildcats");
     expect(data!.designs.map((d) => d.title)).toEqual(["Home", "Away"]);
@@ -632,7 +632,7 @@ async function seedPublicRun(
       createdAt: now,
       updatedAt: now,
     });
-    const runId = await ctx.db.insert("jerseyRuns", {
+    const orderFormId = await ctx.db.insert("orderForms", {
       orderId,
       captainId: userId,
       sizeOptions: ["M", "L"],
@@ -642,14 +642,14 @@ async function seedPublicRun(
       status: "open",
       createdAt: now,
     });
-    return { userId, homeId, orderId, runId };
+    return { userId, homeId, orderId, orderFormId };
   });
 }
 
 describe("getPublic exposes only _id, name, number per picker entry; removed and unnamed items are absent", () => {
   it("returns exactly { _id, name, number } for a named item, with no size, letter, submitter or answers", async () => {
     const t = convexTest(schema, modules);
-    const { orderId, homeId, runId } = await seedPublicRun(t);
+    const { orderId, homeId, orderFormId } = await seedPublicRun(t);
     const id = await insertItem(t, orderId, homeId, {
       name: "Jordan Lee",
       number: "4",
@@ -659,10 +659,10 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
       submitterName: "Jordan's Mum",
       submitterEmail: "mum@example.com",
       customAnswers: { q1: "Gym" },
-      runId,
+      orderFormId,
     });
 
-    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
     const roster = data!.designs[0].roster;
     expect(roster).toEqual([{ _id: id, name: "Jordan Lee", number: "4" }]);
     expect(Object.keys(roster[0]).sort()).toEqual(["_id", "name", "number"]);
@@ -671,7 +671,7 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
 
   it("leaves out removed items and items with no name", async () => {
     const t = convexTest(schema, modules);
-    const { orderId, homeId, runId } = await seedPublicRun(t);
+    const { orderId, homeId, orderFormId } = await seedPublicRun(t);
     const kept = await insertItem(t, orderId, homeId, {
       name: "Kept",
       number: "1",
@@ -687,7 +687,7 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
     await insertItem(t, orderId, homeId, { number: "3", size: "M" });
     await insertItem(t, orderId, homeId, { size: "L", qty: 4 });
 
-    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
     expect(data!.designs[0].roster).toEqual([
       { _id: kept, name: "Kept", number: "1" },
     ]);
@@ -695,7 +695,7 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
 
   it("dedupes the same player by name + number (case/space-insensitive), oldest item wins", async () => {
     const t = convexTest(schema, modules);
-    const { orderId, homeId, runId } = await seedPublicRun(t);
+    const { orderId, homeId, orderFormId } = await seedPublicRun(t);
     const oldest = await insertItem(t, orderId, homeId, {
       name: "Gretzky",
       number: "99",
@@ -716,7 +716,7 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
       createdAt: 3_000,
     });
 
-    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
     expect(data!.designs[0].roster).toEqual([
       { _id: oldest, name: "Gretzky", number: "99" },
     ]);
@@ -724,7 +724,7 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
 
   it("lists Lee #4 and Lee #9 as two separate picks (same name, different number)", async () => {
     const t = convexTest(schema, modules);
-    const { orderId, homeId, runId } = await seedPublicRun(t);
+    const { orderId, homeId, orderFormId } = await seedPublicRun(t);
     const lee4 = await insertItem(t, orderId, homeId, {
       name: "Lee",
       number: "4",
@@ -738,7 +738,7 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
       createdAt: 2_000,
     });
 
-    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
     expect(data!.designs[0].roster).toEqual([
       { _id: lee4, name: "Lee", number: "4" },
       { _id: lee9, name: "Lee", number: "9" },
@@ -747,8 +747,8 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
 
   it("offers players the captain added before the form existed, and nobody from another order", async () => {
     const t = convexTest(schema, modules);
-    const { userId, orderId, homeId, runId } = await seedPublicRun(t);
-    // No runId: added on the order page before "Make an order form".
+    const { userId, orderId, homeId, orderFormId } = await seedPublicRun(t);
+    // No orderFormId: added on the order page before "Make an order form".
     const early = await insertItem(t, orderId, homeId, {
       name: "Early",
       number: "7",
@@ -774,19 +774,19 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
       source: "captain",
     });
 
-    const data = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: runId });
+    const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
     expect(data!.designs[0].roster).toEqual([
       { _id: early, name: "Early", number: "7" },
     ]);
   });
 });
 
-describe("jerseyRuns.listOrderEntries (R-07)", () => {
+describe("orderForms.listOrderEntries (R-07)", () => {
   it("returns the order's sized items as entries, joined with design title and name/number, newest first (L-02)", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
 
@@ -813,7 +813,7 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
       submitterName: "Sam",
       submitterEmail: "sam@example.com",
       customAnswers: { q1: "Gym" },
-      runId,
+      orderFormId,
       createdAt: now,
     });
     // …and a later blank/bulk line.
@@ -824,8 +824,8 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
       createdAt: now + 1,
     });
 
-    const data = await asUser.query(api.jerseyRuns.listOrderEntries, {
-      jerseyRunId: runId,
+    const data = await asUser.query(api.orderForms.listOrderEntries, {
+      orderFormId: orderFormId,
     });
     expect(data).not.toBeNull();
     expect(data!.entries).toHaveLength(2);
@@ -858,8 +858,8 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
   it("excludes removed items, and Needs-size items (an entry is a sized jersey)", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const designId = await t.run((ctx) =>
@@ -880,8 +880,8 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
     });
     await insertItem(t, orderId, designId, { name: "Bure", source: "captain" });
 
-    const data = await asUser.query(api.jerseyRuns.listOrderEntries, {
-      jerseyRunId: runId,
+    const data = await asUser.query(api.orderForms.listOrderEntries, {
+      orderFormId: orderFormId,
     });
     expect(data!.entries.map((e) => e._id)).toEqual([live]);
   });
@@ -889,8 +889,8 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
   it("rejects a caller who is neither the captain nor an admin", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const { asUser: asStranger } = await seedCaptainWithOrder(
@@ -899,18 +899,18 @@ describe("jerseyRuns.listOrderEntries (R-07)", () => {
     );
 
     await expect(
-      asStranger.query(api.jerseyRuns.listOrderEntries, { jerseyRunId: runId }),
+      asStranger.query(api.orderForms.listOrderEntries, { orderFormId: orderFormId }),
     ).rejects.toThrow(/access/i);
   });
 });
 
-describe("jerseyRuns.listMyResponses (R-07)", () => {
+describe("orderForms.listMyResponses (R-07)", () => {
   it("returns only the signed-in user's own items, joined with run + team (L-02)", async () => {
     const t = convexTest(schema, modules);
     // seedCaptainWithOrder signs in as captain@example.com.
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const designId = await t.run((ctx) =>
@@ -930,20 +930,20 @@ describe("jerseyRuns.listMyResponses (R-07)", () => {
       size: "M",
       submitterName: "Cap",
       submitterEmail: "captain@example.com",
-      runId,
+      orderFormId,
     });
     // A different fan's item on the same order — must not leak into my list.
     await insertItem(t, orderId, designId, {
       size: "L",
       submitterName: "Other",
       submitterEmail: "other@example.com",
-      runId,
+      orderFormId,
     });
 
-    const mine = await asUser.query(api.jerseyRuns.listMyResponses, {});
+    const mine = await asUser.query(api.orderForms.listMyResponses, {});
     expect(mine).toHaveLength(1);
     expect(mine[0].teamName).toBe("Falcons");
-    expect(mine[0].run._id).toBe(runId);
+    expect(mine[0].run._id).toBe(orderFormId);
     expect(mine[0].entry).toMatchObject({
       _id: mineId,
       size: "M",
@@ -956,8 +956,8 @@ describe("jerseyRuns.listMyResponses (R-07)", () => {
   it("leaves out an item the captain removed", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const designId = await t.run((ctx) =>
@@ -974,34 +974,34 @@ describe("jerseyRuns.listMyResponses (R-07)", () => {
       size: "M",
       submitterName: "Cap",
       submitterEmail: "captain@example.com",
-      runId,
+      orderFormId,
     });
     await insertItem(t, orderId, designId, {
       size: "L",
       submitterName: "Cap",
       submitterEmail: "captain@example.com",
-      runId,
+      orderFormId,
       removedAt: Date.now(),
     });
 
-    const mine = await asUser.query(api.jerseyRuns.listMyResponses, {});
+    const mine = await asUser.query(api.orderForms.listMyResponses, {});
     expect(mine.map((m) => m.entry._id)).toEqual([kept]);
   });
 
   it("returns [] for an unauthenticated caller", async () => {
     const t = convexTest(schema, modules);
-    expect(await t.query(api.jerseyRuns.listMyResponses, {})).toEqual([]);
+    expect(await t.query(api.orderForms.listMyResponses, {})).toEqual([]);
   });
 });
 
 // L-02: the closure email's count is the order's production total, the same
 // `summary.itemCount` the captain's list shows.
-describe("jerseyRuns._closeRun counts order items (L-02)", () => {
+describe("orderForms._closeForm counts order items (L-02)", () => {
   it("reports responseCount = listForOrder summary.itemCount, excluding removed and Needs-size items", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
-    const runId = await asUser.mutation(
-      api.jerseyRuns.create,
+    const orderFormId = await asUser.mutation(
+      api.orderForms.create,
       validRunArgs(orderId),
     );
     const [homeId, awayId] = await t.run(async (ctx) => {
@@ -1019,8 +1019,8 @@ describe("jerseyRuns._closeRun counts order items (L-02)", () => {
       await ctx.db.patch(orderId, { designIds: ids });
       return ids;
     });
-    // Counted: 2 + 3 (one added before the form, with no runId).
-    await insertItem(t, orderId, homeId, { size: "M", qty: 2, runId });
+    // Counted: 2 + 3 (one added before the form, with no orderFormId).
+    await insertItem(t, orderId, homeId, { size: "M", qty: 2, orderFormId });
     await insertItem(t, orderId, awayId, { size: "L", qty: 3, source: "captain" });
     // Not counted: a removed jersey and a Needs-size player.
     await insertItem(t, orderId, homeId, {
@@ -1031,8 +1031,8 @@ describe("jerseyRuns._closeRun counts order items (L-02)", () => {
     await insertItem(t, orderId, homeId, { name: "Bure", source: "captain" });
 
     const live = await asUser.query(api.orderItems.listForOrder, { orderId });
-    const closed = await t.mutation(internal.jerseyRuns._closeRun, {
-      jerseyRunId: runId,
+    const closed = await t.mutation(internal.orderForms._closeForm, {
+      orderFormId: orderFormId,
     });
 
     expect(closed?.responseCount).toBe(5);

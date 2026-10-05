@@ -49,7 +49,7 @@ export type SeedPortalFixturesResult = {
   designIds: Id<"designs">[];
   orderWithRunId: Id<"orders">;
   orderWithoutRunId: Id<"orders">;
-  runId: Id<"jerseyRuns">;
+  orderFormId: Id<"orderForms">;
   /** False when every fixture already existed — i.e. the call was a no-op. */
   created: boolean;
 };
@@ -105,11 +105,11 @@ export const seedPortalFixtures = internalMutation({
       }),
     );
 
-    const runId = track(
+    const orderFormId = track(
       await ensureRun(ctx, user._id, orderWithRunId, now),
     );
     track(
-      await ensureItems(ctx, orderWithRunId, designIds, runId, RUN_ORDER_ITEMS, now),
+      await ensureItems(ctx, orderWithRunId, designIds, orderFormId, RUN_ORDER_ITEMS, now),
     );
     track(
       await ensureItems(
@@ -127,7 +127,7 @@ export const seedPortalFixtures = internalMutation({
       designIds,
       orderWithRunId,
       orderWithoutRunId,
-      runId,
+      orderFormId,
       created,
     };
   },
@@ -412,14 +412,14 @@ async function ensureRun(
   captainId: Id<"users">,
   orderId: Id<"orders">,
   now: number,
-): Promise<Ensured<Id<"jerseyRuns">>> {
+): Promise<Ensured<Id<"orderForms">>> {
   const existing = await ctx.db
-    .query("jerseyRuns")
+    .query("orderForms")
     .withIndex("by_order", (q) => q.eq("orderId", orderId))
     .unique();
   if (existing) return { value: existing._id, inserted: false };
 
-  const value = await ctx.db.insert("jerseyRuns", {
+  const value = await ctx.db.insert("orderForms", {
     orderId,
     captainId,
     sizeOptions: RUN_SIZE_OPTIONS,
@@ -511,7 +511,7 @@ async function ensureItems(
   ctx: MutationCtx,
   orderId: Id<"orders">,
   designIds: Id<"designs">[],
-  runId: Id<"jerseyRuns"> | null,
+  orderFormId: Id<"orderForms"> | null,
   fixture: readonly ItemFixture[],
   now: number,
 ): Promise<Ensured<null>> {
@@ -527,14 +527,14 @@ async function ensureItems(
       size: item.size,
       qty: item.qty,
       source: item.source,
-      ...(item.submitter && runId
+      ...(item.submitter && orderFormId
         ? {
             submitterName: item.submitter.name,
             // Stored trim+lowercase, matching checkSubmitterEmail — the by-fan
             // grouping keys on this exact value.
             submitterEmail: item.submitter.email.trim().toLowerCase(),
             customAnswers: { "q-shorts": item.submitter.shorts },
-            runId,
+            orderFormId,
           }
         : {}),
       createdAt: now + i,

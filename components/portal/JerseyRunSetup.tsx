@@ -47,7 +47,7 @@ import { cn } from "@/lib/utils";
 // no responses view. No lock control — R-08 stays parked (PRD §5).
 
 // Colocated zod schema. Constants reused from lib/jerseyRun so the client and
-// server cap values the same way (jerseyRuns.updateSettings enforces matching
+// server cap values the same way (orderForms.updateSettings enforces matching
 // limits server-side). superRefine handles the per-question label rules that
 // depend on the whole array.
 const formSchema = z
@@ -95,7 +95,7 @@ const formSchema = z
 type FormValues = z.infer<typeof formSchema>;
 
 type ManagedRun = {
-  _id: Id<"jerseyRuns">;
+  _id: Id<"orderForms">;
   customQuestions: { id: string; label: string }[];
   deadline: number;
   namesMode: NamesMode;
@@ -105,7 +105,7 @@ type ManagedRun = {
 };
 
 export function JerseyRunSetup({ orderId }: { orderId: Id<"orders"> }) {
-  const run = useQuery(api.jerseyRuns.getByOrder, { orderId });
+  const run = useQuery(api.orderForms.getByOrder, { orderId });
 
   if (run === undefined) return <LoadingSkeleton />;
   if (run === null) return <NoRunYet orderId={orderId} />;
@@ -184,7 +184,7 @@ function RunManagement({ run }: { run: ManagedRun }) {
 // Native radios, not the Base UI group: a wrapping <label> names a native
 // input reliably, and the choice is a plain two-way pick.
 function NamesModeSetting({ run }: { run: ManagedRun }) {
-  const setNamesMode = useMutation(api.jerseyRuns.setNamesMode);
+  const setNamesMode = useMutation(api.orderForms.setNamesMode);
   // The choice shows as soon as it's made; the query catches up when the
   // mutation lands, and a rejected save falls back to the stored mode.
   const [pending, setPending] = useState<NamesMode | null>(null);
@@ -195,7 +195,7 @@ function NamesModeSetting({ run }: { run: ManagedRun }) {
     if (next === selected) return;
     setPending(next);
     try {
-      await setNamesMode({ jerseyRunId: run._id, namesMode: next });
+      await setNamesMode({ orderFormId: run._id, namesMode: next });
     } catch (err) {
       toast.error("Could not change how players add their name", {
         description: userMessage(err, "Please try again."),
@@ -308,7 +308,7 @@ function LockedSummary({ run }: { run: ManagedRun }) {
 }
 
 function RunSettingsForm({ run }: { run: ManagedRun }) {
-  const updateSettings = useMutation(api.jerseyRuns.updateSettings);
+  const updateSettings = useMutation(api.orderForms.updateSettings);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -333,7 +333,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
     try {
       const payload = toJerseyRunPayload(values);
       await updateSettings({
-        jerseyRunId: run._id,
+        orderFormId: run._id,
         customQuestions: payload.customQuestions,
         deadline: payload.deadline,
       });

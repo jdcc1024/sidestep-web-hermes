@@ -1,6 +1,6 @@
 // Atomic rules for jersey-run setup. Constants, type guards, and pure
 // helpers that both the form adapter (./form.ts) and the Convex
-// `jerseyRuns.create` mutation import from. Single source of truth so
+// `orderForms.create` mutation import from. Single source of truth so
 // the client and server can't drift on size catalogs or roster caps.
 
 export const SIZE_OPTIONS = [

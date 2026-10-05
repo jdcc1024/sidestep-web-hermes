@@ -22,7 +22,7 @@ vi.mock("convex/react", async () => {
   return {
     useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
       const name = getFunctionName(ref);
-      if (name.startsWith("jerseyRuns:")) return runResult;
+      if (name.startsWith("orderForms:")) return runResult;
       // L-04: the warning reads the order's items, so it works with no run.
       if (name.startsWith("orderEntries:"))
         throw new Error(`L-04: ${name} is deleted; read orderItems instead`);

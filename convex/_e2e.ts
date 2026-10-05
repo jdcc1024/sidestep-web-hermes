@@ -178,7 +178,7 @@ export const cleanup = internalMutation({
         .withIndex("by_order", (q) => q.eq("orderId", order._id))
         .collect();
       const runs = await ctx.db
-        .query("jerseyRuns")
+        .query("orderForms")
         .withIndex("by_order", (q) => q.eq("orderId", order._id))
         .collect();
       for (const run of runs) {

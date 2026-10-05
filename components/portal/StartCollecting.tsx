@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 // date afterwards in Form settings. Nothing creates a form implicitly — this
 // button is the only path.
 export function StartCollecting({ orderId }: { orderId: Id<"orders"> }) {
-  const createRun = useMutation(api.jerseyRuns.create);
+  const createRun = useMutation(api.orderForms.create);
   const [open, setOpen] = useState(false);
   const [deadline, setDeadline] = useState("");
   const [error, setError] = useState<string | null>(null);

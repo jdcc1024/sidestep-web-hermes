@@ -43,7 +43,7 @@ export default function AdminOrderDetailPage({
     return <NotFound />;
   }
 
-  const { order, captain, designs, jerseyRun, jerseyRunResponseCount } =
+  const { order, captain, designs, orderForm, orderFormResponseCount } =
     result;
 
   return (
@@ -250,8 +250,8 @@ export default function AdminOrderDetailPage({
           teamName={order.teamName}
           designs={designs}
           list={list}
-          customQuestions={jerseyRun?.customQuestions}
-          namesMode={jerseyRun?.namesMode}
+          customQuestions={orderForm?.customQuestions}
+          namesMode={orderForm?.namesMode}
         />
       </section>
 
@@ -276,23 +276,23 @@ export default function AdminOrderDetailPage({
           <CardTitle>Jersey run</CardTitle>
         </CardHeader>
         <CardContent>
-          {jerseyRun ? (
+          {orderForm ? (
             <>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                <Field label="Status" value={jerseyRun.status} />
-                <Field label="Names mode" value={jerseyRun.namesMode} />
+                <Field label="Status" value={orderForm.status} />
+                <Field label="Names mode" value={orderForm.namesMode} />
                 <Field
                   label="Deadline"
-                  value={formatDate(jerseyRun.deadline)}
+                  value={formatDate(orderForm.deadline)}
                 />
                 <Field
                   label="Responses"
-                  value={String(jerseyRunResponseCount)}
+                  value={String(orderFormResponseCount)}
                 />
               </dl>
               <p className="mt-4 text-sm">
                 <Link
-                  href={`/admin/jersey-runs/${jerseyRun._id}`}
+                  href={`/admin/jersey-runs/${orderForm._id}`}
                   className="text-teal-700 hover:underline dark:text-teal-300"
                 >
                   View responses and close run →

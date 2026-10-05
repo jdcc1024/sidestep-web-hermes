@@ -25,7 +25,7 @@ import { checkCustomAnswer, isJerseyRunClosed } from "../lib/jerseyRunResponse/r
 //
 // - Fill before insert. A line whose design + player key matches a fillable
 //   item (live, no size, no submitter) fills the oldest one: size, qty,
-//   submitter, answers and `runId` are set, `source` is left alone. Filled
+//   submitter, answers and `orderFormId` are set, `source` is left alone. Filled
 //   ids go into a Set so two lines never fill the same row.
 // - Otherwise it inserts a `fan` item. Fixed mode copies the picked item's
 //   name / number / letter (someone already sized it, or the same player
@@ -38,7 +38,7 @@ import { checkCustomAnswer, isJerseyRunClosed } from "../lib/jerseyRunResponse/r
 // can hit, and can never change a size already set or remove anything.
 export const submitOrder = mutation({
   args: {
-    jerseyRunId: v.id("jerseyRuns"),
+    orderFormId: v.id("orderForms"),
     submitterName: v.string(),
     submitterEmail: v.string(),
     customAnswers: v.record(v.string(), v.string()),
@@ -56,7 +56,7 @@ export const submitOrder = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const run = await ctx.db.get(args.jerseyRunId);
+    const run = await ctx.db.get(args.orderFormId);
     if (!run) throw new ConvexError("Jersey run not found.");
     if (isJerseyRunClosed(run))
       throw new ConvexError("This jersey run is closed.");
@@ -105,7 +105,7 @@ export const submitOrder = mutation({
       submitterName: nameCheck.value,
       submitterEmail: emailCheck.value,
       customAnswers: hasAnswers ? customAnswers : undefined,
-      runId: run._id,
+      orderFormId: run._id,
       updatedAt: now,
     };
     const results: Array<{

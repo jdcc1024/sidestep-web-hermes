@@ -238,10 +238,10 @@ async function seedRun(
   orderId: Id<"orders">,
   captainId: Id<"users">,
   customQuestions: Array<{ id: string; label: string }> = [],
-): Promise<Id<"jerseyRuns">> {
+): Promise<Id<"orderForms">> {
   const now = Date.now();
   return t.run((ctx) =>
-    ctx.db.insert("jerseyRuns", {
+    ctx.db.insert("orderForms", {
       orderId,
       captainId,
       sizeOptions: ["S", "M", "L"],
@@ -270,7 +270,7 @@ async function seedItem(
     submitterName: string;
     submitterEmail: string;
     customAnswers: Record<string, string>;
-    runId: Id<"jerseyRuns">;
+    orderFormId: Id<"orderForms">;
     removedAt: number;
     createdAt: number;
   }> = {},
@@ -351,7 +351,7 @@ describe("admin.exportOrder", () => {
       sleeveStyle: "Short",
     });
     await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
-    const runId = await seedRun(t, orderId, captainId, [
+    const orderFormId = await seedRun(t, orderId, captainId, [
       { id: "q1", label: "Pickup location" },
     ]);
 
@@ -366,7 +366,7 @@ describe("admin.exportOrder", () => {
       submitterName: "Ben Chu",
       submitterEmail: "ben@example.com",
       customAnswers: { q1: "Gym" },
-      runId,
+      orderFormId,
       createdAt: now,
     });
 
@@ -536,7 +536,7 @@ describe("Admin exportOrder row count and getOrder count equal summary.itemCount
 
     expect(list!.summary.itemCount).toBe(3);
     expect(exported!.rows).toHaveLength(list!.summary.itemCount);
-    expect(detail!.jerseyRunResponseCount).toBe(list!.summary.itemCount);
+    expect(detail!.orderFormResponseCount).toBe(list!.summary.itemCount);
   });
 
   it("on an order with no form yet: the captain's items still export and count", async () => {
@@ -552,7 +552,7 @@ describe("Admin exportOrder row count and getOrder count equal summary.itemCount
     expect(list!.summary.itemCount).toBe(3);
     expect(exported!.rows).toHaveLength(3);
     expect(exported!.rows.reduce((sum, r) => sum + r.qty, 0)).toBe(3);
-    expect(detail!.jerseyRunResponseCount).toBe(3);
+    expect(detail!.orderFormResponseCount).toBe(3);
   });
 
   it("sums qty, not rows, for the count: Σ export qty = getOrder count = itemCount", async () => {
@@ -573,7 +573,7 @@ describe("Admin exportOrder row count and getOrder count equal summary.itemCount
 
     expect(list!.summary.itemCount).toBe(7);
     expect(exported!.rows.reduce((sum, r) => sum + r.qty, 0)).toBe(7);
-    expect(detail!.jerseyRunResponseCount).toBe(7);
+    expect(detail!.orderFormResponseCount).toBe(7);
   });
 });
 
@@ -649,15 +649,15 @@ describe("admin list-view user joins", () => {
     const orderId = await seedOrder(t, captainId);
     const designId = await seedDesign(t, captainId, "Home");
     await t.run((ctx) => ctx.db.patch(orderId, { designIds: [designId] }));
-    const runId = await seedRun(t, orderId, captainId);
+    const orderFormId = await seedRun(t, orderId, captainId);
     // responseCount is Σ qty of the order's sized, live items (R-07, read
     // through `summarize` since L-02): one item of qty 1 tallies as 1, and
     // neither a removed jersey nor a Needs-size player adds to it.
-    await seedItem(t, orderId, designId, { size: "M", runId });
+    await seedItem(t, orderId, designId, { size: "M", orderFormId });
     await seedItem(t, orderId, designId, { size: "L", qty: 4, removedAt: Date.now() });
     await seedItem(t, orderId, designId, { name: "Bure", qty: 2 });
 
-    const runs = await asAdmin.query(api.admin.listJerseyRuns, {});
+    const runs = await asAdmin.query(api.admin.listOrderForms, {});
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({
       teamName: "Falcons",
@@ -680,7 +680,7 @@ describe("admin list-view user joins", () => {
       await ctx.db.delete(captainId);
     });
 
-    const runs = await asAdmin.query(api.admin.listJerseyRuns, {});
+    const runs = await asAdmin.query(api.admin.listOrderForms, {});
     expect(runs[0]).toMatchObject({
       teamName: "Unknown team",
       captainName: "Unknown",
@@ -698,7 +698,7 @@ describe("admin list-view user joins", () => {
     await expect(asCaptain.query(api.admin.listDesigns, {})).rejects.toThrow(
       /Admin access required/,
     );
-    await expect(asCaptain.query(api.admin.listJerseyRuns, {})).rejects.toThrow(
+    await expect(asCaptain.query(api.admin.listOrderForms, {})).rejects.toThrow(
       /Admin access required/,
     );
   });

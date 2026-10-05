@@ -9,9 +9,9 @@ const crons = cronJobs();
 // to wake up to a closed-run summary. The action is idempotent, so a
 // missed or duplicated run is safe.
 crons.daily(
-  "close expired jersey runs",
+  "close expired order forms",
   { hourUTC: 8, minuteUTC: 0 },
-  internal.jerseyRunActions.closeExpiredRuns,
+  internal.orderFormActions.closeExpiredForms,
 );
 
 export default crons;

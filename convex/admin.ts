@@ -100,8 +100,8 @@ export const getOrder = query({
 
     // The order's production total (`summary.itemCount`): the same number
     // the captain's list shows, with or without an order form.
-    const { form: jerseyRun, summary: list } = await summarizeOrder(ctx, order);
-    const jerseyRunResponseCount = list.summary.itemCount;
+    const { form: orderForm, summary: list } = await summarizeOrder(ctx, order);
+    const orderFormResponseCount = list.summary.itemCount;
 
     return {
       order,
@@ -109,8 +109,8 @@ export const getOrder = query({
         ? { name: captain.name, email: captain.email, _id: captain._id }
         : null,
       designs,
-      jerseyRun,
-      jerseyRunResponseCount,
+      orderForm,
+      orderFormResponseCount,
     };
   },
 });
@@ -515,12 +515,12 @@ export const getDesign = query({
 // name/email from the user record so the list table can render without
 // follow-up queries. Response count is computed per run — fine at phase 1
 // volume; a denormalized counter on the run can come later if needed.
-export const listJerseyRuns = query({
+export const listOrderForms = query({
   args: {},
   handler: async (ctx) => {
     await requireAdmin(ctx);
 
-    const runs = await ctx.db.query("jerseyRuns").order("desc").collect();
+    const runs = await ctx.db.query("orderForms").order("desc").collect();
 
     const captains = await joinUsersById(ctx, runs, (r) => r.captainId);
     // Same dedupe-then-fetch shape as joinUsersById, on the orders table.

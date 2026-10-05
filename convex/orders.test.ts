@@ -356,7 +356,7 @@ describe("orders.updateOrder", () => {
     const orderId = await seedOrder(t, asUser);
     const now = Date.now();
     await t.run((ctx) =>
-      ctx.db.insert("jerseyRuns", {
+      ctx.db.insert("orderForms", {
         orderId,
         captainId: userId,
         sizeOptions: ["S", "M", "L"],
@@ -551,7 +551,7 @@ describe("orders.getMyOrder", () => {
       run: { status: "open" | "closed"; deadline: number },
     ) {
       return t.run((ctx) =>
-        ctx.db.insert("jerseyRuns", {
+        ctx.db.insert("orderForms", {
           orderId,
           captainId,
           sizeOptions: ["S", "M", "L"],

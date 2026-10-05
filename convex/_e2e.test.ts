@@ -29,7 +29,7 @@ describe("_e2e seed + cleanup", () => {
     const { t } = await setup();
     const r = await t.mutation(internal._e2e.seedOrder, { email: EMAIL, tag: "e2e-abc123" });
     expect(r.teamName).toBe("E2E e2e-abc123");
-    const runs = await t.run((ctx) => ctx.db.query("jerseyRuns").collect());
+    const runs = await t.run((ctx) => ctx.db.query("orderForms").collect());
     expect(runs).toHaveLength(0);
   });
 
@@ -51,7 +51,7 @@ describe("_e2e seed + cleanup", () => {
       }),
     );
     await t.run(async (ctx) => {
-      const runId = await ctx.db.insert("jerseyRuns", {
+      const orderFormId = await ctx.db.insert("orderForms", {
         orderId: mine.orderId,
         captainId: userId,
         sizeOptions: ["M"],
@@ -66,7 +66,7 @@ describe("_e2e seed + cleanup", () => {
         designId: mine.designId,
         qty: 1,
         source: "fan",
-        runId,
+        orderFormId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
@@ -77,7 +77,7 @@ describe("_e2e seed + cleanup", () => {
 
     const left = await t.run(async (ctx) => ({
       orders: (await ctx.db.query("orders").collect()).map((o) => o._id),
-      runs: await ctx.db.query("jerseyRuns").collect(),
+      runs: await ctx.db.query("orderForms").collect(),
       items: await ctx.db.query("orderItems").collect(),
     }));
     expect(left.orders.sort()).toEqual([other.orderId, realOrderId].sort());

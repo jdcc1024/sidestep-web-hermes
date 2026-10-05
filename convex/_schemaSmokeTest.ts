@@ -77,7 +77,7 @@ export const run = internalMutation({
       updatedAt: now,
     });
 
-    const runId = await ctx.db.insert("jerseyRuns", {
+    const orderFormId = await ctx.db.insert("orderForms", {
       orderId,
       captainId: userId,
       sizeOptions: ["S", "M", "L"],
@@ -99,7 +99,7 @@ export const run = internalMutation({
       submitterName: "Fan One",
       submitterEmail: "fan@example.com",
       customAnswers: { q1: "pickup" },
-      runId,
+      orderFormId,
       createdAt: now,
       updatedAt: now,
     });
@@ -120,7 +120,7 @@ export const run = internalMutation({
         ? { designAsset: await ctx.db.get(designAssetId) }
         : {}),
       order: await ctx.db.get(orderId),
-      run: await ctx.db.get(runId),
+      run: await ctx.db.get(orderFormId),
       orderItem: await ctx.db.get(orderItemId),
       intake: await ctx.db.get(intakeId),
     };
@@ -136,7 +136,7 @@ export const run = internalMutation({
     }
 
     await ctx.db.delete(orderItemId);
-    await ctx.db.delete(runId);
+    await ctx.db.delete(orderFormId);
     await ctx.db.delete(orderId);
     if (designAssetId) await ctx.db.delete(designAssetId);
     await ctx.db.delete(designId);

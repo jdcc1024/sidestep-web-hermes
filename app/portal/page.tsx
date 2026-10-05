@@ -17,10 +17,10 @@ import {
   type ChipTone,
 } from "@/lib/orderStages";
 
-// Shape returned by api.jerseyRuns.listMyResponses — one order item (a
+// Shape returned by api.orderForms.listMyResponses — one order item (a
 // jersey the signed-in user ordered) joined with its run and the linked
 // order's team name. Keep this in sync with the query handler in
-// convex/jerseyRuns.ts; if either grows fields, add them here too.
+// convex/orderForms.ts; if either grows fields, add them here too.
 type MyJerseyRunResponse = {
   entry: {
     _id: Id<"orderItems">;
@@ -31,7 +31,7 @@ type MyJerseyRunResponse = {
     qty: number;
     createdAt: number;
   };
-  run: Doc<"jerseyRuns">;
+  run: Doc<"orderForms">;
   teamName: string;
 };
 
@@ -46,7 +46,7 @@ export default function PortalDashboardPage() {
   const orders = useOwnedList(useQuery(api.orders.listMyOrders));
   const designs = useOwnedList(useQuery(api.designs.listMyDesigns));
   const jerseyRunResponses = useOwnedList(
-    useQuery(api.jerseyRuns.listMyResponses),
+    useQuery(api.orderForms.listMyResponses),
   );
 
   const greetingName = user?.firstName ?? "Captain";

@@ -9,7 +9,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 // generic (not a named impl param) so `.mock.calls` carries the args shape
 // without tripping no-unused-vars. beforeEach wires the resolved value.
 type SubmitArgs = {
-  jerseyRunId: string;
+  orderFormId: string;
   submitterName: string;
   submitterEmail: string;
   customAnswers: Record<string, string>;
@@ -66,7 +66,7 @@ vi.mock("convex/react", () => ({
 
 import { JerseyRunPublicForm } from "./JerseyRunPublicForm";
 
-const fakeRunId = "jersey_run_test_id" as Id<"jerseyRuns">;
+const fakeRunId = "jersey_run_test_id" as Id<"orderForms">;
 
 describe("JerseyRunPublicForm", () => {
   beforeEach(() => {
@@ -82,7 +82,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("surfaces validation errors when submitting an empty form", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     await user.click(screen.getByRole("button", { name: /^submit$/i }));
 
@@ -94,7 +94,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("submits a single jersey as one order-entry line", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
@@ -108,7 +108,7 @@ describe("JerseyRunPublicForm", () => {
       expect(submitOrder).toHaveBeenCalledTimes(1);
     });
     expect(submitOrder).toHaveBeenCalledWith({
-      jerseyRunId: fakeRunId,
+      orderFormId: fakeRunId,
       submitterName: "Pat Parent",
       submitterEmail: "pat@example.com",
       customAnswers: {},
@@ -121,7 +121,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("adds a second jersey line and submits both", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
@@ -156,7 +156,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("routes a blank jersey through the confirm dialog before submitting", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
@@ -184,7 +184,7 @@ describe("JerseyRunPublicForm", () => {
         { _id: AWAY, title: "Away", roster: [] },
       ],
     };
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     expect(screen.getByText(/your jerseys & designs/i)).toBeInTheDocument();
     expect(
@@ -211,7 +211,7 @@ describe("JerseyRunPublicForm", () => {
   it("lets a fan tap sizes per roster slot and submits one line per size", async () => {
     publicData = fixedSingleDesign();
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     // No free-text name field and no name dropdown — a roster grid instead.
     expect(screen.queryByLabelText(/name on jersey/i)).not.toBeInTheDocument();
@@ -240,7 +240,7 @@ describe("JerseyRunPublicForm", () => {
       expect(submitOrder).toHaveBeenCalledTimes(1);
     });
     expect(submitOrder).toHaveBeenCalledWith({
-      jerseyRunId: fakeRunId,
+      orderFormId: fakeRunId,
       submitterName: "Pat Parent",
       submitterEmail: "pat@example.com",
       customAnswers: {},
@@ -254,7 +254,7 @@ describe("JerseyRunPublicForm", () => {
   it("decrements a slot's size and hides the minus at zero", async () => {
     publicData = fixedSingleDesign();
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     // No "−" until the size has a count.
     expect(
@@ -285,7 +285,7 @@ describe("JerseyRunPublicForm", () => {
       ...singleDesignOpen(),
       designs: [{ _id: HOME, title: "Home", roster: fanTyped }],
     };
-    const { unmount } = render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    const { unmount } = render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     // Open: free text, and the existing slot is not offered as a choice.
     expect(screen.getByLabelText(/name on jersey/i)).toBeInTheDocument();
@@ -298,7 +298,7 @@ describe("JerseyRunPublicForm", () => {
       ...publicData,
       run: { ...publicData.run, namesMode: "fixed" },
     };
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     expect(screen.queryByLabelText(/name on jersey/i)).not.toBeInTheDocument();
     expect(
@@ -308,7 +308,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("lets fans type freely again after a switch back to open", () => {
     publicData = fixedSingleDesign();
-    const { unmount } = render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    const { unmount } = render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
     expect(screen.queryByLabelText(/name on jersey/i)).not.toBeInTheDocument();
     unmount();
 
@@ -316,7 +316,7 @@ describe("JerseyRunPublicForm", () => {
       ...publicData,
       run: { ...publicData.run, namesMode: "open" },
     };
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     expect(screen.getByLabelText(/name on jersey/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^number$/i)).toBeInTheDocument();
@@ -332,7 +332,7 @@ describe("JerseyRunPublicForm", () => {
         sizeOptions: ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"],
       },
     };
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     // The radio itself is visually hidden inside its label, so the label is
     // what carries the size text a fan actually reads.
@@ -344,7 +344,7 @@ describe("JerseyRunPublicForm", () => {
   it("blocks a fixed-mode submit with nothing selected", async () => {
     publicData = fixedSingleDesign();
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
@@ -376,7 +376,7 @@ describe("Public form error line never shows [CONVEX, Request ID, ConvexError or
 
   async function fillAndSubmit() {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm jerseyRunId={fakeRunId} />);
+    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
     await user.type(screen.getByLabelText(/name on jersey/i), "Alex");

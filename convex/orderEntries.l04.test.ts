@@ -79,8 +79,8 @@ describe("a form-less order: unlinking Away Kit warns about 2 captain items; aft
         { name: "Bure", number: "10" },
       ],
     });
-    // No jerseyRuns row exists at all.
-    const runs = await t.run((ctx) => ctx.db.query("jerseyRuns").collect());
+    // No orderForms row exists at all.
+    const runs = await t.run((ctx) => ctx.db.query("orderForms").collect());
     expect(runs).toHaveLength(0);
 
     const affected = await as.query(api.orderItems.affectedByDesignRemoval, {

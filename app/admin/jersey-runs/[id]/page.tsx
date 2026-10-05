@@ -26,10 +26,10 @@ type PageProps = {
 
 export default function AdminJerseyRunDetailPage({ params }: PageProps) {
   const { id } = use(params);
-  const jerseyRunId = id as Id<"jerseyRuns">;
+  const orderFormId = id as Id<"orderForms">;
 
-  const data = useQuery(api.jerseyRuns.listOrderEntries, { jerseyRunId });
-  const closeRun = useMutation(api.jerseyRuns.closeRunByAdmin);
+  const data = useQuery(api.orderForms.listOrderEntries, { orderFormId });
+  const closeRun = useMutation(api.orderForms.closeFormByAdmin);
 
   const [closing, setClosing] = useState(false);
   const [closeError, setCloseError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export default function AdminJerseyRunDetailPage({ params }: PageProps) {
     setClosing(true);
     setCloseError(null);
     try {
-      await closeRun({ jerseyRunId });
+      await closeRun({ orderFormId });
     } catch (err) {
       const message =
         err instanceof ConvexError

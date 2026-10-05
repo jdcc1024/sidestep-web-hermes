@@ -72,11 +72,11 @@ type PublicRun = {
 };
 
 export function JerseyRunPublicForm({
-  jerseyRunId,
+  orderFormId,
 }: {
-  jerseyRunId: Id<"jerseyRuns">;
+  orderFormId: Id<"orderForms">;
 }) {
-  const data = useQuery(api.jerseyRuns.getPublic, { jerseyRunId });
+  const data = useQuery(api.orderForms.getPublic, { orderFormId });
 
   if (data === undefined) return <Skeleton />;
   if (data === null) return <NotFound />;
@@ -99,7 +99,7 @@ export function JerseyRunPublicForm({
 
   return (
     <OrderForm
-      jerseyRunId={jerseyRunId}
+      orderFormId={orderFormId}
       run={run}
       designs={data.designs}
       teamName={data.teamName}
@@ -259,13 +259,13 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
 }
 
 function OrderForm({
-  jerseyRunId,
+  orderFormId,
   run,
   designs,
   teamName,
   captainName,
 }: {
-  jerseyRunId: Id<"jerseyRuns">;
+  orderFormId: Id<"orderForms">;
   run: PublicRun;
   designs: PublicDesign[];
   teamName: string;
@@ -340,7 +340,7 @@ function OrderForm({
     setPending(true);
     try {
       await submitOrder({
-        jerseyRunId,
+        orderFormId,
         submitterName: values.submitterName.trim(),
         submitterEmail: values.submitterEmail.trim(),
         customAnswers: values.customAnswers,

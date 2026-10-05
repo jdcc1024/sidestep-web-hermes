@@ -2,10 +2,10 @@
 // atomic rules in ./rules into a JerseyRunErrors record keyed by form field,
 // plus a toJerseyRunPayload helper that converts validated input into the
 // shape the Convex mutation accepts. The Convex side imports the same rules
-// directly — see convex/jerseyRuns.ts.
+// directly — see convex/orderForms.ts.
 //
 // Two fields, since M-05: sizes are a fixed catalog the captain is never
-// asked about, and names mode moved to the order page (jerseyRuns.
+// asked about, and names mode moved to the order page (orderForms.
 // setNamesMode) where the designs it affects are visible.
 
 import {

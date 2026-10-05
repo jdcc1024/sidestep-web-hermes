@@ -47,7 +47,7 @@ export const getByOrder = query({
       throw new ConvexError("You don't have access to this order.");
 
     const run = await ctx.db
-      .query("jerseyRuns")
+      .query("orderForms")
       .withIndex("by_order", (q) => q.eq("orderId", orderId))
       .unique();
     if (!run) return null;
@@ -103,9 +103,9 @@ function pickerFor(
 // as closed the moment the deadline passes without a scheduler having
 // touched the row yet.
 export const getPublic = query({
-  args: { jerseyRunId: v.id("jerseyRuns") },
-  handler: async (ctx, { jerseyRunId }) => {
-    const run = await ctx.db.get(jerseyRunId);
+  args: { orderFormId: v.id("orderForms") },
+  handler: async (ctx, { orderFormId }) => {
+    const run = await ctx.db.get(orderFormId);
     if (!run) return null;
 
     const order = await ctx.db.get(run.orderId);
@@ -179,7 +179,7 @@ export const create = mutation({
     // /run/setup if they need to make changes. Creating a second run for
     // the same order would orphan responses from the first.
     const existing = await ctx.db
-      .query("jerseyRuns")
+      .query("orderForms")
       .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
       .unique();
     if (existing) throw new ConvexError("This order already has a jersey run.");
@@ -191,7 +191,7 @@ export const create = mutation({
     // run starts open — the mode
     // only matters once there are slots to pick from, and by then the
     // captain is on the order page where the control lives.
-    return ctx.db.insert("jerseyRuns", {
+    return ctx.db.insert("orderForms", {
       orderId: args.orderId,
       captainId: user._id,
       sizeOptions: [...SIZE_OPTIONS],
@@ -213,19 +213,19 @@ export const create = mutation({
 // other captain list write.
 export const setNamesMode = mutation({
   args: {
-    jerseyRunId: v.id("jerseyRuns"),
+    orderFormId: v.id("orderForms"),
     namesMode: v.union(v.literal("open"), v.literal("fixed")),
   },
-  handler: async (ctx, { jerseyRunId, namesMode }) => {
-    const run = await ctx.db.get(jerseyRunId);
+  handler: async (ctx, { orderFormId, namesMode }) => {
+    const run = await ctx.db.get(orderFormId);
     if (!run) throw new ConvexError("We couldn't find that order form.");
     const { order } = await requireOrderOwnership(ctx, run.orderId);
 
     if (await isListLocked(ctx, order))
       throw new ConvexError(LIST_LOCKED_MESSAGE);
 
-    await ctx.db.patch(jerseyRunId, { namesMode });
-    return jerseyRunId;
+    await ctx.db.patch(orderFormId, { namesMode });
+    return orderFormId;
   },
 });
 
@@ -238,14 +238,14 @@ export const setNamesMode = mutation({
 // deadline is how a captain reopens it (L-06). A confirmed list rejects it.
 export const updateSettings = mutation({
   args: {
-    jerseyRunId: v.id("jerseyRuns"),
+    orderFormId: v.id("orderForms"),
     deadline: v.number(),
     customQuestions: v.array(
       v.object({ id: v.string(), label: v.string() }),
     ),
   },
   handler: async (ctx, args) => {
-    const run = await ctx.db.get(args.jerseyRunId);
+    const run = await ctx.db.get(args.orderFormId);
     if (!run) throw new ConvexError("We couldn't find that order form.");
     const { order } = await requireOrderOwnership(ctx, run.orderId);
 
@@ -255,12 +255,12 @@ export const updateSettings = mutation({
     if (args.deadline <= Date.now())
       throw new ConvexError("Deadline must be in the future.");
 
-    await ctx.db.patch(args.jerseyRunId, {
+    await ctx.db.patch(args.orderFormId, {
       deadline: args.deadline,
       customQuestions: cleanCustomQuestions(args.customQuestions),
       status: "open",
     });
-    return args.jerseyRunId;
+    return args.orderFormId;
   },
 });
 
@@ -300,7 +300,7 @@ export const listMyResponses = query({
         .collect()
     ).filter((i) => i.removedAt === undefined && i.size !== undefined);
 
-    const runCache = new Map<string, Doc<"jerseyRuns"> | null>();
+    const runCache = new Map<string, Doc<"orderForms"> | null>();
     const orderCache = new Map<string, Doc<"orders"> | null>();
     const designTitleCache = new Map<string, string>();
 
@@ -314,16 +314,16 @@ export const listMyResponses = query({
         qty: number;
         createdAt: number;
       };
-      run: Doc<"jerseyRuns">;
+      run: Doc<"orderForms">;
       teamName: string;
     }> = [];
 
     for (const entry of items) {
-      if (entry.runId === undefined || entry.size === undefined) continue;
-      let run = runCache.get(entry.runId) ?? null;
-      if (!runCache.has(entry.runId)) {
-        run = await ctx.db.get(entry.runId);
-        runCache.set(entry.runId, run);
+      if (entry.orderFormId === undefined || entry.size === undefined) continue;
+      let run = runCache.get(entry.orderFormId) ?? null;
+      if (!runCache.has(entry.orderFormId)) {
+        run = await ctx.db.get(entry.orderFormId);
+        runCache.set(entry.orderFormId, run);
       }
       if (!run) continue;
 
@@ -368,11 +368,11 @@ export const listMyResponses = query({
 // access violation so the UI can show a 403; null if the run or order has
 // been deleted.
 export const listOrderEntries = query({
-  args: { jerseyRunId: v.id("jerseyRuns") },
-  handler: async (ctx, { jerseyRunId }) => {
+  args: { orderFormId: v.id("orderForms") },
+  handler: async (ctx, { orderFormId }) => {
     const user = await requireCurrentUser(ctx);
 
-    const run = await ctx.db.get(jerseyRunId);
+    const run = await ctx.db.get(orderFormId);
     if (!run) return null;
     const order = await ctx.db.get(run.orderId);
     if (!order) return null;
@@ -423,10 +423,10 @@ export const listOrderEntries = query({
 // every open run whose deadline has already passed so the action can
 // close each one. Scanning the table is fine at phase 1 volume; a
 // `by_status_deadline` index can come later if the catalog grows.
-export const _listExpiredOpenRuns = internalQuery({
+export const _listExpiredOpenForms = internalQuery({
   args: { now: v.number() },
   handler: async (ctx, { now }) => {
-    const runs = await ctx.db.query("jerseyRuns").collect();
+    const runs = await ctx.db.query("orderForms").collect();
     return runs
       .filter((run) => run.status === "open" && run.deadline < now)
       .map((run) => run._id);
@@ -437,13 +437,13 @@ export const _listExpiredOpenRuns = internalQuery({
 // the notification emails. Returns null when the run is already closed,
 // has been deleted, or its order/captain has vanished — the action skips
 // those silently. Idempotent: running it twice on the same id is safe.
-export const _closeRun = internalMutation({
-  args: { jerseyRunId: v.id("jerseyRuns") },
-  handler: async (ctx, { jerseyRunId }) => {
-    const run = await ctx.db.get(jerseyRunId);
+export const _closeForm = internalMutation({
+  args: { orderFormId: v.id("orderForms") },
+  handler: async (ctx, { orderFormId }) => {
+    const run = await ctx.db.get(orderFormId);
     if (!run || run.status !== "open") return null;
 
-    await ctx.db.patch(jerseyRunId, { status: "closed" });
+    await ctx.db.patch(orderFormId, { status: "closed" });
 
     const order = await ctx.db.get(run.orderId);
     const captain = await ctx.db.get(run.captainId);
@@ -453,7 +453,7 @@ export const _closeRun = internalMutation({
     const { summary: list } = await summarizeOrder(ctx, order);
 
     return {
-      jerseyRunId,
+      orderFormId,
       orderId: run.orderId,
       teamName: order.teamName,
       captainEmail: captain.email,
@@ -467,19 +467,19 @@ export const _closeRun = internalMutation({
 // Admin-only manual close (issue 3-02 will surface this in the UI).
 // Schedules the same action the cron uses so the email side-effect
 // stays in one place and admins don't have to wait for it.
-export const closeRunByAdmin = mutation({
-  args: { jerseyRunId: v.id("jerseyRuns") },
-  handler: async (ctx, { jerseyRunId }) => {
+export const closeFormByAdmin = mutation({
+  args: { orderFormId: v.id("orderForms") },
+  handler: async (ctx, { orderFormId }) => {
     await requireAdmin(ctx);
 
-    const run = await ctx.db.get(jerseyRunId);
+    const run = await ctx.db.get(orderFormId);
     if (!run) throw new ConvexError("We couldn't find that order form.");
     if (run.status === "closed") return { alreadyClosed: true };
 
     await ctx.scheduler.runAfter(
       0,
-      internal.jerseyRunActions.closeRunWithNotification,
-      { jerseyRunId },
+      internal.orderFormActions.closeFormWithNotification,
+      { orderFormId },
     );
     return { alreadyClosed: false };
   },

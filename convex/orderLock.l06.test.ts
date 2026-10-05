@@ -81,11 +81,11 @@ async function seedWorld(
     });
     return { orderId, designIds };
   });
-  let runId: Id<"jerseyRuns"> | null = null;
+  let orderFormId: Id<"orderForms"> | null = null;
   if (opts.run !== false) {
     const run = opts.run ?? {};
-    runId = await t.run((ctx) =>
-      ctx.db.insert("jerseyRuns", {
+    orderFormId = await t.run((ctx) =>
+      ctx.db.insert("orderForms", {
         orderId,
         captainId: captain.userId,
         sizeOptions: ["S", "M", "L"],
@@ -97,7 +97,7 @@ async function seedWorld(
       }),
     );
   }
-  return { captain, admin, orderId, designIds, designId: designIds[0], runId };
+  return { captain, admin, orderId, designIds, designId: designIds[0], orderFormId };
 }
 
 type World = Awaited<ReturnType<typeof seedWorld>>;
@@ -234,7 +234,7 @@ describe("With Order Size Confirmed unchecked, a captain can add/edit/remove aft
     const w = await seedWorld(t, { run: { deadline: Date.now() - ONE_DAY } });
     const message = await userError(() =>
       t.mutation(api.orderEntries.submitOrder, {
-        jerseyRunId: w.runId!,
+        orderFormId: w.orderFormId!,
         submitterName: "Riley",
         submitterEmail: "riley@example.com",
         customAnswers: {},
@@ -242,7 +242,7 @@ describe("With Order Size Confirmed unchecked, a captain can add/edit/remove aft
       }),
     );
     expect(message).toBeTruthy();
-    const pub = await t.query(api.jerseyRuns.getPublic, { jerseyRunId: w.runId! });
+    const pub = await t.query(api.orderForms.getPublic, { orderFormId: w.orderFormId! });
     expect(pub?.effectiveStatus).toBe("closed");
   });
 });
@@ -411,7 +411,7 @@ describe("While confirmed: captain add/update/remove/restore/addMany/copyToDesig
     const w = await seedConfirmed(t);
     const message = await userError(() =>
       t.mutation(api.orderEntries.submitOrder, {
-        jerseyRunId: w.runId!,
+        orderFormId: w.orderFormId!,
         submitterName: "Riley",
         submitterEmail: "riley@example.com",
         customAnswers: {},
@@ -432,15 +432,15 @@ describe("While confirmed: captain add/update/remove/restore/addMany/copyToDesig
     const t = convexTest(schema, modules);
     const w = await seedConfirmed(t);
     await expect(
-      w.captain.as.mutation(api.jerseyRuns.updateSettings, {
-        jerseyRunId: w.runId!,
+      w.captain.as.mutation(api.orderForms.updateSettings, {
+        orderFormId: w.orderFormId!,
         deadline: Date.now() + 14 * ONE_DAY,
         customQuestions: [],
       }),
     ).rejects.toThrow();
     await expect(
-      w.captain.as.mutation(api.jerseyRuns.setNamesMode, {
-        jerseyRunId: w.runId!,
+      w.captain.as.mutation(api.orderForms.setNamesMode, {
+        orderFormId: w.orderFormId!,
         namesMode: "fixed",
       }),
     ).rejects.toThrow();
@@ -567,21 +567,21 @@ describe("Extending a closed form's deadline to a future date reopens the public
         run: { deadline: Date.now() - ONE_DAY, status },
       });
       expect(
-        (await t.query(api.jerseyRuns.getPublic, { jerseyRunId: w.runId! }))
+        (await t.query(api.orderForms.getPublic, { orderFormId: w.orderFormId! }))
           ?.effectiveStatus,
         `${status}: starts closed`,
       ).toBe("closed");
 
-      await w.captain.as.mutation(api.jerseyRuns.updateSettings, {
-        jerseyRunId: w.runId!,
+      await w.captain.as.mutation(api.orderForms.updateSettings, {
+        orderFormId: w.orderFormId!,
         deadline: Date.now() + 14 * ONE_DAY,
         customQuestions: [],
       });
 
-      const run = await t.run((ctx) => ctx.db.get(w.runId!));
+      const run = await t.run((ctx) => ctx.db.get(w.orderFormId!));
       expect(run?.status, `${status}: stored status`).toBe("open");
       expect(
-        (await t.query(api.jerseyRuns.getPublic, { jerseyRunId: w.runId! }))
+        (await t.query(api.orderForms.getPublic, { orderFormId: w.orderFormId! }))
           ?.effectiveStatus,
         `${status}: reopened`,
       ).toBe("open");
@@ -591,13 +591,13 @@ describe("Extending a closed form's deadline to a future date reopens the public
   it("a reopened form accepts a submission", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t, { run: { deadline: Date.now() - ONE_DAY } });
-    await w.captain.as.mutation(api.jerseyRuns.updateSettings, {
-      jerseyRunId: w.runId!,
+    await w.captain.as.mutation(api.orderForms.updateSettings, {
+      orderFormId: w.orderFormId!,
       deadline: Date.now() + 14 * ONE_DAY,
       customQuestions: [],
     });
     const res = await t.mutation(api.orderEntries.submitOrder, {
-      jerseyRunId: w.runId!,
+      orderFormId: w.orderFormId!,
       submitterName: "Riley",
       submitterEmail: "riley@example.com",
       customAnswers: {},
@@ -607,18 +607,18 @@ describe("Extending a closed form's deadline to a future date reopens the public
   });
 });
 
-describe("jerseyRuns.lock / unlock are deleted; a run never becomes locked (§1)", () => {
+describe("orderForms.lock / unlock are deleted; a run never becomes locked (§1)", () => {
   it("the public API has no lock or unlock", () => {
     // `api` is a Proxy (any property reads as a reference), so check the
     // module's exports in source instead.
-    const src = readFileSync(path.resolve(__dirname, "jerseyRuns.ts"), "utf8");
+    const src = readFileSync(path.resolve(__dirname, "orderForms.ts"), "utf8");
     expect(src).not.toMatch(/export const (lock|unlock)\b/);
   });
 
   it("a lapsed form reads as closed, never locked", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t, { run: { deadline: Date.now() - ONE_DAY } });
-    const mine = await w.captain.as.query(api.jerseyRuns.getByOrder, {
+    const mine = await w.captain.as.query(api.orderForms.getByOrder, {
       orderId: w.orderId,
     });
     expect(mine?.effectiveStatus).toBe("closed");

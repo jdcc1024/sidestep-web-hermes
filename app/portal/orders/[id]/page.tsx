@@ -35,7 +35,7 @@ export default function OrderDetailPage({ params }: PageProps) {
   // list's fixed-mode warning. One only exists once the captain makes it —
   // saving an order never creates one, so null here is the common starting
   // state, not an error.
-  const run = useQuery(api.jerseyRuns.getByOrder, { orderId });
+  const run = useQuery(api.orderForms.getByOrder, { orderId });
   // The order's list (L-02): every item on every design, with or without a
   // form. The header total, the order list's rows, chips, footer and CSV all
   // come from this one subscription, so an edit updates every one of them in

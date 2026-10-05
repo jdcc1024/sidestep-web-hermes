@@ -36,7 +36,7 @@ describe("Responses page retired (L-05, Q6 = A)", () => {
   });
 
   it("the closure email action links to the order page", () => {
-    const src = readFileSync(path.join(ROOT, "convex/jerseyRunActions.ts"), "utf8");
+    const src = readFileSync(path.join(ROOT, "convex/orderFormActions.ts"), "utf8");
     expect(src).toMatch(/\/portal\/orders\/\$\{orderId\}`/);
   });
 });

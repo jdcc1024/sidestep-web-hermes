@@ -11,7 +11,7 @@ export type OrderDesign = MyOrder["designs"][number];
 
 // The run behind the collect card and the names-mode switch; `null` until the
 // captain starts collecting, `undefined` while loading.
-export type OrderRun = FunctionReturnType<typeof api.jerseyRuns.getByOrder>;
+export type OrderRun = FunctionReturnType<typeof api.orderForms.getByOrder>;
 
 export function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, {

@@ -4,7 +4,7 @@
 // tables and un-locks stored runs; afterwards the schema no longer has them.
 // A migration test needs pre-migration data, which the post-migration schema
 // can't hold, so the migration runs against `legacySchema`: today's tables
-// plus loose legacy `rosterEntries` / `orderEntries` / `jerseyRuns` shapes.
+// plus loose legacy `rosterEntries` / `orderEntries` / `orderForms` shapes.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -19,7 +19,7 @@ const modules = import.meta.glob("./**/*.*s");
 
 const legacySchema = defineSchema({
   ...schema.tables,
-  jerseyRuns: defineTable(v.any()).index("by_order", ["orderId"]).index("by_captain", ["captainId"]),
+  orderForms: defineTable(v.any()).index("by_order", ["orderId"]).index("by_captain", ["captainId"]),
   rosterEntries: defineTable(v.any()).index("by_run", ["runId"]).index("by_design", ["designId"]),
   orderEntries: defineTable(v.any())
     .index("by_run", ["runId"])
@@ -47,7 +47,7 @@ async function seedLegacy(t: LegacyTest) {
       internalStages: [{ name: "Inquiry", completedAt: now }], createdAt: now, updatedAt: now,
     });
     const run = (status: "open" | "closed" | "locked") =>
-      ctx.db.insert("jerseyRuns", {
+      ctx.db.insert("orderForms", {
         orderId, captainId, sizeOptions: ["S"], namesMode: "open", customQuestions: [],
         deadline: now + 1000, status, createdAt: now,
         ...(status === "locked"
@@ -107,14 +107,14 @@ describe("After the migration the schema has no legacy tables, no lockSnapshot a
   const tables = () =>
     (schema as unknown as { tables: Record<string, unknown> }).tables;
 
-  it("drops rosterEntries and orderEntries but keeps orderItems and jerseyRuns", () => {
+  it("drops rosterEntries and orderEntries but keeps orderItems and orderForms", () => {
     const names = Object.keys(tables());
     expect(names).not.toContain("rosterEntries");
     expect(names).not.toContain("orderEntries");
-    expect(names).toEqual(expect.arrayContaining(["orderItems", "jerseyRuns"]));
+    expect(names).toEqual(expect.arrayContaining(["orderItems", "orderForms"]));
   });
 
-  it("jerseyRuns no longer has lockSnapshot or the locked status literal", () => {
+  it("orderForms no longer has lockSnapshot or the locked status literal", () => {
     const src = readFileSync(path.resolve(__dirname, "schema.ts"), "utf8");
     expect(src).not.toMatch(/lockSnapshot/);
     expect(src).not.toMatch(/v\.literal\(\s*"locked"\s*\)/);

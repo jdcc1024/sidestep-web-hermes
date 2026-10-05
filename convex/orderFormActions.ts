@@ -50,11 +50,11 @@ async function sendEmail(
 // Internal — closes a single run and emails both the captain and the
 // Sidestep ops inbox. Used by both the daily cron (3-01) and the admin
 // manual close button (3-02), so closure semantics stay consistent.
-export const closeRunWithNotification = internalAction({
-  args: { jerseyRunId: v.id("jerseyRuns") },
-  handler: async (ctx, { jerseyRunId }) => {
-    const context = await ctx.runMutation(internal.jerseyRuns._closeRun, {
-      jerseyRunId,
+export const closeFormWithNotification = internalAction({
+  args: { orderFormId: v.id("orderForms") },
+  handler: async (ctx, { orderFormId }) => {
+    const context = await ctx.runMutation(internal.orderForms._closeForm, {
+      orderFormId,
     });
     if (!context) return { closed: false };
 
@@ -64,7 +64,7 @@ export const closeRunWithNotification = internalAction({
       // we have no way to mail anyone. Log so the operator notices.
       console.warn(
         "RESEND_API_KEY not set — jersey run closed but no email sent",
-        { jerseyRunId },
+        { orderFormId },
       );
       return { closed: true, emailed: false };
     }
@@ -95,24 +95,24 @@ export const closeRunWithNotification = internalAction({
 // internal mutation no-ops on already-closed runs.
 //
 // Return type is annotated because this action and
-// closeRunWithNotification are in the same module — without an annotation
-// TypeScript can't resolve the type of `internal.jerseyRunActions.*`
+// closeFormWithNotification are in the same module — without an annotation
+// TypeScript can't resolve the type of `internal.orderFormActions.*`
 // while it's still inferring this function.
-export const closeExpiredRuns = internalAction({
+export const closeExpiredForms = internalAction({
   args: {},
   handler: async (ctx): Promise<{ scanned: number; closed: number }> => {
     const expiredIds = await ctx.runQuery(
-      internal.jerseyRuns._listExpiredOpenRuns,
+      internal.orderForms._listExpiredOpenForms,
       { now: Date.now() },
     );
 
     // Run sequentially so we don't dogpile Resend with parallel sends —
     // a daily cron will never have a backlog large enough to need fanout.
     let closed = 0;
-    for (const jerseyRunId of expiredIds) {
+    for (const orderFormId of expiredIds) {
       const result = await ctx.runAction(
-        internal.jerseyRunActions.closeRunWithNotification,
-        { jerseyRunId },
+        internal.orderFormActions.closeFormWithNotification,
+        { orderFormId },
       );
       if (result.closed) closed += 1;
     }

@@ -66,7 +66,7 @@ export function OrderFormCard({
 // on a form whose submissions all reject. The deadline only closes the form;
 // the list locks when the order size is confirmed, and says so itself (L-06).
 type RunSummary = {
-  _id: Id<"jerseyRuns">;
+  _id: Id<"orderForms">;
   deadline: number;
   effectiveStatus: "open" | "closed";
 };

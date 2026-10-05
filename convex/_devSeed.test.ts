@@ -45,7 +45,7 @@ describe("_devSeed:seedPortalFixtures", () => {
     expect(orders).toHaveLength(2);
     expect(orders.every((o) => o.captainId === userId)).toBe(true);
 
-    const runs = await t.run((ctx) => ctx.db.query("jerseyRuns").collect());
+    const runs = await t.run((ctx) => ctx.db.query("orderForms").collect());
     expect(runs).toHaveLength(1);
     expect(runs[0].orderId).toBe(result.orderWithRunId);
     expect(runs[0].captainId).toBe(userId);
@@ -81,10 +81,10 @@ describe("_devSeed:seedPortalFixtures", () => {
     const sized = items.filter((i) => i.size !== undefined);
     expect(sized.some((i) => i.name !== undefined)).toBe(true);
     expect(sized.some((i) => i.name === undefined)).toBe(true);
-    // At least one came in through the form, with a submitter and the runId.
+    // At least one came in through the form, with a submitter and the orderFormId.
     expect(
       items.some(
-        (i) => i.runId === result.runId && i.submitterEmail !== undefined,
+        (i) => i.orderFormId === result.orderFormId && i.submitterEmail !== undefined,
       ),
     ).toBe(true);
 
@@ -105,7 +105,7 @@ describe("_devSeed:seedPortalFixtures", () => {
     );
     expect(items).toHaveLength(2);
     expect(items.every((i) => i.source === "captain")).toBe(true);
-    expect(items.every((i) => i.runId === undefined)).toBe(true);
+    expect(items.every((i) => i.orderFormId === undefined)).toBe(true);
     expect(items.every((i) => i.submitterEmail === undefined)).toBe(true);
     expect(items.filter((i) => i.size === undefined)).toHaveLength(1);
     expect(items.filter((i) => i.size !== undefined)).toHaveLength(1);
@@ -149,7 +149,7 @@ describe("_devSeed:seedPortalFixtures", () => {
       t.run(async (ctx) => ({
         designs: (await ctx.db.query("designs").collect()).length,
         orders: (await ctx.db.query("orders").collect()).length,
-        runs: (await ctx.db.query("jerseyRuns").collect()).length,
+        runs: (await ctx.db.query("orderForms").collect()).length,
         items: (await ctx.db.query("orderItems").collect()).length,
       }));
     const after1 = await counts();
@@ -162,7 +162,7 @@ describe("_devSeed:seedPortalFixtures", () => {
     expect(after2).toEqual(after1);
     expect(second.orderWithRunId).toBe(first.orderWithRunId);
     expect(second.orderWithoutRunId).toBe(first.orderWithoutRunId);
-    expect(second.runId).toBe(first.runId);
+    expect(second.orderFormId).toBe(first.orderFormId);
     expect(second.created).toBe(false);
     expect(first.created).toBe(true);
   });

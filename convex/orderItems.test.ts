@@ -90,7 +90,7 @@ async function seedRun(
   } = {},
 ) {
   return t.run((ctx) =>
-    ctx.db.insert("jerseyRuns", {
+    ctx.db.insert("orderForms", {
       orderId,
       captainId,
       sizeOptions: ["S", "M", "L"],
@@ -140,7 +140,7 @@ async function insertFanItem(
     submitterName: string;
     submitterEmail: string;
     customAnswers: Record<string, string>;
-    runId: Id<"jerseyRuns">;
+    orderFormId: Id<"orderForms">;
     createdAt: number;
   }> = {},
 ) {
@@ -272,7 +272,7 @@ describe("A captain can add an item to an order with no run (no deadline, no for
     const stored = await getItem(t, id);
     expect(stored?.source).toBe("captain");
     expect(stored?.orderId).toBe(orderId);
-    expect(stored?.runId).toBeUndefined();
+    expect(stored?.orderFormId).toBeUndefined();
     expect(stored?.submitterName).toBeUndefined();
     expect(stored?.submitterEmail).toBeUndefined();
 
@@ -433,10 +433,10 @@ describe("update changes every editable field of a fan-sourced item (name, numbe
   it("edits all five fields and preserves the player's identity and answers", async () => {
     const t = convexTest(schema, modules);
     const { captain, orderId, designId } = await seedWorld(t);
-    const runId = await seedRun(t, orderId, captain.userId);
+    const orderFormId = await seedRun(t, orderId, captain.userId);
     const createdAt = Date.now() - ONE_DAY;
     const id = await insertFanItem(t, orderId, designId, {
-      runId,
+      orderFormId,
       createdAt,
     });
     const before = (await getItem(t, id))!;
@@ -463,7 +463,7 @@ describe("update changes every editable field of a fan-sourced item (name, numbe
     expect(after.source).toBe("fan");
     expect(after.createdAt).toBe(createdAt);
     expect(after.designId).toBe(designId);
-    expect(after.runId).toBe(runId);
+    expect(after.orderFormId).toBe(orderFormId);
     expect(after.updatedBy).toBe(captain.userId);
     expect(after.updatedAt).toBeGreaterThan(createdAt);
   });
@@ -805,20 +805,20 @@ describe('When isListLocked is true: captain writes are rejected with a message 
   // The order's form stays open, so nothing here leans on the form.
   async function seedLocked(t: T) {
     const world = await seedWorld(t, ["Home", "Away"]);
-    const runId = await seedRun(t, world.orderId, world.captain.userId, {
+    const orderFormId = await seedRun(t, world.orderId, world.captain.userId, {
       deadline: Date.now() + ONE_DAY,
     });
     await confirmOrderSize(t, world.orderId);
     const item = await insertFanItem(t, world.orderId, world.designId, {
-      runId,
+      orderFormId,
     });
     const removed = await insertFanItem(t, world.orderId, world.designId, {
       name: "Gone",
       number: "0",
-      runId,
+      orderFormId,
     });
     await t.run((ctx) => ctx.db.patch(removed, { removedAt: Date.now() }));
-    return { ...world, runId, item, removed };
+    return { ...world, orderFormId, item, removed };
   }
 
   function expectCustomerCopy(message: string) {
@@ -954,18 +954,18 @@ describe("listForOrder returns canEdit: false, locked: true to a captain on a lo
   it("reports the lock and edit rights per caller", async () => {
     const t = convexTest(schema, modules);
     const { captain, admin, orderId, designId } = await seedWorld(t);
-    const runId = await seedRun(t, orderId, captain.userId, {
+    const orderFormId = await seedRun(t, orderId, captain.userId, {
       namesMode: "fixed",
     });
     await confirmOrderSize(t, orderId);
-    await insertFanItem(t, orderId, designId, { runId });
+    await insertFanItem(t, orderId, designId, { orderFormId });
 
     const asCaptain = (await captain.as.query(api.orderItems.listForOrder, {
       orderId,
     }))!;
     expect(asCaptain.locked).toBe(true);
     expect(asCaptain.canEdit).toBe(false);
-    expect(asCaptain.form).toEqual({ runId, namesMode: "fixed" });
+    expect(asCaptain.form).toEqual({ orderFormId, namesMode: "fixed" });
 
     const asAdmin = (await admin.as.query(api.orderItems.listForOrder, {
       orderId,
@@ -978,14 +978,14 @@ describe("listForOrder returns canEdit: false, locked: true to a captain on a lo
   it("reports canEdit: true, locked: false to the captain of an unlocked order with a form", async () => {
     const t = convexTest(schema, modules);
     const { captain, orderId } = await seedWorld(t);
-    const runId = await seedRun(t, orderId, captain.userId);
+    const orderFormId = await seedRun(t, orderId, captain.userId);
 
     const list = (await captain.as.query(api.orderItems.listForOrder, {
       orderId,
     }))!;
     expect(list.locked).toBe(false);
     expect(list.canEdit).toBe(true);
-    expect(list.form).toEqual({ runId, namesMode: "open" });
+    expect(list.form).toEqual({ orderFormId, namesMode: "open" });
   });
 
   it("shows the captain and admin the submitter email and answers", async () => {

@@ -78,7 +78,7 @@ export const backfillDesignBlocks = internalMutation({
 export const dropFixedRoster = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const runs = await ctx.db.query("jerseyRuns").collect();
+    const runs = await ctx.db.query("orderForms").collect();
     let fixed = 0;
 
     for (const run of runs) {
@@ -159,11 +159,11 @@ export const retireLegacyRosterTables = internalMutation({
     // `locked` and `lockSnapshot` are gone from the generated Doc type too;
     // read them loosely, and patch through a cast like `dropFixedRoster`.
     const patch = ctx.db.patch as (
-      id: Id<"jerseyRuns">,
+      id: Id<"orderForms">,
       value: Record<string, unknown>,
     ) => Promise<void>;
     let runsPatched = 0;
-    for (const run of await ctx.db.query("jerseyRuns").collect()) {
+    for (const run of await ctx.db.query("orderForms").collect()) {
       const legacy = run as Omit<typeof run, "status"> & {
         status: string;
         lockSnapshot?: unknown;
@@ -180,55 +180,9 @@ export const retireLegacyRosterTables = internalMutation({
   },
 });
 
-// More runs than this means a real deployment, not dev fixtures: page the
-// migration instead of running it in one transaction.
-const RENAME_MAX_RUNS = 500;
-
-/**
- * L-07: rename `jerseyRuns` to `orderForms` in the data. Convex has no table
- * rename and can't insert a row with a chosen `_id`, so each run is copied to
- * a new `orderForms` row (every field kept, `createdAt` included), every
- * `orderItems` row that came through it is re-pointed from `runId` to the new
- * `orderFormId`, and the old row is deleted, all in one transaction.
- *
- * Run with:
- *   npx convex run _migrations:renameJerseyRunsToOrderForms
- *
- * Idempotent: a second run finds `jerseyRuns` empty and returns zeros.
- * Removed in L-07's next commit together with `jerseyRuns`.
+/*
+ * History: `renameJerseyRunsToOrderForms` (initiative 0004, L-07) copied each
+ * `jerseyRuns` row to `orderForms` (new ids) and re-pointed `orderItems.runId`
+ * to `orderFormId`. Ran on dev 2026-10-04: {forms: 2, itemsRepointed: 26}; a
+ * second run returned zeros. Removed in L-07 with the `jerseyRuns` table.
  */
-export const renameJerseyRunsToOrderForms = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const runs = await ctx.db.query("jerseyRuns").collect();
-    if (runs.length > RENAME_MAX_RUNS) {
-      throw new Error(
-        `renameJerseyRunsToOrderForms: ${runs.length} runs is over ${RENAME_MAX_RUNS}; paginate it first.`,
-      );
-    }
-    // `runId: undefined` deletes the field in a patch.
-    const patchItem = ctx.db.patch as (
-      id: Id<"orderItems">,
-      value: Record<string, unknown>,
-    ) => Promise<void>;
-    let itemsRepointed = 0;
-    for (const run of runs) {
-      const { _id, _creationTime, ...fields } = run;
-      void _creationTime;
-      const formId = await ctx.db.insert("orderForms", fields);
-      // The one allowed direct `by_order` read outside _orderItems.ts:
-      // `loadItems` drops removed rows, and those must be re-pointed too.
-      const items = await ctx.db
-        .query("orderItems")
-        .withIndex("by_order", (q) => q.eq("orderId", run.orderId))
-        .collect();
-      for (const item of items) {
-        if (item.runId !== _id) continue;
-        await patchItem(item._id, { orderFormId: formId, runId: undefined });
-        itemsRepointed++;
-      }
-      await ctx.db.delete(_id);
-    }
-    return { forms: runs.length, itemsRepointed };
-  },
-});
