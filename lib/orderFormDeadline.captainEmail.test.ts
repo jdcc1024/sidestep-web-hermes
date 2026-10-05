@@ -2,7 +2,7 @@
 // order form and links to the order page (Q6 = A). Exact wording is left to
 // review, not pinned here.
 import { describe, expect, it } from "vitest";
-import { renderCaptainClosureEmail } from "./jerseyRunDeadline";
+import { renderCaptainClosureEmail } from "./orderFormDeadline";
 
 const url = "https://sidestep.design/portal/orders/abc";
 const ctx = {

@@ -8,7 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useOwnedResource } from "@/lib/ownedResource";
-import { JerseyRunSetup } from "@/components/portal/JerseyRunSetup";
+import { OrderFormSettings } from "@/components/portal/OrderFormSettings";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -54,7 +54,7 @@ export default function RunSetupPage({ params }: PageProps) {
       </header>
 
       <section className="mt-10 rounded-lg border border-border bg-card p-6 shadow-sm">
-        <JerseyRunSetup orderId={orderId} />
+        <OrderFormSettings orderId={orderId} />
       </section>
     </div>
   );

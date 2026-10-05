@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { use } from "react";
 import { Logo } from "@/components/layout/Logo";
-import { JerseyRunPublicForm } from "@/components/run/JerseyRunPublicForm";
+import { PublicOrderForm } from "@/components/run/PublicOrderForm";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -11,7 +11,7 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-export default function JerseyRunPublicPage({ params }: PageProps) {
+export default function PublicOrderFormPage({ params }: PageProps) {
   const { id } = use(params);
   const orderFormId = id as Id<"orderForms">;
 
@@ -35,7 +35,7 @@ export default function JerseyRunPublicPage({ params }: PageProps) {
       <main className="flex-1">
         <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10">
-            <JerseyRunPublicForm orderFormId={orderFormId} />
+            <PublicOrderForm orderFormId={orderFormId} />
           </div>
         </div>
       </main>

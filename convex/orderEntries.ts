@@ -16,7 +16,7 @@ import {
   rosterSlotKey,
 } from "../lib/rosterEntry/rules";
 import { checkItemName, summarize } from "../lib/orderItem";
-import { checkCustomAnswer, isJerseyRunClosed } from "../lib/jerseyRunResponse/rules";
+import { checkCustomAnswer, isOrderFormClosed } from "../lib/orderFormResponse/rules";
 
 // Public — no auth. The order form's write path (R-02), moved onto order
 // items by L-02 (docs/architecture/0004-order-items.md, "Must answer 3").
@@ -58,7 +58,7 @@ export const submitOrder = mutation({
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.orderFormId);
     if (!run) throw new ConvexError("Jersey run not found.");
-    if (isJerseyRunClosed(run))
+    if (isOrderFormClosed(run))
       throw new ConvexError("This jersey run is closed.");
 
     const order = await ctx.db.get(run.orderId);

@@ -1,6 +1,6 @@
 // Form adapter for the jersey-run settings form (/run/setup). Wraps the
-// atomic rules in ./rules into a JerseyRunErrors record keyed by form field,
-// plus a toJerseyRunPayload helper that converts validated input into the
+// atomic rules in ./rules into a OrderFormErrors record keyed by form field,
+// plus a toOrderFormPayload helper that converts validated input into the
 // shape the Convex mutation accepts. The Convex side imports the same rules
 // directly — see convex/orderForms.ts.
 //
@@ -15,33 +15,33 @@ import {
   parseDeadline,
 } from "./rules";
 
-export type JerseyRunInput = {
+export type OrderFormInput = {
   customQuestions: CustomQuestion[];
   // Kept as a string in form state so the empty state is valid; coerced
   // to a timestamp at payload time.
   deadline: string;
 };
 
-export type JerseyRunErrors = {
+export type OrderFormErrors = {
   customQuestions?: string;
   deadline?: string;
 };
 
-export type JerseyRunPayload = {
+export type OrderFormPayload = {
   customQuestions: CustomQuestion[];
   deadline: number;
 };
 
-export const EMPTY_JERSEY_RUN: JerseyRunInput = {
+export const EMPTY_ORDER_FORM: OrderFormInput = {
   customQuestions: [],
   deadline: "",
 };
 
-export function validateJerseyRun(
-  input: JerseyRunInput,
+export function validateOrderForm(
+  input: OrderFormInput,
   now: number = Date.now(),
-): JerseyRunErrors {
-  const errors: JerseyRunErrors = {};
+): OrderFormErrors {
+  const errors: OrderFormErrors = {};
 
   if (input.customQuestions.length > MAX_CUSTOM_QUESTIONS)
     errors.customQuestions = `Up to ${MAX_CUSTOM_QUESTIONS} custom questions.`;
@@ -64,9 +64,9 @@ export function validateJerseyRun(
 }
 
 // Convert validated form state into the payload the Convex mutation
-// expects. Throws if the input was never run through validateJerseyRun
+// expects. Throws if the input was never run through validateOrderForm
 // — callers should gate on an empty error object first.
-export function toJerseyRunPayload(input: JerseyRunInput): JerseyRunPayload {
+export function toOrderFormPayload(input: OrderFormInput): OrderFormPayload {
   const deadline = parseDeadline(input.deadline);
   if (deadline === null) throw new Error("Invalid deadline");
 

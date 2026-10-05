@@ -4,7 +4,7 @@ import type {
   CustomQuestion,
   OrderListData,
 } from "@/components/orderList/shared";
-import type { NamesMode } from "@/lib/jerseyRun";
+import type { NamesMode } from "@/lib/orderForm";
 import type { OrderDesign } from "./shared";
 
 // The order list's place on the order page (L-03): straight after the

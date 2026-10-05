@@ -6,7 +6,7 @@ import { MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { SIZE_OPTIONS } from "@/lib/jerseyRun";
+import { SIZE_OPTIONS } from "@/lib/orderForm";
 import { MAX_QTY } from "@/lib/orderEntry/rules";
 import {
   ITEM_NAME_MAX_LENGTH,

@@ -1,18 +1,18 @@
 // Shared jersey-run submission primitives. Since R-07 retired the flat
-// `jerseyRunResponses` table, the fan submission path is the unified
+// `orderFormResponses` table, the fan submission path is the unified
 // order-entry model (convex/orderEntries.ts). What survives here is the
 // grain both the public form and that mutation still share: the
-// `isJerseyRunClosed` gate (a run stops accepting submissions once it's
+// `isOrderFormClosed` gate (a run stops accepting submissions once it's
 // closed) and the custom-answer length rule. Kept in one module so
 // the client form and the Convex mutation can't drift on that behavior.
 
-import { effectiveStatus } from "../jerseyRun/lock";
+import { effectiveStatus } from "../orderForm/lock";
 
 export const ANSWER_MAX_LENGTH = 500;
 
 // The run fields the submission gate reads. `status` + `deadline` are what
-// `isJerseyRunClosed` inspects; the rest describe the form the fan fills in.
-export type JerseyRunForResponse = {
+// `isOrderFormClosed` inspects; the rest describe the form the fan fills in.
+export type OrderFormForResponse = {
   namesMode: "open" | "fixed";
   sizeOptions: string[];
   customQuestions: { id: string; label: string }[];
@@ -27,8 +27,8 @@ export type CheckResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: string };
 
-export function isJerseyRunClosed(
-  run: Pick<JerseyRunForResponse, "status" | "deadline">,
+export function isOrderFormClosed(
+  run: Pick<OrderFormForResponse, "status" | "deadline">,
   now: number = Date.now(),
 ): boolean {
   // Closed by status, or lazily once its deadline passes. Whether the list

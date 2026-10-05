@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { OrderForm } from "@/components/portal/OrderForm";
+import { OrderDetailsForm } from "@/components/portal/OrderDetailsForm";
 
 export const metadata = {
   title: "New order — Sidestep portal",
@@ -29,7 +29,7 @@ export default function NewOrderPage() {
       </header>
 
       <div className="mt-10">
-        <OrderForm />
+        <OrderDetailsForm />
       </div>
     </div>
   );

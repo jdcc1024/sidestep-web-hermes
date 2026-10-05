@@ -11,7 +11,7 @@
 
 import { toCsv, csvSlug, isoDate } from "./csv";
 import { jerseyLabel } from "./jerseyBreakdown";
-import { sortSizes } from "./jerseyRun";
+import { sortSizes } from "./orderForm";
 import type { ItemView } from "./orderItem/summary";
 import { ROSTER_DESIGNATION_LABEL } from "./rosterEntry/rules";
 

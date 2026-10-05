@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { describeDeadline } from "@/lib/jerseyRunDashboard";
+import { describeDeadline } from "@/lib/orderFormDashboard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-export default function AdminJerseyRunDetailPage({ params }: PageProps) {
+export default function AdminOrderFormDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const orderFormId = id as Id<"orderForms">;
 

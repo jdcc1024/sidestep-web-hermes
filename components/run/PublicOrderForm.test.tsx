@@ -64,11 +64,11 @@ vi.mock("convex/react", () => ({
   useMutation: () => submitOrder,
 }));
 
-import { JerseyRunPublicForm } from "./JerseyRunPublicForm";
+import { PublicOrderForm } from "./PublicOrderForm";
 
-const fakeRunId = "jersey_run_test_id" as Id<"orderForms">;
+const fakeRunId = "order_form_test_id" as Id<"orderForms">;
 
-describe("JerseyRunPublicForm", () => {
+describe("PublicOrderForm", () => {
   beforeEach(() => {
     submitOrder.mockReset();
     submitOrder.mockResolvedValue({
@@ -82,7 +82,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("surfaces validation errors when submitting an empty form", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     await user.click(screen.getByRole("button", { name: /^submit$/i }));
 
@@ -94,7 +94,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("submits a single jersey as one order-entry line", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
@@ -121,7 +121,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("adds a second jersey line and submits both", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
@@ -156,7 +156,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("routes a blank jersey through the confirm dialog before submitting", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
@@ -184,7 +184,7 @@ describe("JerseyRunPublicForm", () => {
         { _id: AWAY, title: "Away", roster: [] },
       ],
     };
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     expect(screen.getByText(/your jerseys & designs/i)).toBeInTheDocument();
     expect(
@@ -211,7 +211,7 @@ describe("JerseyRunPublicForm", () => {
   it("lets a fan tap sizes per roster slot and submits one line per size", async () => {
     publicData = fixedSingleDesign();
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     // No free-text name field and no name dropdown — a roster grid instead.
     expect(screen.queryByLabelText(/name on jersey/i)).not.toBeInTheDocument();
@@ -254,7 +254,7 @@ describe("JerseyRunPublicForm", () => {
   it("decrements a slot's size and hides the minus at zero", async () => {
     publicData = fixedSingleDesign();
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     // No "−" until the size has a count.
     expect(
@@ -285,7 +285,7 @@ describe("JerseyRunPublicForm", () => {
       ...singleDesignOpen(),
       designs: [{ _id: HOME, title: "Home", roster: fanTyped }],
     };
-    const { unmount } = render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    const { unmount } = render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     // Open: free text, and the existing slot is not offered as a choice.
     expect(screen.getByLabelText(/name on jersey/i)).toBeInTheDocument();
@@ -298,7 +298,7 @@ describe("JerseyRunPublicForm", () => {
       ...publicData,
       run: { ...publicData.run, namesMode: "fixed" },
     };
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     expect(screen.queryByLabelText(/name on jersey/i)).not.toBeInTheDocument();
     expect(
@@ -308,7 +308,7 @@ describe("JerseyRunPublicForm", () => {
 
   it("lets fans type freely again after a switch back to open", () => {
     publicData = fixedSingleDesign();
-    const { unmount } = render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    const { unmount } = render(<PublicOrderForm orderFormId={fakeRunId} />);
     expect(screen.queryByLabelText(/name on jersey/i)).not.toBeInTheDocument();
     unmount();
 
@@ -316,7 +316,7 @@ describe("JerseyRunPublicForm", () => {
       ...publicData,
       run: { ...publicData.run, namesMode: "open" },
     };
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     expect(screen.getByLabelText(/name on jersey/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^number$/i)).toBeInTheDocument();
@@ -332,7 +332,7 @@ describe("JerseyRunPublicForm", () => {
         sizeOptions: ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"],
       },
     };
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     // The radio itself is visually hidden inside its label, so the label is
     // what carries the size text a fan actually reads.
@@ -344,7 +344,7 @@ describe("JerseyRunPublicForm", () => {
   it("blocks a fixed-mode submit with nothing selected", async () => {
     publicData = fixedSingleDesign();
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
@@ -376,7 +376,7 @@ describe("Public form error line never shows [CONVEX, Request ID, ConvexError or
 
   async function fillAndSubmit() {
     const user = userEvent.setup();
-    render(<JerseyRunPublicForm orderFormId={fakeRunId} />);
+    render(<PublicOrderForm orderFormId={fakeRunId} />);
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
     await user.type(screen.getByLabelText(/name on jersey/i), "Alex");

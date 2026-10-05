@@ -3,10 +3,10 @@
 // keeping the email rendering and "is it expired" decision in plain
 // functions lets us test them without a Convex harness.
 
-export type RunStatus = "open" | "closed";
+export type FormStatus = "open" | "closed";
 
-export function isRunExpired(
-  run: { status: RunStatus; deadline: number },
+export function isFormExpired(
+  run: { status: FormStatus; deadline: number },
   now: number = Date.now(),
 ): boolean {
   return run.status === "open" && run.deadline < now;

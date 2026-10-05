@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  EMPTY_JERSEY_RUN,
+  EMPTY_ORDER_FORM,
   MAX_CUSTOM_QUESTIONS,
   QUESTION_LABEL_MAX_LENGTH,
   SIZE_OPTIONS,
@@ -9,18 +9,18 @@ import {
   isSizeOption,
   newQuestionId,
   parseDeadline,
-  toJerseyRunPayload,
-  validateJerseyRun,
+  toOrderFormPayload,
+  validateOrderForm,
   type FormRun,
-  type JerseyRunInput,
-} from "./jerseyRun";
+  type OrderFormInput,
+} from "./orderForm";
 
 // Fixed "now" so deadline tests aren't flaky around midnight rollover.
 const NOW = Date.parse("2026-05-22T12:00:00.000Z");
 const FUTURE_DATE = "2026-06-15";
 const PAST_DATE = "2026-05-01";
 
-function validInput(overrides: Partial<JerseyRunInput> = {}): JerseyRunInput {
+function validInput(overrides: Partial<OrderFormInput> = {}): OrderFormInput {
   return {
     customQuestions: [],
     deadline: FUTURE_DATE,
@@ -28,9 +28,9 @@ function validInput(overrides: Partial<JerseyRunInput> = {}): JerseyRunInput {
   };
 }
 
-describe("validateJerseyRun — happy path", () => {
+describe("validateOrderForm — happy path", () => {
   it("accepts a minimal run", () => {
-    expect(validateJerseyRun(validInput(), NOW)).toEqual({});
+    expect(validateOrderForm(validInput(), NOW)).toEqual({});
   });
 
   it("accepts up to MAX_CUSTOM_QUESTIONS questions", () => {
@@ -39,41 +39,41 @@ describe("validateJerseyRun — happy path", () => {
       (_, i) => ({ id: `q${i}`, label: `Question ${i}` }),
     );
     expect(
-      validateJerseyRun(validInput({ customQuestions }), NOW).customQuestions,
+      validateOrderForm(validInput({ customQuestions }), NOW).customQuestions,
     ).toBeUndefined();
   });
 });
 
-describe("validateJerseyRun — required fields", () => {
+describe("validateOrderForm — required fields", () => {
   it("flags the deadline when the form is empty", () => {
-    const errors = validateJerseyRun(EMPTY_JERSEY_RUN, NOW);
+    const errors = validateOrderForm(EMPTY_ORDER_FORM, NOW);
     expect(errors.deadline).toBeTruthy();
   });
 
   // M-05: sizes are a fixed catalog and names mode lives on the order page,
   // so neither is a field this form can get wrong any more.
   it("no longer asks about sizes or names mode", () => {
-    expect(EMPTY_JERSEY_RUN).toEqual({ customQuestions: [], deadline: "" });
-    expect(Object.keys(validateJerseyRun(EMPTY_JERSEY_RUN, NOW))).toEqual([
+    expect(EMPTY_ORDER_FORM).toEqual({ customQuestions: [], deadline: "" });
+    expect(Object.keys(validateOrderForm(EMPTY_ORDER_FORM, NOW))).toEqual([
       "deadline",
     ]);
   });
 });
 
-describe("validateJerseyRun — custom questions", () => {
+describe("validateOrderForm — custom questions", () => {
   it("rejects more than MAX_CUSTOM_QUESTIONS questions", () => {
     const customQuestions = Array.from(
       { length: MAX_CUSTOM_QUESTIONS + 1 },
       (_, i) => ({ id: `q${i}`, label: `Q${i}` }),
     );
     expect(
-      validateJerseyRun(validInput({ customQuestions }), NOW).customQuestions,
+      validateOrderForm(validInput({ customQuestions }), NOW).customQuestions,
     ).toBeTruthy();
   });
 
   it("rejects a question with a blank label", () => {
     expect(
-      validateJerseyRun(
+      validateOrderForm(
         validInput({ customQuestions: [{ id: "q1", label: "   " }] }),
         NOW,
       ).customQuestions,
@@ -82,7 +82,7 @@ describe("validateJerseyRun — custom questions", () => {
 
   it("rejects a question label over the cap", () => {
     expect(
-      validateJerseyRun(
+      validateOrderForm(
         validInput({
           customQuestions: [
             { id: "q1", label: "x".repeat(QUESTION_LABEL_MAX_LENGTH + 1) },
@@ -94,29 +94,29 @@ describe("validateJerseyRun — custom questions", () => {
   });
 });
 
-describe("validateJerseyRun — deadline", () => {
+describe("validateOrderForm — deadline", () => {
   it("rejects an empty deadline", () => {
     expect(
-      validateJerseyRun(validInput({ deadline: "" }), NOW).deadline,
+      validateOrderForm(validInput({ deadline: "" }), NOW).deadline,
     ).toBeTruthy();
   });
 
   it("rejects a deadline in the past", () => {
     expect(
-      validateJerseyRun(validInput({ deadline: PAST_DATE }), NOW).deadline,
+      validateOrderForm(validInput({ deadline: PAST_DATE }), NOW).deadline,
     ).toBeTruthy();
   });
 
   it("rejects garbled date input", () => {
     expect(
-      validateJerseyRun(validInput({ deadline: "not-a-date" }), NOW).deadline,
+      validateOrderForm(validInput({ deadline: "not-a-date" }), NOW).deadline,
     ).toBeTruthy();
   });
 
   it("accepts today as a deadline (end-of-day cutoff)", () => {
     const noonToday = Date.parse("2026-05-22T12:00:00.000Z");
     expect(
-      validateJerseyRun(validInput({ deadline: "2026-05-22" }), noonToday)
+      validateOrderForm(validInput({ deadline: "2026-05-22" }), noonToday)
         .deadline,
     ).toBeUndefined();
   });
@@ -159,9 +159,9 @@ describe("parseDeadline", () => {
   });
 });
 
-describe("toJerseyRunPayload", () => {
+describe("toOrderFormPayload", () => {
   it("returns the cleaned payload for a run with custom questions", () => {
-    const payload = toJerseyRunPayload(
+    const payload = toOrderFormPayload(
       validInput({
         customQuestions: [
           { id: "q1", label: "  Delivery method?  " },
@@ -178,7 +178,7 @@ describe("toJerseyRunPayload", () => {
   });
 
   it("drops custom questions with blank labels", () => {
-    const payload = toJerseyRunPayload(
+    const payload = toOrderFormPayload(
       validInput({
         customQuestions: [
           { id: "q1", label: "Real question" },
@@ -192,14 +192,14 @@ describe("toJerseyRunPayload", () => {
   });
 
   it("carries no sizes or names mode — neither is form state any more", () => {
-    const payload = toJerseyRunPayload(validInput());
+    const payload = toOrderFormPayload(validInput());
     expect(payload).not.toHaveProperty("sizeOptions");
     expect(payload).not.toHaveProperty("namesMode");
   });
 
   it("throws for an invalid deadline (caller should have validated)", () => {
     expect(() =>
-      toJerseyRunPayload(validInput({ deadline: "" })),
+      toOrderFormPayload(validInput({ deadline: "" })),
     ).toThrow();
   });
 });

@@ -37,8 +37,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
 }));
 
-import { OrderForm } from "./OrderForm";
-import type { EditableOrder } from "./OrderForm";
+import { OrderDetailsForm } from "./OrderDetailsForm";
+import type { EditableOrder } from "./OrderDetailsForm";
 
 const existingOrder: EditableOrder = {
   _id: "order_123" as EditableOrder["_id"],
@@ -65,10 +65,10 @@ afterEach(() => {
   affectedResult = undefined;
 });
 
-describe("OrderForm — validation", () => {
+describe("OrderDetailsForm — validation", () => {
   it("surfaces RHF + zod validation errors when the user submits an empty form", async () => {
     const user = userEvent.setup();
-    render(<OrderForm />);
+    render(<OrderDetailsForm />);
 
     await user.click(screen.getByRole("button", { name: /create order/i }));
 
@@ -84,9 +84,9 @@ describe("OrderForm — validation", () => {
   });
 });
 
-describe("OrderForm — progress gate", () => {
+describe("OrderDetailsForm — progress gate", () => {
   it("renders the design milestone as Locked with no design linked, and nudges", () => {
-    render(<OrderForm />);
+    render(<OrderDetailsForm />);
 
     expect(milestoneCaption("Design attached")).toBe("Locked");
     expect(milestoneCaption("Ready to collect")).toBe("Locked");
@@ -98,7 +98,7 @@ describe("OrderForm — progress gate", () => {
   it("clears the design milestone once a design is checked", async () => {
     designsResult = [{ _id: "design_a", title: "Home kit", fileCount: 0 }];
     const user = userEvent.setup();
-    render(<OrderForm />);
+    render(<OrderDetailsForm />);
 
     expect(milestoneCaption("Design attached")).toBe("Locked");
 
@@ -109,9 +109,9 @@ describe("OrderForm — progress gate", () => {
   });
 });
 
-describe("OrderForm — edit mode", () => {
+describe("OrderDetailsForm — edit mode", () => {
   it("pre-populates fields from the order and labels the action 'Save changes'", () => {
-    render(<OrderForm order={existingOrder} />);
+    render(<OrderDetailsForm order={existingOrder} />);
 
     expect(screen.getByLabelText(/team name/i)).toHaveValue("Westside FC");
     expect(screen.getByLabelText(/sport or activity/i)).toHaveValue(
@@ -127,7 +127,7 @@ describe("OrderForm — edit mode", () => {
 
   it("submits through updateOrder with the orderId and navigates to the order", async () => {
     const user = userEvent.setup();
-    render(<OrderForm order={existingOrder} />);
+    render(<OrderDetailsForm order={existingOrder} />);
 
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
@@ -145,7 +145,7 @@ describe("OrderForm — edit mode", () => {
 
 // O-08: unchecking a design that people already ordered warns instead of
 // silently orphaning them — and the warning never blocks the save.
-describe("OrderForm — removing a design with submissions", () => {
+describe("OrderDetailsForm — removing a design with submissions", () => {
   const collectingRun = { _id: "run_1", deadline: 0, status: "open" };
   const affectedHomeKit = {
     itemCount: 4,
@@ -162,7 +162,7 @@ describe("OrderForm — removing a design with submissions", () => {
     runResult = collectingRun;
     affectedResult = affectedHomeKit;
     const user = userEvent.setup();
-    render(<OrderForm order={existingOrder} />);
+    render(<OrderDetailsForm order={existingOrder} />);
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
@@ -178,7 +178,7 @@ describe("OrderForm — removing a design with submissions", () => {
     runResult = collectingRun;
     affectedResult = affectedHomeKit;
     const user = userEvent.setup();
-    render(<OrderForm order={existingOrder} />);
+    render(<OrderDetailsForm order={existingOrder} />);
 
     await user.click(screen.getByRole("checkbox", { name: /home kit/i }));
     await screen.findByRole("alert");
@@ -195,7 +195,7 @@ describe("OrderForm — removing a design with submissions", () => {
     runResult = null;
     affectedResult = affectedCaptainOnly;
     const user = userEvent.setup();
-    render(<OrderForm order={existingOrder} />);
+    render(<OrderDetailsForm order={existingOrder} />);
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: /away kit/i }));
@@ -209,7 +209,7 @@ describe("OrderForm — removing a design with submissions", () => {
     runResult = null;
     affectedResult = { itemCount: 0, submitters: [] };
     const user = userEvent.setup();
-    render(<OrderForm order={existingOrder} />);
+    render(<OrderDetailsForm order={existingOrder} />);
 
     await user.click(screen.getByRole("checkbox", { name: /home kit/i }));
 
@@ -221,7 +221,7 @@ describe("OrderForm — removing a design with submissions", () => {
     runResult = collectingRun;
     affectedResult = affectedHomeKit;
     const user = userEvent.setup();
-    render(<OrderForm />);
+    render(<OrderDetailsForm />);
 
     await user.click(screen.getByRole("checkbox", { name: /home kit/i }));
     await user.click(screen.getByRole("checkbox", { name: /home kit/i }));

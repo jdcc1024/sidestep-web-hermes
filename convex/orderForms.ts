@@ -17,8 +17,8 @@ import {
   MAX_CUSTOM_QUESTIONS,
   QUESTION_LABEL_MAX_LENGTH,
   SIZE_OPTIONS,
-} from "../lib/jerseyRun/rules";
-import { effectiveStatus } from "../lib/jerseyRun/lock";
+} from "../lib/orderForm/rules";
+import { effectiveStatus } from "../lib/orderForm/lock";
 import {
   isListLocked,
   LIST_LOCKED_MESSAGE,

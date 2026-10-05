@@ -34,11 +34,11 @@ vi.mock("convex/react", () => ({
   useMutation: () => updateSettings,
 }));
 
-import { JerseyRunSetup } from "./JerseyRunSetup";
+import { OrderFormSettings } from "./OrderFormSettings";
 
 const fakeOrderId = "order_test_id" as Id<"orders">;
 
-describe("JerseyRunSetup — management only (M-05)", () => {
+describe("OrderFormSettings — management only (M-05)", () => {
   beforeEach(() => {
     updateSettings.mockClear();
     runResult = openRun();
@@ -46,7 +46,7 @@ describe("JerseyRunSetup — management only (M-05)", () => {
 
   it("sends the captain back to the order page when no run exists yet", async () => {
     runResult = null;
-    render(<JerseyRunSetup orderId={fakeOrderId} />);
+    render(<OrderFormSettings orderId={fakeOrderId} />);
 
     expect(
       screen.getByText(/haven't started collecting yet/i),
@@ -64,7 +64,7 @@ describe("JerseyRunSetup — management only (M-05)", () => {
     runResult = openRun({
       customQuestions: [{ id: "q1", label: "How should we deliver?" }],
     });
-    render(<JerseyRunSetup orderId={fakeOrderId} />);
+    render(<OrderFormSettings orderId={fakeOrderId} />);
 
     expect(screen.getByLabelText(/shareable link/i)).toHaveValue(
       "http://localhost:3000/run/run_1",
@@ -79,7 +79,7 @@ describe("JerseyRunSetup — management only (M-05)", () => {
   });
 
   it("asks nothing about sizes, names mode, or locking", () => {
-    render(<JerseyRunSetup orderId={fakeOrderId} />);
+    render(<OrderFormSettings orderId={fakeOrderId} />);
 
     expect(screen.queryByText(/jersey sizes/i)).toBeNull();
     expect(screen.queryByText(/names & numbers/i)).toBeNull();
@@ -89,7 +89,7 @@ describe("JerseyRunSetup — management only (M-05)", () => {
 
   it("saves an edited deadline and a new question", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunSetup orderId={fakeOrderId} />);
+    render(<OrderFormSettings orderId={fakeOrderId} />);
 
     await user.clear(screen.getByLabelText(/deadline/i));
     await user.type(screen.getByLabelText(/deadline/i), "2099-07-20");
@@ -112,7 +112,7 @@ describe("JerseyRunSetup — management only (M-05)", () => {
 
   it("refuses to save without a deadline", async () => {
     const user = userEvent.setup();
-    render(<JerseyRunSetup orderId={fakeOrderId} />);
+    render(<OrderFormSettings orderId={fakeOrderId} />);
 
     await user.clear(screen.getByLabelText(/deadline/i));
     await user.click(screen.getByRole("button", { name: /save changes/i }));
@@ -126,7 +126,7 @@ describe("JerseyRunSetup — management only (M-05)", () => {
       effectiveStatus: "locked",
       customQuestions: [{ id: "q1", label: "How should we deliver?" }],
     });
-    render(<JerseyRunSetup orderId={fakeOrderId} />);
+    render(<OrderFormSettings orderId={fakeOrderId} />);
 
     expect(screen.getByText(/roster locked/i)).toBeInTheDocument();
     expect(screen.getByText(/how should we deliver\?/i)).toBeInTheDocument();

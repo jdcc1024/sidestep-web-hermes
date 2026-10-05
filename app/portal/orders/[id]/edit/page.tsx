@@ -8,7 +8,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useOwnedResource } from "@/lib/ownedResource";
-import { OrderForm } from "@/components/portal/OrderForm";
+import { OrderDetailsForm } from "@/components/portal/OrderDetailsForm";
 import { OrderLockedNotice } from "@/components/portal/OrderLocked";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -16,8 +16,8 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-// Edit reuses the same OrderForm as New (O-04): one component renders both
-// surfaces. Here we resolve the order, then hand the doc to OrderForm to
+// Edit reuses the same OrderDetailsForm as New (O-04): one component renders both
+// surfaces. Here we resolve the order, then hand the doc to OrderDetailsForm to
 // pre-populate and route the submit through updateOrder.
 //
 // Once the roster is locked (O-06) the form is replaced outright by a
@@ -66,7 +66,7 @@ export default function EditOrderPage({ params }: PageProps) {
         </div>
       ) : (
         <div className="mt-10">
-          <OrderForm order={order} />
+          <OrderDetailsForm order={order} />
         </div>
       )}
     </div>

@@ -30,7 +30,7 @@ export const ROSTER_DESIGNATION_LABEL: Record<RosterDesignation, string> = {
 };
 
 // Discriminated result for a single field check. Mirrors the
-// jerseyRunResponse rules so the two read the same. `ok: true` carries
+// orderFormResponse rules so the two read the same. `ok: true` carries
 // the normalized value; `ok: false` carries a user-facing message.
 export type CheckResult<T> =
   | { ok: true; value: T }

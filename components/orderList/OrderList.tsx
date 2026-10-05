@@ -3,7 +3,7 @@
 import { useId } from "react";
 import { AnimatePresence } from "motion/react";
 import type { Id } from "@/convex/_generated/dataModel";
-import type { NamesMode } from "@/lib/jerseyRun";
+import type { NamesMode } from "@/lib/orderForm";
 import { itemCountText, sizeChip, type ItemSummary } from "@/lib/orderItem";
 import { DesignThumbnail } from "@/components/design/DesignThumbnail";
 import { RosterExportButton } from "@/components/portal/RosterExportButton";

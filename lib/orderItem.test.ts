@@ -4,7 +4,7 @@
 // lib/orderItem/index.ts. Spec: backlog/L-01-order-items-table-and-api.md,
 // docs/architecture/0004-order-items.md "Must answer 5", UX §7.5/§7.6/§7.9.
 import { describe, expect, it } from "vitest";
-import { SIZE_OPTIONS } from "./jerseyRun/rules";
+import { SIZE_OPTIONS } from "./orderForm/rules";
 import { checkItemName, checkItemSize, summarize } from "./orderItem";
 
 // ── rules ──────────────────────────────────────────────────────────────────

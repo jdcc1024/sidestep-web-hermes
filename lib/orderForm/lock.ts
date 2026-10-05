@@ -5,17 +5,17 @@
 // is locked is a different question, answered by the order's
 // "Order Size Confirmed" stage (lib/orderItem/lock).
 
-export type RunStatus = "open" | "closed";
+export type FormStatus = "open" | "closed";
 
 export type FormRun = {
-  status: RunStatus;
+  status: FormStatus;
   deadline: number;
 };
 
 export function effectiveStatus(
   run: FormRun,
   now: number = Date.now(),
-): RunStatus {
+): FormStatus {
   if (run.status === "open" && run.deadline < now) return "closed";
   return run.status;
 }

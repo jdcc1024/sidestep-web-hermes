@@ -19,8 +19,8 @@ import {
   ROSTER_NAME_MAX_LENGTH,
   ROSTER_NUMBER_MAX_LENGTH,
 } from "@/lib/rosterEntry";
-import { ANSWER_MAX_LENGTH, isJerseyRunClosed } from "@/lib/jerseyRunResponse";
-import { sortSizes } from "@/lib/jerseyRun";
+import { ANSWER_MAX_LENGTH, isOrderFormClosed } from "@/lib/orderFormResponse";
+import { sortSizes } from "@/lib/orderForm";
 import { userMessage } from "@/lib/userMessage";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -71,7 +71,7 @@ type PublicRun = {
   status: "open" | "closed";
 };
 
-export function JerseyRunPublicForm({
+export function PublicOrderForm({
   orderFormId,
 }: {
   orderFormId: Id<"orderForms">;
@@ -91,14 +91,14 @@ export function JerseyRunPublicForm({
 
   // A confirmed list takes no more submissions either (L-06): the server
   // refuses them, so the form shows closed rather than inviting a rejection.
-  if (isJerseyRunClosed(run) || data.listLocked) {
+  if (isOrderFormClosed(run) || data.listLocked) {
     return (
       <ClosedState teamName={data.teamName} captainName={data.captainName} />
     );
   }
 
   return (
-    <OrderForm
+    <PublicOrderFormBody
       orderFormId={orderFormId}
       run={run}
       designs={data.designs}
@@ -258,7 +258,7 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
     });
 }
 
-function OrderForm({
+function PublicOrderFormBody({
   orderFormId,
   run,
   designs,

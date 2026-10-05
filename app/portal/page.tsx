@@ -21,7 +21,7 @@ import {
 // jersey the signed-in user ordered) joined with its run and the linked
 // order's team name. Keep this in sync with the query handler in
 // convex/orderForms.ts; if either grows fields, add them here too.
-type MyJerseyRunResponse = {
+type MyOrderFormResponse = {
   entry: {
     _id: Id<"orderItems">;
     designTitle: string;
@@ -45,7 +45,7 @@ export default function PortalDashboardPage() {
   // (B-03).
   const orders = useOwnedList(useQuery(api.orders.listMyOrders));
   const designs = useOwnedList(useQuery(api.designs.listMyDesigns));
-  const jerseyRunResponses = useOwnedList(
+  const orderFormResponses = useOwnedList(
     useQuery(api.orderForms.listMyResponses),
   );
 
@@ -163,13 +163,13 @@ export default function PortalDashboardPage() {
           </p>
         </div>
         <div className="mt-4">
-          {jerseyRunResponses === undefined ? (
+          {orderFormResponses === undefined ? (
             <SectionSkeleton />
-          ) : jerseyRunResponses.length === 0 ? (
-            <EmptyJerseyRunResponses />
+          ) : orderFormResponses.length === 0 ? (
+            <EmptyOrderFormResponses />
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
-              {jerseyRunResponses.map((item) => (
+              {orderFormResponses.map((item) => (
                 <li key={item.entry._id}>
                   <JerseyResponseCard entry={item} />
                 </li>
@@ -251,7 +251,7 @@ function DesignCard({
   );
 }
 
-function JerseyResponseCard({ entry }: { entry: MyJerseyRunResponse }) {
+function JerseyResponseCard({ entry }: { entry: MyOrderFormResponse }) {
   const { entry: line, run, teamName } = entry;
   const jerseyLabel =
     [line.name, line.number ? `#${line.number}` : null]
@@ -290,7 +290,7 @@ function JerseyResponseCard({ entry }: { entry: MyJerseyRunResponse }) {
   );
 }
 
-function EmptyJerseyRunResponses() {
+function EmptyOrderFormResponses() {
   return (
     <div className="rounded-lg border border-dashed border-border bg-card px-6 py-10 text-center">
       <svg

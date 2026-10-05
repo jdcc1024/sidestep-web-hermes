@@ -107,7 +107,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Canonical RHF + zod + shadcn Form pattern. S-06 (JerseyRunSetup) will
+// Canonical RHF + zod + shadcn Form pattern. S-06 (OrderFormSettings) will
 // mirror this shape: schema colocated, zodResolver, FormField → FormItem
 // → FormLabel + FormControl + FormMessage, sonner toast on success.
 const sampleFormSchema = z.object({

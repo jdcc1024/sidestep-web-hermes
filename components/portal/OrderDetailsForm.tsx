@@ -94,7 +94,7 @@ export type EditableOrder = Pick<
 // One component renders both New and Edit (O-04 AC): pass an existing `order`
 // to pre-populate fields and route the submit through updateOrder instead of
 // createOrder. Everything else — layout, validation, progress gate — is shared.
-export function OrderForm({ order }: { order?: EditableOrder } = {}) {
+export function OrderDetailsForm({ order }: { order?: EditableOrder } = {}) {
   const router = useRouter();
   const isEdit = order !== undefined;
   const createOrder = useMutation(api.orders.createOrder);

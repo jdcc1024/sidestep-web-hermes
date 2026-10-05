@@ -4,7 +4,7 @@
 // disagree. Pure: the caller loads live items and hands over the order's
 // design ids and titles.
 
-import { sortSizes, type NamesMode } from "../jerseyRun/rules";
+import { sortSizes, type NamesMode } from "../orderForm/rules";
 import { rosterSlotKey } from "../rosterEntry/rules";
 
 // Generic over the id types so Convex `Id<…>` brands survive into the view.

@@ -29,7 +29,7 @@ import {
 import { planRosterCopy } from "../lib/rosterEntry/mirror";
 import { ROSTER_PASTE_MAX_ROWS } from "../lib/orderItem/paste";
 import { checkQty, type CheckResult } from "../lib/orderEntry/rules";
-import { SIZE_OPTIONS } from "../lib/jerseyRun/rules";
+import { SIZE_OPTIONS } from "../lib/orderForm/rules";
 
 // What a captain or admin may set on an item. Strings, not literals, for the
 // letter: `checkRosterDesignation` normalizes ("c" → "C") and words the error.

@@ -15,9 +15,9 @@ import {
   QUESTION_LABEL_MAX_LENGTH,
   newQuestionId,
   parseDeadline,
-  toJerseyRunPayload,
+  toOrderFormPayload,
   type NamesMode,
-} from "@/lib/jerseyRun";
+} from "@/lib/orderForm";
 import { userMessage } from "@/lib/userMessage";
 import { OPS_EMAIL, OPS_MAILTO } from "@/lib/contact";
 import { absoluteUrl, copyLink } from "@/components/portal/CopyLinkButton";
@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils";
 // order page in L-05). What players send lands on the order list, so there is
 // no responses view. No lock control — R-08 stays parked (PRD §5).
 
-// Colocated zod schema. Constants reused from lib/jerseyRun so the client and
+// Colocated zod schema. Constants reused from lib/orderForm so the client and
 // server cap values the same way (orderForms.updateSettings enforces matching
 // limits server-side). superRefine handles the per-question label rules that
 // depend on the whole array.
@@ -104,7 +104,7 @@ type ManagedRun = {
   listLocked: boolean;
 };
 
-export function JerseyRunSetup({ orderId }: { orderId: Id<"orders"> }) {
+export function OrderFormSettings({ orderId }: { orderId: Id<"orders"> }) {
   const run = useQuery(api.orderForms.getByOrder, { orderId });
 
   if (run === undefined) return <LoadingSkeleton />;
@@ -331,7 +331,7 @@ function RunSettingsForm({ run }: { run: ManagedRun }) {
 
   async function onSubmit(values: FormValues) {
     try {
-      const payload = toJerseyRunPayload(values);
+      const payload = toOrderFormPayload(values);
       await updateSettings({
         orderFormId: run._id,
         customQuestions: payload.customQuestions,

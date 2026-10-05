@@ -4,7 +4,7 @@ import {
   describeDeadline,
   estimateForResponses,
   participationLabel,
-} from "./jerseyRunDashboard";
+} from "./orderFormDashboard";
 
 const NOW = Date.parse("2026-05-22T12:00:00.000Z");
 

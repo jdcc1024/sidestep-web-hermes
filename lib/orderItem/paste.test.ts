@@ -23,7 +23,7 @@ import {
   ROSTER_NUMBER_MAX_LENGTH,
   checkRosterName,
 } from "../rosterEntry/rules";
-import { SIZE_OPTIONS } from "../jerseyRun/rules";
+import { SIZE_OPTIONS } from "../orderForm/rules";
 
 describe("two-column paste behaves as before (L-04: existing paste tests pass)", () => {
   const cases: [label: string, text: string][] = [

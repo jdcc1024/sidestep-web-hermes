@@ -1,33 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
-  isRunExpired,
+  isFormExpired,
   renderCaptainClosureEmail,
   renderOpsClosureEmail,
-} from "./jerseyRunDeadline";
+} from "./orderFormDeadline";
 
 const NOW = Date.parse("2026-05-22T12:00:00.000Z");
 
-describe("isRunExpired", () => {
+describe("isFormExpired", () => {
   it("returns true for an open run past its deadline", () => {
     expect(
-      isRunExpired({ status: "open", deadline: NOW - 1 }, NOW),
+      isFormExpired({ status: "open", deadline: NOW - 1 }, NOW),
     ).toBe(true);
   });
 
   it("returns false for an open run with a future deadline", () => {
     expect(
-      isRunExpired({ status: "open", deadline: NOW + 1000 }, NOW),
+      isFormExpired({ status: "open", deadline: NOW + 1000 }, NOW),
     ).toBe(false);
   });
 
   it("returns false for an already-closed run regardless of deadline", () => {
     expect(
-      isRunExpired({ status: "closed", deadline: NOW - 1 }, NOW),
+      isFormExpired({ status: "closed", deadline: NOW - 1 }, NOW),
     ).toBe(false);
   });
 
   it("returns false when deadline equals now (still has the moment)", () => {
-    expect(isRunExpired({ status: "open", deadline: NOW }, NOW)).toBe(false);
+    expect(isFormExpired({ status: "open", deadline: NOW }, NOW)).toBe(false);
   });
 });
 

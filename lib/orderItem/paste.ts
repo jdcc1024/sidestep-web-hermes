@@ -5,7 +5,7 @@
 // disagree about what a paste meant. There is no undo; this preview is the
 // safety net (PRD §6).
 
-import { SIZE_OPTIONS, type SizeOption } from "../jerseyRun/rules";
+import { SIZE_OPTIONS, type SizeOption } from "../orderForm/rules";
 import {
   checkRosterName,
   checkRosterNumber,

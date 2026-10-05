@@ -9,7 +9,7 @@ import {
   renderOpsClosureEmail,
   type ClosureEmail,
   type ClosureEmailContext,
-} from "../lib/jerseyRunDeadline";
+} from "../lib/orderFormDeadline";
 import { OPS_EMAIL as DEFAULT_OPS_EMAIL } from "../lib/contact";
 
 const DEFAULT_FROM_EMAIL = "hello@sidestep.design";

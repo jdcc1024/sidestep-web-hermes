@@ -6,7 +6,7 @@ import { useQuery } from "convex/react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
-import { describeDeadline } from "@/lib/jerseyRunDashboard";
+import { describeDeadline } from "@/lib/orderFormDashboard";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,7 +36,7 @@ const COLUMNS: ReadonlyArray<ColumnDef> = [
   { key: "createdAt", label: "Created", numeric: true },
 ];
 
-export default function AdminJerseyRunsPage() {
+export default function AdminOrderFormsPage() {
   const runs = useQuery(api.admin.listOrderForms);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [direction, setDirection] = useState<SortDirection>("desc");
