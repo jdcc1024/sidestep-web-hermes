@@ -39,7 +39,7 @@ import { SIZE_OPTIONS } from "../lib/orderForm/rules";
 // The printed values a captain or admin may set. Strings, not literals, for
 // the letter: `checkRosterDesignation` normalizes ("c" → "C") and words the
 // error.
-const printedFields = {
+const playerValueArgs = {
   name: v.optional(v.string()),
   number: v.optional(v.string()),
   designation: v.optional(v.string()),
@@ -170,7 +170,7 @@ export const add = mutation({
   args: {
     orderId: v.id("orders"),
     designId: v.id("designs"),
-    ...printedFields,
+    ...playerValueArgs,
     sizes: sizesArg,
   },
   handler: async (ctx, { orderId, designId, sizes, ...input }) => {
@@ -229,7 +229,7 @@ export const add = mutation({
 export const update = mutation({
   args: {
     entryId: v.id("rosterEntries"),
-    ...printedFields,
+    ...playerValueArgs,
     sizeDeltas: v.array(v.object({ size: v.string(), delta: v.number() })),
     merge: v.optional(v.boolean()),
   },
