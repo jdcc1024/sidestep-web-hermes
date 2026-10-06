@@ -9,7 +9,7 @@ import { SIZE_OPTIONS, type SizeOption } from "../orderForm/rules";
 import {
   checkRosterName,
   checkRosterNumber,
-  rosterSlotKey,
+  playerKey,
 } from "../rosterEntry/rules";
 
 // The batch bound, shared with the mutation. A captain pastes ~15 players;
@@ -185,10 +185,10 @@ function readRow(line: number, raw: string): RosterPasteRow {
   };
 }
 
-// The same player key the rest of the list uses, with runs of spaces read
+// The same player key the rest of the list uses, which reads runs of spaces
 // as one: "Jordan  Lee" pasted from a sloppy sheet is still Jordan Lee.
 function repeatKey(name: string, number: string | undefined): string {
-  return rosterSlotKey(name.replace(/\s+/g, " "), number);
+  return playerKey({ name, number });
 }
 
 function playerLabel(name: string, number: string | undefined): string {

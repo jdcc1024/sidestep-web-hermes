@@ -92,19 +92,36 @@ export function checkRosterNumber(
   return { ok: true, value: trimmed.length > 0 ? trimmed : undefined };
 }
 
-// Identity of a player *within* one design: case-insensitive name +
-// number, both trimmed. The single normalization every dedupe rule shares
-// — fan attach (R-02, via rosterMatchKey below), paste preview (M-03), and
-// mirror skip (M-04) — so "already on this roster" can't come to mean
-// three different things. Designation (M-09) is deliberately *not* in here:
-// pinning a C on someone doesn't make them a second player.
+// The printed text values that make a player (0004 phase 1b, invariant 1).
+// An object, not positional args, so a later printed field (parked R2-06's
+// front number) can join the key without touching every caller.
+export type PlayerKeyValues = { name?: string; number?: string };
+
+function normalizeKeyPart(raw: string | undefined): string {
+  return (raw ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+// Identity of a player *within* one design: name + number, each trimmed,
+// inner whitespace collapsed, lowercased. The one normalization every
+// "same player" rule shares — roster entries (`resolveEntry`), fan attach,
+// paste and the mirror — so "already on this roster" can't come to mean
+// several things. The letter (M-09) is deliberately *not* in here: pinning a
+// C on someone doesn't make them a second player. All-blank is `""`, so the
+// "Blank jerseys" entry falls out of the same rule. The parts are joined as a
+// JSON pair so no character moved across the boundary can forge a match.
+export function playerKey({ name, number }: PlayerKeyValues): string {
+  const parts = [normalizeKeyPart(name), normalizeKeyPart(number)];
+  if (parts.every((part) => part.length === 0)) return "";
+  return JSON.stringify(parts);
+}
+
+// The phase-1 spelling of `playerKey`, kept for its existing callers until
+// R2-03 retires it.
 export function rosterSlotKey(
   name: string,
   number: string | undefined,
 ): string {
-  const normName = name.trim().toLowerCase();
-  const normNumber = (number ?? "").trim().toLowerCase();
-  return `${normName}::${normNumber}`;
+  return playerKey({ name, number });
 }
 
 // Identity of a player slot for attach-to-existing-slot matching (R-02):
