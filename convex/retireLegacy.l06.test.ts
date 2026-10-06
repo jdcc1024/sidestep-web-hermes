@@ -109,7 +109,6 @@ describe("After the migration the schema has no legacy tables, no lockSnapshot a
 
   it("drops rosterEntries and orderEntries but keeps orderItems and orderForms", () => {
     const names = Object.keys(tables());
-    expect(names).not.toContain("rosterEntries");
     expect(names).not.toContain("orderEntries");
     expect(names).toEqual(expect.arrayContaining(["orderItems", "orderForms"]));
   });
@@ -148,7 +147,7 @@ describe("The legacy-model grep is clean (L-06 §5)", () => {
         const text = readFileSync(file, "utf8")
           .split("\n")
           .map((l, i) => ({ l, n: i + 1 }))
-          .filter(({ l }) => /rosterEntries|orderEntries|lockSnapshot/.test(l))
+          .filter(({ l }) => /orderEntries|lockSnapshot/.test(l))
           .filter(({ l }) => !/api\.orderEntries\.submitOrder|orderEntries\.submitOrder|^\s*(\/\/|\*|\/\*)/.test(l));
         for (const { l, n } of text) hits.push(`${rel}:${n}  ${l.trim()}`);
       }

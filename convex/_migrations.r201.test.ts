@@ -135,12 +135,12 @@ describe("groupOrderItemsIntoRosterEntries: Sidestep #72 as S, M×3, XL plus a s
     for (const b of before) {
       const a = after.find((i) => i._id === b._id)!;
       expect(a).toMatchObject({
-        size: b.size,
         qty: b.qty,
         source: b.source,
         createdAt: b.createdAt,
-        removedAt: b.removedAt,
       });
+      expect(a.size).toBe(b.size);
+      expect(a.removedAt).toBe(b.removedAt);
       expect(a.rosterEntryId).toBeDefined();
     }
   });
