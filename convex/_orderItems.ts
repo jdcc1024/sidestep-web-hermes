@@ -16,6 +16,7 @@ import {
   needsSizeMessage,
   summarize,
 } from "../lib/orderItem";
+import { playerKey } from "../lib/rosterEntry/rules";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -32,6 +33,178 @@ export async function loadItems(
     .withIndex("by_order", (q) => q.eq("orderId", orderId))
     .collect();
   return rows.filter((row) => row.removedAt === undefined);
+}
+
+// ── Roster entries (0004 phase 1b, R2-01) ───────────────────────────────────
+// A roster entry is a player; its size lines are `orderItems` pointing at it.
+// Both are soft-deleted, and an item under a removed entry is hidden too.
+// `loadRoster` is the only `by_order` reader of `rosterEntries`, and (with
+// `loadItems` and `hasAnyItem` until R2-03 retires them) of `orderItems`.
+// Design: docs/architecture/0004-roster-sizes.md.
+
+// The order's live entries, plus the live items whose entry is live. Items
+// without `rosterEntryId` (phase-1 rows the migration hasn't linked yet) are
+// left out: the old readers still own them.
+export async function loadRoster(
+  ctx: Ctx,
+  orderId: Id<"orders">,
+): Promise<{ entries: Doc<"rosterEntries">[]; items: Doc<"orderItems">[] }> {
+  const entries = (
+    await ctx.db
+      .query("rosterEntries")
+      .withIndex("by_order", (q) => q.eq("orderId", orderId))
+      .collect()
+  ).filter((entry) => entry.removedAt === undefined);
+  const liveIds = new Set<Id<"rosterEntries">>(entries.map((e) => e._id));
+  const items = (
+    await ctx.db
+      .query("orderItems")
+      .withIndex("by_order", (q) => q.eq("orderId", orderId))
+      .collect()
+  ).filter(
+    (item) =>
+      item.removedAt === undefined &&
+      item.rosterEntryId !== undefined &&
+      liveIds.has(item.rosterEntryId),
+  );
+  return { entries, items };
+}
+
+// One entry's items, removed ones included (the caller filters): what moves
+// on a merge or a restore-into-a-live-twin, and what the mirror re-copies.
+export async function loadEntryItems(
+  ctx: Ctx,
+  entryId: Id<"rosterEntries">,
+): Promise<Doc<"orderItems">[]> {
+  return ctx.db
+    .query("orderItems")
+    .withIndex("by_entry", (q) => q.eq("rosterEntryId", entryId))
+    .collect();
+}
+
+export type PlayerValues = {
+  name?: string;
+  number?: string;
+  designation?: "C" | "A";
+};
+
+// The live entry on `designId` with the same `playerKey`, other than `except`.
+export function findLiveEntry(
+  entries: readonly Doc<"rosterEntries">[],
+  designId: Id<"designs">,
+  values: Pick<PlayerValues, "name" | "number">,
+  except?: Id<"rosterEntries">,
+): Doc<"rosterEntries"> | undefined {
+  const key = playerKey(values);
+  return entries.find(
+    (entry) =>
+      entry._id !== except &&
+      entry.removedAt === undefined &&
+      entry.designId === designId &&
+      playerKey(entry) === key,
+  );
+}
+
+// Invariant 1 + 2: every write that names a player comes through here. Returns
+// the live entry on (order, design) with the same key, or inserts one with
+// `values`. A match keeps its own spelling and letter: the caller decides
+// whether to set a letter. Values must already be checked. A caller that
+// resolves many players in one mutation (paste) passes `entries`, the live
+// entries it loaded, and gets each insert appended so the next call sees it
+// without re-reading the order.
+export async function resolveEntry(
+  ctx: MutationCtx,
+  order: Doc<"orders">,
+  designId: Id<"designs">,
+  values: PlayerValues,
+  options: {
+    source?: Doc<"rosterEntries">["source"];
+    updatedBy?: Id<"users">;
+    entries?: Doc<"rosterEntries">[];
+  } = {},
+): Promise<{ entry: Doc<"rosterEntries">; matched: boolean }> {
+  const entries = options.entries ?? (await loadRoster(ctx, order._id)).entries;
+  const existing = findLiveEntry(entries, designId, values);
+  if (existing) return { entry: existing, matched: true };
+
+  const now = Date.now();
+  const entryId = await ctx.db.insert("rosterEntries", {
+    orderId: order._id,
+    designId,
+    name: values.name,
+    number: values.number,
+    designation: values.designation,
+    source: options.source ?? "captain",
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: options.updatedBy,
+  });
+  const entry = (await ctx.db.get(entryId))!;
+  entries.push(entry);
+  return { entry, matched: false };
+}
+
+// Mirror window (R2-01 → R2-03): an item still carries the flat design /
+// name / number / letter the phase-1 readers show. Every new item copies them
+// from its entry (`insertSizeLine`), and this re-copies them onto all of an
+// entry's items after a rename, a letter change or a merge. Only those four
+// fields: never the size, qty or submitter. Deleted in R2-03.
+export async function mirrorEntryOntoItems(
+  ctx: MutationCtx,
+  entry: Doc<"rosterEntries">,
+): Promise<void> {
+  for (const item of await loadEntryItems(ctx, entry._id)) {
+    if (
+      item.designId === entry.designId &&
+      item.name === entry.name &&
+      item.number === entry.number &&
+      item.designation === entry.designation
+    )
+      continue;
+    await ctx.db.patch(item._id, {
+      designId: entry.designId,
+      name: entry.name,
+      number: entry.number,
+      designation: entry.designation,
+    });
+  }
+}
+
+// Inserts one size line under `entry`, with the entry's values mirrored onto
+// it (see above). Size and qty must already be checked.
+export async function insertSizeLine(
+  ctx: MutationCtx,
+  entry: Doc<"rosterEntries">,
+  line: {
+    size: string;
+    qty: number;
+    source: Doc<"orderItems">["source"];
+    updatedBy?: Id<"users">;
+  },
+): Promise<Id<"orderItems">> {
+  const now = Date.now();
+  return ctx.db.insert("orderItems", {
+    orderId: entry.orderId,
+    rosterEntryId: entry._id,
+    designId: entry.designId,
+    name: entry.name,
+    number: entry.number,
+    designation: entry.designation,
+    size: line.size,
+    qty: line.qty,
+    source: line.source,
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: line.updatedBy,
+  });
+}
+
+export function requireDesignOnOrder(
+  order: Doc<"orders">,
+  designId: Id<"designs">,
+) {
+  if (!order.designIds.includes(designId))
+    throw new ConvexError("That design isn't part of this order.");
 }
 
 // Whether the order has any item at all, removed ones included. Only the

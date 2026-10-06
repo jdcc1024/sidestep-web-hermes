@@ -26,6 +26,7 @@ import type * as orderFormActions from "../orderFormActions.js";
 import type * as orderForms from "../orderForms.js";
 import type * as orderItems from "../orderItems.js";
 import type * as orders from "../orders.js";
+import type * as rosterEntries from "../rosterEntries.js";
 import type * as users from "../users.js";
 
 import type {
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   orderForms: typeof orderForms;
   orderItems: typeof orderItems;
   orders: typeof orders;
+  rosterEntries: typeof rosterEntries;
   users: typeof users;
 }>;
 

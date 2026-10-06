@@ -114,9 +114,34 @@ export default defineSchema({
     createdAt: v.number(), // display order; migrated rows keep legacy time
     updatedAt: v.number(),
     updatedBy: v.optional(v.id("users")), // who last changed it (admin after lock)
+    // The player this size line belongs to (0004 phase 1b, R2-01). Optional
+    // while the schema is widened: phase-1 rows get it from
+    // `_migrations:groupOrderItemsIntoRosterEntries`, and R2-03 makes it
+    // required and drops the flat name / number / letter / design above.
+    rosterEntryId: v.optional(v.id("rosterEntries")),
   })
     .index("by_order", ["orderId"])
+    .index("by_entry", ["rosterEntryId"])
     .index("by_submitterEmail", ["submitterEmail"]),
+
+  // A player on one design of one order (0004 phase 1b, R2-01): the printed
+  // values. Its sizes are the `orderItems` that point at it. Parented on the
+  // order, never the order form. Soft-deleted via `removedAt` (the entry
+  // alone; its items are hidden, not touched): read through `loadRoster` in
+  // _orderItems.ts, the only `by_order` reader. Design:
+  // docs/architecture/0004-roster-sizes.md "Data model".
+  rosterEntries: defineTable({
+    orderId: v.id("orders"),
+    designId: v.id("designs"), // never changes; moving = remove + add
+    name: v.optional(v.string()), // name on back (≤ 80)
+    number: v.optional(v.string()), // number on back, text: "01" ≠ "1"
+    designation: v.optional(v.union(v.literal("C"), v.literal("A"))),
+    source: v.union(v.literal("captain"), v.literal("fan")), // who created it
+    removedAt: v.optional(v.number()), // soft delete; restore clears it
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.id("users")),
+  }).index("by_order", ["orderId"]),
 
   intakes: defineTable({
     name: v.string(),
