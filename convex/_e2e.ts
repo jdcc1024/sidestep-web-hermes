@@ -187,6 +187,12 @@ export const cleanup = internalMutation({
       }
       for (const item of items) await ctx.db.delete(item._id);
       rows += items.length;
+      const entries = await ctx.db
+        .query("rosterEntries")
+        .withIndex("by_order", (q) => q.eq("orderId", order._id))
+        .collect();
+      for (const entry of entries) await ctx.db.delete(entry._id);
+      rows += entries.length;
       await ctx.db.delete(order._id);
       orders += 1;
     }
