@@ -203,7 +203,10 @@ export const retireLegacyRosterTables = internalMutation({
  * Run with:
  *   npx convex run _migrations:groupOrderItemsIntoRosterEntries
  *
- * Dev run: (filled in after the dev run)
+ * Dev run 2026-10-06: {entries: 17, itemsLinked: 34, sizelessRows: 1,
+ * sizelessQtyOver1: [], letterConflicts: 0}; a second run returned zeros.
+ * jerseyCount per order was equal before and after (3, 6, 40 on the three
+ * orders with items), counted both the phase-1 way and through the entries.
  *
  * Idempotent: rows that already have `rosterEntryId` are skipped, and a late
  * row for a player who already has a live entry joins it instead of making a
