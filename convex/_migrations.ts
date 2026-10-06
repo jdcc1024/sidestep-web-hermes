@@ -1,6 +1,8 @@
 import { internalMutation } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { prepareBlocks } from "./_designBlocks";
+import { itemLabel } from "../lib/orderItem/label";
+import { playerKey } from "../lib/rosterEntry/rules";
 
 /**
  * One-off backfill for designs created before the D-02 block model (D-02
@@ -177,6 +179,120 @@ export const retireLegacyRosterTables = internalMutation({
       runsPatched++;
     }
     return { ...deleted, runsPatched };
+  },
+});
+
+/**
+ * R2-01 (initiative 0004 phase 1b): group the phase-1 flat order items into
+ * roster entries. Rows sharing order + design + `playerKey({name, number})`
+ * become one entry, and every row (sized or not) gets `rosterEntryId`. Design:
+ * docs/architecture/0004-roster-sizes.md "Migration of existing orderItems
+ * rows". The entry takes the oldest row's spelling, source and `createdAt`,
+ * the first letter by `createdAt` (a group with two different letters keeps
+ * that one and is counted in `letterConflicts`), the latest `updatedAt` /
+ * `updatedBy`, and is removed (at the latest `removedAt`) only if every row
+ * is. A blank group (no name, no number) with no live sized row gets a
+ * removed entry: an empty "Blank jerseys" row means nothing. Rows are only
+ * linked, never otherwise changed: each keeps its size, qty, submitter,
+ * answers, form, timestamps and `removedAt`.
+ *
+ * A sizeless row's qty can't be held by the new model (a player with no sizes
+ * has no count, Gate 1b Q6 = A): each live one with qty > 1 is returned in
+ * `sizelessQtyOver1` by label so it can be re-entered by hand.
+ *
+ * Run with:
+ *   npx convex run _migrations:groupOrderItemsIntoRosterEntries
+ *
+ * Dev run: (filled in after the dev run)
+ *
+ * Idempotent: rows that already have `rosterEntryId` are skipped, and a late
+ * row for a player who already has a live entry joins it instead of making a
+ * second one, so R2-03 can re-run it to catch rows written since. One
+ * transaction, which is fine for the dev fixtures (no production deployment).
+ */
+export const groupOrderItemsIntoRosterEntries = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const unlinked = (await ctx.db.query("orderItems").collect())
+      .filter((item) => item.rosterEntryId === undefined)
+      .sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
+
+    const groupKey = (orderId: string, designId: string, key: string) =>
+      JSON.stringify([orderId, designId, key]);
+
+    const groups = new Map<string, Doc<"orderItems">[]>();
+    for (const item of unlinked) {
+      const k = groupKey(item.orderId, item.designId, playerKey(item));
+      const group = groups.get(k) ?? [];
+      group.push(item);
+      groups.set(k, group);
+    }
+
+    // Live entries from earlier runs (or the new API), so late rows join them.
+    const liveEntries = new Map<string, Id<"rosterEntries">>();
+    for (const entry of await ctx.db.query("rosterEntries").collect())
+      if (entry.removedAt === undefined)
+        liveEntries.set(
+          groupKey(entry.orderId, entry.designId, playerKey(entry)),
+          entry._id,
+        );
+
+    let entries = 0;
+    let itemsLinked = 0;
+    let sizelessRows = 0;
+    let letterConflicts = 0;
+    const sizelessQtyOver1: {
+      orderId: Id<"orders">;
+      label: string;
+      qty: number;
+    }[] = [];
+
+    for (const [k, rows] of groups) {
+      let entryId = liveEntries.get(k);
+      if (entryId === undefined) {
+        const oldest = rows[0];
+        const letters = new Set(rows.flatMap((r) => r.designation ?? []));
+        if (letters.size > 1) letterConflicts += 1;
+        const latest = rows.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a));
+        const allRemoved = rows.every((r) => r.removedAt !== undefined);
+        const blankWithoutJerseys =
+          playerKey(oldest) === "" &&
+          !rows.some((r) => r.size !== undefined && r.removedAt === undefined);
+        const removedAt = allRemoved
+          ? Math.max(...rows.map((r) => r.removedAt!))
+          : blankWithoutJerseys
+            ? Date.now()
+            : undefined;
+        entryId = await ctx.db.insert("rosterEntries", {
+          orderId: oldest.orderId,
+          designId: oldest.designId,
+          name: oldest.name,
+          number: oldest.number,
+          designation: rows.find((r) => r.designation)?.designation,
+          source: oldest.source,
+          removedAt,
+          createdAt: oldest.createdAt,
+          updatedAt: latest.updatedAt,
+          updatedBy: latest.updatedBy,
+        });
+        entries += 1;
+      }
+
+      for (const row of rows) {
+        await ctx.db.patch(row._id, { rosterEntryId: entryId });
+        itemsLinked += 1;
+        if (row.size !== undefined) continue;
+        sizelessRows += 1;
+        if (row.qty > 1 && row.removedAt === undefined)
+          sizelessQtyOver1.push({
+            orderId: row.orderId,
+            label: itemLabel(row),
+            qty: row.qty,
+          });
+      }
+    }
+
+    return { entries, itemsLinked, sizelessRows, sizelessQtyOver1, letterConflicts };
   },
 });
 
