@@ -4,13 +4,14 @@
 
 ## Type: feature
 
-## Size: S–M (~5 files, ~$2)
+## Size: S–M (~4 files, ~$2)
 
 ## Description
 
-Initiative 0004, phase 1b. UX: `docs/ux/0004-roster-sizes.md` §7, frame 6.
-Design: `docs/architecture/0004-roster-sizes.md` ("Effect on each surface",
-Paste).
+Initiative 0004, phase 1b. UX: `docs/ux/0004-roster-sizes.md` §7, frame 6
+(ignore the "number on front … follows the back" bullet; parked). Design:
+`docs/architecture/0004-roster-sizes.md` ("Effect on each surface", Paste).
+On screen: "player" and "jerseys" (Gate 1b Q1/Q2).
 
 `lib/orderItem/paste.ts` changes:
 
@@ -41,3 +42,4 @@ Paste).
 ## Notes
 - Files likely touched: `lib/orderItem/paste.ts` + `lib/orderItem/paste.test.ts`, `components/orderList/PasteList.tsx`, `e2e/` order-list spec.
 - `ROSTER_PASTE_MAX_ROWS` (200) still bounds raw rows. `addMany` already resolves matches server-side (R2-01), so the preview is advisory.
+- `parseRosterPaste` is pure, so its auth line is n/a; `rosterEntries.addMany`'s auth is tested in R2-01.
