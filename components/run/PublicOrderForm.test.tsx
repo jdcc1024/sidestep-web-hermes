@@ -87,7 +87,7 @@ describe("PublicOrderForm", () => {
 
     expect(await screen.findByText(/tell us your name/i)).toBeInTheDocument();
     expect(screen.getByText(/we need an email/i)).toBeInTheDocument();
-    expect(screen.getByText(/pick a size/i)).toBeInTheDocument();
+    expect(screen.getByText(/pick at least one size/i)).toBeInTheDocument();
     expect(submitOrder).not.toHaveBeenCalled();
   });
 
@@ -99,7 +99,7 @@ describe("PublicOrderForm", () => {
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
     await user.type(screen.getByLabelText(/name on jersey/i), "Alex");
     await user.type(screen.getByLabelText(/^number$/i), "7");
-    await user.click(screen.getByRole("radio", { name: "M" }));
+    await user.click(screen.getByRole("button", { name: /add one M\b/i }));
 
     await user.click(screen.getByRole("button", { name: /^submit$/i }));
 
@@ -128,18 +128,22 @@ describe("PublicOrderForm", () => {
     // First jersey.
     const firstCard = screen.getByRole("group", { name: /jersey 1/i });
     await user.type(within(firstCard).getByLabelText(/name on jersey/i), "Alex");
-    await user.click(within(firstCard).getByRole("radio", { name: "M" }));
+    await user.click(
+      within(firstCard).getByRole("button", { name: /add one M\b/i }),
+    );
 
     // Add a second line.
     await user.click(
-      screen.getByRole("button", { name: /add another jersey/i }),
+      screen.getByRole("button", { name: /add a different name or number/i }),
     );
     const secondCard = screen.getByRole("group", { name: /jersey 2/i });
     await user.type(
       within(secondCard).getByLabelText(/name on jersey/i),
       "Jamie",
     );
-    await user.click(within(secondCard).getByRole("radio", { name: "L" }));
+    await user.click(
+      within(secondCard).getByRole("button", { name: /add one L\b/i }),
+    );
 
     await user.click(screen.getByRole("button", { name: /^submit$/i }));
 
@@ -159,7 +163,7 @@ describe("PublicOrderForm", () => {
 
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
-    await user.click(screen.getByRole("radio", { name: "M" }));
+    await user.click(screen.getByRole("button", { name: /add one M\b/i }));
     // Leave name + number blank.
 
     await user.click(screen.getByRole("button", { name: /^submit$/i }));
@@ -333,10 +337,11 @@ describe("PublicOrderForm", () => {
     };
     render(<PublicOrderForm orderFormId={fakeRunId} />);
 
-    // The radio itself is visually hidden inside its label, so the label is
-    // what carries the size text a fan actually reads.
+    // Each size's counter is a button carrying the size text a fan reads.
     expect(
-      screen.getAllByRole("radio").map((r) => r.closest("label")?.textContent),
+      screen
+        .getAllByRole("button", { name: /^add one /i })
+        .map((b) => b.textContent),
     ).toEqual(["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"]);
   });
 
@@ -379,7 +384,7 @@ describe("Public form error line never shows [CONVEX, Request ID, ConvexError or
     await user.type(screen.getByLabelText(/your name/i), "Pat Parent");
     await user.type(screen.getByLabelText(/your email/i), "pat@example.com");
     await user.type(screen.getByLabelText(/name on jersey/i), "Alex");
-    await user.click(screen.getByRole("radio", { name: "M" }));
+    await user.click(screen.getByRole("button", { name: /add one M\b/i }));
     await user.click(screen.getByRole("button", { name: /^submit$/i }));
     await waitFor(() => expect(submitOrder).toHaveBeenCalledTimes(1));
     return screen.findByRole("alert");

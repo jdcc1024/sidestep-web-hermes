@@ -50,8 +50,7 @@ test("a player submits through the captain's /run link and the captain sees the 
   await player.getByLabel(/your email/i).fill(`${tag}@example.com`);
   await player.getByLabel(/name on jersey/i).fill(jerseyName);
   await player.getByLabel(/^number/i).fill("72");
-  // The size radio is visually hidden; its label is the click target.
-  await player.locator("label").filter({ hasText: /^M$/ }).click();
+  await player.getByRole("button", { name: /add one M\b/i }).click();
   await expectNoHorizontalScroll(player);
   await player.getByRole("button", { name: /^submit/i }).click();
   await expect(player.getByRole("status")).toBeVisible();
