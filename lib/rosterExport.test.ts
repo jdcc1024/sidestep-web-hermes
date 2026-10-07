@@ -8,9 +8,13 @@ import {
 
 let nextId = 0;
 
+// An export row: a size line from the list, or the size-less row the list adds
+// for a player who still needs sizes (R2-03: `ItemView.size` is required).
+type Row = Omit<ItemView, "size" | "rosterEntryId"> & { size?: string };
+
 function item(
-  fields: Partial<ItemView> & { qty?: number },
-): ItemView {
+  fields: Partial<Row> & { qty?: number },
+): Row {
   nextId += 1;
   return {
     _id: `item_${nextId}`,
@@ -19,7 +23,6 @@ function item(
     source: "captain",
     customAnswers: {},
     createdAt: nextId,
-    collision: false,
     ...fields,
   };
 }
@@ -31,7 +34,7 @@ function slot(
   number: string | undefined,
   sizes: Array<{ size: string; qty: number }>,
   designation?: "C" | "A",
-): ItemView[] {
+): Row[] {
   if (sizes.length === 0) return [item({ name, number, designation })];
   return sizes.map(({ size, qty }) =>
     item({ name, number, designation, size, qty }),
@@ -39,12 +42,12 @@ function slot(
 }
 
 // Unnamed bulk lines: no name, no number.
-function blank(sizes: Array<{ size: string; qty: number }>): ItemView[] {
+function blank(sizes: Array<{ size: string; qty: number }>): Row[] {
   return sizes.map(({ size, qty }) => item({ size, qty }));
 }
 
-type Group = ItemView[];
-const flat = (groups: readonly Group[]): ItemView[] => groups.flat();
+type Group = Row[];
+const flat = (groups: readonly Group[]): Row[] => groups.flat();
 
 // Data rows only — the header is asserted separately.
 function body(rows: readonly Group[], order: "name" | "size" = "name") {

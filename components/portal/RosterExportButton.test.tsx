@@ -8,6 +8,10 @@ import type { ItemView } from "@/lib/orderItem/summary";
 
 let nextId = 0;
 
+// An export row: a size line, or the size-less row the list adds for a player
+// who still needs sizes (R2-03: `ItemView.size` is required).
+type Row = Omit<ItemView, "size" | "rosterEntryId"> & { size?: string };
+
 // One player's items (L-03: the button reads `ItemView[]`, the same items the
 // list renders): one item per size ordered, qty riding on the item.
 function slot(
@@ -15,8 +19,8 @@ function slot(
   number: string,
   sizes: Array<{ size: string; qty: number }>,
   designation?: "C" | "A",
-): ItemView[] {
-  const make = (size: string | undefined, qty: number): ItemView => {
+): Row[] {
+  const make = (size: string | undefined, qty: number): Row => {
     nextId += 1;
     return {
       _id: `item_${nextId}`,
@@ -29,7 +33,6 @@ function slot(
       source: "captain",
       customAnswers: {},
       createdAt: nextId,
-      collision: false,
     };
   };
   return sizes.length === 0
@@ -37,7 +40,7 @@ function slot(
     : sizes.map(({ size, qty }) => make(size, qty));
 }
 
-const items: ItemView[] = [
+const items: Row[] = [
   ...slot("Ruiz", "7", [{ size: "L", qty: 2 }], "C"),
   ...slot("Abbot", "4", [{ size: "S", qty: 1 }]),
 ];

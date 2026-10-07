@@ -5,7 +5,9 @@ import { listProblems } from "./checks";
 import type { ItemView } from "./summary";
 
 let n = 0;
-function item(o: Partial<ItemView> = {}): ItemView {
+// A phase-1 item: it may have no size (R2-03: `ItemView.size` is required).
+type Item = Omit<ItemView, "size" | "rosterEntryId"> & { size?: string };
+function item(o: Partial<Item> = {}): Item {
   n += 1;
   return {
     _id: `i${n}`,
@@ -14,7 +16,6 @@ function item(o: Partial<ItemView> = {}): ItemView {
     source: "captain",
     customAnswers: {},
     createdAt: n,
-    collision: false,
     ...o,
   };
 }

@@ -11,7 +11,6 @@ import {
   isRosterSource,
   planRosterCopy,
   rosterMatchKey,
-  rosterSlotKey,
 } from "./rosterEntry";
 
 describe("isRosterSource", () => {
@@ -122,25 +121,6 @@ describe("rosterMatchKey", () => {
     expect(rosterMatchKey("d1", "Gretzky", "66")).not.toBe(base);
   });
 });
-
-describe("rosterSlotKey", () => {
-  it("is the design-free half of rosterMatchKey", () => {
-    expect(rosterMatchKey("d1", "Gretzky", "99")).toBe(
-      `d1::${rosterSlotKey("Gretzky", "99")}`,
-    );
-  });
-
-  it("folds case and surrounding space on both halves", () => {
-    expect(rosterSlotKey("  Gretzky ", " 99 ")).toBe(
-      rosterSlotKey("gretzky", "99"),
-    );
-  });
-
-  it("treats a missing number the same as an empty one", () => {
-    expect(rosterSlotKey("Bo", undefined)).toBe(rosterSlotKey("Bo", ""));
-  });
-});
-
 
 // M-04: the mirror's dedupe. Same normalization as the paste above, so
 // "already on this roster" means one thing across every path that says it.

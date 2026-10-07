@@ -105,7 +105,7 @@ vi.mock("convex/react", async () => {
 });
 
 import type { Id } from "@/convex/_generated/dataModel";
-import { summarize, type SummaryItem } from "@/lib/orderItem/summary";
+import { summarizeRoster } from "@/lib/orderItem/summary";
 import OrderDetailPage from "./page";
 
 const ORDER_ID = "order_1" as Id<"orders">;
@@ -116,10 +116,23 @@ const TITLES: Record<string, string> = {
   design_warmup: "Warmup",
 };
 
-type FixtureItem = Partial<SummaryItem> & { designId?: string };
+type FixtureItem = {
+  designId?: string;
+  name?: string;
+  number?: string;
+  designation?: "C" | "A";
+  size?: string;
+  qty?: number;
+  source?: "captain" | "fan";
+  submitterName?: string;
+  submitterEmail?: string;
+  customAnswers?: Record<string, string>;
+  createdAt?: number;
+};
 
 // What `orderItems.listForOrder` returns for these items, built with the real
-// `summarize` read model so the fixture can't drift from the server's shape.
+// `summarizeRoster` read model (R2-03: the phase-1 `summarize` is gone). Each
+// fixture item is its own player, with one size line when it has a size.
 // The linked designs are the current `orderResult`'s; an item on any other
 // design lands in `removedDesigns`, as it does on the server.
 function setItems(
@@ -150,7 +163,15 @@ function setItems(
         : null;
   const locked = opts.locked ?? order.locked ?? false;
   itemsResult = {
-    ...summarize(full, { designIds, titles: TITLES, namesMode }),
+    ...summarizeRoster(
+      full.map((item) => ({ ...item, _id: `entry_${item._id}` })),
+      full.flatMap((item) =>
+        item.size === undefined
+          ? []
+          : [{ ...item, size: item.size, rosterEntryId: `entry_${item._id}` }],
+      ),
+      { designIds, titles: TITLES },
+    ),
     locked,
     canEdit: !locked,
     form: run ? { orderFormId: run._id, namesMode: namesMode ?? "open" } : null,
