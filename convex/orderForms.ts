@@ -328,12 +328,7 @@ export const listMyResponses = query({
     }> = [];
 
     for (const item of items) {
-      if (
-        item.orderFormId === undefined ||
-        item.rosterEntryId === undefined ||
-        item.size === undefined
-      )
-        continue;
+      if (item.orderFormId === undefined) continue;
 
       let player = playerCache.get(item.rosterEntryId) ?? null;
       if (!playerCache.has(item.rosterEntryId)) {
@@ -409,7 +404,7 @@ export const listOrderEntries = query({
     const roster = await loadRoster(ctx, order._id);
     const players = new Map(roster.entries.map((e) => [e._id, e]));
     const sized = roster.items.flatMap((item) => {
-      const player = players.get(item.rosterEntryId!);
+      const player = players.get(item.rosterEntryId);
       return player ? [{ item, player }] : [];
     });
 
@@ -437,7 +432,7 @@ export const listOrderEntries = query({
         number: player.number,
         // The by-roster view renders the letter beside the name (M-09).
         designation: player.designation,
-        size: item.size!,
+        size: item.size,
         qty: item.qty,
         source: item.source,
         customAnswers: item.customAnswers ?? {},

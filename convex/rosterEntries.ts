@@ -74,8 +74,7 @@ const isBlank = (values: Pick<PlayerValues, "name" | "number">) =>
 function qtyBySize(items: readonly Doc<"orderItems">[]): Map<string, number> {
   const totals = new Map<string, number>();
   for (const item of items)
-    if (item.size !== undefined)
-      totals.set(item.size, (totals.get(item.size) ?? 0) + item.qty);
+    totals.set(item.size, (totals.get(item.size) ?? 0) + item.qty);
   return totals;
 }
 
@@ -149,7 +148,7 @@ async function removeIfEmptyBlank(
 ) {
   if (!isBlank(entry)) return;
   const live = (await loadEntryItems(ctx, entry._id)).filter(
-    (item) => item.removedAt === undefined && item.size !== undefined,
+    (item) => item.removedAt === undefined,
   );
   if (live.length > 0) return;
   const now = Date.now();

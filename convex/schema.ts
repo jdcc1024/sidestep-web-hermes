@@ -95,18 +95,12 @@ export default defineSchema({
   // lines are one `by_order` read; `orderFormId` only records which form a
   // line came through. Soft-deleted via `removedAt`: read through `loadRoster`
   // in _orderItems.ts, the only `by_order` reader, which drops removed lines
-  // and lines under a removed entry.
-  //
-  // Widened until `_migrations:stripFlatItemFields` has run: the phase-1 flat
-  // design / name / number / letter are still allowed (nothing reads or
-  // writes them), and `size` / `rosterEntryId` may be missing on a legacy row.
+  // and lines under a removed entry. The phase-1 flat design / name / number /
+  // letter were stripped by `_migrations:stripFlatItemFields`.
   orderItems: defineTable({
     orderId: v.id("orders"),
-    designId: v.optional(v.id("designs")),
-    name: v.optional(v.string()),
-    number: v.optional(v.string()),
-    designation: v.optional(v.union(v.literal("C"), v.literal("A"))),
-    size: v.optional(v.string()),
+    rosterEntryId: v.id("rosterEntries"), // the player this line belongs to
+    size: v.string(), // a player who needs sizes has no lines
     qty: v.number(), // integer 1..MAX_QTY
     source: v.union(v.literal("captain"), v.literal("fan")), // who created the row
     // Set only by the public form: no captain or admin mutation accepts these.
@@ -118,8 +112,6 @@ export default defineSchema({
     createdAt: v.number(), // display order; migrated rows keep legacy time
     updatedAt: v.number(),
     updatedBy: v.optional(v.id("users")), // who last changed it (admin after lock)
-    // The player this size line belongs to.
-    rosterEntryId: v.optional(v.id("rosterEntries")),
   })
     .index("by_order", ["orderId"])
     .index("by_entry", ["rosterEntryId"])

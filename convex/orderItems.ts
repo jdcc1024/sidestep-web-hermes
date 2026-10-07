@@ -53,9 +53,7 @@ export const affectedByDesignRemoval = query({
     const playersOnDesign = new Set(
       entries.filter((e) => e.designId === designId).map((e) => e._id),
     );
-    const onDesign = items.filter((i) =>
-      playersOnDesign.has(i.rosterEntryId!),
-    );
+    const onDesign = items.filter((i) => playersOnDesign.has(i.rosterEntryId));
     return {
       itemCount: onDesign.reduce((sum, i) => sum + i.qty, 0),
       submitters: submittersOf(onDesign),

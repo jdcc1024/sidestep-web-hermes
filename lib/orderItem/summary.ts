@@ -83,10 +83,8 @@ export type RosterLineInput<
   EntryId extends string = string,
 > = {
   _id: Id;
-  rosterEntryId?: EntryId;
-  // Optional only while the schema is widened: a legacy sizeless row linked
-  // by the migration. It's no jersey, so the read model skips it.
-  size?: string;
+  rosterEntryId: EntryId;
+  size: string;
   qty: number;
   source: "captain" | "fan";
   submitterName?: string;
@@ -180,7 +178,6 @@ export function summarizeRoster<
 ): OrderRosterSummary<Id, DesignId, EntryId> {
   const linesByEntry = new Map<string, RosterLineInput<Id, EntryId>[]>();
   for (const item of items) {
-    if (item.rosterEntryId === undefined || item.size === undefined) continue;
     const list = linesByEntry.get(item.rosterEntryId) ?? [];
     list.push(item);
     linesByEntry.set(item.rosterEntryId, list);
@@ -241,7 +238,7 @@ function toPlayerView<
     .map(
       (line): PlayerLine<Id> => ({
         itemId: line._id,
-        size: line.size!,
+        size: line.size,
         qty: line.qty,
         source: line.source,
         submitterName: line.submitterName,

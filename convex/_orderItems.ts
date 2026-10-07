@@ -44,13 +44,7 @@ export async function loadRoster(
       .collect()
   ).filter(
     (item) =>
-      item.removedAt === undefined &&
-      // Until the schema narrows, a legacy unlinked or sizeless row may still
-      // exist; `_migrations:stripFlatItemFields` removes them. Neither is a
-      // jersey.
-      item.size !== undefined &&
-      item.rosterEntryId !== undefined &&
-      liveIds.has(item.rosterEntryId),
+      item.removedAt === undefined && liveIds.has(item.rosterEntryId),
   );
   return { entries, items };
 }
