@@ -23,12 +23,13 @@ export type RosterExportOrder = (typeof ROSTER_EXPORT_ORDERS)[number];
 
 const HEADERS = ["Name", "Number", "Role", "Size"];
 
-type ExportItem = Pick<
-  ItemView,
-  "name" | "number" | "designation" | "size" | "qty"
->;
+// A size line from the list, or a size-less row the caller adds for a player
+// who still needs sizes (a player with no lines has no `ItemView`).
+type ExportItem = Pick<ItemView, "name" | "number" | "designation" | "qty"> & {
+  size?: string;
+};
 
-// One garment. `size` is "" for an item that still needs one — it stays in
+// One garment. `size` is "" for a player who still needs one — it stays in
 // the file, because a captain uses it to see who still owes a size, and a
 // missing row can't say that.
 type ExportRecord = {

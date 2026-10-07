@@ -115,17 +115,8 @@ export function playerKey({ name, number }: PlayerKeyValues): string {
   return JSON.stringify(parts);
 }
 
-// The phase-1 spelling of `playerKey`, kept for its existing callers until
-// R2-03 retires it.
-export function rosterSlotKey(
-  name: string,
-  number: string | undefined,
-): string {
-  return playerKey({ name, number });
-}
-
 // Identity of a player slot for attach-to-existing-slot matching (R-02):
-// a design + the slot key above. Two fans typing "Gretzky 99" under the
+// a design + the player key above. Two fans typing "Gretzky 99" under the
 // same design resolve to the same key (and so the same slot), regardless
 // of casing or surrounding whitespace.
 export function rosterMatchKey(
@@ -133,5 +124,5 @@ export function rosterMatchKey(
   name: string,
   number: string | undefined,
 ): string {
-  return `${designId}::${rosterSlotKey(name, number)}`;
+  return `${designId}::${playerKey({ name, number })}`;
 }

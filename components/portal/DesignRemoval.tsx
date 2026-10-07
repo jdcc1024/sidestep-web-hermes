@@ -76,7 +76,7 @@ export function DesignRemovalWarning({
 const SECTION_COLLAPSED = { height: 0, opacity: 0 };
 const SECTION_EXPANDED = { height: "auto", opacity: 1 };
 
-// `summarize` titles a design it couldn't load as "".
+// `summarizeRoster` titles a design it couldn't load as "".
 const UNTITLED = "Untitled design";
 
 // Post-save: the durable "these designs were removed" section on the order

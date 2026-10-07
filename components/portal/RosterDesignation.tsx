@@ -17,8 +17,7 @@ import { cn } from "@/lib/utils";
 // to the surface using them.
 
 // The letter as it sits on a roster row. One character, because the rows are
-// dense one-liners — the word is there for a screen reader and for a hover,
-// which is the same trade the collision flag beside it makes.
+// dense one-liners — the word is there for a screen reader and for a hover.
 export function DesignationBadge({
   designation,
   className,

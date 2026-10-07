@@ -33,9 +33,7 @@ export function isPlayerItem(
   return item.source === "fan" || item.submitterEmail !== undefined;
 }
 
-export function removedItemMessage(
-  item: Labelled & Pick<ItemView, "size">,
-): string {
+export function removedItemMessage(item: Labelled & { size?: string }): string {
   const label = itemLabel(item);
   return item.size ? `Removed ${label} (${item.size})` : `Removed ${label}`;
 }

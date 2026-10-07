@@ -9,7 +9,7 @@
 // plan only ever *adds*, so there is no path here that touches an existing
 // target slot or the jerseys hanging off it.
 
-import { rosterSlotKey, type RosterDesignation } from "./rules";
+import { playerKey, type RosterDesignation } from "./rules";
 
 export type RosterCopySlot = {
   name: string;
@@ -31,21 +31,19 @@ export type RosterCopyPlan = {
 };
 
 // What copying `source`'s slots onto `target` would create. Dedupe is
-// `rosterSlotKey` — the same normalization the fan-attach path matches on
-// (R-02), which is the point: a duplicate slot would split one player's
-// future orders across two rows unpredictably.
+// `playerKey` — the same normalization `resolveEntry` matches on, which is
+// the point: a duplicate player would split one player's future orders
+// across two rows unpredictably.
 export function planRosterCopy(
   source: readonly RosterCopySlot[],
   target: readonly RosterCopySlot[],
 ): RosterCopyPlan {
-  const taken = new Set(
-    target.map((slot) => rosterSlotKey(slot.name, slot.number)),
-  );
+  const taken = new Set(target.map((slot) => playerKey(slot)));
 
   const additions: RosterCopyPlan["additions"] = [];
   let skipped = 0;
   for (const slot of source) {
-    const key = rosterSlotKey(slot.name, slot.number);
+    const key = playerKey(slot);
     // `taken` grows as we go, so a slot repeated within the source itself
     // lands once — nothing dedupes `create`, so a source roster can hold
     // two of the same player, and copying both would defeat the rule above.

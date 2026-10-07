@@ -30,9 +30,9 @@ export function listPlayerProblems(players: CheckedPlayer[]): Problem[] {
 }
 
 // Phase-1 item rule, pinned by its L-06 acceptance test. Nothing on the
-// server calls it since R2-02 moved the gate to players; it goes with the
-// flat item fields in R2-03.
-type CheckedItem = Pick<ItemView, "name" | "number" | "size">;
+// server calls it since R2-02 moved the gate to players (a size line always
+// has a size now), so it only ever sees a size-less row in that test.
+type CheckedItem = Pick<ItemView, "name" | "number"> & { size?: string };
 
 export function listProblems(items: CheckedItem[]): Problem[] {
   return items.flatMap((item) =>
