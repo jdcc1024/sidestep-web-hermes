@@ -1,4 +1,4 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, type MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { prepareBlocks } from "./_designBlocks";
 import { itemLabel } from "../lib/orderItem/label";
@@ -215,87 +215,169 @@ export const retireLegacyRosterTables = internalMutation({
  */
 export const groupOrderItemsIntoRosterEntries = internalMutation({
   args: {},
-  handler: async (ctx) => {
-    const unlinked = (await ctx.db.query("orderItems").collect())
-      .filter((item) => item.rosterEntryId === undefined)
-      .sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
+  handler: (ctx) => groupFlatItems(ctx),
+});
 
-    const groupKey = (orderId: string, designId: string, key: string) =>
-      JSON.stringify([orderId, designId, key]);
+// An order item as it may still be stored before the R2-03 strip: the flat
+// design / name / number / letter, and possibly no size or `rosterEntryId`.
+// The narrowed schema declares none of that, so these migrations read items
+// through this type. `designId` is typed as present because only unlinked
+// rows are grouped, and those are all phase-1 rows, which always had one.
+type FlatItem = Omit<Doc<"orderItems">, "size" | "rosterEntryId"> & {
+  size?: string;
+  rosterEntryId?: Id<"rosterEntries">;
+  designId: Id<"designs">;
+  name?: string;
+  number?: string;
+  designation?: "C" | "A";
+};
 
-    const groups = new Map<string, Doc<"orderItems">[]>();
-    for (const item of unlinked) {
-      const k = groupKey(item.orderId, item.designId, playerKey(item));
-      const group = groups.get(k) ?? [];
-      group.push(item);
-      groups.set(k, group);
+const FLAT_ITEM_FIELDS = ["designId", "name", "number", "designation"] as const;
+
+async function loadFlatItems(ctx: MutationCtx): Promise<FlatItem[]> {
+  return (await ctx.db.query("orderItems").collect()) as unknown as FlatItem[];
+}
+
+// The body of `groupOrderItemsIntoRosterEntries`, shared with
+// `stripFlatItemFields` so the strip re-runs the very same grouping first.
+async function groupFlatItems(ctx: MutationCtx) {
+  const unlinked = (await loadFlatItems(ctx))
+    .filter((item) => item.rosterEntryId === undefined)
+    .sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
+
+  const groupKey = (orderId: string, designId: string, key: string) =>
+    JSON.stringify([orderId, designId, key]);
+
+  const groups = new Map<string, FlatItem[]>();
+  for (const item of unlinked) {
+    const k = groupKey(item.orderId, item.designId, playerKey(item));
+    const group = groups.get(k) ?? [];
+    group.push(item);
+    groups.set(k, group);
+  }
+
+  // Live entries from earlier runs (or the new API), so late rows join them.
+  const liveEntries = new Map<string, Id<"rosterEntries">>();
+  for (const entry of await ctx.db.query("rosterEntries").collect())
+    if (entry.removedAt === undefined)
+      liveEntries.set(
+        groupKey(entry.orderId, entry.designId, playerKey(entry)),
+        entry._id,
+      );
+
+  let entries = 0;
+  let itemsLinked = 0;
+  let sizelessRows = 0;
+  let letterConflicts = 0;
+  const sizelessQtyOver1: {
+    orderId: Id<"orders">;
+    label: string;
+    qty: number;
+  }[] = [];
+
+  for (const [k, rows] of groups) {
+    let entryId = liveEntries.get(k);
+    if (entryId === undefined) {
+      const oldest = rows[0];
+      const letters = new Set(rows.flatMap((r) => r.designation ?? []));
+      if (letters.size > 1) letterConflicts += 1;
+      const latest = rows.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a));
+      const allRemoved = rows.every((r) => r.removedAt !== undefined);
+      const blankWithoutJerseys =
+        playerKey(oldest) === "" &&
+        !rows.some((r) => r.size !== undefined && r.removedAt === undefined);
+      const removedAt = allRemoved
+        ? Math.max(...rows.map((r) => r.removedAt!))
+        : blankWithoutJerseys
+          ? Date.now()
+          : undefined;
+      entryId = await ctx.db.insert("rosterEntries", {
+        orderId: oldest.orderId,
+        designId: oldest.designId,
+        name: oldest.name,
+        number: oldest.number,
+        designation: rows.find((r) => r.designation)?.designation,
+        source: oldest.source,
+        removedAt,
+        createdAt: oldest.createdAt,
+        updatedAt: latest.updatedAt,
+        updatedBy: latest.updatedBy,
+      });
+      entries += 1;
     }
 
-    // Live entries from earlier runs (or the new API), so late rows join them.
-    const liveEntries = new Map<string, Id<"rosterEntries">>();
-    for (const entry of await ctx.db.query("rosterEntries").collect())
-      if (entry.removedAt === undefined)
-        liveEntries.set(
-          groupKey(entry.orderId, entry.designId, playerKey(entry)),
-          entry._id,
-        );
-
-    let entries = 0;
-    let itemsLinked = 0;
-    let sizelessRows = 0;
-    let letterConflicts = 0;
-    const sizelessQtyOver1: {
-      orderId: Id<"orders">;
-      label: string;
-      qty: number;
-    }[] = [];
-
-    for (const [k, rows] of groups) {
-      let entryId = liveEntries.get(k);
-      if (entryId === undefined) {
-        const oldest = rows[0];
-        const letters = new Set(rows.flatMap((r) => r.designation ?? []));
-        if (letters.size > 1) letterConflicts += 1;
-        const latest = rows.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a));
-        const allRemoved = rows.every((r) => r.removedAt !== undefined);
-        const blankWithoutJerseys =
-          playerKey(oldest) === "" &&
-          !rows.some((r) => r.size !== undefined && r.removedAt === undefined);
-        const removedAt = allRemoved
-          ? Math.max(...rows.map((r) => r.removedAt!))
-          : blankWithoutJerseys
-            ? Date.now()
-            : undefined;
-        entryId = await ctx.db.insert("rosterEntries", {
-          orderId: oldest.orderId,
-          designId: oldest.designId,
-          name: oldest.name,
-          number: oldest.number,
-          designation: rows.find((r) => r.designation)?.designation,
-          source: oldest.source,
-          removedAt,
-          createdAt: oldest.createdAt,
-          updatedAt: latest.updatedAt,
-          updatedBy: latest.updatedBy,
+    for (const row of rows) {
+      await ctx.db.patch(row._id, { rosterEntryId: entryId });
+      itemsLinked += 1;
+      if (row.size !== undefined) continue;
+      sizelessRows += 1;
+      if (row.qty > 1 && row.removedAt === undefined)
+        sizelessQtyOver1.push({
+          orderId: row.orderId,
+          label: itemLabel(row),
+          qty: row.qty,
         });
-        entries += 1;
-      }
+    }
+  }
 
-      for (const row of rows) {
-        await ctx.db.patch(row._id, { rosterEntryId: entryId });
-        itemsLinked += 1;
-        if (row.size !== undefined) continue;
-        sizelessRows += 1;
-        if (row.qty > 1 && row.removedAt === undefined)
-          sizelessQtyOver1.push({
-            orderId: row.orderId,
-            label: itemLabel(row),
-            qty: row.qty,
-          });
+  return { entries, itemsLinked, sizelessRows, sizelessQtyOver1, letterConflicts };
+}
+
+/**
+ * R2-03 (initiative 0004 phase 1b): end the mirror window. An order item
+ * becomes only a size line under a roster entry. Design:
+ * docs/architecture/0004-roster-sizes.md "Migration of existing orderItems
+ * rows".
+ *
+ * 1. Re-runs the grouping (`groupOrderItemsIntoRosterEntries`, same code) so
+ *    a flat row written since the R2-01 run joins its player first.
+ * 2. Deletes every sizeless item, removed or not and whatever its qty: its
+ *    name / number / letter already live on its entry, which stays as a
+ *    player who needs sizes. A sized item is never deleted, removed or not.
+ * 3. Unsets `designId`, `name`, `number` and `designation` on every remaining
+ *    item. Size, qty, submitter, answers, form, timestamps and `removedAt`
+ *    are untouched, so Σ qty of live sized items per order is unchanged.
+ *
+ * Returns `{grouped: {...}, sizelessDeleted, itemsStripped}`. Once it has
+ * run, the schema narrows (`rosterEntryId` and `size` required, the four flat
+ * fields gone).
+ *
+ * Run with:
+ *   npx convex run _migrations:stripFlatItemFields
+ *
+ * Dev run: (filled in after the dev run)
+ *
+ * Idempotent: a second run finds nothing unlinked, nothing sizeless and no
+ * flat field, and returns zeros. One transaction, which is fine for the dev
+ * fixtures (no production deployment).
+ */
+export const stripFlatItemFields = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const grouped = await groupFlatItems(ctx);
+
+    // The narrowed schema doesn't declare the flat fields, so the patch is
+    // typed loosely; patching a field to undefined removes it.
+    const unsetFlat: Record<(typeof FLAT_ITEM_FIELDS)[number], undefined> = {
+      designId: undefined,
+      name: undefined,
+      number: undefined,
+      designation: undefined,
+    };
+    let sizelessDeleted = 0;
+    let itemsStripped = 0;
+    for (const item of await loadFlatItems(ctx)) {
+      if (item.size === undefined) {
+        await ctx.db.delete(item._id);
+        sizelessDeleted += 1;
+        continue;
       }
+      if (FLAT_ITEM_FIELDS.every((field) => item[field] === undefined)) continue;
+      await ctx.db.patch(item._id, unsetFlat as Partial<Doc<"orderItems">>);
+      itemsStripped += 1;
     }
 
-    return { entries, itemsLinked, sizelessRows, sizelessQtyOver1, letterConflicts };
+    return { grouped, sizelessDeleted, itemsStripped };
   },
 });
 
