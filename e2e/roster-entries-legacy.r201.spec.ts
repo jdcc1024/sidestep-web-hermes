@@ -34,7 +34,7 @@ test("an order seeded with flat items shows the same list, counts and CSV after 
   await expect(page.getByText(/\b1 needs\b/i).first()).toBeVisible();
 
   // The controls still work: editing is offered on this order.
-  await expect(page.getByRole("button", { name: /add item/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /add player/i })).toBeVisible();
 
   await expectNoHorizontalScroll(page);
   await page.setViewportSize({ width: 375, height: 812 });
