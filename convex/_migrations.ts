@@ -345,7 +345,10 @@ async function groupFlatItems(ctx: MutationCtx) {
  * Run with:
  *   npx convex run _migrations:stripFlatItemFields
  *
- * Dev run: (filled in after the dev run)
+ * Dev run 2026-10-07: {grouped: all zeros, sizelessDeleted: 1,
+ * itemsStripped: 33}; a second run returned zeros. 34 items -> 33, 17 entries
+ * unchanged; live sized qty per order 6 / 40 / 3 before and after; the
+ * narrowed schema then pushed with no validation errors.
  *
  * Idempotent: a second run finds nothing unlinked, nothing sizeless and no
  * flat field, and returns zeros. One transaction, which is fine for the dev
