@@ -25,22 +25,41 @@ export const LIST_LOCKED_MESSAGE = "This order is locked for production.";
 
 // The order's live items, in index order. Callers that display them sort by
 // `createdAt` (via `summarize`): migrated rows have a fresh `_creationTime`.
+// Since R2-02 a captain removes a player by removing its entry alone, so an
+// item under a removed entry is hidden here too, or the admin export, counts
+// and closure email would still count that player's jerseys. Unlinked rows
+// (no `rosterEntryId`) are kept: this reader still owns them until R2-03.
 export async function loadItems(
   ctx: Ctx,
   orderId: Id<"orders">,
 ): Promise<Doc<"orderItems">[]> {
+  const removedEntries = new Set<Id<"rosterEntries">>(
+    (
+      await ctx.db
+        .query("rosterEntries")
+        .withIndex("by_order", (q) => q.eq("orderId", orderId))
+        .collect()
+    )
+      .filter((entry) => entry.removedAt !== undefined)
+      .map((entry) => entry._id),
+  );
   const rows = await ctx.db
     .query("orderItems")
     .withIndex("by_order", (q) => q.eq("orderId", orderId))
     .collect();
-  return rows.filter((row) => row.removedAt === undefined);
+  return rows.filter(
+    (row) =>
+      row.removedAt === undefined &&
+      (row.rosterEntryId === undefined ||
+        !removedEntries.has(row.rosterEntryId)),
+  );
 }
 
 // ── Roster entries (0004 phase 1b, R2-01) ───────────────────────────────────
 // A roster entry is a player; its size lines are `orderItems` pointing at it.
 // Both are soft-deleted, and an item under a removed entry is hidden too.
-// `loadRoster` is the only `by_order` reader of `rosterEntries`, and (with
-// `loadItems` and `hasAnyItem` until R2-03 retires them) of `orderItems`.
+// `loadRoster` is the only `by_order` reader of `rosterEntries` and
+// `orderItems`, except `loadItems` and `hasAnyItem` until R2-03 retires them.
 // Design: docs/architecture/0004-roster-sizes.md.
 
 // The order's live entries, plus the live items whose entry is live. Items
