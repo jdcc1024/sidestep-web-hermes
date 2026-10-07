@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,7 +14,12 @@ import {
   EMAIL_PATTERN,
   MAX_QTY,
   SUBMITTER_NAME_MAX_LENGTH,
+  addOneSize,
+  cardJerseyCount,
+  cardToLines,
+  removeOneSize,
 } from "@/lib/orderEntry";
+import type { CardSizes } from "@/lib/orderEntry";
 import {
   ROSTER_NAME_MAX_LENGTH,
   ROSTER_NUMBER_MAX_LENGTH,
@@ -43,7 +48,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -107,13 +111,20 @@ export function PublicOrderForm({
   );
 }
 
+// Fixed mode: one line per (roster slot × size) the fan has tapped.
 type LineValues = {
   designId: string;
-  name: string;
-  number: string;
   rosterEntryId: string;
   size: string;
   qty: string;
+};
+
+// Open mode: one card per name + number, with a count per size (R2-05).
+type CardValues = {
+  designId: string;
+  name: string;
+  number: string;
+  sizes: CardSizes;
 };
 
 type FormValues = {
@@ -121,19 +132,32 @@ type FormValues = {
   submitterEmail: string;
   customAnswers: Record<string, string>;
   lines: LineValues[];
+  cards: CardValues[];
 };
 
-function emptyLine(designs: PublicDesign[]): LineValues {
+function emptyCard(designs: PublicDesign[]): CardValues {
   return {
     // A single-design order collapses the picker — preselect that design
     // so the fan never has to choose.
     designId: designs.length === 1 ? designs[0]._id : "",
     name: "",
     number: "",
-    rosterEntryId: "",
-    size: "",
-    qty: "1",
+    sizes: {},
   };
+}
+
+// A card expands to one submitOrder line per (size, qty). Validation already
+// ran `cardToLines` on every card, so the failure branch is unreachable.
+function cardSubmitLines(card: CardValues, sizeOptions: string[]) {
+  const lines = cardToLines(card, sortSizes(sizeOptions));
+  if (!lines.ok) return [];
+  return lines.value.map((line) => ({
+    designId: line.designId as Id<"designs">,
+    name: line.name.trim() || undefined,
+    number: line.number.trim() || undefined,
+    size: line.size,
+    qty: line.qty,
+  }));
 }
 
 // Schema depends on the run (sizeOptions, namesMode) and the order's
@@ -169,20 +193,34 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
           "That doesn't look like an email.",
         ),
       customAnswers: z.record(z.string(), z.string()),
-      lines: z
-        .array(
-          z.object({
-            designId: z.string(),
-            name: z.string(),
-            number: z.string(),
-            rosterEntryId: z.string(),
-            size: z.string(),
-            qty: z.string(),
-          }),
-        )
-        .min(1, "Add at least one jersey."),
+      lines: z.array(
+        z.object({
+          designId: z.string(),
+          rosterEntryId: z.string(),
+          size: z.string(),
+          qty: z.string(),
+        }),
+      ),
+      cards: z.array(
+        z.object({
+          designId: z.string(),
+          name: z.string(),
+          number: z.string(),
+          sizes: z.record(z.string(), z.number()),
+        }),
+      ),
     })
     .superRefine((data, ctx) => {
+      // Each mode fills its own array; the other stays empty.
+      const filled = run.namesMode === "fixed" ? data.lines : data.cards;
+      if (filled.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: [run.namesMode === "fixed" ? "lines" : "cards"],
+          message: "Add at least one jersey.",
+        });
+      }
+
       data.lines.forEach((line, i) => {
         if (!designIds.has(line.designId)) {
           ctx.addIssue({
@@ -192,11 +230,12 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
           });
         }
 
+        // Grid taps only offer sizeOptions, so this guards stale state only.
         if (!run.sizeOptions.includes(line.size)) {
           ctx.addIssue({
             code: "custom",
             path: ["lines", i, "size"],
-            message: "Pick a size.",
+            message: "That size isn't on this form.",
           });
         }
 
@@ -215,30 +254,49 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
           });
         }
 
-        if (run.namesMode === "fixed") {
-          const slots = rosterByDesign.get(line.designId);
-          if (!line.rosterEntryId || !slots?.has(line.rosterEntryId)) {
-            ctx.addIssue({
-              code: "custom",
-              path: ["lines", i, "rosterEntryId"],
-              message: "Pick a name from the list.",
-            });
-          }
-        } else {
-          if (line.name.trim().length > ROSTER_NAME_MAX_LENGTH) {
-            ctx.addIssue({
-              code: "custom",
-              path: ["lines", i, "name"],
-              message: `Keep the name under ${ROSTER_NAME_MAX_LENGTH} characters.`,
-            });
-          }
-          if (line.number.trim().length > ROSTER_NUMBER_MAX_LENGTH) {
-            ctx.addIssue({
-              code: "custom",
-              path: ["lines", i, "number"],
-              message: `Keep the number under ${ROSTER_NUMBER_MAX_LENGTH} characters.`,
-            });
-          }
+        const slots = rosterByDesign.get(line.designId);
+        if (!line.rosterEntryId || !slots?.has(line.rosterEntryId)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["lines", i, "rosterEntryId"],
+            message: "Pick a name from the list.",
+          });
+        }
+      });
+
+      data.cards.forEach((card, i) => {
+        if (!designIds.has(card.designId)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["cards", i, "designId"],
+            message: "Pick a design.",
+          });
+        }
+
+        // The rule submit expands the card with, so a valid card always
+        // yields lines.
+        const lines = cardToLines(card, run.sizeOptions);
+        if (!lines.ok) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["cards", i, "sizes"],
+            message: lines.error,
+          });
+        }
+
+        if (card.name.trim().length > ROSTER_NAME_MAX_LENGTH) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["cards", i, "name"],
+            message: `Keep the name under ${ROSTER_NAME_MAX_LENGTH} characters.`,
+          });
+        }
+        if (card.number.trim().length > ROSTER_NUMBER_MAX_LENGTH) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["cards", i, "number"],
+            message: `Keep the number under ${ROSTER_NUMBER_MAX_LENGTH} characters.`,
+          });
         }
       });
 
@@ -289,21 +347,25 @@ function PublicOrderFormBody({
       submitterEmail: "",
       customAnswers: emptyCustomAnswers,
       // Fixed mode builds its lines from the roster grid (starts empty);
-      // open mode seeds one blank line for the fan to fill in.
-      lines: run.namesMode === "fixed" ? [] : [emptyLine(designs)],
+      // open mode seeds one blank card for the fan to fill in.
+      lines: [],
+      cards: run.namesMode === "fixed" ? [] : [emptyCard(designs)],
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { append, remove, update } = useFieldArray({
     control: form.control,
     name: "lines",
   });
+  const cards = useFieldArray({ control: form.control, name: "cards" });
 
   // Fixed mode reads live line quantities to render its per-slot counters
   // and the header tally. Each (roster slot × size) the fan picks is one
   // line; clicking a size bumps that line's qty, decrementing trims it.
   const watchedLines =
     useWatch({ control: form.control, name: "lines" }) ?? [];
+  const watchedCards =
+    useWatch({ control: form.control, name: "cards" }) ?? [];
 
   function addSize(
     designId: string,
@@ -315,7 +377,7 @@ function PublicOrderFormBody({
       (l) => l.rosterEntryId === rosterEntryId && l.size === size,
     );
     if (idx === -1) {
-      append({ designId, name: "", number: "", rosterEntryId, size, qty: "1" });
+      append({ designId, rosterEntryId, size, qty: "1" });
     } else {
       const cur = Number.parseInt(lines[idx].qty, 10) || 0;
       if (cur < MAX_QTY) update(idx, { ...lines[idx], qty: String(cur + 1) });
@@ -343,24 +405,17 @@ function PublicOrderFormBody({
         submitterName: values.submitterName.trim(),
         submitterEmail: values.submitterEmail.trim(),
         customAnswers: values.customAnswers,
-        lines: values.lines.map((line) => {
-          const qty = Number.parseInt(line.qty.trim(), 10);
-          if (run.namesMode === "fixed") {
-            return {
-              designId: line.designId as Id<"designs">,
-              rosterEntryId: line.rosterEntryId as Id<"rosterEntries">,
-              size: line.size,
-              qty,
-            };
-          }
-          return {
-            designId: line.designId as Id<"designs">,
-            name: line.name.trim() || undefined,
-            number: line.number.trim() || undefined,
-            size: line.size,
-            qty,
-          };
-        }),
+        lines:
+          run.namesMode === "fixed"
+            ? values.lines.map((line) => ({
+                designId: line.designId as Id<"designs">,
+                rosterEntryId: line.rosterEntryId as Id<"rosterEntries">,
+                size: line.size,
+                qty: Number.parseInt(line.qty.trim(), 10),
+              }))
+            : values.cards.flatMap((card) =>
+                cardSubmitLines(card, run.sizeOptions),
+              ),
       });
       setSubmitted(true);
     } catch (err) {
@@ -379,8 +434,8 @@ function PublicOrderFormBody({
     // always carries a chosen name, so it skips this.
     if (
       run.namesMode === "open" &&
-      values.lines.some(
-        (l) => l.name.trim().length === 0 && l.number.trim().length === 0,
+      values.cards.some(
+        (c) => c.name.trim().length === 0 && c.number.trim().length === 0,
       )
     ) {
       setConfirming(values);
@@ -393,18 +448,20 @@ function PublicOrderFormBody({
 
   const busy = pending || form.formState.isSubmitting;
   const customAnswersError = form.formState.errors.customAnswers?.message;
-  const linesError = form.formState.errors.lines?.message;
+  const linesError =
+    form.formState.errors.lines?.message ??
+    form.formState.errors.cards?.message;
   const singleDesign = designs.length === 1;
 
-  // Open mode counts line cards; fixed mode counts total jerseys (Σ qty
-  // across the slots the fan has picked) since one slot can take several.
+  // Both modes count jerseys (Σ qty): a roster slot or a card can each take
+  // several sizes.
   const jerseyCount =
     run.namesMode === "fixed"
       ? watchedLines.reduce(
           (sum, l) => sum + (Number.parseInt(l.qty, 10) || 0),
           0,
         )
-      : fields.length;
+      : watchedCards.reduce((sum, c) => sum + cardJerseyCount(c.sizes), 0);
 
   return (
     <>
@@ -479,7 +536,7 @@ function PublicOrderFormBody({
               />
             ) : (
               <>
-                {fields.map((fieldItem, index) => (
+                {cards.fields.map((fieldItem, index) => (
                   <JerseyLine
                     key={fieldItem.id}
                     control={form.control}
@@ -487,18 +544,18 @@ function PublicOrderFormBody({
                     designs={designs}
                     run={run}
                     singleDesign={singleDesign}
-                    removable={fields.length > 1}
-                    onRemove={() => remove(index)}
+                    removable={cards.fields.length > 1}
+                    onRemove={() => cards.remove(index)}
                   />
                 ))}
 
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => append(emptyLine(designs))}
+                  onClick={() => cards.append(emptyCard(designs))}
                 >
                   <PlusIcon aria-hidden className="h-4 w-4" />
-                  Add another jersey
+                  Add a different name or number
                 </Button>
               </>
             )}
@@ -577,9 +634,9 @@ function PublicOrderFormBody({
   );
 }
 
-// One open-mode jersey line: design (when the order has more than one),
-// free-text name/number, size, and quantity. Fixed-mode runs render the
-// roster grid (below) instead of these cards.
+// One open-mode jersey card: design (when the order has more than one),
+// free-text name/number, and a counter per size (R2-05). Fixed-mode runs
+// render the roster grid (below) instead of these cards.
 function JerseyLine({
   control,
   index,
@@ -598,6 +655,7 @@ function JerseyLine({
   onRemove: () => void;
 }) {
   const sizes = useMemo(() => sortSizes(run.sizeOptions), [run.sizeOptions]);
+  const sizesLabelId = useId();
 
   return (
     <fieldset
@@ -625,7 +683,7 @@ function JerseyLine({
       {!singleDesign && (
         <FormField
           control={control}
-          name={`lines.${index}.designId`}
+          name={`cards.${index}.designId`}
           render={({ field }) => (
             <FormItem>
               <FormLabel>
@@ -658,7 +716,7 @@ function JerseyLine({
       <div className="grid gap-5 sm:grid-cols-[1fr_140px]">
         <FormField
           control={control}
-          name={`lines.${index}.name`}
+          name={`cards.${index}.name`}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Name on jersey</FormLabel>
@@ -672,7 +730,7 @@ function JerseyLine({
         />
         <FormField
           control={control}
-          name={`lines.${index}.number`}
+          name={`cards.${index}.number`}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Number</FormLabel>
@@ -692,41 +750,37 @@ function JerseyLine({
 
       <FormField
         control={control}
-        name={`lines.${index}.size`}
+        name={`cards.${index}.sizes`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel>
-              Size
+            <FormLabel id={sizesLabelId}>
+              Sizes
               <RequiredMark />
             </FormLabel>
             <FormControl>
-              <RadioGroup
-                value={field.value}
-                onValueChange={(value) => field.onChange(value)}
+              <div
+                role="group"
+                aria-labelledby={sizesLabelId}
                 className="flex flex-wrap gap-2"
               >
                 {sizes.map((size) => (
-                  <SizeOption key={size} value={size} />
+                  <SizeCounter
+                    key={size}
+                    size={size}
+                    qty={field.value[size] ?? 0}
+                    max={MAX_QTY}
+                    onAdd={() => field.onChange(addOneSize(field.value, size))}
+                    onRemove={() =>
+                      field.onChange(removeOneSize(field.value, size))
+                    }
+                  />
                 ))}
-              </RadioGroup>
+              </div>
             </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={control}
-        name={`lines.${index}.qty`}
-        render={({ field }) => (
-          <FormItem className="sm:max-w-[140px]">
-            <FormLabel>
-              Quantity
-              <RequiredMark />
-            </FormLabel>
-            <FormControl>
-              <Input type="number" inputMode="numeric" min={1} {...field} />
-            </FormControl>
+            <FormDescription>
+              Tap a size once for each jersey you want with this name and
+              number.
+            </FormDescription>
             <FormMessage />
           </FormItem>
         )}
@@ -829,15 +883,6 @@ function RosterGrid({
         </fieldset>
       ))}
     </div>
-  );
-}
-
-function SizeOption({ value }: { value: string }) {
-  return (
-    <label className="flex cursor-pointer items-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:border-ring has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/10 has-[[data-checked]]:text-primary">
-      <RadioGroupItem value={value} className="sr-only" />
-      {value}
-    </label>
   );
 }
 
