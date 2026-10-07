@@ -88,11 +88,20 @@ export const run = internalMutation({
       createdAt: now,
     });
 
-    const orderItemId = await ctx.db.insert("orderItems", {
+    const rosterEntryId = await ctx.db.insert("rosterEntries", {
       orderId,
       designId,
       name: "Gretzky",
       number: "99",
+      designation: "C",
+      source: "fan",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const orderItemId = await ctx.db.insert("orderItems", {
+      orderId,
+      rosterEntryId,
       size: "L",
       qty: 2,
       source: "fan",
@@ -121,6 +130,7 @@ export const run = internalMutation({
         : {}),
       order: await ctx.db.get(orderId),
       run: await ctx.db.get(orderFormId),
+      rosterEntry: await ctx.db.get(rosterEntryId),
       orderItem: await ctx.db.get(orderItemId),
       intake: await ctx.db.get(intakeId),
     };
@@ -136,6 +146,7 @@ export const run = internalMutation({
     }
 
     await ctx.db.delete(orderItemId);
+    await ctx.db.delete(rosterEntryId);
     await ctx.db.delete(orderFormId);
     await ctx.db.delete(orderId);
     if (designAssetId) await ctx.db.delete(designAssetId);
