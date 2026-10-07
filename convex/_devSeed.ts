@@ -3,7 +3,12 @@ import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { prepareBlocks } from "./_designBlocks";
-import { hasAnyItem, loadItems } from "./_orderItems";
+import {
+  hasAnyPlayer,
+  insertSizeLine,
+  loadRoster,
+  resolveEntry,
+} from "./_orderItems";
 import { overviewBlocks } from "../lib/designBlock";
 
 /**
@@ -16,11 +21,12 @@ import { overviewBlocks } from "../lib/designBlock";
  * captain-side UI it shipped.
  *
  * This seeds the smallest set of rows that makes those surfaces photographable:
- * two designs, an order **with** a live run (order items, players and a spare,
- * so the C-01/C-02 breakdown views have something to group) and an order
- * **with no run at all** (two captain items, one Needs size), which is the
- * only way to photograph B-04's `NoRunYet` branch. Since L-02 every row is an
- * `orderItems` row; the legacy roster/order entry tables are never written.
+ * two designs, an order **with** a live run (players with size lines, and a
+ * spare, so the C-01/C-02 breakdown views have something to group) and an
+ * order **with no run at all** (two captain players, one who needs sizes),
+ * which is the only way to photograph B-04's `NoRunYet` branch. Since R2-03
+ * every player is a `rosterEntries` row and each of its sizes an `orderItems`
+ * size line under it.
  *
  * Run against the dev deployment with:
  *   npx convex run _devSeed:seedPortalFixtures '{"email":"jcc@sidestep.design"}'
@@ -109,7 +115,7 @@ export const seedPortalFixtures = internalMutation({
       await ensureRun(ctx, user._id, orderWithRunId, now),
     );
     track(
-      await ensureItems(ctx, orderWithRunId, designIds, orderFormId, RUN_ORDER_ITEMS, now),
+      await ensureItems(ctx, orderWithRunId, designIds, orderFormId, RUN_ORDER_ITEMS),
     );
     track(
       await ensureItems(
@@ -118,7 +124,6 @@ export const seedPortalFixtures = internalMutation({
         [homeKit],
         null,
         NO_RUN_ORDER_ITEMS,
-        now,
       ),
     );
 
@@ -141,13 +146,13 @@ export const seedPortalFixtures = internalMutation({
  * preview exists for the opposite case — a captain adds fifteen players and
  * needs to see that it saved — and its overflow cap can only be judged
  * against a card that actually overflows. This tops the home kit up to
- * fifteen named items, the added ones Needs size so they render muted.
+ * fifteen named players, the added ones with no sizes so they render muted.
  *
  * Run against the dev deployment with:
  *   npx convex run _devSeed:seedLargeRoster '{"email":"jcc@sidestep.design"}'
  *
  * Idempotent: it tops up to `size` and stops, so re-running adds nothing. It
- * only ever *adds* captain items — nothing existing is edited or removed.
+ * only ever *adds* captain players — nothing existing is edited or removed.
  */
 const PREVIEW_ROSTER_SIZE = 15;
 
@@ -196,28 +201,25 @@ export const seedLargeRoster = internalMutation({
     const designId = order.designIds[0];
     if (!designId) throw new ConvexError("That order has no designs.");
 
-    const existing = (await loadItems(ctx, order._id)).filter(
-      (i) => i.designId === designId && i.name !== undefined,
+    const { entries } = await loadRoster(ctx, order._id);
+    const existing = entries.filter(
+      (e) => e.designId === designId && e.name !== undefined,
     );
 
-    const now = Date.now();
-    const taken = new Set(existing.map((i) => i.name));
-    const added: Id<"orderItems">[] = [];
+    const taken = new Set(existing.map((e) => e.name));
+    const added: Id<"rosterEntries">[] = [];
     for (const name of PADDING_PLAYERS) {
       if (existing.length + added.length >= target) break;
       if (taken.has(name)) continue;
-      added.push(
-        await ctx.db.insert("orderItems", {
-          orderId: order._id,
-          designId,
-          name,
-          number: `${30 + added.length}`,
-          qty: 1,
-          source: "captain",
-          createdAt: now + added.length,
-          updatedAt: now + added.length,
-        }),
+      // A player with no size lines: "Needs sizes".
+      const { entry } = await resolveEntry(
+        ctx,
+        order,
+        designId,
+        { name, number: `${30 + added.length}` },
+        { entries },
       );
+      added.push(entry._id);
     }
 
     return {
@@ -506,39 +508,46 @@ const NO_RUN_ORDER_ITEMS: ItemFixture[] = [
 ];
 
 // All-or-nothing per order: topping up a list a human has been editing (or
-// re-adding items they removed) would be worse than leaving it alone.
+// re-adding players they removed) would be worse than leaving it alone. Each
+// fixture row is a player (through `resolveEntry`, so rows sharing a name +
+// number land on one) plus, when it has a size, one size line under it; a
+// sizeless row is a player who needs sizes.
 async function ensureItems(
   ctx: MutationCtx,
   orderId: Id<"orders">,
   designIds: Id<"designs">[],
   orderFormId: Id<"orderForms"> | null,
   fixture: readonly ItemFixture[],
-  now: number,
 ): Promise<Ensured<null>> {
-  if (await hasAnyItem(ctx, orderId)) return { value: null, inserted: false };
+  if (await hasAnyPlayer(ctx, orderId)) return { value: null, inserted: false };
+  const order = await ctx.db.get(orderId);
+  if (!order) throw new ConvexError("That order is gone.");
 
-  for (const [i, item] of fixture.entries()) {
-    await ctx.db.insert("orderItems", {
-      orderId,
-      designId: designIds[item.designIndex] ?? designIds[0],
-      name: item.name,
-      number: item.number,
-      designation: item.designation,
+  const { entries } = await loadRoster(ctx, orderId);
+  for (const item of fixture) {
+    const { entry } = await resolveEntry(
+      ctx,
+      order,
+      designIds[item.designIndex] ?? designIds[0],
+      { name: item.name, number: item.number, designation: item.designation },
+      { source: item.source, entries },
+    );
+    if (item.size === undefined) continue;
+    await insertSizeLine(ctx, entry, {
       size: item.size,
       qty: item.qty,
       source: item.source,
-      ...(item.submitter && orderFormId
-        ? {
-            submitterName: item.submitter.name,
-            // Stored trim+lowercase, matching checkSubmitterEmail — the by-fan
-            // grouping keys on this exact value.
-            submitterEmail: item.submitter.email.trim().toLowerCase(),
-            customAnswers: { "q-shorts": item.submitter.shorts },
-            orderFormId,
-          }
-        : {}),
-      createdAt: now + i,
-      updatedAt: now + i,
+      submission:
+        item.submitter && orderFormId
+          ? {
+              submitterName: item.submitter.name,
+              // Stored trim+lowercase, matching checkSubmitterEmail — the
+              // by-fan grouping keys on this exact value.
+              submitterEmail: item.submitter.email.trim().toLowerCase(),
+              customAnswers: { "q-shorts": item.submitter.shorts },
+              orderFormId,
+            }
+          : undefined,
     });
   }
   return { value: null, inserted: true };

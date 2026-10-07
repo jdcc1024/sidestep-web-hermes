@@ -1,10 +1,13 @@
-// Server helpers for the order list (initiative 0004, L-01). Underscored, so
+// Server helpers for the order list (initiative 0004). Underscored, so
 // nothing here is a Convex function: these are the shared reads and the write
-// guard behind `convex/orderItems.ts` (and, from L-02, the public form).
+// guard behind `convex/rosterEntries.ts`, `convex/orderItems.ts` and the
+// public form.
 //
-// Items are soft-deleted (`removedAt`), so every reader must skip removed rows.
-// To make that impossible to forget, `loadItems` is the only place that reads
-// `orderItems` by `by_order`.
+// A roster entry is a player; its size lines are `orderItems` pointing at it
+// (0004 phase 1b). Both are soft-deleted, and an item under a removed entry is
+// hidden too. To make that impossible to forget, this module is the only
+// place that reads either table by `by_order` (invariant 4): readers go
+// through `loadRoster`. Design: docs/architecture/0004-roster-sizes.md.
 
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -14,7 +17,6 @@ import {
   isListConfirmed,
   listPlayerProblems,
   needsSizesMessage,
-  summarize,
   summarizeRoster,
 } from "../lib/orderItem";
 import { playerKey } from "../lib/rosterEntry/rules";
@@ -23,48 +25,7 @@ type Ctx = QueryCtx | MutationCtx;
 
 export const LIST_LOCKED_MESSAGE = "This order is locked for production.";
 
-// The order's live items, in index order. Callers that display them sort by
-// `createdAt` (via `summarize`): migrated rows have a fresh `_creationTime`.
-// Since R2-02 a captain removes a player by removing its entry alone, so an
-// item under a removed entry is hidden here too, or the admin export, counts
-// and closure email would still count that player's jerseys. Unlinked rows
-// (no `rosterEntryId`) are kept: this reader still owns them until R2-03.
-export async function loadItems(
-  ctx: Ctx,
-  orderId: Id<"orders">,
-): Promise<Doc<"orderItems">[]> {
-  const removedEntries = new Set<Id<"rosterEntries">>(
-    (
-      await ctx.db
-        .query("rosterEntries")
-        .withIndex("by_order", (q) => q.eq("orderId", orderId))
-        .collect()
-    )
-      .filter((entry) => entry.removedAt !== undefined)
-      .map((entry) => entry._id),
-  );
-  const rows = await ctx.db
-    .query("orderItems")
-    .withIndex("by_order", (q) => q.eq("orderId", orderId))
-    .collect();
-  return rows.filter(
-    (row) =>
-      row.removedAt === undefined &&
-      (row.rosterEntryId === undefined ||
-        !removedEntries.has(row.rosterEntryId)),
-  );
-}
-
-// ── Roster entries (0004 phase 1b, R2-01) ───────────────────────────────────
-// A roster entry is a player; its size lines are `orderItems` pointing at it.
-// Both are soft-deleted, and an item under a removed entry is hidden too.
-// `loadRoster` is the only `by_order` reader of `rosterEntries` and
-// `orderItems`, except `loadItems` and `hasAnyItem` until R2-03 retires them.
-// Design: docs/architecture/0004-roster-sizes.md.
-
-// The order's live entries, plus the live items whose entry is live. Items
-// without `rosterEntryId` (phase-1 rows the migration hasn't linked yet) are
-// left out: the old readers still own them.
+// The order's live entries, plus the live size lines whose entry is live.
 export async function loadRoster(
   ctx: Ctx,
   orderId: Id<"orders">,
@@ -84,6 +45,10 @@ export async function loadRoster(
   ).filter(
     (item) =>
       item.removedAt === undefined &&
+      // Until the schema narrows, a legacy unlinked or sizeless row may still
+      // exist; `_migrations:stripFlatItemFields` removes them. Neither is a
+      // jersey.
+      item.size !== undefined &&
       item.rosterEntryId !== undefined &&
       liveIds.has(item.rosterEntryId),
   );
@@ -91,7 +56,7 @@ export async function loadRoster(
 }
 
 // One entry's items, removed ones included (the caller filters): what moves
-// on a merge or a restore-into-a-live-twin, and what the mirror re-copies.
+// on a merge or a restore-into-a-live-twin.
 export async function loadEntryItems(
   ctx: Ctx,
   entryId: Id<"rosterEntries">,
@@ -164,36 +129,10 @@ export async function resolveEntry(
   return { entry, matched: false };
 }
 
-// Mirror window (R2-01 → R2-03): an item still carries the flat design /
-// name / number / letter the phase-1 readers show. Every new item copies them
-// from its entry (`insertSizeLine`), and this re-copies them onto all of an
-// entry's items after a rename, a letter change or a merge. Only those four
-// fields: never the size, qty or submitter. Deleted in R2-03.
-export async function mirrorEntryOntoItems(
-  ctx: MutationCtx,
-  entry: Doc<"rosterEntries">,
-): Promise<void> {
-  for (const item of await loadEntryItems(ctx, entry._id)) {
-    if (
-      item.designId === entry.designId &&
-      item.name === entry.name &&
-      item.number === entry.number &&
-      item.designation === entry.designation
-    )
-      continue;
-    await ctx.db.patch(item._id, {
-      designId: entry.designId,
-      name: entry.name,
-      number: entry.number,
-      designation: entry.designation,
-    });
-  }
-}
-
-// Inserts one size line under `entry`, with the entry's values mirrored onto
-// it (see above). Size and qty must already be checked. Only the public form
-// passes a submission (who sent it, their answers, the form): a captain's
-// line has none.
+// Inserts one size line under `entry`. The printed values stay on the entry.
+// Size and qty must already be checked. Only the public form passes a
+// submission (who sent it, their answers, the form): a captain's line has
+// none.
 export async function insertSizeLine(
   ctx: MutationCtx,
   entry: Doc<"rosterEntries">,
@@ -212,10 +151,6 @@ export async function insertSizeLine(
   return ctx.db.insert("orderItems", {
     orderId: entry.orderId,
     rosterEntryId: entry._id,
-    designId: entry.designId,
-    name: entry.name,
-    number: entry.number,
-    designation: entry.designation,
     size: line.size,
     qty: line.qty,
     source: line.source,
@@ -234,18 +169,37 @@ export function requireDesignOnOrder(
     throw new ConvexError("That design isn't part of this order.");
 }
 
-// Whether the order has any item at all, removed ones included. Only the
-// "already done?" checks need this (the dev fixtures);
-// everything else wants live items.
-export async function hasAnyItem(
+// Whether the order has any player at all, removed ones included (every item
+// hangs off an entry, so this covers items too). Only the "already done?"
+// checks need this (the dev fixtures); everything else wants live players.
+export async function hasAnyPlayer(
   ctx: Ctx,
   orderId: Id<"orders">,
 ): Promise<boolean> {
   const first = await ctx.db
-    .query("orderItems")
+    .query("rosterEntries")
     .withIndex("by_order", (q) => q.eq("orderId", orderId))
     .first();
   return first !== null;
+}
+
+// Hard-deletes every entry and item on the order, removed ones included, and
+// returns how many rows went. Test fixtures only (`_e2e.cleanup`): the app
+// itself never hard-deletes a player or a size line.
+export async function deleteOrderRoster(
+  ctx: MutationCtx,
+  orderId: Id<"orders">,
+): Promise<number> {
+  const items = await ctx.db
+    .query("orderItems")
+    .withIndex("by_order", (q) => q.eq("orderId", orderId))
+    .collect();
+  const entries = await ctx.db
+    .query("rosterEntries")
+    .withIndex("by_order", (q) => q.eq("orderId", orderId))
+    .collect();
+  for (const row of [...items, ...entries]) await ctx.db.delete(row._id);
+  return items.length + entries.length;
 }
 
 // The order form (a jersey run), if the captain has made one. 0..1 per order.
@@ -259,33 +213,6 @@ export async function loadOrderForm(
     .unique();
 }
 
-// The order's live items run through the single read model (`summarize`),
-// with the titles and names mode it needs. Every count of an order — the
-// captain's list, the admin page and export, the closure email — comes from
-// here, so they can't disagree. `items` is returned
-// too for callers that need the raw rows alongside the summary.
-export async function summarizeOrder(ctx: Ctx, order: Doc<"orders">) {
-  const items = await loadItems(ctx, order._id);
-  const form = await loadOrderForm(ctx, order._id);
-
-  // Titles for the linked designs and for any unlinked design that still
-  // has items on it, so "removed designs" can name them.
-  const designIds = new Set<Id<"designs">>(order.designIds);
-  for (const item of items) designIds.add(item.designId);
-  const titles: Record<string, string> = {};
-  for (const designId of designIds) {
-    const design = await ctx.db.get(designId);
-    titles[designId] = design?.title ?? "Deleted design";
-  }
-
-  const summary = summarize(items, {
-    designIds: order.designIds,
-    titles,
-    namesMode: form?.namesMode ?? null,
-  });
-  return { items, form, summary };
-}
-
 // The one lock predicate for the list (L-06, Q1 = A): JCC has checked the
 // order's "Order Size Confirmed" stage. The order form's deadline plays no
 // part. Async and ctx-taking although today's rule only reads the order, so
@@ -297,10 +224,11 @@ export async function isListLocked(
   return isListConfirmed(order);
 }
 
-// The order's players through the roster read model (`summarizeRoster`,
-// R2-01), with the titles it needs. The captain's list and the confirm gate
-// read this. Titles cover the linked designs and any unlinked design that
-// still has a player, so "removed designs" can name them.
+// The order's players through the single read model (`summarizeRoster`),
+// with the titles it needs. Every count of an order (the captain's list, the
+// confirm gate, the admin page and export, the closure email) comes from
+// here, so they can't disagree. Titles cover the linked designs and any
+// unlinked design that still has a player, so "removed designs" can name them.
 export async function summarizeRosterOrder(ctx: Ctx, order: Doc<"orders">) {
   const { entries, items } = await loadRoster(ctx, order._id);
   const form = await loadOrderForm(ctx, order._id);

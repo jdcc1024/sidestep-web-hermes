@@ -19,7 +19,6 @@ import {
   insertSizeLine,
   loadEntryItems,
   loadRoster,
-  mirrorEntryOntoItems,
   requireDesignOnOrder,
   requireListWriter,
   resolveEntry,
@@ -119,8 +118,8 @@ async function designTitle(ctx: MutationCtx, designId: Id<"designs">) {
   return (await ctx.db.get(designId))?.title ?? "this design";
 }
 
-// Moves `from`'s live items under `into` (patching `rosterEntryId` and the
-// mirrored flat values only, never a submitter), then soft-removes `from`.
+// Moves `from`'s live items under `into` (patching `rosterEntryId` only,
+// never a submitter), then soft-removes `from`.
 // Shared by rename-merge and restore-into-a-live-twin.
 async function mergeEntryInto(
   ctx: MutationCtx,
@@ -133,7 +132,6 @@ async function mergeEntryInto(
     if (item.removedAt !== undefined) continue;
     await ctx.db.patch(item._id, { rosterEntryId: into._id });
   }
-  await mirrorEntryOntoItems(ctx, into);
   if (from.removedAt === undefined)
     await ctx.db.patch(from._id, {
       removedAt: now,
@@ -207,7 +205,6 @@ export const add = mutation({
         updatedBy: user._id,
       });
       entry = (await ctx.db.get(entry._id))!;
-      await mirrorEntryOntoItems(ctx, entry);
     }
     for (const line of lines)
       await insertSizeLine(ctx, entry, {
@@ -330,7 +327,6 @@ export const update = mutation({
       updatedBy: user._id,
     });
     const updated = (await ctx.db.get(entryId))!;
-    await mirrorEntryOntoItems(ctx, updated);
     await removeIfEmptyBlank(ctx, updated, user._id);
     return { entryId, merged: false };
   },

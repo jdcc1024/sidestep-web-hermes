@@ -4,6 +4,7 @@ import {
   internalQuery,
   mutation,
   query,
+  type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
@@ -22,9 +23,8 @@ import { effectiveStatus } from "../lib/orderForm/lock";
 import {
   isListLocked,
   LIST_LOCKED_MESSAGE,
-  loadItems,
   loadRoster,
-  summarizeOrder,
+  summarizeRosterOrder,
 } from "./_orderItems";
 
 // Get the jersey run linked to one of the captain's orders. Returns null
@@ -271,32 +271,39 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// Issue 3-08 / R-07. Returns the jerseys the signed-in user has ordered
-// across every run — their own live, sized order items, matched by
-// normalized submitter email (the same lowercasing the submit path stores).
-// Each is joined with its run, the linked order's team name, its design
-// title, and its name/number, so the portal dashboard renders each jersey
-// card without a follow-up roundtrip. Skips orphaned items whose
-// run/order/design has been deleted — better to omit than leak a
-// half-populated card. Cached lookups keep this O(unique runs+designs)
-// rather than O(items). Newest first.
+// The signed-in caller's normalized email, or null.
+async function callerEmail(ctx: QueryCtx): Promise<string | null> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.email) return null;
+  const email = normalizeEmail(identity.email);
+  return email.length > 0 ? email : null;
+}
+
+// Issue 3-08 / R-07 / R2-03. Returns the jerseys the signed-in user has
+// ordered across every run: their own live size lines, matched by normalized
+// submitter email (the same lowercasing the submit path stores). Each is
+// joined with its player (name/number), its run, the linked order's team
+// name and its design title, so the portal dashboard renders each jersey
+// card without a follow-up roundtrip. Skips a removed line, a line under a
+// removed player, and orphans whose player/run/order has been deleted —
+// better to omit than leak a half-populated card. Cached lookups keep this
+// O(unique players+runs+designs) rather than O(items). Newest first.
 export const listMyResponses = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity?.email) return [];
-    const email = normalizeEmail(identity.email);
-    if (email.length === 0) return [];
+    const email = await callerEmail(ctx);
+    if (!email) return [];
 
-    // Not `loadItems` (that reads by order), so removed items are skipped
-    // here; so are Needs-size ones, since a jersey card shows its size.
+    // Not `loadRoster` (that reads by order), so removed lines and players
+    // are skipped here explicitly (invariant 4).
     const items = (
       await ctx.db
         .query("orderItems")
         .withIndex("by_submitterEmail", (q) => q.eq("submitterEmail", email))
         .collect()
-    ).filter((i) => i.removedAt === undefined && i.size !== undefined);
+    ).filter((i) => i.removedAt === undefined);
 
+    const playerCache = new Map<string, Doc<"rosterEntries"> | null>();
     const runCache = new Map<string, Doc<"orderForms"> | null>();
     const orderCache = new Map<string, Doc<"orders"> | null>();
     const designTitleCache = new Map<string, string>();
@@ -315,12 +322,25 @@ export const listMyResponses = query({
       teamName: string;
     }> = [];
 
-    for (const entry of items) {
-      if (entry.orderFormId === undefined || entry.size === undefined) continue;
-      let run = runCache.get(entry.orderFormId) ?? null;
-      if (!runCache.has(entry.orderFormId)) {
-        run = await ctx.db.get(entry.orderFormId);
-        runCache.set(entry.orderFormId, run);
+    for (const item of items) {
+      if (
+        item.orderFormId === undefined ||
+        item.rosterEntryId === undefined ||
+        item.size === undefined
+      )
+        continue;
+
+      let player = playerCache.get(item.rosterEntryId) ?? null;
+      if (!playerCache.has(item.rosterEntryId)) {
+        player = await ctx.db.get(item.rosterEntryId);
+        playerCache.set(item.rosterEntryId, player);
+      }
+      if (!player || player.removedAt !== undefined) continue;
+
+      let run = runCache.get(item.orderFormId) ?? null;
+      if (!runCache.has(item.orderFormId)) {
+        run = await ctx.db.get(item.orderFormId);
+        runCache.set(item.orderFormId, run);
       }
       if (!run) continue;
 
@@ -331,20 +351,22 @@ export const listMyResponses = query({
       }
       if (!order) continue;
 
-      if (!designTitleCache.has(entry.designId)) {
-        const design = await ctx.db.get(entry.designId);
-        designTitleCache.set(entry.designId, design?.title ?? "Untitled design");
+      if (!designTitleCache.has(player.designId)) {
+        const design = await ctx.db.get(player.designId);
+        designTitleCache.set(player.designId, design?.title ?? "Untitled design");
       }
 
+      // `entry` is the jersey card's shape (the item, with its player's
+      // printed values), kept from before players existed.
       joined.push({
         entry: {
-          _id: entry._id,
-          designTitle: designTitleCache.get(entry.designId)!,
-          name: entry.name,
-          number: entry.number,
-          size: entry.size,
-          qty: entry.qty,
-          createdAt: entry.createdAt,
+          _id: item._id,
+          designTitle: designTitleCache.get(player.designId)!,
+          name: player.name,
+          number: player.number,
+          size: item.size,
+          qty: item.qty,
+          createdAt: item.createdAt,
         },
         run,
         teamName: order.teamName,
@@ -359,7 +381,7 @@ export const listMyResponses = query({
 // order's live, sized items (a Needs-size player isn't a jersey yet), in
 // the entry shape the responses and admin run pages render; `_id` is the
 // item id. Each is enriched with its design title; name/number/letter come
-// off the item (blank/bulk jerseys carry none). Returns the run +
+// off its player (blank/bulk jerseys carry none). Returns the run +
 // linked order so the dashboard shows team name + deadline without a
 // follow-up query. Newest first — fresh submissions at the top. Throws on
 // access violation so the UI can show a 403; null if the run or order has
@@ -377,14 +399,19 @@ export const listOrderEntries = query({
     if (run.captainId !== user._id && !user.isAdmin)
       throw new ConvexError("You don't have access to this order form.");
 
-    const sized = (await loadItems(ctx, order._id)).flatMap((item) =>
-      item.size === undefined ? [] : [{ ...item, size: item.size }],
-    );
+    // Every live size line joined to its live player, on any design (a
+    // design since unlinked from the order still shows its jerseys here).
+    const roster = await loadRoster(ctx, order._id);
+    const players = new Map(roster.entries.map((e) => [e._id, e]));
+    const sized = roster.items.flatMap((item) => {
+      const player = players.get(item.rosterEntryId!);
+      return player ? [{ item, player }] : [];
+    });
 
     // Resolve each referenced design title once.
     const designTitles = new Map(
       await Promise.all(
-        [...new Set(sized.map((e) => e.designId))].map(
+        [...new Set(sized.map(({ player }) => player.designId))].map(
           async (id) =>
             [id, (await ctx.db.get(id))?.title ?? "Untitled design"] as const,
         ),
@@ -392,24 +419,24 @@ export const listOrderEntries = query({
     );
 
     const entries = sized
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .map((e) => ({
-        _id: e._id,
+      .sort((a, b) => b.item.createdAt - a.item.createdAt)
+      .map(({ item, player }) => ({
+        _id: item._id,
         // A captain's item has no sender; the views show a blank, as for a
         // legacy line with no name.
-        submitterName: e.submitterName ?? "",
-        submitterEmail: e.submitterEmail ?? "",
-        designId: e.designId,
-        designTitle: designTitles.get(e.designId) ?? "Untitled design",
-        name: e.name,
-        number: e.number,
+        submitterName: item.submitterName ?? "",
+        submitterEmail: item.submitterEmail ?? "",
+        designId: player.designId,
+        designTitle: designTitles.get(player.designId) ?? "Untitled design",
+        name: player.name,
+        number: player.number,
         // The by-roster view renders the letter beside the name (M-09).
-        designation: e.designation,
-        size: e.size,
-        qty: e.qty,
-        source: e.source,
-        customAnswers: e.customAnswers ?? {},
-        createdAt: e.createdAt,
+        designation: player.designation,
+        size: item.size!,
+        qty: item.qty,
+        source: item.source,
+        customAnswers: item.customAnswers ?? {},
+        createdAt: item.createdAt,
       }));
 
     return { run, order, entries };
@@ -447,7 +474,7 @@ export const _closeForm = internalMutation({
     if (!order || !captain) return null;
 
     // The order's production total, the same number the captain's list shows.
-    const { summary: list } = await summarizeOrder(ctx, order);
+    const { summary: list } = await summarizeRosterOrder(ctx, order);
 
     return {
       orderFormId,
@@ -456,7 +483,7 @@ export const _closeForm = internalMutation({
       captainEmail: captain.email,
       captainName: captain.name,
       deadline: run.deadline,
-      responseCount: list.summary.itemCount,
+      responseCount: list.summary.jerseyCount,
     };
   },
 });

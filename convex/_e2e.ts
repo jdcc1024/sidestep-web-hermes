@@ -3,7 +3,12 @@ import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { prepareBlocks } from "./_designBlocks";
-import { insertSizeLine, loadRoster, resolveEntry } from "./_orderItems";
+import {
+  deleteOrderRoster,
+  insertSizeLine,
+  loadRoster,
+  resolveEntry,
+} from "./_orderItems";
 import { overviewBlocks } from "../lib/designBlock";
 
 /**
@@ -179,10 +184,6 @@ export const cleanup = internalMutation({
       .withIndex("by_captain", (q) => q.eq("captainId", user._id))
       .collect();
     for (const order of userOrders.filter((o) => ours(o.teamName, o.createdAt))) {
-      const items = await ctx.db
-        .query("orderItems")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
-        .collect();
       const runs = await ctx.db
         .query("orderForms")
         .withIndex("by_order", (q) => q.eq("orderId", order._id))
@@ -191,14 +192,7 @@ export const cleanup = internalMutation({
         await ctx.db.delete(run._id);
         rows += 1;
       }
-      for (const item of items) await ctx.db.delete(item._id);
-      rows += items.length;
-      const entries = await ctx.db
-        .query("rosterEntries")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
-        .collect();
-      for (const entry of entries) await ctx.db.delete(entry._id);
-      rows += entries.length;
+      rows += await deleteOrderRoster(ctx, order._id);
       await ctx.db.delete(order._id);
       orders += 1;
     }

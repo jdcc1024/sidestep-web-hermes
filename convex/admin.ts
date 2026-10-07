@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { requireAdmin } from "./_auth";
 import { joinUsersById } from "./_users";
-import { confirmBlocker, summarizeOrder } from "./_orderItems";
+import { confirmBlocker, summarizeRosterOrder } from "./_orderItems";
 import { INTERNAL_STAGES } from "../lib/orderStages";
 import { isListConfirmed } from "../lib/orderItem/lock";
 import {
@@ -98,10 +98,13 @@ export const getOrder = query({
       })),
     );
 
-    // The order's production total (`summary.itemCount`): the same number
+    // The order's production total (`summary.jerseyCount`): the same number
     // the captain's list shows, with or without an order form.
-    const { form: orderForm, summary: list } = await summarizeOrder(ctx, order);
-    const orderFormResponseCount = list.summary.itemCount;
+    const { form: orderForm, summary: list } = await summarizeRosterOrder(
+      ctx,
+      order,
+    );
+    const orderFormResponseCount = list.summary.jerseyCount;
 
     return {
       order,
@@ -173,11 +176,12 @@ export const updateOrderStages = mutation({
 // downloading an empty file. CSV formatting lives in lib/orderExport.ts —
 // this query only joins.
 //
-// A row is one sized order item (one jersey line to produce), carrying its
-// name/number/letter and its design's silhouette specs (which live on the
-// design since O-01). Rows come from `summarize`, so Needs-size items,
-// removed items and items on designs the order no longer links are all
-// excluded, and Σ qty equals `summary.itemCount` (R-05, L-02).
+// A row is one live size line (one jersey line to produce), carrying its
+// player's name/number/letter, its own submitter, and its design's silhouette
+// specs (which live on the design since O-01). Rows come from
+// `summarizeRoster`, so players who need sizes, removed lines, removed
+// players and designs the order no longer links are all excluded, and Σ qty
+// equals `summary.jerseyCount` (R-05, R2-03).
 //
 // `hasRun` means "the rows are jerseys": true with an order form, and also
 // without one once the captain has sized items. Only an order with neither
@@ -214,14 +218,10 @@ export const exportOrder = query({
       orderDate: order.createdAt,
     };
 
-    const { form: run, summary: list } = await summarizeOrder(ctx, order);
-    // Linked-design order (the captain's arrangement), then oldest first
-    // within a design — `summarize` already sorts each design by createdAt.
-    const sized = list.designs.flatMap((d) =>
-      d.items.flatMap((item) =>
-        item.size === undefined ? [] : [{ ...item, size: item.size }],
-      ),
-    );
+    const { form: run, summary: list } = await summarizeRosterOrder(ctx, order);
+    // Linked-design order (the captain's arrangement), then players in list
+    // order with each one's lines oldest first, as `summarizeRoster` gives them.
+    const sized = list.designs.flatMap((d) => d.items);
 
     if (!run && sized.length === 0) {
       return {
@@ -533,8 +533,10 @@ export const listOrderForms = query({
         const order = orders.get(run.orderId);
         const captain = captains.get(run.captainId);
 
-        const list = order ? (await summarizeOrder(ctx, order)).summary : null;
-        const responseCount = list?.summary.itemCount ?? 0;
+        const list = order
+          ? (await summarizeRosterOrder(ctx, order)).summary
+          : null;
+        const responseCount = list?.summary.jerseyCount ?? 0;
 
         return {
           _id: run._id,

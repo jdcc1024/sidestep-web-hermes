@@ -6,7 +6,7 @@
 import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import { getCurrentUserOrNull, requireCurrentUser } from "./_auth";
-import { isListLocked, loadItems, summarizeRosterOrder } from "./_orderItems";
+import { isListLocked, loadRoster, summarizeRosterOrder } from "./_orderItems";
 import { submittersOf } from "../lib/orderItem";
 
 // The order's list as one read model: per-design players (with their size
@@ -49,8 +49,12 @@ export const affectedByDesignRemoval = query({
     if (order.captainId !== user._id && !user.isAdmin)
       throw new ConvexError("You don't have access to this order.");
 
-    const onDesign = (await loadItems(ctx, orderId)).filter(
-      (i) => i.designId === designId,
+    const { entries, items } = await loadRoster(ctx, orderId);
+    const playersOnDesign = new Set(
+      entries.filter((e) => e.designId === designId).map((e) => e._id),
+    );
+    const onDesign = items.filter((i) =>
+      playersOnDesign.has(i.rosterEntryId!),
     );
     return {
       itemCount: onDesign.reduce((sum, i) => sum + i.qty, 0),

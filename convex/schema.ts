@@ -89,20 +89,24 @@ export default defineSchema({
     .index("by_order", ["orderId"])
     .index("by_captain", ["captainId"]),
 
-  // One order list the captain owns (initiative 0004, L-01): an item is one
-  // jersey line on the order — design, optional name / number / letter, a size
-  // or none ("Needs size"), a qty. It replaced the R-01 player-slot and
-  // jersey-line tables, which L-06 retired. The parent is the order, so items exist
-  // before any order form; `orderFormId` only records which form a row came through.
-  // Soft-deleted via `removedAt`: read through `loadItems` in _orderItems.ts,
-  // the only `by_order` reader, which drops removed rows.
+  // A size line under a player (initiative 0004; phase 1b, R2-03): its roster
+  // entry, a size and a qty, plus who sent it. The printed values live on the
+  // entry. `orderId` is denormalised from the entry (immutable) so the order's
+  // lines are one `by_order` read; `orderFormId` only records which form a
+  // line came through. Soft-deleted via `removedAt`: read through `loadRoster`
+  // in _orderItems.ts, the only `by_order` reader, which drops removed lines
+  // and lines under a removed entry.
+  //
+  // Widened until `_migrations:stripFlatItemFields` has run: the phase-1 flat
+  // design / name / number / letter are still allowed (nothing reads or
+  // writes them), and `size` / `rosterEntryId` may be missing on a legacy row.
   orderItems: defineTable({
     orderId: v.id("orders"),
-    designId: v.id("designs"),
-    name: v.optional(v.string()), // absent = "No name"
-    number: v.optional(v.string()), // text: "01" ≠ "1"
+    designId: v.optional(v.id("designs")),
+    name: v.optional(v.string()),
+    number: v.optional(v.string()),
     designation: v.optional(v.union(v.literal("C"), v.literal("A"))),
-    size: v.optional(v.string()), // absent = "Needs size"
+    size: v.optional(v.string()),
     qty: v.number(), // integer 1..MAX_QTY
     source: v.union(v.literal("captain"), v.literal("fan")), // who created the row
     // Set only by the public form: no captain or admin mutation accepts these.
@@ -114,10 +118,7 @@ export default defineSchema({
     createdAt: v.number(), // display order; migrated rows keep legacy time
     updatedAt: v.number(),
     updatedBy: v.optional(v.id("users")), // who last changed it (admin after lock)
-    // The player this size line belongs to (0004 phase 1b, R2-01). Optional
-    // while the schema is widened: phase-1 rows get it from
-    // `_migrations:groupOrderItemsIntoRosterEntries`, and R2-03 makes it
-    // required and drops the flat name / number / letter / design above.
+    // The player this size line belongs to.
     rosterEntryId: v.optional(v.id("rosterEntries")),
   })
     .index("by_order", ["orderId"])
