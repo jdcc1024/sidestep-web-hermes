@@ -61,9 +61,17 @@ describe("_e2e seed + cleanup", () => {
         status: "open",
         createdAt: Date.now(),
       });
-      await ctx.db.insert("orderItems", {
+      const rosterEntryId = await ctx.db.insert("rosterEntries", {
         orderId: mine.orderId,
         designId: mine.designId,
+        source: "fan",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("orderItems", {
+        orderId: mine.orderId,
+        rosterEntryId,
+        size: "M",
         qty: 1,
         source: "fan",
         orderFormId,

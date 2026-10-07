@@ -25,6 +25,12 @@ const legacySchema = defineSchema({
     .index("by_run", ["runId"])
     .index("by_rosterEntry", ["rosterEntryId"])
     .index("by_submitterEmail", ["submitterEmail"]),
+  // An L-06-era item carried its name on the row; R2-03 moved it to the
+  // player, so the narrowed table can't hold this one.
+  orderItems: defineTable(v.any())
+    .index("by_order", ["orderId"])
+    .index("by_entry", ["rosterEntryId"])
+    .index("by_submitterEmail", ["submitterEmail"]),
 });
 
 const retire = internal._migrations.retireLegacyRosterTables;

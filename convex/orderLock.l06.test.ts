@@ -134,10 +134,7 @@ async function insertPlayer(
     if (o.size !== undefined)
       await ctx.db.insert("orderItems", {
         orderId: w.orderId,
-        designId: w.designId,
         rosterEntryId: entryId,
-        name: o.name,
-        number: o.number,
         size: o.size,
         qty: o.qty ?? 1,
         source: "captain",

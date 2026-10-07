@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
@@ -26,10 +27,53 @@ async function seedUser(
   );
 }
 
-// L-02: the fixtures seed `orderItems` directly; the legacy tables are no
-// longer written by any path.
-async function allItems(t: ReturnType<typeof convexTest>) {
-  return t.run((ctx) => ctx.db.query("orderItems").collect());
+// R2-03: the fixtures seed players and their size lines. A row here is one
+// size line with its player's printed values, or, for a player with no lines
+// (needs sizes), one size-less row standing for the player.
+type Row = {
+  _id: string;
+  orderId: Id<"orders">;
+  designId: Id<"designs">;
+  name?: string;
+  number?: string;
+  size?: string;
+  source: "captain" | "fan";
+  orderFormId?: Id<"orderForms">;
+  submitterEmail?: string;
+  removedAt?: number;
+};
+async function allItems(t: ReturnType<typeof convexTest>): Promise<Row[]> {
+  return t.run(async (ctx) => {
+    const entries = await ctx.db.query("rosterEntries").collect();
+    const items = await ctx.db.query("orderItems").collect();
+    return entries.flatMap((entry): Row[] => {
+      const values = {
+        orderId: entry.orderId,
+        designId: entry.designId,
+        name: entry.name,
+        number: entry.number,
+      };
+      const lines = items.filter((i) => i.rosterEntryId === entry._id);
+      if (lines.length === 0)
+        return [
+          {
+            _id: entry._id,
+            ...values,
+            source: entry.source,
+            removedAt: entry.removedAt,
+          },
+        ];
+      return lines.map((line) => ({
+        _id: line._id,
+        ...values,
+        size: line.size,
+        source: line.source,
+        orderFormId: line.orderFormId,
+        submitterEmail: line.submitterEmail,
+        removedAt: line.removedAt ?? entry.removedAt,
+      }));
+    });
+  });
 }
 
 describe("_devSeed:seedPortalFixtures", () => {

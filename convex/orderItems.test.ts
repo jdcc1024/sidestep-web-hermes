@@ -141,7 +141,7 @@ async function insertFanItem(
   }> = {},
 ) {
   const now = Date.now();
-  const line = {
+  const { name, number, ...line } = {
     name: "Riley Park",
     number: "7",
     size: "M",
@@ -155,15 +155,14 @@ async function insertFanItem(
     const rosterEntryId = await ctx.db.insert("rosterEntries", {
       orderId,
       designId,
-      name: line.name,
-      number: line.number,
+      name,
+      number,
       source: "fan",
       createdAt: now,
       updatedAt: now,
     });
     return ctx.db.insert("orderItems", {
       orderId,
-      designId,
       rosterEntryId,
       source: "fan",
       ...line,

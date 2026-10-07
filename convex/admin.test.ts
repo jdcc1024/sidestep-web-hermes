@@ -254,8 +254,9 @@ async function seedRun(
   );
 }
 
-// An order item written straight into the table (L-02: the admin readers
-// read `orderItems`). Defaults to one sized fan jersey with no name.
+// A player and one size line written straight into the tables (R2-03: the
+// printed values live on the player). Defaults to one sized fan jersey with
+// no name. A row with no size is a player with no line (needs sizes).
 async function seedItem(
   t: ReturnType<typeof convexTest>,
   orderId: Id<"orders">,
@@ -274,19 +275,33 @@ async function seedItem(
     removedAt: number;
     createdAt: number;
   }> = {},
-): Promise<Id<"orderItems">> {
+): Promise<void> {
   const createdAt = fields.createdAt ?? Date.now();
-  return t.run((ctx) =>
-    ctx.db.insert("orderItems", {
+  const { name, number, designation, size, ...line } = fields;
+  const source = fields.source ?? "fan";
+  await t.run(async (ctx) => {
+    const rosterEntryId = await ctx.db.insert("rosterEntries", {
       orderId,
       designId,
-      qty: 1,
-      source: "fan",
-      ...fields,
+      name,
+      number,
+      designation,
+      source,
       createdAt,
       updatedAt: createdAt,
-    }),
-  );
+    });
+    if (size === undefined) return;
+    await ctx.db.insert("orderItems", {
+      orderId,
+      rosterEntryId,
+      size,
+      qty: 1,
+      ...line,
+      source,
+      createdAt,
+      updatedAt: createdAt,
+    });
+  });
 }
 
 describe("admin.exportOrder", () => {
@@ -523,10 +538,7 @@ async function seedPlayer(
     for (const line of lines)
       await ctx.db.insert("orderItems", {
         orderId,
-        designId,
         rosterEntryId,
-        name: player.name,
-        number: player.number,
         size: line.size,
         qty: line.qty ?? 1,
         source: "captain",

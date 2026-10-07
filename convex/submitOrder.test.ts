@@ -114,14 +114,28 @@ const fan = {
 };
 
 // Every item on the order, removed ones included, in the order they were
-// written. Tests that care about "live" filter `removedAt` themselves.
+// written. Tests that care about "live" filter `removedAt` themselves. Since
+// R2-03 the printed values live only on the player, so each line carries its
+// player's design / name / number / letter here.
 async function allItems(t: T, orderId: Id<"orders">) {
-  const rows = await t.run((ctx) =>
-    ctx.db
+  const rows = await t.run(async (ctx) => {
+    const items = await ctx.db
       .query("orderItems")
       .withIndex("by_order", (q) => q.eq("orderId", orderId))
-      .collect(),
-  );
+      .collect();
+    return Promise.all(
+      items.map(async (item) => {
+        const entry = (await ctx.db.get(item.rosterEntryId!))!;
+        return {
+          ...item,
+          designId: entry.designId,
+          name: entry.name,
+          number: entry.number,
+          designation: entry.designation,
+        };
+      }),
+    );
+  });
   return rows.sort(
     (a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime,
   );

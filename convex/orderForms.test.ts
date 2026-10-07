@@ -66,8 +66,7 @@ async function confirmOrderSize(
   });
 }
 
-// An order item written straight into the table (L-02: every reader below
-// reads `orderItems`, the legacy roster/order entry tables are dead).
+// An order item written straight into the table, under a player.
 // Defaults to a sized fan jersey with no name.
 async function insertItem(
   t: ReturnType<typeof convexTest>,
@@ -88,19 +87,38 @@ async function insertItem(
     removedAt: number;
     createdAt: number;
   }> = {},
-): Promise<Id<"orderItems">> {
+): Promise<Id<"orderItems"> | null> {
+  // R2-03: an item is a size line under a player. Without `rosterEntryId`, the
+  // values given make a player of their own; with no size, the player is all
+  // there is (it needs sizes) and there is no item.
   const createdAt = fields.createdAt ?? Date.now();
-  return t.run((ctx) =>
-    ctx.db.insert("orderItems", {
+  const { name, number, designation, size, rosterEntryId, ...line } = fields;
+  const source = fields.source ?? "fan";
+  return t.run(async (ctx) => {
+    const entryId =
+      rosterEntryId ??
+      (await ctx.db.insert("rosterEntries", {
+        orderId,
+        designId,
+        name,
+        number,
+        designation,
+        source,
+        createdAt,
+        updatedAt: createdAt,
+      }));
+    if (size === undefined) return null;
+    return ctx.db.insert("orderItems", {
       orderId,
-      designId,
+      rosterEntryId: entryId,
+      size,
       qty: 1,
-      source: "fan",
-      ...fields,
+      ...line,
+      source,
       createdAt,
       updatedAt: createdAt,
-    }),
-  );
+    });
+  });
 }
 
 // A player written straight into `rosterEntries` (R2-02: the picker and the
