@@ -29,7 +29,7 @@ describe("cardToLines", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value).toHaveLength(3);
-    const bySize = Object.fromEntries(result.value.map((l: { size: string }) => [l.size, l]));
+    const bySize = Object.fromEntries(result.value.map((l) => [l.size, l]));
     expect(Object.keys(bySize).sort()).toEqual(["M", "S", "XL"]);
     expect(bySize.S.qty).toBe(1);
     expect(bySize.M.qty).toBe(3);
