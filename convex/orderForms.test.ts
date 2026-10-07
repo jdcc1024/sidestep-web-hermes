@@ -84,6 +84,7 @@ async function insertItem(
     submitterEmail: string;
     customAnswers: Record<string, string>;
     orderFormId: Id<"orderForms">;
+    rosterEntryId: Id<"rosterEntries">;
     removedAt: number;
     createdAt: number;
   }> = {},
@@ -95,6 +96,35 @@ async function insertItem(
       designId,
       qty: 1,
       source: "fan",
+      ...fields,
+      createdAt,
+      updatedAt: createdAt,
+    }),
+  );
+}
+
+// A player written straight into `rosterEntries` (R2-02: the picker and the
+// captain's counts read players). Sizes are items under it, via `insertItem`
+// with `rosterEntryId`; with none, a named player needs sizes.
+async function insertPlayer(
+  t: ReturnType<typeof convexTest>,
+  orderId: Id<"orders">,
+  designId: Id<"designs">,
+  fields: Partial<{
+    name: string;
+    number: string;
+    designation: "C" | "A";
+    source: "captain" | "fan";
+    removedAt: number;
+    createdAt: number;
+  }> = {},
+): Promise<Id<"rosterEntries">> {
+  const createdAt = fields.createdAt ?? Date.now();
+  return t.run((ctx) =>
+    ctx.db.insert("rosterEntries", {
+      orderId,
+      designId,
+      source: "captain",
       ...fields,
       createdAt,
       updatedAt: createdAt,
@@ -577,12 +607,11 @@ describe("orderForms.getPublic", () => {
       });
       return { orderFormId, orderId, homeId, awayId };
     });
-    // L-02: the picker is the order's named items (a captain's Needs-size
-    // player), not a run-scoped roster table.
-    const gretzkyId = await insertItem(t, orderId, homeId, {
+    // R2-02: the picker is the order's live named players (here a captain's
+    // player who needs sizes).
+    const gretzkyId = await insertPlayer(t, orderId, homeId, {
       name: "Gretzky",
       number: "99",
-      source: "captain",
     });
 
     const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
@@ -598,7 +627,7 @@ describe("orderForms.getPublic", () => {
   });
 });
 
-// ─── L-02 (initiative 0004): getPublic reads order items ───────────────────
+// ─── L-02 (initiative 0004): getPublic reads the order's list (players since R2-02)
 
 // The public chain: captain → Home + Away designs → order → open run.
 async function seedPublicRun(
@@ -646,11 +675,17 @@ async function seedPublicRun(
   });
 }
 
-describe("getPublic exposes only _id, name, number per picker entry; removed and unnamed items are absent", () => {
-  it("returns exactly { _id, name, number } for a named item, with no size, letter, submitter or answers", async () => {
+describe("getPublic exposes only _id, name, number per picker entry; removed and unnamed players are absent", () => {
+  it("returns exactly { _id, name, number } for a named player, with no size, letter, submitter or answers", async () => {
     const t = convexTest(schema, modules);
     const { orderId, homeId, orderFormId } = await seedPublicRun(t);
-    const id = await insertItem(t, orderId, homeId, {
+    const id = await insertPlayer(t, orderId, homeId, {
+      name: "Jordan Lee",
+      number: "4",
+      designation: "C",
+    });
+    await insertItem(t, orderId, homeId, {
+      rosterEntryId: id,
       name: "Jordan Lee",
       number: "4",
       designation: "C",
@@ -669,23 +704,22 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
     expect(JSON.stringify(data)).not.toMatch(/mum@example\.com|Jordan's Mum|Gym/);
   });
 
-  it("leaves out removed items and items with no name", async () => {
+  it("leaves out removed players and players with no name", async () => {
     const t = convexTest(schema, modules);
     const { orderId, homeId, orderFormId } = await seedPublicRun(t);
-    const kept = await insertItem(t, orderId, homeId, {
+    const kept = await insertPlayer(t, orderId, homeId, {
       name: "Kept",
       number: "1",
-      source: "captain",
     });
-    await insertItem(t, orderId, homeId, {
+    await insertPlayer(t, orderId, homeId, {
       name: "Removed",
       number: "2",
-      source: "captain",
       removedAt: Date.now(),
     });
-    // A blank jersey (number only, and a bulk line with neither).
-    await insertItem(t, orderId, homeId, { number: "3", size: "M" });
-    await insertItem(t, orderId, homeId, { size: "L", qty: 4 });
+    // A number-only player, and blank jerseys (neither) with a size.
+    await insertPlayer(t, orderId, homeId, { number: "3", source: "fan" });
+    const blank = await insertPlayer(t, orderId, homeId, { source: "fan" });
+    await insertItem(t, orderId, homeId, { rosterEntryId: blank, size: "L", qty: 4 });
 
     const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
     expect(data!.designs[0].roster).toEqual([
@@ -693,48 +727,17 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
     ]);
   });
 
-  it("dedupes the same player by name + number (case/space-insensitive), oldest item wins", async () => {
-    const t = convexTest(schema, modules);
-    const { orderId, homeId, orderFormId } = await seedPublicRun(t);
-    const oldest = await insertItem(t, orderId, homeId, {
-      name: "Gretzky",
-      number: "99",
-      source: "captain",
-      createdAt: 1_000,
-    });
-    // The same player ordered twice more (two jerseys, Q7): still one pick.
-    await insertItem(t, orderId, homeId, {
-      name: " gretzky ",
-      number: "99",
-      size: "M",
-      createdAt: 2_000,
-    });
-    await insertItem(t, orderId, homeId, {
-      name: "Gretzky",
-      number: "99",
-      size: "L",
-      createdAt: 3_000,
-    });
-
-    const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
-    expect(data!.designs[0].roster).toEqual([
-      { _id: oldest, name: "Gretzky", number: "99" },
-    ]);
-  });
-
   it("lists Lee #4 and Lee #9 as two separate picks (same name, different number)", async () => {
     const t = convexTest(schema, modules);
     const { orderId, homeId, orderFormId } = await seedPublicRun(t);
-    const lee4 = await insertItem(t, orderId, homeId, {
+    const lee4 = await insertPlayer(t, orderId, homeId, {
       name: "Lee",
       number: "4",
-      source: "captain",
       createdAt: 1_000,
     });
-    const lee9 = await insertItem(t, orderId, homeId, {
+    const lee9 = await insertPlayer(t, orderId, homeId, {
       name: "Lee",
       number: "9",
-      source: "captain",
       createdAt: 2_000,
     });
 
@@ -749,10 +752,9 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
     const t = convexTest(schema, modules);
     const { userId, orderId, homeId, orderFormId } = await seedPublicRun(t);
     // No orderFormId: added on the order page before "Make an order form".
-    const early = await insertItem(t, orderId, homeId, {
+    const early = await insertPlayer(t, orderId, homeId, {
       name: "Early",
       number: "7",
-      source: "captain",
       createdAt: 1,
     });
     const otherOrderId = await t.run((ctx) =>
@@ -768,10 +770,9 @@ describe("getPublic exposes only _id, name, number per picker entry; removed and
         updatedAt: Date.now(),
       }),
     );
-    await insertItem(t, otherOrderId, homeId, {
+    await insertPlayer(t, otherOrderId, homeId, {
       name: "Stranger",
       number: "8",
-      source: "captain",
     });
 
     const data = await t.query(api.orderForms.getPublic, { orderFormId: orderFormId });
@@ -995,9 +996,9 @@ describe("orderForms.listMyResponses (R-07)", () => {
 });
 
 // L-02: the closure email's count is the order's production total, the same
-// `summary.itemCount` the captain's list shows.
+// `summary.jerseyCount` the captain's list shows (players since R2-02).
 describe("orderForms._closeForm counts order items (L-02)", () => {
-  it("reports responseCount = listForOrder summary.itemCount, excluding removed and Needs-size items", async () => {
+  it("reports responseCount = listForOrder summary.jerseyCount, excluding removed jerseys, removed players and players who need sizes", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderId, asUser } = await seedCaptainWithOrder(t);
     const orderFormId = await asUser.mutation(
@@ -1020,15 +1021,42 @@ describe("orderForms._closeForm counts order items (L-02)", () => {
       return ids;
     });
     // Counted: 2 + 3 (one added before the form, with no orderFormId).
-    await insertItem(t, orderId, homeId, { size: "M", qty: 2, orderFormId });
-    await insertItem(t, orderId, awayId, { size: "L", qty: 3, source: "captain" });
-    // Not counted: a removed jersey and a Needs-size player.
+    const fanBlank = await insertPlayer(t, orderId, homeId, { source: "fan" });
     await insertItem(t, orderId, homeId, {
+      rosterEntryId: fanBlank,
+      size: "M",
+      qty: 2,
+      orderFormId,
+    });
+    const captainBlank = await insertPlayer(t, orderId, awayId);
+    await insertItem(t, orderId, awayId, {
+      rosterEntryId: captainBlank,
+      size: "L",
+      qty: 3,
+      source: "captain",
+    });
+    // Not counted: a removed jersey, a removed player's jersey, and a player
+    // who needs sizes.
+    await insertItem(t, orderId, homeId, {
+      rosterEntryId: fanBlank,
       size: "XL",
       qty: 4,
       removedAt: Date.now(),
     });
-    await insertItem(t, orderId, homeId, { name: "Bure", source: "captain" });
+    const gone = await insertPlayer(t, orderId, homeId, {
+      name: "Gone",
+      number: "0",
+      removedAt: Date.now(),
+    });
+    await insertItem(t, orderId, homeId, {
+      rosterEntryId: gone,
+      name: "Gone",
+      number: "0",
+      size: "S",
+      qty: 6,
+      source: "captain",
+    });
+    await insertPlayer(t, orderId, homeId, { name: "Bure" });
 
     const live = await asUser.query(api.orderItems.listForOrder, { orderId });
     const closed = await t.mutation(internal.orderForms._closeForm, {
@@ -1036,6 +1064,6 @@ describe("orderForms._closeForm counts order items (L-02)", () => {
     });
 
     expect(closed?.responseCount).toBe(5);
-    expect(closed?.responseCount).toBe(live!.summary.itemCount);
+    expect(closed?.responseCount).toBe(live!.summary.jerseyCount);
   });
 });

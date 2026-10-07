@@ -497,9 +497,49 @@ describe("admin.exportOrder", () => {
   });
 });
 
-// L-02: every admin count reads the same list the captain sees, through
-// `loadItems` + `summarize`, so they reconcile with `summary.itemCount`.
-describe("Admin exportOrder row count and getOrder count equal summary.itemCount for the same order", () => {
+// A player with its size lines (R2-02): one roster entry and one captain item
+// per line under it. No lines = the player needs sizes. `removed` removes the
+// entry alone, as `rosterEntries.remove` does; a line's `removedAt` removes
+// that line.
+async function seedPlayer(
+  t: ReturnType<typeof convexTest>,
+  orderId: Id<"orders">,
+  designId: Id<"designs">,
+  player: { name?: string; number?: string; removed?: boolean },
+  lines: Array<{ size: string; qty?: number; removedAt?: number }> = [],
+) {
+  const now = Date.now();
+  await t.run(async (ctx) => {
+    const rosterEntryId = await ctx.db.insert("rosterEntries", {
+      orderId,
+      designId,
+      name: player.name,
+      number: player.number,
+      source: "captain",
+      removedAt: player.removed ? now : undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (const line of lines)
+      await ctx.db.insert("orderItems", {
+        orderId,
+        designId,
+        rosterEntryId,
+        name: player.name,
+        number: player.number,
+        size: line.size,
+        qty: line.qty ?? 1,
+        source: "captain",
+        removedAt: line.removedAt,
+        createdAt: now,
+        updatedAt: now,
+      });
+  });
+}
+
+// L-02: every admin count reads the same list the captain sees, so they
+// reconcile with the captain's `summary.jerseyCount` (R2-02: players).
+describe("Admin exportOrder row count and getOrder count equal summary.jerseyCount for the same order", () => {
   async function seedMixedOrder(
     t: ReturnType<typeof convexTest>,
     opts: { withRun: boolean },
@@ -513,18 +553,24 @@ describe("Admin exportOrder row count and getOrder count equal summary.itemCount
     await t.run((ctx) => ctx.db.patch(orderId, { designIds: [homeId, awayId] }));
     if (opts.withRun) await seedRun(t, orderId, captainId);
 
-    // Counted, one jersey each: three sized items across both designs.
-    await seedItem(t, orderId, homeId, { name: "Gretzky", number: "99", size: "L" });
-    await seedItem(t, orderId, homeId, { size: "M" });
-    await seedItem(t, orderId, awayId, { name: "Sosa", number: "25", size: "S" });
-    // Not counted: Needs size, removed, and a since-unlinked design.
-    await seedItem(t, orderId, homeId, { name: "Bure", number: "10" });
-    await seedItem(t, orderId, awayId, { size: "XL", removedAt: Date.now() });
-    await seedItem(t, orderId, goneId, { size: "M" });
+    // Counted, one jersey each: three sized lines across both designs.
+    await seedPlayer(t, orderId, homeId, { name: "Gretzky", number: "99" }, [{ size: "L" }]);
+    await seedPlayer(t, orderId, homeId, {}, [{ size: "M" }]);
+    await seedPlayer(t, orderId, awayId, { name: "Sosa", number: "25" }, [{ size: "S" }]);
+    // Not counted: a player who needs sizes, a removed line, a removed
+    // player's line, and a since-unlinked design.
+    await seedPlayer(t, orderId, homeId, { name: "Bure", number: "10" });
+    await seedPlayer(t, orderId, awayId, { name: "Ortiz", number: "3" }, [
+      { size: "XL", removedAt: Date.now() },
+    ]);
+    await seedPlayer(t, orderId, homeId, { name: "Gone", number: "0", removed: true }, [
+      { size: "M" },
+    ]);
+    await seedPlayer(t, orderId, goneId, { name: "Warm", number: "1" }, [{ size: "M" }]);
     return { orderId, asCaptain, asAdmin };
   }
 
-  it("on an order with a form: exportOrder rows, getOrder count and listForOrder itemCount agree", async () => {
+  it("on an order with a form: exportOrder rows, getOrder count and listForOrder jerseyCount agree", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asCaptain, asAdmin } = await seedMixedOrder(t, {
       withRun: true,
@@ -534,12 +580,12 @@ describe("Admin exportOrder row count and getOrder count equal summary.itemCount
     const exported = await asAdmin.query(api.admin.exportOrder, { orderId });
     const detail = await asAdmin.query(api.admin.getOrder, { orderId });
 
-    expect(list!.summary.itemCount).toBe(3);
-    expect(exported!.rows).toHaveLength(list!.summary.itemCount);
-    expect(detail!.orderFormResponseCount).toBe(list!.summary.itemCount);
+    expect(list!.summary.jerseyCount).toBe(3);
+    expect(exported!.rows).toHaveLength(list!.summary.jerseyCount);
+    expect(detail!.orderFormResponseCount).toBe(list!.summary.jerseyCount);
   });
 
-  it("on an order with no form yet: the captain's items still export and count", async () => {
+  it("on an order with no form yet: the captain's players still export and count", async () => {
     const t = convexTest(schema, modules);
     const { orderId, asCaptain, asAdmin } = await seedMixedOrder(t, {
       withRun: false,
@@ -549,13 +595,13 @@ describe("Admin exportOrder row count and getOrder count equal summary.itemCount
     const exported = await asAdmin.query(api.admin.exportOrder, { orderId });
     const detail = await asAdmin.query(api.admin.getOrder, { orderId });
 
-    expect(list!.summary.itemCount).toBe(3);
+    expect(list!.summary.jerseyCount).toBe(3);
     expect(exported!.rows).toHaveLength(3);
     expect(exported!.rows.reduce((sum, r) => sum + r.qty, 0)).toBe(3);
     expect(detail!.orderFormResponseCount).toBe(3);
   });
 
-  it("sums qty, not rows, for the count: Σ export qty = getOrder count = itemCount", async () => {
+  it("sums qty, not rows, for the count: Σ export qty = getOrder count = jerseyCount", async () => {
     const t = convexTest(schema, modules);
     const { userId: captainId, asUser: asCaptain } = await seedUser(t, "captain");
     const { asUser: asAdmin } = await seedUser(t, "admin", { isAdmin: true });
@@ -563,15 +609,17 @@ describe("Admin exportOrder row count and getOrder count equal summary.itemCount
     const homeId = await seedDesign(t, captainId, "Home");
     await t.run((ctx) => ctx.db.patch(orderId, { designIds: [homeId] }));
     await seedRun(t, orderId, captainId);
-    await seedItem(t, orderId, homeId, { size: "M", qty: 2 });
-    await seedItem(t, orderId, homeId, { size: "L", qty: 5 });
-    await seedItem(t, orderId, homeId, { name: "Bure", qty: 3 });
+    await seedPlayer(t, orderId, homeId, {}, [
+      { size: "M", qty: 2 },
+      { size: "L", qty: 5 },
+    ]);
+    await seedPlayer(t, orderId, homeId, { name: "Bure" });
 
     const list = await asCaptain.query(api.orderItems.listForOrder, { orderId });
     const exported = await asAdmin.query(api.admin.exportOrder, { orderId });
     const detail = await asAdmin.query(api.admin.getOrder, { orderId });
 
-    expect(list!.summary.itemCount).toBe(7);
+    expect(list!.summary.jerseyCount).toBe(7);
     expect(exported!.rows.reduce((sum, r) => sum + r.qty, 0)).toBe(7);
     expect(detail!.orderFormResponseCount).toBe(7);
   });

@@ -69,14 +69,14 @@ describe("a form-less order: unlinking Away Kit warns about 2 captain items; aft
     return { t, as, ...ids };
   }
 
-  it("affectedByDesignRemoval counts the 2 captain items with no run and no submitters", async () => {
+  it("affectedByDesignRemoval counts the 2 captain jerseys with no run and no submitters", async () => {
     const { t, as, orderId, away } = await seed();
-    await as.mutation(api.orderItems.addMany, {
+    await as.mutation(api.rosterEntries.addMany, {
       orderId,
       designId: away,
-      rows: [
-        { name: "Lemieux", number: "66", size: "M" },
-        { name: "Bure", number: "10" },
+      players: [
+        { name: "Lemieux", number: "66", sizes: [{ size: "M", qty: 1 }] },
+        { name: "Bure", number: "10", sizes: [{ size: "L", qty: 1 }] },
       ],
     });
     // No orderForms row exists at all.
@@ -91,14 +91,14 @@ describe("a form-less order: unlinking Away Kit warns about 2 captain items; aft
     expect(affected.submitters).toEqual([]);
   });
 
-  it("after the design is unlinked, listForOrder().removedDesigns lists Away Kit with its 2 items", async () => {
+  it("after the design is unlinked, listForOrder().removedDesigns lists Away Kit with its 2 jerseys", async () => {
     const { t, as, orderId, home, away } = await seed();
-    await as.mutation(api.orderItems.addMany, {
+    await as.mutation(api.rosterEntries.addMany, {
       orderId,
       designId: away,
-      rows: [
-        { name: "Lemieux", number: "66", size: "M" },
-        { name: "Bure", number: "10" },
+      players: [
+        { name: "Lemieux", number: "66", sizes: [{ size: "M", qty: 1 }] },
+        { name: "Bure", number: "10", sizes: [{ size: "L", qty: 1 }] },
       ],
     });
     await t.run((ctx) => ctx.db.patch(orderId, { designIds: [home] }));
@@ -111,6 +111,6 @@ describe("a form-less order: unlinking Away Kit warns about 2 captain items; aft
       title: "Away Kit",
     });
     // Same count the warning gave before the save: nobody is lost silently.
-    expect(list!.removedDesigns[0].itemCount).toBe(2);
+    expect(list!.removedDesigns[0].jerseyCount).toBe(2);
   });
 });
