@@ -2,16 +2,26 @@ import { createContext, useContext } from "react";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import type { ItemView } from "@/lib/orderItem";
+import type { ItemView, PlayerView } from "@/lib/orderItem";
 
 // What `orderItems.listForOrder` hands the page once it has loaded: every
-// item on every design, the per-design and order-wide summaries, and the
-// server's verdict on whether the captain may edit.
+// player on every design (with their size lines, flattened again as `items`
+// for the CSV), the per-design and order-wide summaries, and the server's
+// verdict on whether the captain may edit.
 export type OrderListData = NonNullable<
   FunctionReturnType<typeof api.orderItems.listForOrder>
 >;
 
-export type OrderItem = ItemView<Id<"orderItems">, Id<"designs">>;
+export type OrderPlayer = PlayerView<
+  Id<"orderItems">,
+  Id<"designs">,
+  Id<"rosterEntries">
+>;
+export type OrderItem = ItemView<
+  Id<"orderItems">,
+  Id<"designs">,
+  Id<"rosterEntries">
+>;
 
 // The order form's custom questions. A player's answers are stored by question
 // id; the edit sheet shows the question's label, falling back to the stored
@@ -37,8 +47,8 @@ export type OrderListDesign = {
 
 // The approved sentences (UX §4, "Errors"). Anything the server words for the
 // captain arrives as a ConvexError and replaces these via `userMessage`.
-export const SAVE_FAILED = "Could not save that item. Please try again.";
-export const RESTORE_FAILED = "Could not restore that item. Please try again.";
+export const SAVE_FAILED = "Could not save that player. Please try again.";
+export const RESTORE_FAILED = "Could not restore that player. Please try again.";
 
 // How long the Undo toast stays up (mockup frame 4: "about 8 seconds").
 export const UNDO_TOAST_MS = 8000;

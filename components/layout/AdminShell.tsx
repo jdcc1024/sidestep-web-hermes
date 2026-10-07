@@ -27,7 +27,7 @@ type AdminLink = {
 
 const adminLinks: AdminLink[] = [
   { href: "/admin/orders", label: "All Orders" },
-  { href: "/admin/jersey-runs", label: "Jersey Runs" },
+  { href: "/admin/jersey-runs", label: "Order forms" },
   { href: "/admin/designs", label: "All Designs" },
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/leads", label: "Leads" },

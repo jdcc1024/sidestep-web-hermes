@@ -3,6 +3,7 @@ import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { prepareBlocks } from "./_designBlocks";
+import { insertSizeLine, loadRoster, resolveEntry } from "./_orderItems";
 import { overviewBlocks } from "../lib/designBlock";
 
 /**
@@ -77,8 +78,11 @@ export const seedOrder = internalMutation({
   },
 });
 
-// Test-only: puts items straight on an E2E order, so a test can start from
-// "a list with a sized and an unsized item" without driving the sheet.
+// Test-only: puts players straight on an E2E order's first design, so a test
+// can start from "a list with a sized player and one who needs sizes" without
+// driving the sheet. Each row goes through `resolveEntry`, so rows sharing a
+// name + number land on one player; a row with a size adds a line under it,
+// and a sizeless row is a player with no lines.
 export const seedItems = internalMutation({
   args: {
     email: v.string(),
@@ -99,20 +103,22 @@ export const seedItems = internalMutation({
     const order = await ctx.db.get(orderId);
     if (!order || order.captainId !== user._id || !order.teamName.startsWith(`${PREFIX}${tag}`))
       throw new ConvexError("Not an E2E order for this tag.");
-    const now = Date.now();
     const designId = order.designIds[0];
-    for (const [i, item] of items.entries()) {
-      await ctx.db.insert("orderItems", {
-        orderId,
+    const { entries } = await loadRoster(ctx, orderId);
+    for (const item of items) {
+      const { entry } = await resolveEntry(
+        ctx,
+        order,
         designId,
-        name: item.name,
-        number: item.number,
-        size: item.size,
-        qty: item.qty ?? 1,
-        source: "captain",
-        createdAt: now + i,
-        updatedAt: now + i,
-      });
+        { name: item.name, number: item.number },
+        { entries },
+      );
+      if (item.size !== undefined)
+        await insertSizeLine(ctx, entry, {
+          size: item.size,
+          qty: item.qty ?? 1,
+          source: "captain",
+        });
     }
     return { count: items.length };
   },

@@ -9,7 +9,9 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { jerseyLabel } from "@/lib/jerseyBreakdown";
 import {
   ROSTER_PASTE_MAX_ROWS,
+  jerseyCountText,
   parseRosterPaste,
+  playerCountText,
   type RosterPasteRow,
 } from "@/lib/orderItem";
 import { userMessage } from "@/lib/userMessage";
@@ -26,25 +28,26 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { SAVE_FAILED, wrapTabWithin, type OrderItem } from "./shared";
+import { SAVE_FAILED, wrapTabWithin, type OrderPlayer } from "./shared";
 
 // `Paste a list` (M-03, moved here from the old per-design sheet by L-03):
 // parse, preview, confirm. The parser is pure and lives in `lib/orderItem`,
-// so the rows shown here and the array sent to `addMany` are literally the
-// same object — the count on the button is the promise this screen keeps.
-// L-04 added the size column, and repeats are added with a note (JCC Q7).
+// so the rows shown here are exactly what goes to `rosterEntries.addMany`,
+// one player per pasted row (R2-04 groups them) — the count on the button is
+// the promise this screen keeps. L-04 added the size column; a row matching
+// a player already there adds its size to that player.
 export function PasteList({
   orderId,
   designId,
   designTitle,
-  items,
+  players,
   className,
 }: {
   orderId: Id<"orders">;
   designId: Id<"designs">;
   designTitle: string;
-  // The design's items, so the preview can point out a name already there.
-  items: readonly OrderItem[];
+  // The design's players, so the preview can point out a name already there.
+  players: readonly OrderPlayer[];
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -65,7 +68,7 @@ export function PasteList({
           orderId={orderId}
           designId={designId}
           designTitle={designTitle}
-          items={items}
+          players={players}
           onDone={() => setOpen(false)}
         />
       </SheetContent>
@@ -77,25 +80,25 @@ function PasteForm({
   orderId,
   designId,
   designTitle,
-  items,
+  players,
   onDone,
 }: {
   orderId: Id<"orders">;
   designId: Id<"designs">;
   designTitle: string;
-  items: readonly OrderItem[];
+  players: readonly OrderPlayer[];
   onDone: () => void;
 }) {
-  const addMany = useMutation(api.orderItems.addMany);
+  const addMany = useMutation(api.rosterEntries.addMany);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
   const named = useMemo(
     () =>
-      items.flatMap((item) =>
-        item.name ? [{ name: item.name, number: item.number }] : [],
+      players.flatMap((player) =>
+        player.name ? [{ name: player.name, number: player.number }] : [],
       ),
-    [items],
+    [players],
   );
   const { additions, counts, rows, tooManyRows } = useMemo(
     () => parseRosterPaste(text, named),
@@ -104,8 +107,16 @@ function PasteForm({
   async function onConfirm() {
     setBusy(true);
     try {
-      await addMany({ orderId, designId, rows: additions });
-      toast.success(`Added ${countOf(additions.length)}`);
+      const result = await addMany({
+        orderId,
+        designId,
+        players: additions.map((row) => ({
+          name: row.name || undefined,
+          number: row.number,
+          sizes: row.size ? [{ size: row.size, qty: 1 }] : [],
+        })),
+      });
+      toast.success(addedMessage(result));
       onDone();
     } catch (err) {
       // Stays open: the block is still in the box, so the captain can fix a
@@ -164,7 +175,7 @@ function PasteForm({
               {[
                 `${counts.additions} to add`,
                 counts.needSize > 0
-                  ? `${counts.needSize} ${counts.needSize === 1 ? "needs" : "need"} a size`
+                  ? `${counts.needSize} ${counts.needSize === 1 ? "needs" : "need"} sizes`
                   : null,
                 counts.repeats > 0
                   ? `${counts.repeats} repeat${counts.repeats === 1 ? "" : "s"}`
@@ -212,7 +223,24 @@ function PasteForm({
 }
 
 function countOf(n: number): string {
-  return `${n} item${n === 1 ? "" : "s"}`;
+  return playerCountText(n);
+}
+
+// The server's counts: `Added 3 players · 2 jerseys`, and how many rows
+// joined a player already on the list.
+function addedMessage({
+  added,
+  updated,
+  jerseys,
+}: {
+  added: number;
+  updated: number;
+  jerseys: number;
+}): string {
+  const parts = [`Added ${playerCountText(added)}`, jerseyCountText(jerseys)];
+  if (updated > 0)
+    parts.push(`${updated} already on the list`);
+  return parts.join(" · ");
 }
 
 // Every piece wraps rather than truncates: at 375px a long name or note must
@@ -246,7 +274,7 @@ function PreviewRow({ row }: { row: RosterPasteRow }) {
       ) : row.size ? (
         <Badge variant="secondary">{row.size}</Badge>
       ) : (
-        <span className="text-xs text-muted-foreground">Needs size</span>
+        <span className="text-xs text-muted-foreground">Needs sizes</span>
       )}
       {row.note && (
         <p className="basis-full text-xs break-words text-muted-foreground">

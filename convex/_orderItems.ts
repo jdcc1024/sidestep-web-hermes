@@ -12,9 +12,10 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireCurrentUser } from "./_auth";
 import {
   isListConfirmed,
-  listProblems,
-  needsSizeMessage,
+  listPlayerProblems,
+  needsSizesMessage,
   summarize,
+  summarizeRoster,
 } from "../lib/orderItem";
 import { playerKey } from "../lib/rosterEntry/rules";
 
@@ -171,7 +172,9 @@ export async function mirrorEntryOntoItems(
 }
 
 // Inserts one size line under `entry`, with the entry's values mirrored onto
-// it (see above). Size and qty must already be checked.
+// it (see above). Size and qty must already be checked. Only the public form
+// passes a submission (who sent it, their answers, the form): a captain's
+// line has none.
 export async function insertSizeLine(
   ctx: MutationCtx,
   entry: Doc<"rosterEntries">,
@@ -180,6 +183,10 @@ export async function insertSizeLine(
     qty: number;
     source: Doc<"orderItems">["source"];
     updatedBy?: Id<"users">;
+    submission?: Pick<
+      Doc<"orderItems">,
+      "submitterName" | "submitterEmail" | "customAnswers" | "orderFormId"
+    >;
   },
 ): Promise<Id<"orderItems">> {
   const now = Date.now();
@@ -193,6 +200,7 @@ export async function insertSizeLine(
     size: line.size,
     qty: line.qty,
     source: line.source,
+    ...line.submission,
     createdAt: now,
     updatedAt: now,
     updatedBy: line.updatedBy,
@@ -270,19 +278,42 @@ export async function isListLocked(
   return isListConfirmed(order);
 }
 
-// The confirm gate (L-06, Q2 = A): the message that refuses confirming the
-// order size while a live item on the order's current designs has no size,
-// or null when it may be confirmed. Admin copy.
+// The order's players through the roster read model (`summarizeRoster`,
+// R2-01), with the titles it needs. The captain's list and the confirm gate
+// read this. Titles cover the linked designs and any unlinked design that
+// still has a player, so "removed designs" can name them.
+export async function summarizeRosterOrder(ctx: Ctx, order: Doc<"orders">) {
+  const { entries, items } = await loadRoster(ctx, order._id);
+  const form = await loadOrderForm(ctx, order._id);
+
+  const designIds = new Set<Id<"designs">>(order.designIds);
+  for (const entry of entries) designIds.add(entry.designId);
+  const titles: Record<string, string> = {};
+  for (const designId of designIds) {
+    const design = await ctx.db.get(designId);
+    titles[designId] = design?.title ?? "Deleted design";
+  }
+
+  const summary = summarizeRoster(entries, items, {
+    designIds: order.designIds,
+    titles,
+  });
+  return { form, summary };
+}
+
+// The confirm gate (L-06, Q2 = A; players since R2-02): the message that
+// refuses confirming the order size while a named player on the order's
+// current designs has no live size, or null when it may be confirmed. Blank
+// jerseys never block: there is no name to chase. Admin copy.
 export async function confirmBlocker(
   ctx: Ctx,
   order: Doc<"orders">,
 ): Promise<string | null> {
-  const current = new Set<Id<"designs">>(order.designIds);
-  const items = (await loadItems(ctx, order._id))
-    .filter((item) => current.has(item.designId))
-    .sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
-  const problems = listProblems(items);
-  return problems.length > 0 ? needsSizeMessage(problems) : null;
+  const { summary } = await summarizeRosterOrder(ctx, order);
+  const problems = listPlayerProblems(
+    summary.designs.flatMap((design) => design.players),
+  );
+  return problems.length > 0 ? needsSizesMessage(problems) : null;
 }
 
 // The write guard for every captain/admin list mutation. Admin status comes

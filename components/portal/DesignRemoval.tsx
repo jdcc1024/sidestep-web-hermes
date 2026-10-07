@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { describeSubmitters } from "@/lib/designRemoval";
 import { REVEAL_TRANSITION } from "@/lib/motion";
-import { itemCountText } from "@/lib/orderItem";
+import { itemCountText, jerseyCountText } from "@/lib/orderItem";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -147,7 +147,7 @@ export function RemovedDesigns({ orderId }: { orderId: Id<"orders"> }) {
                   <CardContent className="text-sm text-muted-foreground">
                     {design.submitters.length > 0 &&
                       `${describeSubmitters(design.submitters)} sent items for this. `}
-                    The {itemCountText(design.itemCount)} on it no longer
+                    The {jerseyCountText(design.jerseyCount)} on it no longer
                     count. Link the design again from Edit order to bring them
                     back in.
                   </CardContent>

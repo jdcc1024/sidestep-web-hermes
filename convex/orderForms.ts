@@ -23,9 +23,9 @@ import {
   isListLocked,
   LIST_LOCKED_MESSAGE,
   loadItems,
+  loadRoster,
   summarizeOrder,
 } from "./_orderItems";
-import { rosterSlotKey } from "../lib/rosterEntry/rules";
 
 // Get the jersey run linked to one of the captain's orders. Returns null
 // if no run exists yet — the order detail page uses that to show the
@@ -63,32 +63,27 @@ export const getByOrder = query({
 });
 
 type PickerEntry = {
-  _id: Id<"orderItems">;
+  _id: Id<"rosterEntries">;
   name: string;
   number: string | undefined;
 };
 
-// The fixed-mode picker for one design: the order's live named items, one
-// entry per player (`rosterSlotKey`, so "Lee #4" and "Lee #9" are two), the
-// oldest item standing for repeats. Only `_id`, name and number leave the
-// server — never a size, letter, submitter or answer.
+// The fixed-mode picker for one design: the order's live named players, in
+// the order they were added. Entries are already one per player, so there is
+// nothing to dedupe. Only `_id`, name and number leave the server — never a
+// size, letter, submitter or answer.
 function pickerFor(
-  items: readonly Doc<"orderItems">[],
+  entries: readonly Doc<"rosterEntries">[],
   designId: Id<"designs">,
 ): PickerEntry[] {
-  const seen = new Set<string>();
-  const picker: PickerEntry[] = [];
-  const named = items
-    .filter((i) => i.designId === designId)
-    .sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime);
-  for (const item of named) {
-    if (item.name === undefined) continue;
-    const key = rosterSlotKey(item.name, item.number);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    picker.push({ _id: item._id, name: item.name, number: item.number });
-  }
-  return picker;
+  return entries
+    .filter((entry) => entry.designId === designId && entry.name)
+    .sort((a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime)
+    .map((entry) => ({
+      _id: entry._id,
+      name: entry.name!,
+      number: entry.number,
+    }));
 }
 
 // Public — used by the fan submission form (R-02) and the captain's run
@@ -111,12 +106,14 @@ export const getPublic = query({
     const order = await ctx.db.get(run.orderId);
     const captain = await ctx.db.get(run.captainId);
 
-    const items = order ? await loadItems(ctx, order._id) : [];
+    const { entries } = order
+      ? await loadRoster(ctx, order._id)
+      : { entries: [] };
 
     const designs = await Promise.all(
       (order?.designIds ?? []).map(async (designId) => {
         const design = await ctx.db.get(designId);
-        const roster = pickerFor(items, designId);
+        const roster = pickerFor(entries, designId);
         return {
           _id: designId,
           title: design?.title ?? "Untitled design",

@@ -1,41 +1,44 @@
 // The public order form's write path. The module keeps its R-01 name because
 // `api.orderEntries.submitOrder` is the form's API path; since L-06 it holds
-// only that mutation and writes only `orderItems`.
+// only that mutation.
 import { ConvexError, v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { isListLocked, LIST_LOCKED_MESSAGE, loadItems } from "./_orderItems";
+import {
+  insertSizeLine,
+  isListLocked,
+  LIST_LOCKED_MESSAGE,
+  loadRoster,
+  resolveEntry,
+} from "./_orderItems";
 import {
   checkQty,
   checkSize,
   checkSubmitterEmail,
   checkSubmitterName,
 } from "../lib/orderEntry/rules";
-import {
-  checkRosterNumber,
-  rosterSlotKey,
-} from "../lib/rosterEntry/rules";
-import { checkItemName, summarize } from "../lib/orderItem";
+import { checkRosterNumber } from "../lib/rosterEntry/rules";
+import { checkItemName } from "../lib/orderItem";
 import { checkCustomAnswer, isOrderFormClosed } from "../lib/orderFormResponse/rules";
 
-// Public — no auth. The order form's write path (R-02), moved onto order
-// items by L-02 (docs/architecture/0004-order-items.md, "Must answer 3").
-// One submission carries the player's identity plus 1..N jersey lines
-// spanning the order's designs, and writes only `orderItems`:
+// Public — no auth. The order form's write path, on players since R2-02
+// (docs/architecture/0004-roster-sizes.md, "Write: the public form"). One
+// submission carries the sender's identity plus 1..N jersey lines spanning
+// the order's designs. Per line:
 //
-// - Fill before insert. A line whose design + player key matches a fillable
-//   item (live, no size, no submitter) fills the oldest one: size, qty,
-//   submitter, answers and `orderFormId` are set, `source` is left alone. Filled
-//   ids go into a Set so two lines never fill the same row.
-// - Otherwise it inserts a `fan` item. Fixed mode copies the picked item's
-//   name / number / letter (someone already sized it, or the same player
-//   picked two sizes); open mode takes the typed name / number, and a blank
-//   name keeps the number.
+// - Fixed mode (`rosterEntryId`): the picked player must be live, on this
+//   order and on the line's design, and named.
+// - Open mode: `resolveEntry` on the typed name / number, so a player already
+//   on the design (any case or spacing) gets the line, and a new one is
+//   created as a `fan` entry. Lines of one card share a key, so they land on
+//   one player.
 //
-// Nothing is merged or rejected for repeating a player (JCC Q7). Grouping by
-// submitter is emergent from the normalized email. Re-validates everything
-// the client checked, since this is the one surface anyone on the internet
-// can hit, and can never change a size already set or remove anything.
+// Then it always **inserts** a `fan` size line carrying this sender, their
+// answers and the form. It never changes or removes an existing line or
+// player and never sets a letter, so two people who type the same print join
+// one player and each keeps their own lines (Gate 1b Q5). Re-validates
+// everything the client checked, since this is the one surface anyone on the
+// internet can hit. Returns only this submission's own ids.
 export const submitOrder = mutation({
   args: {
     orderFormId: v.id("orderForms"),
@@ -47,7 +50,7 @@ export const submitOrder = mutation({
         designId: v.id("designs"),
         // An explicit pick (the fixed-mode picker). When present the line is
         // that player; otherwise it is matched by the typed name + number.
-        itemId: v.optional(v.id("orderItems")),
+        rosterEntryId: v.optional(v.id("rosterEntries")),
         name: v.optional(v.string()),
         number: v.optional(v.string()),
         size: v.string(),
@@ -85,33 +88,20 @@ export const submitOrder = mutation({
       if (!result.ok) throw new ConvexError(result.error);
       if (result.value.length > 0) customAnswers[id] = result.value;
     }
-    const hasAnswers = Object.keys(customAnswers).length > 0;
-
-    // The order's live items, oldest first: the fill candidates. Filled ids
-    // are tracked so two lines in this submission never fill the same row;
-    // rows inserted here are sized, so they are never candidates anyway.
-    const existing = (await loadItems(ctx, order._id)).sort(
-      (a, b) => a.createdAt - b.createdAt || a._creationTime - b._creationTime,
-    );
-    const filled = new Set<Id<"orderItems">>();
-    const isFillable = (item: Doc<"orderItems">) =>
-      item.removedAt === undefined &&
-      item.size === undefined &&
-      item.submitterEmail === undefined &&
-      !filled.has(item._id);
-
-    const now = Date.now();
     const submission = {
       submitterName: nameCheck.value,
       submitterEmail: emailCheck.value,
-      customAnswers: hasAnswers ? customAnswers : undefined,
+      customAnswers:
+        Object.keys(customAnswers).length > 0 ? customAnswers : undefined,
       orderFormId: run._id,
-      updatedAt: now,
     };
+
+    // Loaded once; `resolveEntry` appends each player it creates, so a later
+    // line for the same player finds it.
+    const { entries } = await loadRoster(ctx, order._id);
     const results: Array<{
-      itemId: Id<"orderItems">;
+      rosterEntryId: Id<"rosterEntries">;
       designId: Id<"designs">;
-      filled: boolean;
     }> = [];
 
     for (const line of args.lines) {
@@ -122,88 +112,49 @@ export const submitOrder = mutation({
       if (!sizeCheck.ok) throw new ConvexError(sizeCheck.error);
       const qtyCheck = checkQty(line.qty);
       if (!qtyCheck.ok) throw new ConvexError(qtyCheck.error);
-      const sized = { size: sizeCheck.value, qty: qtyCheck.value };
 
-      // Who this line is: a picked player, or the typed name / number.
-      let player: Pick<Doc<"orderItems">, "name" | "number" | "designation">;
-      let target: Doc<"orderItems"> | undefined;
-      if (line.itemId) {
-        const picked = await ctx.db.get(line.itemId);
+      let entry: Doc<"rosterEntries">;
+      if (line.rosterEntryId) {
+        const picked = await ctx.db.get(line.rosterEntryId);
         if (
           !picked ||
           picked.removedAt !== undefined ||
           picked.orderId !== order._id ||
-          picked.name === undefined
+          !picked.name
         )
           throw new ConvexError(
             "That player is no longer on this order. Refresh the page and pick again.",
           );
         if (picked.designId !== line.designId)
           throw new ConvexError("That player is on a different design.");
-        player = {
-          name: picked.name,
-          number: picked.number,
-          designation: picked.designation,
-        };
-        if (isFillable(picked)) target = picked;
+        entry = picked;
       } else {
         const numberCheck = checkRosterNumber(line.number);
         if (!numberCheck.ok) throw new ConvexError(numberCheck.error);
         const itemNameCheck = checkItemName(line.name);
         if (!itemNameCheck.ok) throw new ConvexError(itemNameCheck.error);
-        player = { name: itemNameCheck.value, number: numberCheck.value };
-        const name = itemNameCheck.value;
-        if (name !== undefined) {
-          const key = rosterSlotKey(name, numberCheck.value);
-          target = existing.find(
-            (item) =>
-              item.designId === line.designId &&
-              item.name !== undefined &&
-              rosterSlotKey(item.name, item.number) === key &&
-              isFillable(item),
-          );
-        }
+        ({ entry } = await resolveEntry(
+          ctx,
+          order,
+          line.designId,
+          { name: itemNameCheck.value, number: numberCheck.value },
+          { source: "fan", entries },
+        ));
       }
 
-      if (target) {
-        await ctx.db.patch(target._id, { ...sized, ...submission });
-        filled.add(target._id);
-        results.push({ itemId: target._id, designId: line.designId, filled: true });
-      } else {
-        const itemId = await ctx.db.insert("orderItems", {
-          orderId: order._id,
-          designId: line.designId,
-          ...player,
-          ...sized,
-          source: "fan",
-          ...submission,
-          createdAt: now,
-        });
-        results.push({ itemId, designId: line.designId, filled: false });
-      }
+      await insertSizeLine(ctx, entry, {
+        size: sizeCheck.value,
+        qty: qtyCheck.value,
+        source: "fan",
+        submission,
+      });
+      results.push({ rosterEntryId: entry._id, designId: line.designId });
     }
-
-    // Collisions come from the same rule the captain's list shows
-    // (`summarize`), read back after this submission's writes.
-    const colliding = new Set<string>();
-    const after = summarize(await loadItems(ctx, order._id), {
-      designIds: order.designIds,
-      titles: {},
-      namesMode: run.namesMode,
-    });
-    for (const design of after.designs)
-      for (const item of design.items)
-        if (item.collision) colliding.add(item._id);
-    const items = results.map((r) => ({
-      ...r,
-      collision: colliding.has(r.itemId),
-    }));
 
     return {
       submitterEmail: emailCheck.value,
-      created: items.length,
-      collisions: items.filter((r) => r.collision).length,
-      items,
+      created: results.length,
+      items: results,
     };
   },
 });

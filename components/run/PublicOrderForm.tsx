@@ -5,7 +5,7 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CheckIcon, MinusIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CheckIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -22,8 +22,7 @@ import {
 import { ANSWER_MAX_LENGTH, isOrderFormClosed } from "@/lib/orderFormResponse";
 import { sortSizes } from "@/lib/orderForm";
 import { userMessage } from "@/lib/userMessage";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { SizeCounter } from "@/components/orderList/SizeCounter";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -60,7 +59,7 @@ import { Textarea } from "@/components/ui/textarea";
 type PublicDesign = {
   _id: Id<"designs">;
   title: string;
-  roster: { _id: Id<"orderItems">; name: string; number?: string }[];
+  roster: { _id: Id<"rosterEntries">; name: string; number?: string }[];
 };
 
 type PublicRun = {
@@ -112,7 +111,7 @@ type LineValues = {
   designId: string;
   name: string;
   number: string;
-  itemId: string;
+  rosterEntryId: string;
   size: string;
   qty: string;
 };
@@ -131,7 +130,7 @@ function emptyLine(designs: PublicDesign[]): LineValues {
     designId: designs.length === 1 ? designs[0]._id : "",
     name: "",
     number: "",
-    itemId: "",
+    rosterEntryId: "",
     size: "",
     qty: "1",
   };
@@ -176,7 +175,7 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
             designId: z.string(),
             name: z.string(),
             number: z.string(),
-            itemId: z.string(),
+            rosterEntryId: z.string(),
             size: z.string(),
             qty: z.string(),
           }),
@@ -218,10 +217,10 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
 
         if (run.namesMode === "fixed") {
           const slots = rosterByDesign.get(line.designId);
-          if (!line.itemId || !slots?.has(line.itemId)) {
+          if (!line.rosterEntryId || !slots?.has(line.rosterEntryId)) {
             ctx.addIssue({
               code: "custom",
-              path: ["lines", i, "itemId"],
+              path: ["lines", i, "rosterEntryId"],
               message: "Pick a name from the list.",
             });
           }
@@ -308,15 +307,15 @@ function PublicOrderFormBody({
 
   function addSize(
     designId: string,
-    itemId: string,
+    rosterEntryId: string,
     size: string,
   ) {
     const lines = form.getValues("lines");
     const idx = lines.findIndex(
-      (l) => l.itemId === itemId && l.size === size,
+      (l) => l.rosterEntryId === rosterEntryId && l.size === size,
     );
     if (idx === -1) {
-      append({ designId, name: "", number: "", itemId, size, qty: "1" });
+      append({ designId, name: "", number: "", rosterEntryId, size, qty: "1" });
     } else {
       const cur = Number.parseInt(lines[idx].qty, 10) || 0;
       if (cur < MAX_QTY) update(idx, { ...lines[idx], qty: String(cur + 1) });
@@ -324,10 +323,10 @@ function PublicOrderFormBody({
     if (form.formState.errors.lines) form.clearErrors("lines");
   }
 
-  function removeSize(itemId: string, size: string) {
+  function removeSize(rosterEntryId: string, size: string) {
     const lines = form.getValues("lines");
     const idx = lines.findIndex(
-      (l) => l.itemId === itemId && l.size === size,
+      (l) => l.rosterEntryId === rosterEntryId && l.size === size,
     );
     if (idx === -1) return;
     const cur = Number.parseInt(lines[idx].qty, 10) || 0;
@@ -349,7 +348,7 @@ function PublicOrderFormBody({
           if (run.namesMode === "fixed") {
             return {
               designId: line.designId as Id<"designs">,
-              itemId: line.itemId as Id<"orderItems">,
+              rosterEntryId: line.rosterEntryId as Id<"rosterEntries">,
               size: line.size,
               qty,
             };
@@ -752,14 +751,14 @@ function RosterGrid({
   designs: PublicDesign[];
   singleDesign: boolean;
   lines: LineValues[];
-  onAdd: (designId: string, itemId: string, size: string) => void;
-  onRemove: (itemId: string, size: string) => void;
+  onAdd: (designId: string, rosterEntryId: string, size: string) => void;
+  onRemove: (rosterEntryId: string, size: string) => void;
 }) {
   const sizes = useMemo(() => sortSizes(run.sizeOptions), [run.sizeOptions]);
 
-  const qtyFor = (itemId: string, size: string) => {
+  const qtyFor = (rosterEntryId: string, size: string) => {
     const line = lines.find(
-      (l) => l.itemId === itemId && l.size === size,
+      (l) => l.rosterEntryId === rosterEntryId && l.size === size,
     );
     if (!line) return 0;
     const n = Number.parseInt(line.qty, 10);
@@ -829,71 +828,6 @@ function RosterGrid({
           )}
         </fieldset>
       ))}
-    </div>
-  );
-}
-
-// One size control for a roster slot, with a fixed footprint so a click
-// never reflows the row. Three constant-width zones: a decrement slot (a
-// "−" once the count is above zero), the size label (tap to add), and a
-// count badge. The minus and count only render when active, but their
-// slots are always reserved — so the pill is the same width empty or full.
-function SizeCounter({
-  size,
-  playerName,
-  qty,
-  onAdd,
-  onRemove,
-}: {
-  size: string;
-  playerName: string;
-  qty: number;
-  onAdd: () => void;
-  onRemove: () => void;
-}) {
-  const active = qty > 0;
-  return (
-    <div
-      className={cn(
-        "flex h-9 min-w-[4.5rem] items-center rounded-md border text-sm font-medium transition",
-        active
-          ? "border-primary bg-primary/10"
-          : "border-input bg-background hover:border-ring",
-      )}
-    >
-      <span className="flex w-7 shrink-0 items-center justify-center">
-        {active && (
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label={`Remove one ${size} for ${playerName}`}
-            className="text-muted-foreground transition hover:text-foreground"
-          >
-            <MinusIcon aria-hidden className="h-4 w-4" />
-          </button>
-        )}
-      </span>
-      <button
-        type="button"
-        onClick={onAdd}
-        aria-label={`Add one ${size} for ${playerName}`}
-        className={cn(
-          "flex-1 px-1 text-center transition",
-          active ? "text-primary" : "text-foreground",
-        )}
-      >
-        {size}
-      </button>
-      <span className="flex w-7 shrink-0 items-center justify-center">
-        {active && (
-          <Badge
-            variant="secondary"
-            className="h-5 min-w-5 justify-center rounded-full bg-primary px-1 text-xs tabular-nums text-primary-foreground"
-          >
-            {qty}
-          </Badge>
-        )}
-      </span>
     </div>
   );
 }

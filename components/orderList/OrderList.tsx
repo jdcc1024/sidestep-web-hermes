@@ -4,32 +4,39 @@ import { useId } from "react";
 import { AnimatePresence } from "motion/react";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { NamesMode } from "@/lib/orderForm";
-import { itemCountText, sizeChip, type ItemSummary } from "@/lib/orderItem";
+import {
+  jerseyCountText,
+  playerCountText,
+  sizeChip,
+  type RosterSummary,
+} from "@/lib/orderItem";
 import { DesignThumbnail } from "@/components/design/DesignThumbnail";
 import { RosterExportButton } from "@/components/portal/RosterExportButton";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyFromDesign } from "./CopyFromDesign";
-import { ItemRow } from "./ItemRow";
-import { ItemSheet } from "./ItemSheet";
 import { PasteList } from "./PasteList";
+import { PlayerRow } from "./PlayerRow";
+import { PlayerSheet } from "./PlayerSheet";
 import {
   CustomQuestionsProvider,
   type CustomQuestion,
   type OrderItem,
   type OrderListData,
   type OrderListDesign,
+  type OrderPlayer,
 } from "./shared";
 
-// The order list (initiative 0004, L-03): everything we'll make for the
-// order, one group per design, editable in place. The captain-facing heart of
-// the order page.
+// The order list (initiative 0004, L-03; players since R2-02): everything
+// we'll make for the order, one group per design, one row per player with
+// their sizes, editable in place. The captain-facing heart of the order page.
 //
 // No query of its own. The page reads `orderItems.listForOrder` once and hands
 // it down, so every count here — a design's line, its size chips, the footer
 // — comes from the same summary as the rows, and an edit moves all of them in
-// one render. Counts follow rule 5 (JCC, Q8 = A): only sized items are items;
-// the rest "need a size". So every scope's item count is the sum of its chips.
+// one render. A jersey is a size line's qty; a named player with no sizes
+// "needs sizes" and adds no jerseys, so every scope's jersey count is the sum
+// of its chips.
 export function OrderList({
   orderId,
   teamName,
@@ -66,8 +73,8 @@ export function OrderList({
           Order list
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Everything we&apos;ll make for this order. Add items yourself, or
-          share the order form and let players add their own.
+          Everything we&apos;ll make for this order. Add players yourself, or
+          share the order form and let them add their own.
         </p>
       </div>
 
@@ -90,6 +97,7 @@ export function OrderList({
                 orderId={orderId}
                 teamName={teamName}
                 design={design}
+                players={designList?.players ?? []}
                 items={designList?.items ?? []}
                 summary={designList?.summary ?? EMPTY_SUMMARY}
                 otherDesigns={designs.filter((d) => d._id !== design._id)}
@@ -106,18 +114,26 @@ export function OrderList({
   );
 }
 
-const EMPTY_SUMMARY: ItemSummary = { itemCount: 0, needsSize: 0, bySize: [] };
+const EMPTY_SUMMARY: RosterSummary = {
+  jerseyCount: 0,
+  playerCount: 0,
+  needsSizes: 0,
+  bySize: [],
+};
 
-// `3 items · 1 needs a size`, or `1 item` when nothing needs one.
-function countLine({ itemCount, needsSize }: ItemSummary): string {
-  const items = itemCountText(itemCount);
-  return needsSize > 0 ? `${items} · ${needsSize} needs a size` : items;
+// `3 players · 10 jerseys · 1 needs sizes`; the last part only when someone
+// does.
+function countLine({ playerCount, jerseyCount, needsSizes }: RosterSummary): string {
+  const parts = [playerCountText(playerCount), jerseyCountText(jerseyCount)];
+  if (needsSizes > 0) parts.push(`${needsSizes} needs sizes`);
+  return parts.join(" · ");
 }
 
 function DesignGroup({
   orderId,
   teamName,
   design,
+  players,
   items,
   summary,
   otherDesigns,
@@ -127,8 +143,10 @@ function DesignGroup({
   orderId: Id<"orders">;
   teamName: string;
   design: OrderListDesign;
+  players: readonly OrderPlayer[];
+  // The players' size lines, one per jersey row in the CSV.
   items: readonly OrderItem[];
-  summary: ItemSummary;
+  summary: RosterSummary;
   otherDesigns: readonly OrderListDesign[];
   canEdit: boolean;
   pickFromList: boolean;
@@ -136,7 +154,7 @@ function DesignGroup({
   // When players pick their name from the list (fixed mode, M-05), the public
   // form only offers the names already on the design, so a design with none
   // takes no orders.
-  const unorderable = pickFromList && !items.some((item) => item.name);
+  const unorderable = pickFromList && !players.some((player) => player.name);
 
   return (
     <div
@@ -155,7 +173,7 @@ function DesignGroup({
             {design.title}
           </p>
           <p className="text-xs text-muted-foreground">
-            {items.length === 0 ? "No items yet" : countLine(summary)}
+            {players.length === 0 ? "No players yet" : countLine(summary)}
           </p>
         </div>
       </div>
@@ -178,7 +196,7 @@ function DesignGroup({
 
       {/* A warning, not a block: the captain is usually mid-way through
           adding names, and blocking would fight that. Disappears with the
-          first named item. */}
+          first named player. */}
       {unorderable && (
         <p
           role="note"
@@ -192,19 +210,19 @@ function DesignGroup({
         </p>
       )}
 
-      {items.length === 0 && (
+      {players.length === 0 && (
         <div className="mx-4 my-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-5 text-center sm:mx-6">
-          <p className="font-medium text-foreground">Nothing on the list yet</p>
+          <p className="font-medium text-foreground">Nobody on the list yet</p>
           {canEdit && (
             <p className="mt-1 text-sm text-muted-foreground">
-              Add your players one at a time, paste a list from a spreadsheet,
-              or share the order form and let them add themselves.
+              Add players one at a time, paste a list from a spreadsheet, or
+              share the order form and let them add themselves.
             </p>
           )}
         </div>
       )}
 
-      {/* The list stays mounted through the empty state, so the first item
+      {/* The list stays mounted through the empty state, so the first player
           added is a row arriving into a list like every one after it. An
           empty `ul` takes no space; `relative` gives the row `popLayout` lifts
           out of the flow something to be positioned against while it fades.
@@ -217,12 +235,13 @@ function DesignGroup({
           they were and arrive with nothing to animate from. No `layoutScroll`
           here: the rows scroll with the page, not inside a scrolling box,
           and Motion already accounts for window scroll. */}
-      <ul aria-label={`Items on ${design.title}`} className="relative">
+      <ul aria-label={`Players on ${design.title}`} className="relative">
         <AnimatePresence initial={false} mode="popLayout">
-          {items.map((item) => (
-            <ItemRow
-              key={item._id}
-              item={item}
+          {players.map((player) => (
+            <PlayerRow
+              key={player.entryId}
+              player={player}
+              players={players}
               orderId={orderId}
               designTitle={design.title}
               canEdit={canEdit}
@@ -234,10 +253,11 @@ function DesignGroup({
       <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-3 sm:px-6">
         {canEdit && (
           <>
-            <ItemSheet
+            <PlayerSheet
               orderId={orderId}
               designId={design._id}
               designTitle={design.title}
+              players={players}
               trigger={
                 <Button
                   type="button"
@@ -245,13 +265,13 @@ function DesignGroup({
                 />
               }
             >
-              + Add item
-            </ItemSheet>
+              + Add player
+            </PlayerSheet>
             <PasteList
               orderId={orderId}
               designId={design._id}
               designTitle={design.title}
-              items={items}
+              players={players}
               className="h-10 px-3"
             />
             <CopyFromDesign
@@ -273,21 +293,20 @@ function DesignGroup({
   );
 }
 
-// The whole order's line: `6 items · S×1 M×2 …`, and how many still need a
-// size beside it. Only the linked designs — a removed design's items are out
-// of the summary already (they keep their own section, O-08).
-function Footer({ summary }: { summary: ItemSummary }) {
+// The whole order's line: `10 jerseys · S×1 M×5 …`, and how many players
+// still need sizes beside it. Only the linked designs — a removed design's
+// jerseys are out of the summary already (they keep their own section, O-08).
+function Footer({ summary }: { summary: RosterSummary }) {
   const sizes = summary.bySize.map(sizeChip).join(" ");
+  const jerseys = jerseyCountText(summary.jerseyCount);
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border bg-muted/50 px-4 py-3 sm:px-6">
       <p className="font-semibold tabular-nums text-foreground">
-        {sizes
-          ? `${itemCountText(summary.itemCount)} · ${sizes}`
-          : itemCountText(summary.itemCount)}
+        {sizes ? `${jerseys} · ${sizes}` : jerseys}
       </p>
-      {summary.needsSize > 0 && (
+      {summary.needsSizes > 0 && (
         <p className="font-medium text-amber-800 dark:text-amber-200">
-          {`${summary.needsSize} needs a size`}
+          {`${playerCountText(summary.needsSizes)} ${summary.needsSizes === 1 ? "needs" : "need"} sizes`}
         </p>
       )}
     </div>

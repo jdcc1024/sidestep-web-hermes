@@ -49,10 +49,10 @@ export default function OrderDetailPage({ params }: PageProps) {
   // affordance on this page goes away and the note under the header says why.
   const { order, designs, locked } = result.data;
   const stage = deriveCustomerStage(order.internalStages);
-  // Σ qty of sized items on the linked designs (O-07). 0 is the resting
-  // total — an empty list or one still loading never reads as the stale
-  // intake estimate.
-  const total = list?.summary.itemCount ?? 0;
+  // Σ jerseys on the linked designs (O-07). 0 is the resting total — an
+  // empty list or one still loading never reads as the stale intake
+  // estimate.
+  const total = list?.summary.jerseyCount ?? 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8">

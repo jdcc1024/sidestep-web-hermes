@@ -33,7 +33,7 @@ export function CopyFromDesign({
   otherDesigns: readonly { _id: Id<"designs">; title: string }[];
   className?: string;
 }) {
-  const copyToDesign = useMutation(api.orderItems.copyToDesign);
+  const copyToDesign = useMutation(api.rosterEntries.copyToDesign);
   const [busy, setBusy] = useState(false);
 
   if (otherDesigns.length === 0) return null;
