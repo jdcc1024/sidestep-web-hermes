@@ -5,10 +5,12 @@
 // docs/architecture/0004-order-items.md "Must answer 3", UX §7.6 / §7.10.
 //
 // The first describe is the R-02 regression suite, kept scenario for scenario.
-// The player-facing args change only by the id rename (`rosterEntryId` →
-// `itemId`, rule 10); the assertions read `orderItems`, because after L-02
-// that is the only table the form writes. The describes after it are the
-// L-02 acceptance criteria, one per criterion and named after it.
+// The describes after it are the L-02 acceptance criteria, one per criterion
+// and named after it. Since R2-02 the form writes players
+// (docs/architecture/0004-roster-sizes.md, "Write: the public form"): each
+// line resolves a roster entry and inserts a `fan` item under it. The fill
+// path and the collision flag are gone, so their tests became the
+// "joins the existing player" rules; the line's id is `rosterEntryId` again.
 import { describe, expect, it } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
 import { ConvexError } from "convex/values";
@@ -129,21 +131,30 @@ async function liveItems(t: T, orderId: Id<"orders">) {
   return (await allItems(t, orderId)).filter((i) => i.removedAt === undefined);
 }
 
-// An item written straight into the table, for the states no public API can
-// reach in one step (a removed row, an unnamed captain row, a sized row with
-// no submitter). Defaults to a captain's Needs-size player.
-async function insertItem(
+async function liveEntries(t: T, orderId: Id<"orders">) {
+  const rows = await t.run((ctx) =>
+    ctx.db
+      .query("rosterEntries")
+      .withIndex("by_order", (q) => q.eq("orderId", orderId))
+      .collect(),
+  );
+  return rows.filter((e) => e.removedAt === undefined);
+}
+
+// A player written straight into the table, for the states no public API can
+// reach in one step (a removed player, an unnamed one, one on another order).
+// No items: a named player with none "needs sizes".
+async function insertEntry(
   t: T,
   orderId: Id<"orders">,
   designId: Id<"designs">,
-  fields: Partial<Omit<Doc<"orderItems">, "_id" | "_creationTime">> = {},
+  fields: Partial<Omit<Doc<"rosterEntries">, "_id" | "_creationTime">> = {},
 ) {
   const now = Date.now();
   return t.run((ctx) =>
-    ctx.db.insert("orderItems", {
+    ctx.db.insert("rosterEntries", {
       orderId,
       designId,
-      qty: 1,
       source: "captain",
       createdAt: now,
       updatedAt: now,
@@ -235,12 +246,12 @@ describe("orderEntries.submitOrder", () => {
   it("attaches to an existing captain-seeded slot instead of duplicating it", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t);
-    const seededId = await asCaptain.mutation(api.orderItems.add, {
+    const { entryId: seededId } = await asCaptain.mutation(api.rosterEntries.add, {
       orderId,
       designId: homeId,
       name: "Gretzky",
       number: "99",
-      qty: 1,
+      sizes: [],
     });
 
     await t.mutation(api.orderEntries.submitOrder, {
@@ -251,9 +262,11 @@ describe("orderEntries.submitOrder", () => {
       lines: [{ designId: homeId, name: "  gretzky ", number: "99", size: "L", qty: 1 }],
     });
 
+    const entries = await liveEntries(t, orderId);
+    expect(entries.map((e) => e._id)).toEqual([seededId]); // no duplicate player
     const items = await liveItems(t, orderId);
-    expect(items).toHaveLength(1); // no duplicate row
-    expect(items[0]._id).toBe(seededId);
+    expect(items).toHaveLength(1);
+    expect(items[0].rosterEntryId).toBe(seededId);
     expect(items[0].size).toBe("L");
   });
 
@@ -280,7 +293,9 @@ describe("orderEntries.submitOrder", () => {
     ]);
   });
 
-  it("flags an open-mode collision when a different fan matches an existing slot", async () => {
+  // Gate 1b Q5: no collision flag. The captain's list shows one player whose
+  // lines keep each sender.
+  it("joins a different fan's same name + number to one player, each line keeping its sender", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
       namesMode: "open",
@@ -300,47 +315,19 @@ describe("orderEntries.submitOrder", () => {
       customAnswers: {},
       lines: [{ designId: homeId, name: "Gretzky", number: "99", size: "M", qty: 1 }],
     });
+    expect(second.created).toBe(1);
 
-    expect(second.collisions).toBe(1);
-
-    // And the captain's list surfaces the collision on those rows.
     const view = await asCaptain.query(api.orderItems.listForOrder, { orderId });
     const gretzkys = view!.designs
-      .flatMap((d) => d.items)
-      .filter((i) => i.name === "Gretzky");
-    expect(gretzkys).toHaveLength(2);
-    expect(gretzkys.every((i) => i.collision)).toBe(true);
-  });
-
-  it("does not flag a collision in fixed mode", async () => {
-    const t = convexTest(schema, modules);
-    const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
-      namesMode: "fixed",
-    });
-    const itemId = await asCaptain.mutation(api.orderItems.add, {
-      orderId,
-      designId: homeId,
-      name: "Gretzky",
-      number: "99",
-      qty: 1,
-    });
-
-    // Two different fans pick the same seeded player — expected in fixed mode.
-    await t.mutation(api.orderEntries.submitOrder, {
-      orderFormId: orderFormId,
-      submitterName: "Pat",
-      submitterEmail: "pat@example.com",
-      customAnswers: {},
-      lines: [{ designId: homeId, itemId, size: "L", qty: 1 }],
-    });
-    const second = await t.mutation(api.orderEntries.submitOrder, {
-      orderFormId: orderFormId,
-      submitterName: "Sam",
-      submitterEmail: "sam@example.com",
-      customAnswers: {},
-      lines: [{ designId: homeId, itemId, size: "M", qty: 1 }],
-    });
-    expect(second.collisions).toBe(0);
+      .flatMap((d) => d.players)
+      .filter((p) => p.name === "Gretzky");
+    expect(gretzkys).toHaveLength(1);
+    expect(
+      gretzkys[0].lines.map((l) => [l.size, l.submitterEmail]),
+    ).toEqual([
+      ["L", "pat@example.com"],
+      ["M", "sam@example.com"],
+    ]);
   });
 
   it("creates a blank/bulk line with no roster entry", async () => {
@@ -442,19 +429,19 @@ describe("orderEntries.submitOrder", () => {
 
 // ─── L-02 acceptance criteria ──────────────────────────────────────────────
 
-describe("Open mode: a player line matching a captain's Needs-size item fills that item; a non-matching line inserts a fan item (§7.6)", () => {
-  it("fills the matching Needs-size item in place: size, qty, submitter, answers and orderFormId set, same _id, source left alone", async () => {
+describe("Open mode: a player line matching an existing player adds a fan item under it; a non-matching line creates a new player (§7.6, R2-02)", () => {
+  it("adds an item under the existing player (same entry, no second entry), with size, qty, submitter, answers and orderFormId", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
       customQuestions: [{ id: "q1", label: "Pickup?" }],
     });
-    const seededId = await asCaptain.mutation(api.orderItems.add, {
+    const { entryId: seededId } = await asCaptain.mutation(api.rosterEntries.add, {
       orderId,
       designId: homeId,
       name: "Jordan Lee",
       number: "4",
       designation: "C",
-      qty: 1,
+      sizes: [],
     });
 
     const result = await t.mutation(api.orderEntries.submitOrder, {
@@ -466,18 +453,28 @@ describe("Open mode: a player line matching a captain's Needs-size item fills th
       lines: [{ designId: homeId, name: " jordan LEE ", number: " 4", size: "M", qty: 2 }],
     });
     expect(result.created).toBe(1);
+    expect(result.items).toEqual([{ rosterEntryId: seededId, designId: homeId }]);
+
+    const entries = await liveEntries(t, orderId);
+    expect(entries.map((e) => e._id)).toEqual([seededId]);
+    // The captain's spelling and letter stand: the form never sets either.
+    expect(entries[0]).toMatchObject({
+      name: "Jordan Lee",
+      number: "4",
+      designation: "C",
+      source: "captain",
+    });
 
     const items = await liveItems(t, orderId);
     expect(items).toHaveLength(1);
-    const filled = items[0];
-    expect(filled._id).toBe(seededId);
-    expect(filled).toMatchObject({
+    expect(items[0]).toMatchObject({
+      rosterEntryId: seededId,
       name: "Jordan Lee",
       number: "4",
       designation: "C",
       size: "M",
       qty: 2,
-      source: "captain",
+      source: "fan",
       submitterName: "Jordan's Mum",
       submitterEmail: "mum@example.com",
       customAnswers: { q1: "Gym" },
@@ -485,15 +482,15 @@ describe("Open mode: a player line matching a captain's Needs-size item fills th
     });
   });
 
-  it("inserts a new fan item when no Needs-size item matches the design + name + number", async () => {
+  it("creates a new player when no player matches the design + name + number", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId, awayId, asCaptain } = await seedRun(t);
-    const seededId = await asCaptain.mutation(api.orderItems.add, {
+    const { entryId: seededId } = await asCaptain.mutation(api.rosterEntries.add, {
       orderId,
       designId: homeId,
       name: "Jordan Lee",
       number: "4",
-      qty: 1,
+      sizes: [],
     });
 
     await t.mutation(api.orderEntries.submitOrder, {
@@ -508,67 +505,39 @@ describe("Open mode: a player line matching a captain's Needs-size item fills th
       ],
     });
 
+    // The seeded player still has no sizes; each line made its own player.
     const items = await liveItems(t, orderId);
-    expect(items).toHaveLength(3);
-    const seeded = items.find((i) => i._id === seededId)!;
-    expect(seeded.size).toBeUndefined();
-    expect(seeded.submitterEmail).toBeUndefined();
-    const inserted = items.filter((i) => i._id !== seededId);
-    expect(inserted.every((i) => i.source === "fan")).toBe(true);
-    expect(inserted.map((i) => [i.designId, i.name, i.size])).toEqual([
+    expect(items).toHaveLength(2);
+    expect(items.some((i) => i.rosterEntryId === seededId)).toBe(false);
+    expect(items.every((i) => i.source === "fan")).toBe(true);
+    expect(items.map((i) => [i.designId, i.name, i.size])).toEqual([
       [awayId, "Jordan Lee", "S"],
       [homeId, "Sam Ruiz", "L"],
     ]);
+    const entries = await liveEntries(t, orderId);
+    expect(entries).toHaveLength(3);
+    expect(new Set(items.map((i) => i.rosterEntryId)).size).toBe(2);
+    expect(
+      entries.filter((e) => e._id !== seededId).every((e) => e.source === "fan"),
+    ).toBe(true);
   });
 
-  it("fills the oldest matching Needs-size item first, and two lines never fill the same row", async () => {
+  it("never joins a removed player, and never changes a line the player already has", async () => {
     const t = convexTest(schema, modules);
-    const { orderId, orderFormId, homeId } = await seedRun(t);
-    const older = await insertItem(t, orderId, homeId, {
-      name: "Gretzky",
-      number: "99",
-      createdAt: 1_000,
-    });
-    const newer = await insertItem(t, orderId, homeId, {
-      name: "Gretzky",
-      number: "99",
-      createdAt: 2_000,
-    });
-
-    // Three lines for two empty rows: the first two fill (oldest first), the
-    // third has nothing left to fill and lands as its own item.
-    await t.mutation(api.orderEntries.submitOrder, {
-      orderFormId: orderFormId,
-      ...fan,
-      customAnswers: {},
-      lines: [
-        { designId: homeId, name: "Gretzky", number: "99", size: "S", qty: 1 },
-        { designId: homeId, name: "Gretzky", number: "99", size: "M", qty: 1 },
-        { designId: homeId, name: "Gretzky", number: "99", size: "L", qty: 1 },
-      ],
-    });
-
-    const items = await liveItems(t, orderId);
-    expect(items).toHaveLength(3);
-    expect(items.find((i) => i._id === older)?.size).toBe("S");
-    expect(items.find((i) => i._id === newer)?.size).toBe("M");
-    const extra = items.find((i) => i._id !== older && i._id !== newer)!;
-    expect(extra).toMatchObject({ size: "L", source: "fan" });
-  });
-
-  it("does not fill an item that is removed, already sized, or already has a submitter", async () => {
-    const t = convexTest(schema, modules);
-    const { orderId, orderFormId, homeId } = await seedRun(t);
-    const removed = await insertItem(t, orderId, homeId, {
+    const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t);
+    const removed = await insertEntry(t, orderId, homeId, {
       name: "Gretzky",
       number: "99",
       removedAt: Date.now(),
     });
-    const sized = await insertItem(t, orderId, homeId, {
+    const { entryId: live } = await asCaptain.mutation(api.rosterEntries.add, {
+      orderId,
+      designId: homeId,
       name: "Gretzky",
       number: "99",
-      size: "XL",
+      sizes: [{ size: "XL", qty: 1 }],
     });
+    const [captainLine] = await liveItems(t, orderId);
 
     await t.mutation(api.orderEntries.submitOrder, {
       orderFormId: orderFormId,
@@ -577,17 +546,18 @@ describe("Open mode: a player line matching a captain's Needs-size item fills th
       lines: [{ designId: homeId, name: "Gretzky", number: "99", size: "M", qty: 1 }],
     });
 
+    const removedEntry = await t.run((ctx) => ctx.db.get(removed));
+    expect(removedEntry?.removedAt).toBeDefined();
     const all = await allItems(t, orderId);
-    // Convex stores no key for an undefined field, so check each field is
-    // absent rather than toMatchObject({ size: undefined }), which needs the key.
-    const removedItem = all.find((i) => i._id === removed);
-    expect(removedItem?.removedAt).toBeDefined();
-    expect(removedItem?.size).toBeUndefined();
-    expect(removedItem?.submitterEmail).toBeUndefined();
-    expect(all.find((i) => i._id === sized)?.size).toBe("XL");
-    const fresh = all.filter((i) => i._id !== removed && i._id !== sized);
+    expect(all.some((i) => i.rosterEntryId === removed)).toBe(false);
+    expect(all.find((i) => i._id === captainLine._id)).toEqual(captainLine);
+    const fresh = all.filter((i) => i._id !== captainLine._id);
     expect(fresh).toHaveLength(1);
-    expect(fresh[0]).toMatchObject({ size: "M", source: "fan" });
+    expect(fresh[0]).toMatchObject({
+      rosterEntryId: live,
+      size: "M",
+      source: "fan",
+    });
   });
 
   it("keeps the typed number on a line with a blank name", async () => {
@@ -608,66 +578,74 @@ describe("Open mode: a player line matching a captain's Needs-size item fills th
   });
 });
 
-describe("Fixed mode: picking a Needs-size item fills it; picking an already-sized item, or one item in two sizes, inserts copies and nothing is merged (§7.6)", () => {
-  it("fills the picked Needs-size item in place", async () => {
+describe("Fixed mode: picking a player adds a fan item under that player, whether or not it already has sizes; nothing is merged or overwritten (§7.6, R2-02)", () => {
+  it("adds an item under the picked player who needs sizes", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
       namesMode: "fixed",
     });
-    const itemId = await asCaptain.mutation(api.orderItems.add, {
+    const { entryId } = await asCaptain.mutation(api.rosterEntries.add, {
       orderId,
       designId: homeId,
       name: "Jordan Lee",
       number: "4",
       designation: "A",
-      qty: 1,
+      sizes: [],
     });
 
     await t.mutation(api.orderEntries.submitOrder, {
       orderFormId: orderFormId,
       ...fan,
       customAnswers: {},
-      lines: [{ designId: homeId, itemId, size: "L", qty: 1 }],
+      lines: [{ designId: homeId, rosterEntryId: entryId, size: "L", qty: 1 }],
     });
 
+    expect((await liveEntries(t, orderId)).map((e) => e._id)).toEqual([entryId]);
     const items = await liveItems(t, orderId);
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
-      _id: itemId,
+      rosterEntryId: entryId,
       name: "Jordan Lee",
       number: "4",
       designation: "A",
       size: "L",
+      source: "fan",
       submitterEmail: "pat@example.com",
       orderFormId,
     });
   });
 
-  it("inserts a copy with the same name, number and letter when the picked item is already sized", async () => {
+  it("adds an item with the same name, number and letter when the picked player already has a size", async () => {
     const t = convexTest(schema, modules);
-    const { orderId, orderFormId, homeId } = await seedRun(t, { namesMode: "fixed" });
-    // The race in the design note: the captain sized the row before the
-    // player pressed Submit.
-    const itemId = await insertItem(t, orderId, homeId, {
+    const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
+      namesMode: "fixed",
+    });
+    // The race in the design note: the captain sized the player before the
+    // fan pressed Submit.
+    const { entryId } = await asCaptain.mutation(api.rosterEntries.add, {
+      orderId,
+      designId: homeId,
       name: "Jordan Lee",
       number: "4",
       designation: "C",
-      size: "M",
+      sizes: [{ size: "M", qty: 1 }],
     });
+    const [captainLine] = await liveItems(t, orderId);
 
     await t.mutation(api.orderEntries.submitOrder, {
       orderFormId: orderFormId,
       ...fan,
       customAnswers: {},
-      lines: [{ designId: homeId, itemId, size: "L", qty: 1 }],
+      lines: [{ designId: homeId, rosterEntryId: entryId, size: "L", qty: 1 }],
     });
 
     const items = await liveItems(t, orderId);
     expect(items).toHaveLength(2);
-    // The captain's size is never overwritten by the public form.
-    expect(items.find((i) => i._id === itemId)?.size).toBe("M");
-    const copy = items.find((i) => i._id !== itemId)!;
-    expect(copy).toMatchObject({
+    // The captain's line is never overwritten by the public form.
+    expect(items.find((i) => i._id === captainLine._id)).toEqual(captainLine);
+    const added = items.find((i) => i._id !== captainLine._id)!;
+    expect(added).toMatchObject({
+      rosterEntryId: entryId,
       name: "Jordan Lee",
       number: "4",
       designation: "C",
@@ -677,17 +655,17 @@ describe("Fixed mode: picking a Needs-size item fills it; picking an already-siz
     });
   });
 
-  it("picking one item in two sizes in one submission fills it once and inserts one copy", async () => {
+  it("picking one player in two sizes in one submission adds two items under that player", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
       namesMode: "fixed",
     });
-    const itemId = await asCaptain.mutation(api.orderItems.add, {
+    const { entryId } = await asCaptain.mutation(api.rosterEntries.add, {
       orderId,
       designId: homeId,
       name: "Jordan Lee",
       number: "4",
-      qty: 1,
+      sizes: [],
     });
 
     const result = await t.mutation(api.orderEntries.submitOrder, {
@@ -695,33 +673,34 @@ describe("Fixed mode: picking a Needs-size item fills it; picking an already-siz
       ...fan,
       customAnswers: {},
       lines: [
-        { designId: homeId, itemId, size: "M", qty: 2 },
-        { designId: homeId, itemId, size: "L", qty: 1 },
+        { designId: homeId, rosterEntryId: entryId, size: "M", qty: 2 },
+        { designId: homeId, rosterEntryId: entryId, size: "L", qty: 1 },
       ],
     });
     expect(result.created).toBe(2);
 
+    expect(await liveEntries(t, orderId)).toHaveLength(1);
     const items = await liveItems(t, orderId);
     expect(items).toHaveLength(2);
     expect(items.map((i) => [i.name, i.number, i.size, i.qty])).toEqual([
       ["Jordan Lee", "4", "M", 2],
       ["Jordan Lee", "4", "L", 1],
     ]);
-    expect(items[0]._id).toBe(itemId);
+    expect(items.every((i) => i.rosterEntryId === entryId)).toBe(true);
   });
 
-  it("rejects a picked item that is removed, unnamed, on another design or on another order", async () => {
+  it("rejects a picked player that is removed, unnamed, on another design or on another order", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId, awayId, userId } = await seedRun(t, {
       namesMode: "fixed",
     });
-    const removed = await insertItem(t, orderId, homeId, {
+    const removed = await insertEntry(t, orderId, homeId, {
       name: "Gone",
       number: "1",
       removedAt: Date.now(),
     });
-    const unnamed = await insertItem(t, orderId, homeId, { number: "2" });
-    const onAway = await insertItem(t, orderId, awayId, { name: "Away", number: "3" });
+    const unnamed = await insertEntry(t, orderId, homeId, { number: "2" });
+    const onAway = await insertEntry(t, orderId, awayId, { name: "Away", number: "3" });
     const otherOrderId = await t.run((ctx) =>
       ctx.db.insert("orders", {
         captainId: userId,
@@ -735,35 +714,33 @@ describe("Fixed mode: picking a Needs-size item fills it; picking an already-siz
         updatedAt: Date.now(),
       }),
     );
-    const foreign = await insertItem(t, otherOrderId, homeId, {
+    const foreign = await insertEntry(t, otherOrderId, homeId, {
       name: "Foreign",
       number: "4",
     });
 
-    for (const itemId of [removed, unnamed, onAway, foreign]) {
+    for (const rosterEntryId of [removed, unnamed, onAway, foreign]) {
       await expectUserError(() =>
         t.mutation(api.orderEntries.submitOrder, {
           orderFormId: orderFormId,
           ...fan,
           customAnswers: {},
-          lines: [{ designId: homeId, itemId, size: "M", qty: 1 }],
+          lines: [{ designId: homeId, rosterEntryId, size: "M", qty: 1 }],
         }),
       );
     }
-    // Nothing was filled or written by any of the refused submissions.
-    const fresh = (await allItems(t, orderId)).filter(
-      (i) => i.submitterEmail !== undefined,
-    );
-    expect(fresh).toEqual([]);
+    // Nothing was written by any of the refused submissions, on either order.
+    expect(await allItems(t, orderId)).toEqual([]);
+    expect(await allItems(t, otherOrderId)).toEqual([]);
   });
 });
 
-describe("Open mode collision: two different emails on the same design + name + number flag both items; same email twice does not; fixed mode never does (§7.6, JCC Q7 = A)", () => {
+describe("Open mode, same print from two emails: two different emails on the same design + name + number give one entry with two items, each keeping its own submitterEmail; the line is never refused (Gate 1b Q5)", () => {
   async function submit(
     t: T,
     orderFormId: Id<"orderForms">,
     email: string,
-    line: { designId: Id<"designs">; name?: string; number?: string; itemId?: Id<"orderItems"> },
+    line: { designId: Id<"designs">; name?: string; number?: string },
     size = "M",
   ) {
     return t.mutation(api.orderEntries.submitOrder, {
@@ -775,100 +752,59 @@ describe("Open mode collision: two different emails on the same design + name + 
     });
   }
 
-  it("flags both items when two different emails send the same player in open mode", async () => {
+  it("two different emails, same name + number on one design: one entry, two items, each keeps its own submitterEmail", async () => {
     const t = convexTest(schema, modules);
-    const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
+    const { orderId, orderFormId, homeId } = await seedRun(t, {
       namesMode: "open",
     });
     const line = { designId: homeId, name: "Gretzky", number: "99" };
-    expect((await submit(t, orderFormId, "pat@example.com", line)).collisions).toBe(0);
-    expect((await submit(t, orderFormId, "sam@example.com", line, "L")).collisions).toBe(1);
-
-    const view = await asCaptain.query(api.orderItems.listForOrder, { orderId });
-    const items = view!.designs[0].items;
-    expect(items).toHaveLength(2);
-    expect(items.map((i) => i.collision)).toEqual([true, true]);
-  });
-
-  it("does not flag the same email sending the same player twice", async () => {
-    const t = convexTest(schema, modules);
-    const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
-      namesMode: "open",
-    });
-    const line = { designId: homeId, name: "Gretzky", number: "99" };
-    await submit(t, orderFormId, "pat@example.com", line);
-    const second = await submit(t, orderFormId, "PAT@example.com", line, "L");
-    expect(second.collisions).toBe(0);
-
-    const view = await asCaptain.query(api.orderItems.listForOrder, { orderId });
-    expect(view!.designs[0].items.map((i) => i.collision)).toEqual([false, false]);
-  });
-
-  it("never flags in fixed mode, even when two emails pick the same player", async () => {
-    const t = convexTest(schema, modules);
-    const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
-      namesMode: "fixed",
-    });
-    const itemId = await asCaptain.mutation(api.orderItems.add, {
-      orderId,
-      designId: homeId,
-      name: "Gretzky",
-      number: "99",
-      qty: 1,
-    });
-    await submit(t, orderFormId, "pat@example.com", { designId: homeId, itemId });
-    const second = await submit(
-      t,
-      orderFormId,
-      "sam@example.com",
-      { designId: homeId, itemId },
-      "L",
-    );
-    expect(second.collisions).toBe(0);
-
-    const view = await asCaptain.query(api.orderItems.listForOrder, { orderId });
-    const items = view!.designs[0].items;
-    expect(items).toHaveLength(2);
-    expect(items.every((i) => !i.collision)).toBe(true);
-  });
-
-  it("is a row warning, never a block: the colliding line is still written", async () => {
-    const t = convexTest(schema, modules);
-    const { orderId, orderFormId, homeId } = await seedRun(t, { namesMode: "open" });
-    const line = { designId: homeId, name: "Gretzky", number: "99" };
-    await submit(t, orderFormId, "pat@example.com", line);
-    const second = await submit(t, orderFormId, "sam@example.com", line);
+    const first = await submit(t, orderFormId, "pat@example.com", line);
+    // Never a block: the second sender's line is written too.
+    const second = await submit(t, orderFormId, "sam@example.com", line, "L");
     expect(second.created).toBe(1);
-    expect(await liveItems(t, orderId)).toHaveLength(2);
+    expect(second).not.toHaveProperty("collisions");
+
+    const entries = await liveEntries(t, orderId);
+    expect(entries).toHaveLength(1);
+    expect(first.items[0].rosterEntryId).toBe(entries[0]._id);
+    expect(second.items[0].rosterEntryId).toBe(entries[0]._id);
+
+    const items = await liveItems(t, orderId);
+    expect(
+      items.map((i) => [i.rosterEntryId, i.size, i.submitterEmail]),
+    ).toEqual([
+      [entries[0]._id, "M", "pat@example.com"],
+      [entries[0]._id, "L", "sam@example.com"],
+    ]);
   });
 });
 
-describe("Same name, different number (Lee #4, Lee #9): two separate items; neither fills the other's Needs-size item; no collision in either mode", () => {
+describe("Same name, different number (Lee #4, Lee #9): two separate players; neither line joins the other player, in either mode", () => {
   for (const namesMode of ["open", "fixed"] as const) {
     it(`keeps Lee #4 and Lee #9 apart in ${namesMode} mode`, async () => {
       const t = convexTest(schema, modules);
       const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t, {
         namesMode,
       });
-      const lee4 = await asCaptain.mutation(api.orderItems.add, {
+      const { entryId: lee4 } = await asCaptain.mutation(api.rosterEntries.add, {
         orderId,
         designId: homeId,
         name: "Lee",
         number: "4",
-        qty: 1,
+        sizes: [],
       });
-      const lee9 = await asCaptain.mutation(api.orderItems.add, {
+      const { entryId: lee9 } = await asCaptain.mutation(api.rosterEntries.add, {
         orderId,
         designId: homeId,
         name: "Lee",
         number: "9",
-        qty: 1,
+        sizes: [],
       });
 
       // Two different people, one for each Lee.
-      const lineFor = (id: Id<"orderItems">, number: string) =>
+      const lineFor = (id: Id<"rosterEntries">, number: string) =>
         namesMode === "fixed"
-          ? { designId: homeId, itemId: id, size: "M", qty: 1 }
+          ? { designId: homeId, rosterEntryId: id, size: "M", qty: 1 }
           : { designId: homeId, name: "Lee", number, size: "M", qty: 1 };
       const first = await t.mutation(api.orderEntries.submitOrder, {
         orderFormId: orderFormId,
@@ -884,16 +820,18 @@ describe("Same name, different number (Lee #4, Lee #9): two separate items; neit
         customAnswers: {},
         lines: [lineFor(lee4, "4")],
       });
-      expect(first.collisions + second.collisions).toBe(0);
+      expect(first.items[0].rosterEntryId).toBe(lee9);
+      expect(second.items[0].rosterEntryId).toBe(lee4);
 
+      // Each line went under its own player; no third player, no cross-join.
+      expect(await liveEntries(t, orderId)).toHaveLength(2);
       const items = await liveItems(t, orderId);
-      // Each line filled its own player; no third row, no cross-fill.
       expect(items).toHaveLength(2);
-      expect(items.find((i) => i._id === lee9)).toMatchObject({
+      expect(items.find((i) => i.rosterEntryId === lee9)).toMatchObject({
         number: "9",
         submitterEmail: "pat@example.com",
       });
-      expect(items.find((i) => i._id === lee4)).toMatchObject({
+      expect(items.find((i) => i.rosterEntryId === lee4)).toMatchObject({
         number: "4",
         submitterEmail: "sam@example.com",
       });
@@ -901,19 +839,24 @@ describe("Same name, different number (Lee #4, Lee #9): two separate items; neit
       const view = await asCaptain.query(api.orderItems.listForOrder, {
         orderId,
       });
-      expect(view!.designs[0].items.every((i) => !i.collision)).toBe(true);
+      expect(
+        view!.designs[0].players.map((p) => [p.number, p.jerseyCount]),
+      ).toEqual([
+        ["4", 1],
+        ["9", 1],
+      ]);
     });
   }
 
-  it("an open-mode Lee #9 line does not fill a Needs-size Lee #4", async () => {
+  it("an open-mode Lee #9 line does not join a Lee #4 who needs sizes", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId, asCaptain } = await seedRun(t);
-    const lee4 = await asCaptain.mutation(api.orderItems.add, {
+    const { entryId: lee4 } = await asCaptain.mutation(api.rosterEntries.add, {
       orderId,
       designId: homeId,
       name: "Lee",
       number: "4",
-      qty: 1,
+      sizes: [],
     });
 
     await t.mutation(api.orderEntries.submitOrder, {
@@ -923,10 +866,11 @@ describe("Same name, different number (Lee #4, Lee #9): two separate items; neit
       lines: [{ designId: homeId, name: "Lee", number: "9", size: "M", qty: 1 }],
     });
 
+    expect(await liveEntries(t, orderId)).toHaveLength(2);
     const items = await liveItems(t, orderId);
-    expect(items).toHaveLength(2);
-    expect(items.find((i) => i._id === lee4)?.size).toBeUndefined();
-    expect(items.find((i) => i._id !== lee4)).toMatchObject({
+    expect(items).toHaveLength(1);
+    expect(items[0].rosterEntryId).not.toBe(lee4);
+    expect(items[0]).toMatchObject({
       name: "Lee",
       number: "9",
       size: "M",
@@ -934,7 +878,7 @@ describe("Same name, different number (Lee #4, Lee #9): two separate items; neit
   });
 });
 
-describe("Same name + number submitted twice (same or different email, either mode) produces two items; nothing is merged or rejected", () => {
+describe("Same name + number submitted twice (same or different email, either mode) produces two items on one player; nothing is merged or rejected", () => {
   const cases = [
     { namesMode: "open", second: "pat@example.com" },
     { namesMode: "open", second: "sam@example.com" },
@@ -949,18 +893,20 @@ describe("Same name + number submitted twice (same or different email, either mo
         namesMode,
       });
       // Fixed mode needs a player to pick; open mode starts from nothing.
-      const itemId =
+      const rosterEntryId =
         namesMode === "fixed"
-          ? await asCaptain.mutation(api.orderItems.add, {
-              orderId,
-              designId: homeId,
-              name: "Gretzky",
-              number: "99",
-              qty: 1,
-            })
+          ? (
+              await asCaptain.mutation(api.rosterEntries.add, {
+                orderId,
+                designId: homeId,
+                name: "Gretzky",
+                number: "99",
+                sizes: [],
+              })
+            ).entryId
           : undefined;
-      const line = itemId
-        ? { designId: homeId, itemId, size: "M", qty: 1 }
+      const line = rosterEntryId
+        ? { designId: homeId, rosterEntryId, size: "M", qty: 1 }
         : { designId: homeId, name: "Gretzky", number: "99", size: "M", qty: 1 };
 
       for (const email of ["pat@example.com", second]) {
@@ -980,6 +926,8 @@ describe("Same name + number submitted twice (same or different email, either mo
         true,
       );
       expect(items.every((i) => i.size === "M" && i.qty === 1)).toBe(true);
+      expect(await liveEntries(t, orderId)).toHaveLength(1);
+      expect(new Set(items.map((i) => i.rosterEntryId)).size).toBe(1);
     });
   }
 });
@@ -996,7 +944,7 @@ describe("submitOrder is rejected when isListLocked, and when the form is closed
   it("rejects a confirmed (locked) list with customer copy and writes nothing", async () => {
     const t = convexTest(schema, modules);
     const { orderId, orderFormId, homeId } = await seedRun(t, { confirmed: true });
-    const seeded = await insertItem(t, orderId, homeId, {
+    const seeded = await insertEntry(t, orderId, homeId, {
       name: "Gretzky",
       number: "99",
     });
@@ -1012,10 +960,9 @@ describe("submitOrder is rejected when isListLocked, and when the form is closed
     expect(message).toMatch(/locked/i);
     expect(message).not.toMatch(/convex|request id|\.ts\b/i);
 
-    const items = await allItems(t, orderId);
-    expect(items).toHaveLength(1);
-    expect(items[0]._id).toBe(seeded);
-    expect(items[0].size).toBeUndefined();
+    // The player is untouched and still has no sizes.
+    expect((await liveEntries(t, orderId)).map((e) => e._id)).toEqual([seeded]);
+    expect(await allItems(t, orderId)).toEqual([]);
   });
 
   it("rejects a form that closed lazily past its deadline", async () => {

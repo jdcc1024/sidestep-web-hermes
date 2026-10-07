@@ -8,6 +8,9 @@
 // docs/ux/0004-order-items.md §7.2, §7.8, §8.9, §8.10.
 // One `describe` per acceptance criterion, named after it. Written before the
 // build: every test fails only because the lock is still "the run is locked".
+// Since R2-02 the list is players: fixtures seed roster entries, writes go
+// through `api.rosterEntries.*`, and the confirm gate names players with no
+// live sizes.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -102,29 +105,64 @@ async function seedWorld(
 
 type World = Awaited<ReturnType<typeof seedWorld>>;
 
-async function insertItem(
+// A player written straight into the tables (R2-02): a roster entry, plus one
+// captain size line under it when `size` is given. No size = the player needs
+// sizes. `removed` soft-removes the entry.
+async function insertPlayer(
   t: T,
   w: Pick<World, "orderId" | "designId">,
-  o: { name?: string; number?: string; size?: string; qty?: number } = {},
+  o: {
+    name?: string;
+    number?: string;
+    size?: string;
+    qty?: number;
+    removed?: boolean;
+  } = {},
 ) {
   const now = Date.now();
-  return t.run((ctx) =>
-    ctx.db.insert("orderItems", {
+  return t.run(async (ctx) => {
+    const entryId = await ctx.db.insert("rosterEntries", {
       orderId: w.orderId,
       designId: w.designId,
       name: o.name,
       number: o.number,
-      size: o.size,
-      qty: o.qty ?? 1,
       source: "captain",
+      removedAt: o.removed ? now : undefined,
       createdAt: now,
       updatedAt: now,
-    }),
-  );
+    });
+    if (o.size !== undefined)
+      await ctx.db.insert("orderItems", {
+        orderId: w.orderId,
+        designId: w.designId,
+        rosterEntryId: entryId,
+        name: o.name,
+        number: o.number,
+        size: o.size,
+        qty: o.qty ?? 1,
+        source: "captain",
+        createdAt: now,
+        updatedAt: now,
+      });
+    return entryId;
+  });
 }
 
-async function getItem(t: T, id: Id<"orderItems">) {
+async function getEntry(t: T, id: Id<"rosterEntries">) {
   return t.run((ctx) => ctx.db.get(id));
+}
+
+// A player's live size lines as [size, qty], oldest first.
+async function liveSizes(t: T, entryId: Id<"rosterEntries">) {
+  const items = await t.run((ctx) =>
+    ctx.db
+      .query("orderItems")
+      .withIndex("by_entry", (q) => q.eq("rosterEntryId", entryId))
+      .collect(),
+  );
+  return items
+    .filter((i) => i.removedAt === undefined)
+    .map((i) => [i.size, i.qty]);
 }
 
 // Every internal stage, with the named ones completed. This is what the admin
@@ -183,26 +221,27 @@ describe("With Order Size Confirmed unchecked, a captain can add/edit/remove aft
   it("captain writes succeed past the deadline", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t, { run: { deadline: Date.now() - ONE_DAY } });
-    const existing = await insertItem(t, w, { name: "Sam", number: "9", size: "M" });
+    const existing = await insertPlayer(t, w, { name: "Sam", number: "9", size: "M" });
 
-    const added = await w.captain.as.mutation(api.orderItems.add, {
+    const { entryId: added } = await w.captain.as.mutation(api.rosterEntries.add, {
       orderId: w.orderId,
       designId: w.designId,
       name: "Late",
-      size: "L",
-      qty: 1,
+      sizes: [{ size: "L", qty: 1 }],
     });
-    await w.captain.as.mutation(api.orderItems.update, {
-      itemId: existing,
+    await w.captain.as.mutation(api.rosterEntries.update, {
+      entryId: existing,
       name: "Sam",
       number: "9",
-      size: "L",
-      qty: 2,
+      sizeDeltas: [
+        { size: "M", delta: -1 },
+        { size: "L", delta: 2 },
+      ],
     });
-    await w.captain.as.mutation(api.orderItems.remove, { itemId: added });
+    await w.captain.as.mutation(api.rosterEntries.remove, { entryId: added });
 
-    expect((await getItem(t, existing))?.size).toBe("L");
-    expect((await getItem(t, added))?.removedAt).toEqual(expect.any(Number));
+    expect(await liveSizes(t, existing)).toEqual([["L", 2]]);
+    expect((await getEntry(t, added))?.removedAt).toEqual(expect.any(Number));
     const mine = await w.captain.as.query(api.orders.getMyOrder, {
       orderId: w.orderId,
     });
@@ -247,12 +286,12 @@ describe("With Order Size Confirmed unchecked, a captain can add/edit/remove aft
   });
 });
 
-describe("Checking Order Size Confirmed on a list with no Needs-size items succeeds and locks the list (§8.9)", () => {
+describe("Checking Order Size Confirmed on a list where no player needs sizes succeeds and locks the list (§8.9)", () => {
   it("the stage sticks and the captain sees the list as locked, with or without an order form", async () => {
     for (const run of [undefined, false] as const) {
       const t = convexTest(schema, modules);
       const w = await seedWorld(t, run === false ? { run: false } : {});
-      await insertItem(t, w, { name: "Sam", number: "9", size: "M" });
+      await insertPlayer(t, w, { name: "Sam", number: "9", size: "M" });
 
       await w.admin.as.mutation(api.admin.updateOrderStages, {
         orderId: w.orderId,
@@ -275,7 +314,7 @@ describe("Checking Order Size Confirmed on a list with no Needs-size items succe
   it("a confirmed list is locked even though the form's deadline is still in the future", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t); // deadline a week out, form open
-    await insertItem(t, w, { name: "Sam", number: "9", size: "M" });
+    await insertPlayer(t, w, { name: "Sam", number: "9", size: "M" });
     await confirmDirectly(t, w.orderId);
     const list = await w.captain.as.query(api.orderItems.listForOrder, {
       orderId: w.orderId,
@@ -286,7 +325,7 @@ describe("Checking Order Size Confirmed on a list with no Needs-size items succe
   it("only an admin can check the stage", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t);
-    await insertItem(t, w, { name: "Sam", size: "M" });
+    await insertPlayer(t, w, { name: "Sam", size: "M" });
     await expect(
       w.captain.as.mutation(api.admin.updateOrderStages, {
         orderId: w.orderId,
@@ -297,13 +336,13 @@ describe("Checking Order Size Confirmed on a list with no Needs-size items succe
   });
 });
 
-describe("Checking Order Size Confirmed on a list with 2 Needs-size items is rejected with a message naming both; the stage stays unchecked (Q2 = A)", () => {
-  it("names both items and leaves the stage unchecked", async () => {
+describe("Checking Order Size Confirmed on a list with 2 players who need sizes is rejected with a message naming both; the stage stays unchecked (Q2 = A; players since R2-02)", () => {
+  it("names both players and leaves the stage unchecked", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t);
-    await insertItem(t, w, { name: "Jordan Lee", number: "4" }); // no size
-    await insertItem(t, w, { name: "Sam Ortiz", number: "11" }); // no size
-    await insertItem(t, w, { name: "Riley Park", number: "7", size: "M" });
+    await insertPlayer(t, w, { name: "Jordan Lee", number: "4" }); // no size
+    await insertPlayer(t, w, { name: "Sam Ortiz", number: "11" }); // no size
+    await insertPlayer(t, w, { name: "Riley Park", number: "7", size: "M" });
 
     const message = await userError(() =>
       w.admin.as.mutation(api.admin.updateOrderStages, {
@@ -312,7 +351,7 @@ describe("Checking Order Size Confirmed on a list with 2 Needs-size items is rej
       }),
     );
 
-    expect(message).toMatch(/2 items need a size/i);
+    expect(message).toMatch(/2 players need sizes/i);
     expect(message).toContain("Jordan Lee #4");
     expect(message).toContain("Sam Ortiz #11");
     expect(message).not.toContain("Riley Park");
@@ -326,7 +365,7 @@ describe("Checking Order Size Confirmed on a list with 2 Needs-size items is rej
   it("names the first 5, then 'and n more'", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t);
-    for (let i = 1; i <= 7; i++) await insertItem(t, w, { name: `Player${i}`, number: String(i) });
+    for (let i = 1; i <= 7; i++) await insertPlayer(t, w, { name: `Player${i}`, number: String(i) });
 
     const message = await userError(() =>
       w.admin.as.mutation(api.admin.updateOrderStages, {
@@ -334,19 +373,18 @@ describe("Checking Order Size Confirmed on a list with 2 Needs-size items is rej
         stages: stages(["Inquiry", CONFIRMED]),
       }),
     );
-    expect(message).toMatch(/7 items need a size/i);
+    expect(message).toMatch(/7 players need sizes/i);
     expect(message).toMatch(/and 2 more/i);
     expect(message).toContain("Player1 #1");
     expect(message).toContain("Player5 #5");
     expect(message).not.toContain("Player6 #6");
   });
 
-  it("removed items and sized items don't block confirming", async () => {
+  it("removed players and sized players don't block confirming", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t);
-    const gone = await insertItem(t, w, { name: "Gone", number: "0" });
-    await t.run((ctx) => ctx.db.patch(gone, { removedAt: Date.now() }));
-    await insertItem(t, w, { name: "Sam", number: "9", size: "M" });
+    await insertPlayer(t, w, { name: "Gone", number: "0", removed: true });
+    await insertPlayer(t, w, { name: "Sam", number: "9", size: "M" });
 
     await w.admin.as.mutation(api.admin.updateOrderStages, {
       orderId: w.orderId,
@@ -359,11 +397,15 @@ describe("Checking Order Size Confirmed on a list with 2 Needs-size items is rej
 describe("While confirmed: captain add/update/remove/restore/addMany/copyToDesign, orders.updateOrder and submitOrder are rejected (§7.2)", () => {
   async function seedConfirmed(t: T) {
     const w = await seedWorld(t); // form open, deadline in the future
-    const item = await insertItem(t, w, { name: "Sam", number: "9", size: "M" });
-    const removed = await insertItem(t, w, { name: "Gone", number: "0", size: "S" });
-    await t.run((ctx) => ctx.db.patch(removed, { removedAt: Date.now() }));
+    const player = await insertPlayer(t, w, { name: "Sam", number: "9", size: "M" });
+    const removed = await insertPlayer(t, w, {
+      name: "Gone",
+      number: "0",
+      size: "S",
+      removed: true,
+    });
     await confirmDirectly(t, w.orderId);
-    return { ...w, item, removed };
+    return { ...w, player, removed };
   }
 
   it("rejects every captain list write with customer copy and changes nothing", async () => {
@@ -372,21 +414,29 @@ describe("While confirmed: captain add/update/remove/restore/addMany/copyToDesig
     const [home, away] = w.designIds;
 
     const calls: Array<[string, () => Promise<unknown>]> = [
-      ["add", () => w.captain.as.mutation(api.orderItems.add, { orderId: w.orderId, designId: home, qty: 1 })],
-      ["addMany", () => w.captain.as.mutation(api.orderItems.addMany, { orderId: w.orderId, designId: home, rows: [{ name: "Late" }] })],
-      ["update", () => w.captain.as.mutation(api.orderItems.update, { itemId: w.item, name: "Sam", number: "9", size: "L", qty: 1 })],
-      ["remove", () => w.captain.as.mutation(api.orderItems.remove, { itemId: w.item })],
-      ["restore", () => w.captain.as.mutation(api.orderItems.restore, { itemId: w.removed })],
-      ["copyToDesign", () => w.captain.as.mutation(api.orderItems.copyToDesign, { orderId: w.orderId, sourceDesignId: home, targetDesignId: away })],
+      ["add", () => w.captain.as.mutation(api.rosterEntries.add, { orderId: w.orderId, designId: home, sizes: [{ size: "M", qty: 1 }] })],
+      ["addMany", () => w.captain.as.mutation(api.rosterEntries.addMany, { orderId: w.orderId, designId: home, players: [{ name: "Late", sizes: [] }] })],
+      ["update", () => w.captain.as.mutation(api.rosterEntries.update, { entryId: w.player, name: "Sam", number: "9", sizeDeltas: [{ size: "L", delta: 1 }] })],
+      ["remove", () => w.captain.as.mutation(api.rosterEntries.remove, { entryId: w.player })],
+      ["restore", () => w.captain.as.mutation(api.rosterEntries.restore, { entryId: w.removed })],
+      ["copyToDesign", () => w.captain.as.mutation(api.rosterEntries.copyToDesign, { orderId: w.orderId, sourceDesignId: home, targetDesignId: away })],
     ];
     for (const [name, call] of calls) {
       const message = await userError(call);
       expect(message, `${name} message`).toBeTruthy();
       expectCustomerCopy(message);
     }
-    expect((await getItem(t, w.item))?.size).toBe("M");
-    expect((await getItem(t, w.item))?.removedAt).toBeUndefined();
-    expect((await getItem(t, w.removed))?.removedAt).toEqual(expect.any(Number));
+    expect(await liveSizes(t, w.player)).toEqual([["M", 1]]);
+    expect((await getEntry(t, w.player))?.removedAt).toBeUndefined();
+    expect((await getEntry(t, w.removed))?.removedAt).toEqual(expect.any(Number));
+    // Nothing was added: still the two seeded players.
+    const entries = await t.run((ctx) =>
+      ctx.db
+        .query("rosterEntries")
+        .withIndex("by_order", (q) => q.eq("orderId", w.orderId))
+        .collect(),
+    );
+    expect(entries).toHaveLength(2);
   });
 
   it("rejects orders.updateOrder with customer copy", async () => {
@@ -451,42 +501,50 @@ describe("While confirmed: admin edits succeed and the captain's view updates li
   it("admin add/update/remove/restore work on a confirmed list, and the captain's listForOrder shows them", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t, { run: false });
-    const item = await insertItem(t, w, { name: "Sam", number: "9", size: "M" });
-    const removed = await insertItem(t, w, { name: "Gone", number: "0", size: "S" });
-    await t.run((ctx) => ctx.db.patch(removed, { removedAt: Date.now() }));
+    const player = await insertPlayer(t, w, { name: "Sam", number: "9", size: "M" });
+    const removed = await insertPlayer(t, w, {
+      name: "Gone",
+      number: "0",
+      size: "S",
+      removed: true,
+    });
     await confirmDirectly(t, w.orderId);
 
-    const added = await w.admin.as.mutation(api.orderItems.add, {
+    const { entryId: added } = await w.admin.as.mutation(api.rosterEntries.add, {
       orderId: w.orderId,
       designId: w.designId,
       name: "Late Add",
-      size: "S",
-      qty: 2,
+      sizes: [{ size: "S", qty: 2 }],
     });
-    await w.admin.as.mutation(api.orderItems.update, {
-      itemId: item,
+    await w.admin.as.mutation(api.rosterEntries.update, {
+      entryId: player,
       name: "Sam",
       number: "9",
-      size: "L",
-      qty: 1,
+      sizeDeltas: [
+        { size: "M", delta: -1 },
+        { size: "L", delta: 1 },
+      ],
     });
-    await w.admin.as.mutation(api.orderItems.restore, { itemId: removed });
-    expect((await getItem(t, item))?.updatedBy).toBe(w.admin.userId);
+    await w.admin.as.mutation(api.rosterEntries.restore, { entryId: removed });
+    expect((await getEntry(t, player))?.updatedBy).toBe(w.admin.userId);
 
     const asCaptain = await w.captain.as.query(api.orderItems.listForOrder, {
       orderId: w.orderId,
     });
     expect(asCaptain?.locked).toBe(true);
     expect(asCaptain?.canEdit).toBe(false);
-    const names = asCaptain!.designs.flatMap((d) => d.items.map((i) => i.name));
+    const names = asCaptain!.designs.flatMap((d) => d.players.map((p) => p.name));
     expect(names).toEqual(expect.arrayContaining(["Late Add", "Gone"]));
-    expect(asCaptain!.designs.flatMap((d) => d.items).find((i) => i._id === item)?.size).toBe("L");
+    expect(
+      asCaptain!.designs.flatMap((d) => d.players).find((p) => p.entryId === player)
+        ?.sizes,
+    ).toEqual([{ size: "L", qty: 1 }]);
 
-    await w.admin.as.mutation(api.orderItems.remove, { itemId: added });
+    await w.admin.as.mutation(api.rosterEntries.remove, { entryId: added });
     const after = await w.captain.as.query(api.orderItems.listForOrder, {
       orderId: w.orderId,
     });
-    expect(after!.designs.flatMap((d) => d.items.map((i) => i.name))).not.toContain("Late Add");
+    expect(after!.designs.flatMap((d) => d.players.map((p) => p.name))).not.toContain("Late Add");
 
     const asAdmin = await w.admin.as.query(api.orderItems.listForOrder, {
       orderId: w.orderId,
@@ -495,19 +553,19 @@ describe("While confirmed: admin edits succeed and the captain's view updates li
     expect(asAdmin?.canEdit).toBe(true);
   });
 
-  it("an admin edit that leaves a Needs-size item on a confirmed list doesn't block other stage edits", async () => {
+  it("an admin edit that leaves a player needing sizes on a confirmed list doesn't block other stage edits", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t, { run: false });
-    await insertItem(t, w, { name: "Sam", number: "9", size: "M" });
+    await insertPlayer(t, w, { name: "Sam", number: "9", size: "M" });
     await w.admin.as.mutation(api.admin.updateOrderStages, {
       orderId: w.orderId,
       stages: stages(["Inquiry", CONFIRMED]),
     });
-    await w.admin.as.mutation(api.orderItems.add, {
+    await w.admin.as.mutation(api.rosterEntries.add, {
       orderId: w.orderId,
       designId: w.designId,
       name: "No Size Yet",
-      qty: 1,
+      sizes: [],
     });
 
     // Confirmed stays checked while another stage moves.
@@ -520,20 +578,20 @@ describe("While confirmed: admin edits succeed and the captain's view updates li
 });
 
 describe("Unchecking Order Size Confirmed unlocks the list for the captain", () => {
-  it("unchecks (always allowed, even with Needs-size items) and the captain can write again", async () => {
+  it("unchecks (always allowed, even with players who need sizes) and the captain can write again", async () => {
     const t = convexTest(schema, modules);
     const w = await seedWorld(t);
-    const item = await insertItem(t, w, { name: "Sam", number: "9", size: "M" });
+    const player = await insertPlayer(t, w, { name: "Sam", number: "9", size: "M" });
     await w.admin.as.mutation(api.admin.updateOrderStages, {
       orderId: w.orderId,
       stages: stages(["Inquiry", CONFIRMED]),
     });
-    // Admin leaves a Needs-size item behind, then unlocks.
-    await w.admin.as.mutation(api.orderItems.add, {
+    // Admin leaves a player with no sizes behind, then unlocks.
+    await w.admin.as.mutation(api.rosterEntries.add, {
       orderId: w.orderId,
       designId: w.designId,
       name: "No Size Yet",
-      qty: 1,
+      sizes: [],
     });
     await w.admin.as.mutation(api.admin.updateOrderStages, {
       orderId: w.orderId,
@@ -546,14 +604,16 @@ describe("Unchecking Order Size Confirmed unlocks the list for the captain", () 
     });
     expect(list?.locked).toBe(false);
     expect(list?.canEdit).toBe(true);
-    await w.captain.as.mutation(api.orderItems.update, {
-      itemId: item,
+    await w.captain.as.mutation(api.rosterEntries.update, {
+      entryId: player,
       name: "Sam",
       number: "9",
-      size: "L",
-      qty: 1,
+      sizeDeltas: [
+        { size: "M", delta: -1 },
+        { size: "L", delta: 1 },
+      ],
     });
-    expect((await getItem(t, item))?.size).toBe("L");
+    expect(await liveSizes(t, player)).toEqual([["L", 1]]);
   });
 });
 
