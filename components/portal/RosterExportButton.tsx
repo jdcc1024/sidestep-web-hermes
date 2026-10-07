@@ -3,7 +3,6 @@
 import { ChevronDownIcon, DownloadIcon } from "lucide-react";
 
 import { downloadCsv } from "@/lib/csv";
-import type { ItemView } from "@/lib/orderItem/summary";
 import {
   buildRosterCsv,
   rosterExportFilename,
@@ -35,7 +34,8 @@ export function RosterExportButton({
 }: {
   teamName: string;
   designTitle: string;
-  items: readonly ItemView[];
+  // One per jersey, plus a size-less one per player who still needs sizes.
+  items: Parameters<typeof buildRosterCsv>[0];
   className?: string;
 }) {
   const empty = items.length === 0;

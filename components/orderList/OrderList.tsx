@@ -155,6 +155,20 @@ function DesignGroup({
   // form only offers the names already on the design, so a design with none
   // takes no orders.
   const unorderable = pickFromList && !players.some((player) => player.name);
+  // The CSV is one row per jersey, plus one size-less row per player who
+  // still needs sizes: the captain reads the file to see who owes one
+  // (lib/rosterExport.ts). A player with no size lines has no `items`.
+  const exportRows = [
+    ...items,
+    ...players
+      .filter((player) => player.needsSizes)
+      .map(({ name, number, designation }) => ({
+        name,
+        number,
+        designation,
+        qty: 1,
+      })),
+  ];
 
   return (
     <div
@@ -285,7 +299,7 @@ function DesignGroup({
         <RosterExportButton
           teamName={teamName}
           designTitle={design.title}
-          items={items}
+          items={exportRows}
           className="h-10 px-3 sm:ml-auto"
         />
       </div>
