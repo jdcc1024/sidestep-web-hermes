@@ -101,7 +101,7 @@ async function lock(t: T, orderId: Id<"orders">) {
 }
 
 // Inserts an entry + its size lines directly (no API), the way a state built
-// by earlier writes looks. Lines also carry the mirrored flat fields.
+// by earlier writes looks. Lines carry no flat fields (R2-03).
 async function seedEntry(
   t: T,
   w: Pick<World, "orderId" | "designId">,
@@ -136,9 +136,6 @@ async function seedEntry(
       itemIds.push(
         await ctx.db.insert("orderItems", {
           orderId: w.orderId,
-          designId: w.designId,
-          name: o.name,
-          number: o.number,
           rosterEntryId: entryId,
           size: l.size,
           qty: l.qty ?? 1,
@@ -228,8 +225,10 @@ describe("rosterEntries.add: Sidestep #72 takes S×1, M×3, XL×1 as one player 
       expect(i.rosterEntryId).toBe(res.entryId);
       expect(i.source).toBe("captain");
       expect(i.orderId).toBe(w.orderId);
-      // mirror window: flat copies of the entry's values
-      expect(i).toMatchObject({ designId: w.designId, name: "Sidestep", number: "72" });
+      // R2-03 ended the mirror window: the entry's values live on the entry only
+      expect(i).not.toHaveProperty("designId");
+      expect(i).not.toHaveProperty("name");
+      expect(i).not.toHaveProperty("number");
       expect(i.submitterEmail).toBeUndefined();
     }
   });
@@ -424,8 +423,11 @@ describe("rosterEntries.update: size deltas, newest line first, and merge", () =
     });
     const [entry] = await allEntries(t, w.orderId);
     expect(entry).toMatchObject({ name: "Samuel", number: "9", designation: "C" });
+    // R2-03: the line stays under the renamed player and carries no copy.
     const [item] = await allItems(t, w.orderId);
-    expect(item).toMatchObject({ name: "Samuel", number: "9" });
+    expect(item).toMatchObject({ rosterEntryId: entryId });
+    expect(item).not.toHaveProperty("name");
+    expect(item).not.toHaveProperty("number");
   });
 
   it("renaming onto an existing player throws without merge; with merge: true one live entry holds both sets of lines, submitters unchanged", async () => {

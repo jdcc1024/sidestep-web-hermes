@@ -11,12 +11,24 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
-import schema from "./schema";
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+import realSchema from "./schema";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { overviewBlocks } from "../lib/designBlock";
 
 const modules = import.meta.glob("./**/*.*s");
+// R2-03 narrowed `orderItems` to size lines, so the phase-1 flat rows this
+// migration starts from are seeded through a local `v.any()` table (same
+// indexes), as convex/_migrations.r203.test.ts does.
+const schema = defineSchema({
+  ...realSchema.tables,
+  orderItems: defineTable(v.any())
+    .index("by_order", ["orderId"])
+    .index("by_entry", ["rosterEntryId"])
+    .index("by_submitterEmail", ["submitterEmail"]),
+});
 type T = TestConvex<typeof schema>;
 
 async function seedOrder(t: T) {

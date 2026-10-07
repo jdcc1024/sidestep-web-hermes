@@ -135,9 +135,6 @@ async function seedEntry(
     for (const [i, l] of (o.lines ?? []).entries())
       await ctx.db.insert("orderItems", {
         orderId: w.orderId,
-        designId: w.designId,
-        name: o.name,
-        number: o.number,
         rosterEntryId: entryId,
         size: l.size,
         qty: l.qty ?? 1,
