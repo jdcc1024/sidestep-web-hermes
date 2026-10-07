@@ -275,13 +275,15 @@ function JerseyResponseCard({ entry }: { entry: MyOrderFormResponse }) {
       </div>
       <p className="mt-1 text-sm font-medium text-foreground">{jerseyLabel}</p>
       <p className="text-xs text-muted-foreground">{line.designTitle}</p>
+      {/* The spaces keep "Size L Ordered" apart in the text (assistive tech,
+          copy-paste); the grid drops whitespace-only text, so nothing moves. */}
       <dl className="mt-3 grid grid-cols-2 gap-y-2 text-sm">
-        <dt className="text-muted-foreground">Size</dt>
+        <dt className="text-muted-foreground">Size</dt>{" "}
         <dd className="text-foreground">
           {line.size}
           {line.qty > 1 ? ` · ${line.qty}×` : ""}
-        </dd>
-        <dt className="text-muted-foreground">Ordered</dt>
+        </dd>{" "}
+        <dt className="text-muted-foreground">Ordered</dt>{" "}
         <dd className="text-foreground">
           {formatResponseDate(line.createdAt)}
         </dd>
