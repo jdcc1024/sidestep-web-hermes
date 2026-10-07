@@ -271,11 +271,16 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// The signed-in caller's normalized email, or null.
+// The signed-in caller's normalized email, or null. The app's Clerk session
+// token carries no email claim (lib/clerkProfile.ts), so `identity.email` is
+// null in practice; the caller's `users` row holds the email
+// `users.refreshFromClerk` fetched server-side from Clerk's API. A token that
+// does carry one (tests, a future JWT template) is used as is.
 async function callerEmail(ctx: QueryCtx): Promise<string | null> {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity?.email) return null;
-  const email = normalizeEmail(identity.email);
+  if (!identity) return null;
+  const raw = identity.email ?? (await getCurrentUserOrNull(ctx))?.email;
+  const email = raw ? normalizeEmail(raw) : "";
   return email.length > 0 ? email : null;
 }
 
