@@ -74,7 +74,6 @@ describe("PublicOrderForm", () => {
     submitOrder.mockResolvedValue({
       submitterEmail: "pat@example.com",
       created: 1,
-      collisions: 0,
       entries: [],
     });
     publicData = singleDesignOpen();
@@ -245,8 +244,8 @@ describe("PublicOrderForm", () => {
       submitterEmail: "pat@example.com",
       customAnswers: {},
       lines: [
-        { designId: HOME, itemId: "slot_1", size: "M", qty: 2 },
-        { designId: HOME, itemId: "slot_1", size: "L", qty: 1 },
+        { designId: HOME, rosterEntryId: "slot_1", size: "M", qty: 2 },
+        { designId: HOME, rosterEntryId: "slot_1", size: "L", qty: 1 },
       ],
     });
   });
