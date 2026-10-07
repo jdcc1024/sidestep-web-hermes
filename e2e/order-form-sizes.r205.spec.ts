@@ -116,7 +116,8 @@ test("375px: a player fills one card as Sidestep #72 with S, M×3, XL and the ca
   await expect(row).toContainText("XL");
   await expect(row).toContainText(/5 jerseys/i);
   await expect(row).toContainText(/added by/i);
-  await expect(row).toContainText(first.name);
+  // "Added by" credits first names only (R2-02, UX §8).
+  await expect(row).toContainText(first.name.split(" ")[0]);
   await expectNoHorizontalScroll(page);
   await expect(
     page.getByRole("main").getByText(/CONVEX|ConvexError|Request ID/),
@@ -151,8 +152,9 @@ test("375px: a second player with a different email adding Sidestep #72 in L joi
   await expect(row).toContainText(/M\s*×\s*3/);
   await expect(row).toContainText(/6 jerseys/i);
   await expect(row).toContainText(/added by/i);
-  await expect(row).toContainText(first.name);
-  await expect(row).toContainText(second.name);
+  // "Added by" credits first names only (R2-02, UX §8).
+  await expect(row).toContainText(first.name.split(" ")[0]);
+  await expect(row).toContainText(second.name.split(" ")[0]);
   // Gate 1b Q5: no flag, no warning on the list.
   await expect(
     page.getByRole("main").getByText(/sizes from|conflict|duplicate|check with/i),

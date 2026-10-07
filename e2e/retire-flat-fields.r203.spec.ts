@@ -147,7 +147,7 @@ test("a player who submitted through the order form signs in and sees their jers
   await player.getByLabel(/your email/i).fill(uid);
   await player.getByLabel(/name on jersey/i).fill(jerseyName);
   await player.getByLabel(/^number/i).fill("72");
-  await player.locator("label").filter({ hasText: /^L$/ }).click();
+  await player.getByRole("button", { name: /add one L\b/i }).click();
   await player.getByRole("button", { name: /^submit/i }).click();
   await expect(player.getByRole("status")).toBeVisible();
   await ctx.close();
