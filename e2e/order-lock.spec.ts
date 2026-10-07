@@ -41,7 +41,7 @@ test.describe("as a non-admin captain", () => {
 
     // Before confirming: the list is editable.
     await page.goto(`/portal/orders/${order.orderId}`);
-    await expect(page.getByRole("button", { name: /add item/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /add player/i })).toBeVisible();
     await expect(
       page.getByRole("button", { name: /^edit /i }).first(),
     ).toBeVisible();
@@ -53,7 +53,7 @@ test.describe("as a non-admin captain", () => {
     await expectNoHorizontalScroll(page);
 
     // No way to change the list.
-    await expect(page.getByRole("button", { name: /add item/i })).toHaveCount(
+    await expect(page.getByRole("button", { name: /add player/i })).toHaveCount(
       0,
     );
     await expect(
@@ -102,7 +102,7 @@ test.describe("as a non-admin captain", () => {
 
     // Unconfirming gives the controls back, live.
     setConfirmed(tag, order.orderId, false, "captain");
-    await expect(page.getByRole("button", { name: /add item/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /add player/i })).toBeVisible();
     await expect(page.getByText(/locked for production/i)).toHaveCount(0);
   });
 });
@@ -114,7 +114,7 @@ test("admin order page shows the same list and edits it while confirmed; confirm
 }) => {
   // The refused confirm is a ConvexError by design; Convex dev echoes it to
   // the console. The page itself must still show no raw error text.
-  allowBrowserErrors.push(/item needs a size: Jordan Lee #4/);
+  allowBrowserErrors.push(/needs? sizes?: Jordan Lee #4/);
   const order = seedOrder(tag);
   seedItems(tag, order.orderId, [
     { name: "Sidestep", number: "72", size: "M" },
@@ -131,17 +131,17 @@ test("admin order page shows the same list and edits it while confirmed; confirm
   await expect(
     page.getByRole("main").getByText(/CONVEX|ConvexError|Request ID/),
   ).toHaveCount(0);
-  await expect(page.getByText(/needs? a size/i).first()).toBeVisible();
+  await expect(page.getByText(/needs? sizes?/i).first()).toBeVisible();
   await expect(
     page.getByRole("checkbox", { name: "Order Size Confirmed" }),
   ).not.toBeChecked();
 
   // Give Jordan a size from the admin page (same list, same controls).
   await page.getByRole("button", { name: /edit jordan lee/i }).click();
-  // The size picker is a row of toggle buttons (aria-pressed), not radios.
+  // The sheet's sizes are counters: "Add one M" adds a jersey in M.
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: "M", exact: true })
+    .getByRole("button", { name: /add one M\b/i })
     .click();
   await page.getByRole("dialog").getByRole("button", { name: /save/i }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -153,7 +153,7 @@ test("admin order page shows the same list and edits it while confirmed; confirm
   ).toBeChecked();
   await expect(page.getByText(/locked for production/i)).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /add item/i }).first(),
+    page.getByRole("button", { name: /add player/i }).first(),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /edit sidestep/i }),
