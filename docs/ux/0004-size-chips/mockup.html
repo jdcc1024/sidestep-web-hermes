@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0004 mockup: size chips + order-row cleanup</title>
+<!--
+  UX mockup for docs/ux/0004-size-chips.md. Static, no build, no network.
+  Query string picks the frame:
+    ?state=before|after   today's main (5ae72f7) or the proposal
+    &theme=light|dark     the app's :root / .dark tokens (app/globals.css)
+    &view=page|warning    the order page, or Edit order's remove-design warning
+  Width comes from the viewport: < 640px is the phone layout, >= 1024px gets
+  the portal sidebar. Rendered to PNG by render.mjs next to this file.
+
+  Data is one consistent order: JCC's own total line from Gate 2b,
+  XS×1 S×14 M×7 XL×3 2XL×2 3XL×4 4XL×16 = 47 jerseys, split over 4 players
+  and the design's blank entry.
+-->
+<style>
+  :root {
+    --background:#ffffff; --foreground:#0a0a0a; --card:#ffffff; --muted:#f5f5f5;
+    --muted-fg:#737373; --border:#e5e5e5; --primary:#171717;
+    --teal-label:#0f766e;            /* text-teal-700 */
+    --count:#0f766e;                 /* proposal: text-teal-700 */
+    --amber-bg:#fef3c7; --amber-fg:#92400e; --amber-border:#fcd34d; --amber-panel:#fffbeb; --amber-text:#78350f;
+    --stage-bg:#fef3c7; --stage-fg:#92400e;
+    --btn:#0d9488;
+  }
+  .dark {
+    --background:#0a0a0a; --foreground:#fafafa; --card:#171717; --muted:#262626;
+    --muted-fg:#a1a1a1; --border:rgba(255,255,255,.10); --primary:#00bba7;
+    --teal-label:#5eead4;            /* dark:text-teal-300 */
+    --count:#5eead4;                 /* proposal: dark:text-teal-300 */
+    --amber-bg:rgba(245,158,11,.20); --amber-fg:#fde68a; --amber-border:rgba(245,158,11,.40); --amber-panel:rgba(245,158,11,.10); --amber-text:#fef3c7;
+    --stage-bg:rgba(245,158,11,.20); --stage-fg:#fde68a;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--background); color:var(--foreground); }
+  body { font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:14px; line-height:1.43; }
+  .tabular { font-variant-numeric:tabular-nums; }
+
+  /* shell */
+  .topbar { display:flex; align-items:center; justify-content:space-between; height:56px; padding:0 16px; border-bottom:1px solid var(--border); }
+  .logo { font-weight:800; font-size:20px; letter-spacing:-.01em; }
+  .logo b { color:#0d9488; }
+  .burger { width:18px; height:12px; border-top:2px solid var(--foreground); border-bottom:2px solid var(--foreground); position:relative; }
+  .burger::after { content:""; position:absolute; left:0; right:0; top:3px; border-top:2px solid var(--foreground); }
+  .shell { display:block; }
+  .side { display:none; }
+  .main { padding:24px 16px 40px; max-width:960px; margin:0 auto; }
+  @media (min-width:1024px) {
+    .topbar { display:none; }
+    .shell { display:flex; min-height:100vh; }
+    .side { display:block; width:256px; flex:none; border-right:1px solid var(--border); padding:20px 16px; }
+    .side .logo { margin-bottom:28px; }
+    .side a { display:block; padding:8px 10px; font-size:14px; color:var(--foreground); text-decoration:none; }
+    .main { flex:1; padding:40px 48px 64px; }
+  }
+
+  /* header */
+  .back { color:var(--teal-label); font-weight:500; font-size:14px; }
+  .eyebrow { margin:12px 0 0; color:var(--teal-label); font-weight:600; font-size:14px; letter-spacing:.08em; text-transform:uppercase; }
+  h1 { margin:4px 0 0; font-family:"Bebas Neue", Impact, "Arial Narrow", sans-serif; font-weight:400; font-size:34px; letter-spacing:.01em; line-height:1.1; }
+  .hdr { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px 16px; align-items:flex-start; }
+  .badges { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .badge { display:inline-flex; align-items:center; height:22px; padding:0 8px; border-radius:999px; font-size:12px; font-weight:500; background:var(--muted); color:var(--foreground); border:1px solid transparent; white-space:nowrap; }
+  .badge.outline { background:transparent; border-color:var(--border); }
+  .actions { display:flex; gap:12px; align-items:center; }
+  .stage { background:var(--stage-bg); color:var(--stage-fg); }
+  .btn-o { height:32px; display:inline-flex; align-items:center; padding:0 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; font-weight:500; background:var(--card); }
+
+  /* cards */
+  .card { margin-top:24px; border:1px solid var(--border); border-radius:14px; background:var(--card); overflow:hidden; }
+  .card-pad { padding:20px 16px; }
+  @media (min-width:640px) { .card-pad { padding:24px; } }
+  .card h2 { margin:0; font-size:18px; font-weight:600; }
+  .card .sub { margin:6px 0 0; color:var(--muted-fg); font-size:14px; }
+  .steps { display:flex; justify-content:space-between; align-items:center; padding:16px; font-size:14px; }
+  .steps a { color:var(--teal-label); font-weight:600; }
+
+  /* design group */
+  .group { border-top:1px solid var(--border); }
+  .ghead { display:flex; gap:12px; align-items:center; padding:16px 16px 8px; }
+  @media (min-width:640px) { .ghead { padding:16px 24px 8px; } }
+  .thumb { width:40px; height:40px; border-radius:8px; background:linear-gradient(135deg,#0f766e,#111827); flex:none; }
+  .gtitle { font-weight:600; }
+  .gline { font-size:12px; color:var(--muted-fg); }
+  .breakdown { display:flex; flex-wrap:wrap; gap:4px; padding:0 16px 12px; margin:0; list-style:none; }
+  @media (min-width:640px) { .breakdown { padding:0 24px 12px; } }
+  .rows { list-style:none; margin:0; padding:0; }
+  .row { display:flex; align-items:center; gap:8px; min-height:56px; padding:8px 6px 8px 16px; border-top:1px solid var(--border); }
+  @media (min-width:640px) { .row { padding-left:24px; } }
+  .row .body { flex:1; min-width:0; }
+  .row .name { display:flex; align-items:center; gap:6px; font-size:14px; font-weight:500; }
+  .row .num { color:var(--muted-fg); font-weight:400; }
+  .row .by { font-size:12px; color:var(--muted-fg); }
+  .letter { display:inline-flex; width:18px; height:18px; align-items:center; justify-content:center; border-radius:3px; font-size:10px; font-weight:700;
+            border:1px solid color-mix(in srgb, var(--primary) 40%, transparent); background:color-mix(in srgb, var(--primary) 10%, transparent); color:var(--primary); }
+  .chips { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:4px; font-size:12px; font-variant-numeric:tabular-nums; }
+  .more { width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center; color:var(--muted-fg); font-size:18px; letter-spacing:1px; flex:none; }
+  .total-j { margin-left:2px; color:var(--muted-fg); }
+  .need { border-radius:999px; padding:2px 8px; font-weight:600; background:var(--amber-bg); color:var(--amber-fg); }
+  .gactions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px 16px; border-top:1px solid var(--border); }
+  @media (min-width:640px) { .gactions { padding:12px 24px; } .gactions .csv { margin-left:auto; } }
+  .btn-p { height:40px; display:inline-flex; align-items:center; padding:0 14px; border-radius:8px; background:var(--btn); color:#fff; font-weight:600; }
+  .btn-g { height:40px; display:inline-flex; align-items:center; padding:0 12px; border-radius:8px; font-weight:500; }
+  .footer { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:4px 16px; padding:12px 16px; border-top:1px solid var(--border);
+            background:color-mix(in srgb, var(--muted) 50%, var(--card)); }
+  @media (min-width:640px) { .footer { padding:12px 24px; } }
+  .footer .needs { font-weight:500; color:var(--amber-fg); }
+  .dark .footer .needs { color:#fde68a; }
+  :root:not(.dark) .footer .needs { color:#92400e; }
+
+  /* ── BEFORE: chips as they are on main ─────────────────────────────── */
+  .chip-old { border-radius:999px; background:var(--muted); padding:2px 8px; font-weight:600; color:var(--foreground); }
+  .chip-old.b { font-weight:500; }
+  .foot-old { margin:0; font-weight:600; font-variant-numeric:tabular-nums; }
+
+  /* ── AFTER: <SizeQty> ──────────────────────────────────────────────────
+     size  = font-semibold text-foreground
+     ×N    = font-normal text-teal-700 dark:text-teal-300, a hair of space
+             before it (ml-px) so the size's last letter and the × don't touch.
+     Chip  = same pill as today (rounded-full bg-muted px-2 py-0.5 text-xs).   */
+  .chip-new { display:inline-flex; align-items:baseline; border-radius:999px; background:var(--muted); padding:2px 8px; font-variant-numeric:tabular-nums; }
+  .sz { font-weight:600; color:var(--foreground); }
+  .qty { font-weight:400; color:var(--count); margin-left:1px; }
+  .foot-new { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 12px; margin:0; font-variant-numeric:tabular-nums; }
+  .foot-new .jerseys { font-weight:600; }
+  .foot-new ul { display:flex; flex-wrap:wrap; gap:4px 12px; list-style:none; margin:0; padding:0; }
+  .foot-new li { white-space:nowrap; }
+  .foot-new .qty { font-weight:500; }
+
+  /* order details */
+  dl { display:grid; gap:12px; margin:16px 0 0; font-size:14px; }
+  @media (min-width:640px) { dl { grid-template-columns:1fr 1fr; } }
+  dt { font-size:12px; color:var(--muted-fg); text-transform:uppercase; letter-spacing:.04em; }
+  dd { margin:2px 0 0; }
+  .changed { outline:2px dashed #f59e0b; outline-offset:2px; border-radius:4px; }
+  .noshow { display:none; }
+
+  /* review label strip */
+  .tag { position:sticky; top:0; z-index:2; padding:6px 16px; font:600 12px/1.4 ui-sans-serif, system-ui, sans-serif; letter-spacing:.06em; text-transform:uppercase;
+         background:#111827; color:#fff; }
+  .tag.after { background:#0f766e; }
+
+  /* warning (Edit order) */
+  .alert { margin-top:16px; border:1px solid var(--amber-border); background:var(--amber-panel); color:var(--amber-text); border-radius:10px; padding:12px 16px; }
+  .alert b { display:block; font-weight:500; }
+  .alert p { margin:4px 0 0; font-size:14px; opacity:.9; }
+  .wlabel { margin:24px 0 0; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-fg); }
+</style>
+</head>
+<body>
+<div id="tag" class="tag"></div>
+<div id="app"></div>
+
+<script>
+const q = new URLSearchParams(location.search);
+const STATE = q.get("state") === "before" ? "before" : "after";
+const THEME = q.get("theme") === "dark" ? "dark" : "light";
+const VIEW = q.get("view") === "warning" ? "warning" : "page";
+const MARK = q.get("mark") === "1"; // dashed outline on what changed (after only)
+if (THEME === "dark") document.documentElement.classList.add("dark");
+
+// One order, JCC's own total line (Gate 2b). Catalogue order.
+const players = [
+  { name: "Sidestep", number: "72", letter: "C", by: "Added by you and Quinn", sizes: [["S",1],["M",3],["XL",1]] },
+  { name: "Riley Park", number: "7", by: "Added by Riley", sizes: [["2XL",2]] },
+  { name: "Ana Silva", number: "11", by: "Added by Ana", sizes: [["XS",1]] },
+  { name: "Jordan Lee", number: "4", by: "Added by you", sizes: [] },
+  { blank: true, by: "Nothing printed · Added by you", sizes: [["S",13],["M",4],["XL",2],["3XL",4],["4XL",16]] },
+];
+const ORDER = ["XS","S","M","L","XL","2XL","3XL","4XL"];
+const totals = {};
+for (const p of players) for (const [s, n] of p.sizes) totals[s] = (totals[s] || 0) + n;
+const bySize = ORDER.filter((s) => totals[s]).map((s) => [s, totals[s]]);
+const jerseys = bySize.reduce((a, [, n]) => a + n, 0); // 47
+const count = (p) => p.sizes.reduce((a, [, n]) => a + n, 0);
+const mk = (cls) => (MARK && STATE === "after" ? `${cls} changed` : cls);
+
+// BEFORE: today's strings. sizeQtyText (rows) drops ×1; sizeChip (breakdown, footer) keeps it.
+const oldRowChip = ([s, n]) => `<span class="chip-old">${n > 1 ? `${s}×${n}` : s}</span>`;
+const oldBreakChip = ([s, n]) => `<li class="chip-old b">${s}×${n}</li>`;
+// AFTER: <SizeQty>. Always ×N, ×1 included. The DOM text stays "M×3" (two
+// spans, nothing hidden, nothing added), so copy-paste, text lookups and a
+// screen reader ("M times 3") all get the same thing as today.
+const sizeQty = ([s, n]) => `<span class="sz">${s}</span><span class="qty">×${n}</span>`;
+const newChip = (e, tag = "span") => `<${tag} class="chip-new">${sizeQty(e)}</${tag}>`;
+
+function row(p) {
+  const label = p.blank ? "Blank jerseys" : `${p.name}<span class="num">&nbsp;#${p.number}</span>`;
+  const letter = p.letter ? `<span class="letter">${p.letter}</span>` : "";
+  let by = "";
+  if (STATE === "before") by = `<div class="by">${p.by}</div>`;
+  else if (p.blank) by = `<div class="by">Nothing printed</div>`;
+  let chips;
+  if (p.sizes.length === 0) chips = `<span class="need">Needs sizes</span>`;
+  else chips = p.sizes.map(STATE === "before" ? oldRowChip : (e) => newChip(e)).join("");
+  const n = count(p);
+  const tot = n > 1 ? `<span class="total-j">${n} jerseys</span>` : "";
+  return `<li class="row"><div class="body"><div class="name"><span>${label}</span>${letter}</div>${by}
+    <div class="chips ${STATE === "after" && p.sizes.length ? mk("") : ""}">${chips}${tot}</div></div><span class="more">···</span></li>`;
+}
+
+function footer() {
+  const needs = `<p class="needs" style="margin:0">1 player needs sizes</p>`;
+  if (STATE === "before") {
+    const run = bySize.map(([s, n]) => `${s}×${n}`).join(" ");
+    return `<div class="footer"><p class="foot-old">${jerseys} jerseys · ${run}</p>${needs}</div>`;
+  }
+  return `<div class="footer"><div class="foot-new ${mk("")}"><span class="jerseys">${jerseys} jerseys</span>
+    <ul aria-label="Sizes on this order">${bySize.map((e) => `<li>${sizeQty(e)}</li>`).join(" ")}</ul></div>${needs}</div>`;
+}
+
+function page() {
+  const unit = STATE === "before" ? "items" : "jerseys";
+  const breakdown = STATE === "before"
+    ? bySize.map(oldBreakChip).join("")
+    : bySize.map((e) => newChip(e, "li")).join("");
+  return `
+  <div class="topbar"><span class="logo"><b>Side</b>step</span><span class="burger"></span></div>
+  <div class="shell">
+    <aside class="side"><div class="logo"><b>Side</b>step</div><a>My Orders</a><a>My Designs</a></aside>
+    <main class="main">
+      <div class="back">← Back to dashboard</div>
+      <div class="hdr"><div>
+        <p class="eyebrow">Order</p>
+        <h1>Kits Beach Dodgers</h1>
+        <div class="badges"><span class="badge">Dodgeball</span>
+          <span class="badge tabular ${mk("")}">${jerseys} ${unit}</span>
+          <span class="badge outline">Created Oct 7, 2026</span></div>
+      </div>
+      <div class="actions"><span class="badge stage">Order Started</span><span class="btn-o">Edit order</span></div></div>
+
+      <div class="card"><div class="steps"><span>Step 1 of 8 · <b>Order Started</b></span><a>See all steps</a></div></div>
+
+      <div class="card" id="order-list">
+        <div class="card-pad"><h2>Order list</h2>
+          <p class="sub">Everything we'll make for this order. Add players yourself, or share the order form and let them add their own.</p></div>
+        <div class="group">
+          <div class="ghead"><div class="thumb"></div><div><div class="gtitle">Home kit</div>
+            <div class="gline">4 players · ${jerseys} jerseys · 1 needs sizes</div></div></div>
+          <ul class="breakdown ${mk("")}" aria-label="Size breakdown for Home kit">${breakdown}</ul>
+          <ul class="rows">${players.map(row).join("")}</ul>
+          <div class="gactions"><span class="btn-p">+ Add player</span><span class="btn-g">Paste a list</span><span class="btn-g csv">⤓ Download CSV ⌄</span></div>
+        </div>
+        ${footer()}
+      </div>
+
+      <div class="card"><div class="card-pad">
+        <p class="eyebrow" style="font-size:12px;margin:0">Order details</p>
+        <h2 style="font-size:16px;margin-top:6px">The basics</h2>
+        <dl>
+          <div><dt>Team name</dt><dd>Kits Beach Dodgers</dd></div>
+          <div><dt>Sport</dt><dd>Dodgeball</dd></div>
+          <div class="${mk("")}"><dt>${STATE === "before" ? "Items" : "On the list"}</dt><dd>${jerseys} ${unit}</dd></div>
+          <div><dt>Estimated at intake</dt><dd>50 jerseys</dd></div>
+        </dl>
+      </div></div>
+    </main>
+  </div>`;
+}
+
+function warning() {
+  const unit = STATE === "before" ? "items" : "jerseys";
+  const sent = STATE === "before" ? "sent items for it" : "added jerseys to it";
+  const stay = STATE === "before" ? "the items stay saved" : "their names and sizes stay saved";
+  return `<main class="main">
+    <p class="wlabel">Edit order → Designs → untick "Home kit"</p>
+    <div class="alert ${mk("")}"><b>⚠ Removing “Home kit” drops ${jerseys} ${unit} from your order</b>
+      <p>Riley (2), Ana (1), Quinn (2) ${sent}. Nothing is deleted: ${stay} and show as removed on the order page, so you can link the design again any time.</p></div>
+  </main>`;
+}
+
+document.getElementById("app").innerHTML = VIEW === "warning" ? warning() : page();
+document.getElementById("tag").textContent =
+  `${STATE === "before" ? "Before · main today" : "After · proposal"} · ${THEME}`;
+document.getElementById("tag").className = `tag ${STATE}`;
+</script>
+</body>
+</html>
