@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0004 mockup: public order form redesign</title>
+<!--
+  UX mockup for docs/ux/0004-public-form.md. Static, no build, no network.
+  This is the AFTER state only; the "before" PNGs are real captures of main
+  (capture.mjs). Query string picks the frame:
+    ?theme=light|dark
+    &mode=open|fixed      type-your-own-name cards, or pick-your-name roster
+    &designs=1|2          one design on the order, or two
+    &img=yes|no           designs have a web-safe main image, or not (fallback)
+  Width comes from the viewport: < 640px is the phone layout (Tailwind `sm`).
+  Rendered to PNG by render.mjs next to this file. Pictures are two real
+  design files from the dev deployment, downscaled (shrink.mjs).
+
+  Tailwind classes the build should use are noted in comments as tw: ...
+-->
+<style>
+  :root {
+    --background:#ffffff; --foreground:#0a0a0a; --card:#ffffff; --muted:#f5f5f5;
+    --muted-fg:#737373; --border:#e5e5e5; --input:#e5e5e5; --primary:#171717;
+    --primary-fg:#fafafa; --soft:#fcfcfc; --count:#0f766e; --logo:#0d9488;
+    --destructive:#e40014;
+  }
+  .dark {
+    --background:#0a0a0a; --foreground:#fafafa; --card:#171717; --muted:#262626;
+    --muted-fg:#a1a1a1; --border:rgba(255,255,255,.10); --input:rgba(255,255,255,.15);
+    --primary:#00bba7; --primary-fg:#fafafa; --soft:#1c1c1c; --count:#5eead4; --logo:#00bba7;
+    --destructive:#ff6467;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--background); color:var(--foreground); }
+  body { font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:14px; line-height:1.43; }
+  .tab { font-variant-numeric:tabular-nums; }
+  .muted { color:var(--muted-fg); }
+
+  /* shell (app/run/[id]/page.tsx) */
+  .topbar { border-bottom:1px solid var(--border); }
+  .topbar .in { max-width:672px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:16px; }
+  .logo { font-weight:800; font-size:20px; letter-spacing:-.01em; }
+  .logo b { color:var(--logo); }
+  .about { font-size:14px; font-weight:500; opacity:.8; padding:8px 12px; }
+  main .wrap { max-width:672px; margin:0 auto; padding:24px 16px 40px; }
+  /* tw: phone drops the outer card — "rounded-none border-0 bg-transparent p-0 shadow-none
+         sm:rounded-2xl sm:border sm:bg-card sm:p-10 sm:shadow-sm" */
+  .page-card { }
+  footer { border-top:1px solid var(--border); text-align:center; font-size:12px; color:var(--muted-fg); padding:24px 16px; }
+  @media (min-width:640px) {
+    main .wrap { padding:56px 24px; }
+    .page-card { border:1px solid var(--border); border-radius:18px; background:var(--card); padding:40px; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+  }
+
+  /* header */
+  .eyebrow { margin:0; font-size:14px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--primary); }
+  :root:not(.dark) .eyebrow { color:var(--foreground); }
+  h1 { margin:8px 0 0; font-family:"Bebas Neue", Impact, "Arial Narrow", sans-serif; font-weight:400; font-size:30px; line-height:1.15; letter-spacing:.01em; }
+  @media (min-width:640px) { h1 { font-size:36px; } }
+  .intro { margin:12px 0 0; color:var(--muted-fg); font-size:16px; line-height:1.5; }
+  .close { margin:4px 0 0; color:var(--muted-fg); font-size:14px; }
+
+  /* design pictures */
+  /* tw: hero box "h-48 sm:h-64 w-full rounded-xl border bg-muted/50", img "size-full object-contain" */
+  .hero { margin-top:24px; }
+  .hero .box { height:192px; border:1px solid var(--border); border-radius:12px; background:color-mix(in srgb, var(--muted) 50%, transparent); overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  @media (min-width:640px) { .hero .box { height:256px; } }
+  .hero img, .tile .box img { width:100%; height:100%; object-fit:contain; display:block; }
+  .cap { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:8px; font-size:14px; }
+  .cap .t { font-weight:500; }
+  .cap .z { font-size:12px; color:var(--muted-fg); display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .gallery { margin-top:24px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (min-width:640px) { .gallery { grid-template-columns:repeat(3,1fr); } }
+  .tile .box { height:144px; border:1px solid var(--border); border-radius:12px; background:color-mix(in srgb, var(--muted) 50%, transparent); overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  @media (min-width:640px) { .tile .box { height:160px; } }
+  .tile .t { margin-top:6px; font-size:14px; font-weight:500; line-height:1.3; }
+  .ph { color:var(--muted-fg); display:flex; align-items:center; justify-content:center; width:100%; height:100%; }
+  .ph svg { width:20px; height:20px; }
+  .fallback-row { margin-top:24px; display:flex; align-items:center; gap:12px; }
+  .design-line { margin:16px 0 0; font-size:14px; color:var(--muted-fg); }
+  .design-line b { color:var(--foreground); font-weight:500; }
+  .thumb { flex:none; border:1px solid var(--border); border-radius:8px; background:color-mix(in srgb, var(--muted) 50%, transparent); overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .t56 { width:56px; height:56px; } .t40 { width:40px; height:40px; } .t36 { width:36px; height:36px; }
+
+  /* form */
+  form { margin-top:32px; }
+  .field + .field { margin-top:24px; }
+  label, .label { display:block; font-size:14px; font-weight:500; line-height:1; }
+  .req { color:var(--destructive); margin-left:2px; }
+  .desc { margin-top:8px; font-size:12.8px; color:var(--muted-fg); }
+  /* tw: Input className="h-10" on this form (was h-8) */
+  .input { margin-top:8px; height:40px; width:100%; border:1px solid var(--input); border-radius:10px; padding:0 10px; display:flex; align-items:center; font-size:16px; background:transparent; overflow:hidden; white-space:nowrap; }
+  .dark .input { background:rgba(255,255,255,.045); }
+  @media (min-width:768px) { .input { font-size:14px; } }
+  .input.num { justify-content:center; font-weight:500; font-variant-numeric:tabular-nums; }
+  textarea.input { height:72px; }
+  .textarea { height:72px; }
+
+  .section { margin-top:32px; }
+  .shead { display:flex; justify-content:space-between; align-items:baseline; }
+  .shead h2 { margin:0; font-size:18px; font-weight:600; }
+  .shead span { font-size:14px; color:var(--muted-fg); }
+
+  /* jersey card — tw: "space-y-4 rounded-xl border bg-muted/30 p-3 sm:p-5" (was space-y-5 p-5) */
+  .jcard { margin-top:16px; border:1px solid var(--border); border-radius:14px; background:var(--soft); padding:12px; }
+  @media (min-width:640px) { .jcard { padding:20px; } }
+  .jcard > * + * { margin-top:16px; }
+  .jhead { display:flex; justify-content:space-between; align-items:center; }
+  .jhead .l { font-size:14px; font-weight:600; }
+  .ghost-sm { height:28px; display:inline-flex; align-items:center; gap:4px; padding:0 10px; border-radius:8px; font-size:12.8px; font-weight:500; }
+  .ghost-sm svg { width:14px; height:14px; }
+  /* tw: "grid grid-cols-[minmax(0,1fr)_6rem] gap-3" at every width (was stacked on phone, 1fr_140px on sm) */
+  .nn { display:grid; grid-template-columns:minmax(0,1fr) 6rem; gap:12px; }
+  .nn .desc { grid-column:1 / -1; margin-top:-4px; }
+
+  /* design chooser — tw: radiogroup "grid grid-cols-2 gap-2", tile "flex h-14 items-center gap-2 rounded-lg border px-2" */
+  .choose { margin-top:8px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .opt { height:56px; display:flex; align-items:center; gap:8px; padding:0 8px; border:1px solid var(--input); border-radius:10px; background:var(--background); font-size:13px; font-weight:500; line-height:1.25; }
+  .dark .opt { background:rgba(255,255,255,.03); }
+  .opt.on { border-color:var(--primary); background:color-mix(in srgb, var(--primary) 10%, transparent); box-shadow:0 0 0 1px var(--primary) inset; }
+  .opt .tt { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+  /* size grid — tw: "grid grid-cols-3 gap-1.5 sm:grid-cols-4"; SizeCounter className="h-10 w-full min-w-0" */
+  .sizes { margin-top:8px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  @media (min-width:640px) { .sizes { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+  .sc { height:40px; display:flex; align-items:center; border:1px solid var(--input); border-radius:8px; background:var(--background); font-size:14px; font-weight:500; }
+  .dark .sc { background:rgba(255,255,255,.03); }
+  .sc.on { border-color:var(--primary); background:color-mix(in srgb, var(--primary) 10%, transparent); }
+  .sc .m { width:36px; flex:none; display:flex; justify-content:center; color:var(--muted-fg); }
+  .sc .m svg { width:16px; height:16px; }
+  .sc .s { flex:1; min-width:0; text-align:center; }
+  .sc.on .s { color:var(--primary); }
+  :root:not(.dark) .sc.on .s { color:var(--foreground); }
+  .sc .c { width:32px; flex:none; display:flex; justify-content:center; }
+  .badge { min-width:20px; height:20px; border-radius:999px; background:var(--primary); color:var(--primary-fg); font-size:12px; font-weight:500; display:inline-flex; align-items:center; justify-content:center; padding:0 4px; font-variant-numeric:tabular-nums; }
+
+  .add { margin-top:16px; height:32px; display:inline-flex; align-items:center; gap:6px; padding:0 10px; border:1px solid var(--border); border-radius:10px; background:var(--background); font-size:14px; font-weight:500; }
+  .dark .add { background:rgba(255,255,255,.045); border-color:var(--input); }
+  .add svg { width:16px; height:16px; }
+
+  /* picker mode */
+  .dsec { margin-top:16px; border:1px solid var(--border); border-radius:14px; background:var(--soft); overflow:hidden; }
+  .dsec .dh { display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--border); }
+  @media (min-width:640px) { .dsec .dh { padding:16px 20px; } }
+  .dsec .dh .t { font-size:14px; font-weight:600; }
+  .dsec .dh .h { font-size:12.8px; color:var(--muted-fg); margin-top:2px; }
+  .dsec .hint { padding:12px 12px 4px; font-size:12.8px; color:var(--muted-fg); }
+  /* tw row: button "flex h-12 w-full items-center gap-3 px-3 sm:px-5 text-left", number "w-10 shrink-0 text-right tabular-nums font-semibold" */
+  .prow { border-top:1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+  .prow:first-of-type { border-top:0; }
+  .pbtn { height:48px; display:flex; align-items:center; gap:12px; padding:0 12px; }
+  @media (min-width:640px) { .pbtn { padding:0 20px; } }
+  .pnum { width:40px; flex:none; text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+  .pnum i { font-style:normal; color:var(--muted-fg); font-weight:500; }
+  .pname { flex:1; min-width:0; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .prow.open .pname { white-space:normal; }
+  .chips { display:flex; gap:6px; flex:none; font-size:13px; }
+  .chip b { font-weight:600; }
+  .chip span { color:var(--count); font-weight:400; }
+  .chev { flex:none; width:16px; height:16px; color:var(--muted-fg); }
+  .prow.open .chev { transform:rotate(180deg); }
+  .prow.open { background:color-mix(in srgb, var(--primary) 4%, transparent); }
+  .ppanel { padding:0 12px 14px; }
+  @media (min-width:640px) { .ppanel { padding:0 20px 18px 72px; } }
+  .ppanel .sizes { margin-top:0; }
+  .ppanel .desc { margin-top:8px; }
+
+  /* footer of form */
+  .sep { margin-top:32px; height:1px; background:var(--border); }
+  .foot { margin-top:32px; display:flex; flex-direction:column; gap:12px; }
+  .foot p { margin:0; font-size:14px; color:var(--muted-fg); }
+  /* tw: Submit className="h-10 w-full sm:w-auto sm:px-6" (was h-8) */
+  .submit { height:40px; border-radius:10px; background:var(--primary); color:var(--primary-fg); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:500; }
+  @media (min-width:640px) { .foot { flex-direction:row; align-items:center; justify-content:space-between; } .submit { padding:0 24px; } }
+
+  #tag { position:absolute; right:6px; top:62px; font:600 10px/1 system-ui; padding:4px 6px; border-radius:4px; background:#0d9488; color:#fff; letter-spacing:.04em; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<span id="tag"></span>
+<script>
+const q = new URLSearchParams(location.search);
+const theme = q.get("theme") || "light";
+const mode = q.get("mode") || "open";
+const nDesigns = Number(q.get("designs") || 1);
+const withImg = (q.get("img") || "yes") === "yes";
+if (theme === "dark") document.documentElement.classList.add("dark");
+document.getElementById("tag").textContent = `AFTER · ${mode} · ${nDesigns} design${nDesigns > 1 ? "s" : ""}${withImg ? "" : " · no image"}`;
+
+const SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"];
+const DESIGNS = [
+  { id: "home", title: "Snap Demo — Home Kit", img: "design-portrait.jpg" },
+  { id: "away", title: "Snap Demo — Away Kit", img: "design-wide.jpg" },
+].slice(0, nDesigns).map((d) => ({ ...d, img: withImg ? d.img : null }));
+
+const icon = {
+  minus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>',
+  zoom: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+};
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const pic = (d, cls) => `<div class="${cls}">${d.img ? `<img src="${d.img}" alt="${esc(d.title)} main image">` : `<div class="ph" role="img" aria-label="No image yet for ${esc(d.title)}">${icon.image}</div>`}</div>`;
+
+function sizeGrid(picked) {
+  return `<div class="sizes" role="group" aria-label="Sizes">${SIZES.map((s) => {
+    const n = picked[s] || 0;
+    return `<div class="sc${n ? " on" : ""}"><span class="m">${n ? icon.minus : ""}</span><span class="s">${s}</span><span class="c">${n ? `<span class="badge">${n}</span>` : ""}</span></div>`;
+  }).join("")}</div>`;
+}
+
+function pictures() {
+  // No renderable picture anywhere: no picture block at all. A grey "no
+  // image" box at the top of a customer page reads as broken.
+  if (DESIGNS.length === 1) {
+    const d = DESIGNS[0];
+    if (!d.img)
+      return `<p class="design-line">Design: <b>${esc(d.title)}</b></p>`;
+    return `<div class="hero">${pic(d, "box")}<div class="cap"><span class="t">${esc(d.title)}</span><span class="z">${icon.zoom} Tap to enlarge</span></div></div>`;
+  }
+  if (!DESIGNS.some((d) => d.img)) return "";
+  return `<div class="gallery">${DESIGNS.map((d) => `<div class="tile">${pic(d, "box")}<div class="t">${esc(d.title)}</div></div>`).join("")}</div>`;
+}
+
+const CARDS = [
+  { d: "home", name: "Sidestep", num: "72", sizes: { S: 1, M: 3, XL: 1 } },
+  { d: "away", name: "Alexandra Vandermeulen-Okafor", num: "7", sizes: { L: 1 } },
+  { d: "home", name: "Bo", num: "", sizes: { "2XL": 2 } },
+];
+
+function openMode() {
+  const total = CARDS.reduce((a, c) => a + Object.values(c.sizes).reduce((x, y) => x + y, 0), 0);
+  return `<div class="section"><div class="shead"><h2>${DESIGNS.length > 1 ? "Your jerseys &amp; designs" : "Your jerseys"}</h2><span class="tab">${total} jerseys</span></div>
+  ${CARDS.map((c, i) => `<fieldset class="jcard" style="margin-inline:0;min-width:0">
+    <div class="jhead"><span class="l">Jersey ${i + 1}</span><span class="ghost-sm">${icon.trash}Remove</span></div>
+    ${DESIGNS.length > 1 ? `<div><span class="label">Design<span class="req">*</span></span><div class="choose" role="radiogroup">${DESIGNS.map((d) => `<div class="opt${d.id === c.d ? " on" : ""}" role="radio">${pic(d, "thumb t40")}<span class="tt">${esc(d.title)}</span></div>`).join("")}</div></div>` : ""}
+    <div class="nn">
+      <div><label>Name on jersey</label><div class="input">${esc(c.name)}</div></div>
+      <div><label>Number</label><div class="input num">${c.num}</div></div>
+      <div class="desc">Leave either one blank and we won't print it.</div>
+    </div>
+    <div><span class="label">Sizes<span class="req">*</span></span>${sizeGrid(c.sizes)}<div class="desc">Tap a size once for each jersey you want with this name and number.</div></div>
+  </fieldset>`).join("")}
+  <span class="add">${icon.plus}Add a different name or number</span></div>`;
+}
+
+const ROSTER = {
+  home: [
+    { name: "Avery Quinn", num: "7", sizes: { M: 1 } },
+    { name: "Sam Okafor", num: "12", sizes: {} },
+    { name: "Sidestep", num: "72", sizes: { S: 1, M: 2, XL: 1 }, open: true },
+    { name: "Alexandra Vandermeulen-Okafor", num: "7", sizes: {} },
+    { name: "Bo", num: "9", sizes: {} },
+  ],
+  away: [{ name: "Riley Tran", num: "23", sizes: { L: 1 } }],
+};
+
+function chips(sizes) {
+  return SIZES.filter((s) => sizes[s]).map((s) => `<span class="chip"><b>${s}</b><span>×${sizes[s]}</span></span>`).join("");
+}
+
+function fixedMode() {
+  let total = 0;
+  for (const d of DESIGNS) for (const p of ROSTER[d.id]) total += Object.values(p.sizes).reduce((a, b) => a + b, 0);
+  return `<div class="section"><div class="shead"><h2>${DESIGNS.length > 1 ? "Your jerseys &amp; designs" : "Your jerseys"}</h2><span class="tab">${total} jerseys</span></div>
+  ${DESIGNS.map((d) => `<fieldset class="dsec" style="margin-inline:0;padding:0;min-width:0">
+    ${DESIGNS.length > 1
+      ? `<div class="dh">${pic(d, "thumb t40")}<div><div class="t">${esc(d.title)}</div><div class="h">Find your name and tap it to pick sizes.</div></div></div>`
+      : `<div class="hint">Find your name and tap it to pick sizes.</div>`}
+    ${ROSTER[d.id].map((p) => `<div class="prow${p.open ? " open" : ""}">
+      <div class="pbtn" role="button" aria-expanded="${!!p.open}"><span class="pnum"><i>#</i>${p.num}</span><span class="pname">${esc(p.name)}</span><span class="chips">${p.open ? "" : chips(p.sizes)}</span>${icon.chev}</div>
+      ${p.open ? `<div class="ppanel">${sizeGrid(p.sizes)}<div class="desc">Tap a size once for each jersey you want.</div></div>` : ""}
+    </div>`).join("")}
+  </fieldset>`).join("")}</div>`;
+}
+
+document.getElementById("app").innerHTML = `
+<header class="topbar"><div class="in"><span class="logo"><b>Side</b>step</span><span style="display:flex;align-items:center;gap:4px"><span class="about">About Sidestep</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin:0 8px"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span></div></header>
+<main><div class="wrap"><div class="page-card">
+  <p class="eyebrow">Jersey run</p>
+  <h1>Snap Demo — Live Run</h1>
+  <p class="intro">jcc@sidestep.design is ordering custom jerseys. Add a jersey for each person — pick the design, size, and how you'd like the name and number.</p>
+  <p class="close">Submissions close October 13, 2026.</p>
+  ${pictures()}
+  <form>
+    <div class="field"><label>Your name<span class="req">*</span></label><div class="input">Pat Morrison</div></div>
+    <div class="field"><label>Your email<span class="req">*</span></label><div class="desc">So your captain can reach you with updates.</div><div class="input">pat@example.com</div></div>
+    ${mode === "open" ? openMode() : fixedMode()}
+    <div class="section"><label>Do you also want shorts?</label><div class="input textarea"></div></div>
+    <div class="sep"></div>
+    <div class="foot"><p>Your captain will see your submission right away.</p><div class="submit">Submit</div></div>
+  </form>
+</div></div></main>
+<footer>Powered by Sidestep — custom team jerseys, made in Vancouver.</footer>`;
+</script>
+</body>
+</html>
