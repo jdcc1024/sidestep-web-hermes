@@ -5,10 +5,13 @@ import { requireCurrentUser } from "./_auth";
 import {
   canDeleteDesignAsset,
   canUploadDesignAsset,
+  isWebSafeImage,
   normalizeContentType,
   normalizeFilename,
   resolveMainAsset,
+  toPublicImage,
   type DesignMainImage,
+  type PublicDesignImage,
 } from "../lib/designAsset";
 
 // The Convex-side of the design asset model (D-01). Every read of a design's
@@ -126,6 +129,28 @@ export async function assetSummariesByDesign(
     }),
   );
   return new Map(unique.map((designId, i) => [designId, summaries[i]!]));
+}
+
+// The public order form's picture per design (0004). Same "which picture"
+// answer as `assetSummariesByDesign`, but narrower: a URL is built only for
+// a web-safe main, never for any other file, and `toPublicImage` drops it
+// when it's over the size cap. No filename or file count leaves here.
+export async function publicMainImagesByDesign(
+  ctx: QueryCtx | MutationCtx,
+  designIds: readonly Id<"designs">[],
+): Promise<Map<Id<"designs">, PublicDesignImage | null>> {
+  const unique = [...new Set(designIds)];
+  const images = await Promise.all(
+    unique.map(async (designId): Promise<PublicDesignImage | null> => {
+      const main = resolveMainAsset(await listDesignAssets(ctx, designId));
+      if (!main || !isWebSafeImage(main.contentType)) return null;
+      const file = await ctx.db.system.get("_storage", main.storageId);
+      if (!file) return null;
+      const url = await ctx.storage.getUrl(main.storageId);
+      return toPublicImage(main, file.size, url);
+    }),
+  );
+  return new Map(unique.map((designId, i) => [designId, images[i]!]));
 }
 
 // Records uploads against a design. Filename and content type are normalized

@@ -8,6 +8,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import { publicMainImagesByDesign } from "./_designAssets";
 import {
   getCurrentUserOrNull,
   requireAdmin,
@@ -110,14 +111,18 @@ export const getPublic = query({
       ? await loadRoster(ctx, order._id)
       : { entries: [] };
 
+    const designIds = order?.designIds ?? [];
+    // One drawable, size-capped picture per design, url + contentType only.
+    const mainImages = await publicMainImagesByDesign(ctx, designIds);
     const designs = await Promise.all(
-      (order?.designIds ?? []).map(async (designId) => {
+      designIds.map(async (designId) => {
         const design = await ctx.db.get(designId);
         const roster = pickerFor(entries, designId);
         return {
           _id: designId,
           title: design?.title ?? "Untitled design",
           roster,
+          mainImage: mainImages.get(designId) ?? null,
         };
       }),
     );

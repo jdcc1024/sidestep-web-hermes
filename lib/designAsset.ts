@@ -56,6 +56,30 @@ export type DesignMainImage = {
   contentType: string;
 };
 
+// The public order form is unauthenticated and opened on phones, often on cell
+// data, so it only gets a picture a browser can draw and that is small enough
+// to load quickly (docs/architecture/0004-public-form.md, Q2).
+export const PUBLIC_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+// What the public form may see of a design's main file: no filename (names
+// are internal), no storage id, nothing about the design's other files.
+export type PublicDesignImage = { url: string; contentType: string };
+
+// Null unless the main file is web-safe, still in storage, and its size is
+// known and within the cap. A flagged PDF/AI/PSD returns null here, on the
+// server, so its URL never reaches the public. Builds a fresh object so no
+// other field of the asset row can ride along.
+export function toPublicImage(
+  main: { contentType: string },
+  sizeBytes: number | null,
+  url: string | null,
+): PublicDesignImage | null {
+  if (!isWebSafeImage(main.contentType)) return null;
+  if (url === null) return null;
+  if (sizeBytes === null || sizeBytes > PUBLIC_IMAGE_MAX_BYTES) return null;
+  return { url, contentType: main.contentType };
+}
+
 // The minimum an asset must carry to take part in main-image resolution.
 export type MainImageCandidate = {
   contentType: string;
