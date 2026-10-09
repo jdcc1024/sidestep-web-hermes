@@ -275,7 +275,7 @@ test("375px: pick-your-name: Sidestep's row closes with S×1 M×2 XL×1, Avery's
   await expect(mine.getByText("S×1", { exact: true })).toBeVisible();
   await expect(mine.getByText("M×2", { exact: true })).toBeVisible();
   await expect(mine.getByText("XL×1", { exact: true })).toBeVisible();
-  await expect(page.getByText(/\b4 jerseys\b/i)).toBeVisible();
+  await expect(page.getByText(/\b4 jerseys\b/i).first()).toBeVisible();
 });
 
 // ── Done when 6 ─────────────────────────────────────────────────────────────
@@ -327,7 +327,9 @@ test("375px: pick-your-name: numbers 7, 12 and 72 share a right edge, and a 29-c
       return {
         text: b.textContent ?? "",
         numberRight: nr ? nr.getBoundingClientRect().right : null,
-        nameLines: nameRange ? nameRange.getClientRects().length : null,
+        nameLines: nameRange
+          ? new Set(Array.from(nameRange.getClientRects()).map((r) => Math.round(r.top))).size
+          : null,
         nameClipped: nameEl ? nameEl.scrollWidth > nameEl.clientWidth + 1 : null,
         nameBoxRight: nameEl ? nameEl.getBoundingClientRect().right : null,
         rowRight: b.getBoundingClientRect().right,
