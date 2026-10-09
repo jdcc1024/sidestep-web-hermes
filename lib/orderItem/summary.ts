@@ -119,8 +119,8 @@ export type PlayerView<
   sizes: { size: string; qty: number }[];
   jerseyCount: number;
   needsSizes: boolean;
-  // Every line with its own submitter, never collapsed: "Added by" and the
-  // sheet's "Sizes added by" render these.
+  // Every line with its own submitter, never collapsed: the sheet's "Sizes
+  // added by" renders these.
   lines: PlayerLine<Id>[];
 };
 

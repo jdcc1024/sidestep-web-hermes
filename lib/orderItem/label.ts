@@ -1,7 +1,8 @@
 // How an order item reads on the captain's list (L-03, UX §4): the row's
-// label, the "Added by" credit under it, and the sentence its removal toasts.
-// Pure, so the row, the sheet, the Undo toast and the row menu's accessible
-// name all say the same thing about the same item.
+// label, its size counts, and the sentence its removal toasts. Pure, so the
+// row, the sheet, the Undo toast and the row menu's accessible name all say
+// the same thing about the same item. Who sent a player's sizes shows in the
+// sheet only (0004 size chips §5), via `sendersOf`.
 
 import type { ItemView, PlayerLine, PlayerView } from "./summary";
 
@@ -12,17 +13,6 @@ type Labelled = Pick<ItemView, "name" | "number">;
 export function itemLabel({ name, number }: Labelled): string {
   const parts = [name?.trim(), number?.trim() ? `#${number.trim()}` : null];
   return parts.filter(Boolean).join(" ") || "No name";
-}
-
-// Whoever sent the item through the order form, by first name; the captain's
-// own items read as theirs. A captain-seeded item a player filled in (fixed
-// names mode) carries the player as submitter, so it credits the player.
-export function itemAddedBy(
-  item: Pick<ItemView, "submitterName" | "submitterEmail">,
-): string {
-  if (!item.submitterEmail && !item.submitterName) return "Added by you";
-  const first = item.submitterName?.trim().split(/\s+/)[0];
-  return first ? `Added by ${first}` : "Added by a player";
 }
 
 // Sent through the order form, so the edit sheet shows who and what they
@@ -36,15 +26,6 @@ export function isPlayerItem(
 export function removedItemMessage(item: Labelled & { size?: string }): string {
   const label = itemLabel(item);
   return item.size ? `Removed ${label} (${item.size})` : `Removed ${label}`;
-}
-
-// `S×1 M×2 …`, the chip text and the footer's run of sizes.
-export function sizeChip({ size, qty }: { size: string; qty: number }): string {
-  return `${size}×${qty}`;
-}
-
-export function itemCountText(count: number): string {
-  return `${count} item${count === 1 ? "" : "s"}`;
 }
 
 // ── Players (0004 phase 1b, R2-02) ─────────────────────────────────────────
@@ -75,15 +56,19 @@ export function isBlankPlayer({ name, number }: PlayerLabelled): boolean {
   return !name?.trim() && !number?.trim();
 }
 
-// `M×3`, or `S` alone for one: the row chips and the match notice.
+// `M×3`, and `S×1` for one (0004 size chips §6): one rule for a size with
+// its count everywhere, so the row, the breakdown, the footer, the sheet and
+// the notices all read the same. `<SizeQty>` renders this text, styled.
 export function sizeQtyText({ size, qty }: { size: string; qty: number }): string {
-  return qty > 1 ? `${size}×${qty}` : size;
+  return `${size}×${qty}`;
 }
+
+export const sizeChip = sizeQtyText;
 
 // One group of a player's lines per person who sent them: the captain's own
 // lines (no submitter) are "you", a player's are keyed by email. In order of
-// each person's first line, the captain first. "Added by" and the sheet's
-// "Sizes added by" both read this, so they name the same people.
+// each person's first line, the captain first. The sheet's "Sizes added by"
+// reads this.
 export type LineSender<L extends AddedByLine = AddedByLine> = {
   key: string;
   isYou: boolean;
@@ -114,25 +99,6 @@ export function sendersOf<L extends AddedByLine>(
   }
   const senders = [...byKey.values()];
   return [...senders.filter((s) => s.isYou), ...senders.filter((s) => !s.isYou)];
-}
-
-// `Added by you and Riley`: every distinct person behind a player's lines,
-// by first name. A player with no lines yet credits whoever created it.
-export function playerAddedBy(
-  player: Pick<PlayerView, "source"> & { lines: readonly AddedByLine[] },
-): string {
-  const senders = sendersOf(player.lines);
-  if (senders.length === 0)
-    return player.source === "captain" ? "Added by you" : "Added by a player";
-  const names = senders.map((s) =>
-    s.isYou ? "you" : (s.name?.trim().split(/\s+/)[0] ?? "a player"),
-  );
-  return `Added by ${joinNames(names)}`;
-}
-
-function joinNames(names: string[]): string {
-  if (names.length <= 1) return names.join("");
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
 // `Removed Sidestep #72 (5 jerseys)`, or `Removed Jordan Lee #4` for a player

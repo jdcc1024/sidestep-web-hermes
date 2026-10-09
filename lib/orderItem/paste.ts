@@ -8,7 +8,7 @@
 // Columns are name, number, size and an optional "how many" after the size.
 // Rows naming the same player (`playerKey`) become one player whose sizes are
 // summed, so "Sidestep 72 S / Sidestep 72 M 3 / Sidestep 72 XL" is one
-// Sidestep #72 with S, M×3, XL. A player already on the design is "updated":
+// Sidestep #72 with S×1, M×3, XL×1. A player already on the design is "updated":
 // the paste adds its sizes to that player (the server resolves the match
 // again on commit, so the preview is advisory, R2-01).
 
@@ -249,7 +249,7 @@ function sizesText(sizes: readonly { size: string; qty: number }[]): string {
   return sizes.map(sizeQtyText).join(", ");
 }
 
-// UX §7: `Already on your list with M, XL. Adds an L.`
+// UX §7: `Already on your list with M×1, XL×1. Adds an L.`
 function matchNote(
   existingSizes: readonly { size: string; qty: number }[],
   adds: readonly RosterPasteSize[],

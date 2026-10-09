@@ -12,7 +12,6 @@ import {
   jerseyCountText,
   parseRosterPaste,
   playerCountText,
-  sizeQtyText,
   type RosterPastePreview,
 } from "@/lib/orderItem";
 import { userMessage } from "@/lib/userMessage";
@@ -29,6 +28,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { SAVE_FAILED, wrapTabWithin, type OrderPlayer } from "./shared";
+import { SizeQty } from "./SizeQty";
 
 // `Paste a list` (M-03, moved here from the old per-design sheet by L-03):
 // parse, preview, confirm. The parser is pure and lives in `lib/orderItem`,
@@ -257,7 +257,7 @@ function addedMessage({
 
 // Every piece wraps rather than truncates: at 375px a long name or note must
 // push the row taller, never the sheet wider (§8.2). A player shows the sizes
-// this paste adds as the same chips the list rows use (S, M×3, XL).
+// this paste adds as the same chips the list rows use (S×1, M×3, XL×1).
 function PreviewItem({ item }: { item: RosterPastePreview }) {
   if (item.kind === "invalid")
     return (
@@ -292,9 +292,9 @@ function PreviewItem({ item }: { item: RosterPastePreview }) {
             item.sizes.map((line) => (
               <span
                 key={line.size}
-                className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground"
+                className="rounded-full bg-muted px-2 py-0.5"
               >
-                {sizeQtyText(line)}
+                <SizeQty size={line.size} qty={line.qty} />
               </span>
             ))
           )}

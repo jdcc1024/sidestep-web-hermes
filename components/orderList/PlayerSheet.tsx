@@ -504,7 +504,7 @@ function isAre(player: OrderPlayer): string {
   return playerKey(player) === "" ? "are" : "is";
 }
 
-// ` (S, M×3, XL)`, or nothing for a player with no sizes yet.
+// ` (S×1, M×3, XL×1)`, or nothing for a player with no sizes yet.
 function matchSizes(player: OrderPlayer): string {
   return player.sizes.length > 0
     ? ` (${player.sizes.map(sizeQtyText).join(", ")})`
@@ -512,8 +512,8 @@ function matchSizes(player: OrderPlayer): string {
 }
 
 // Who added this player's sizes, one line per person, read-only above the
-// fields (UX frame 4): `You · S, M×2 · Oct 2`, `Riley Chen · M, XL · Oct 4,
-// through the order form`, plus what each player answered on the form.
+// fields (UX frame 4): `You · S×1, M×2 · Oct 2`, `Riley Chen · M×1, XL×1 ·
+// Oct 4, through the order form`, plus what each player answered on the form.
 function SizesAddedBy({
   lines,
 }: {

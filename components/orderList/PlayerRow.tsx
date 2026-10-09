@@ -6,9 +6,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import {
   isBlankPlayer,
   jerseyCountText,
-  playerAddedBy,
   playerLabel,
-  sizeQtyText,
 } from "@/lib/orderItem";
 import { ROW_TRANSITION } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -16,6 +14,7 @@ import { DesignationBadge } from "@/components/portal/RosterDesignation";
 import { Button } from "@/components/ui/button";
 import { PlayerSheet } from "./PlayerSheet";
 import type { OrderPlayer } from "./shared";
+import { SizeQty } from "./SizeQty";
 
 // A row's entire entrance and exit. Opacity only, on purpose — the reasoning
 // lives with `ROW_TRANSITION` in `lib/motion.ts`. Module constants rather than
@@ -24,10 +23,11 @@ const ROW_HIDDEN = { opacity: 0 };
 const ROW_SHOWN = { opacity: 1 };
 
 // One player on the order list (R2-02, UX §4, mockup frame 1):
-// `<Name> #<Number>` with its letter, who added its sizes, then its size chips
-// (display only), the total when it's more than one, or `Needs sizes`. The
-// design's blank entry reads `Blank jerseys`. The `⋯` button opens the edit
-// sheet; on a locked list it isn't there.
+// `<Name> #<Number>` with its letter, then its size chips (`S×1`, display
+// only), the total when it's more than one, or `Needs sizes`. The design's
+// blank entry reads `Blank jerseys`. Who added the sizes is in the sheet, not
+// on the row (0004 size chips §5). The `⋯` button opens the edit sheet; on a
+// locked list it isn't there.
 export function PlayerRow({
   ref,
   player,
@@ -98,11 +98,6 @@ export function PlayerRow({
           </span>
           <DesignationBadge designation={player.designation} />
         </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {blank
-            ? `Nothing printed · ${playerAddedBy(player)}`
-            : playerAddedBy(player)}
-        </p>
         {/* Chips wrap, so more sizes make the row taller, never wider. */}
         <p className="mt-1 flex flex-wrap items-center gap-1 text-xs tabular-nums">
           {player.needsSizes ? (
@@ -113,9 +108,9 @@ export function PlayerRow({
             player.sizes.map((entry) => (
               <span
                 key={entry.size}
-                className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground"
+                className="rounded-full bg-muted px-2 py-0.5"
               >
-                {sizeQtyText(entry)}
+                <SizeQty size={entry.size} qty={entry.qty} />
               </span>
             ))
           )}

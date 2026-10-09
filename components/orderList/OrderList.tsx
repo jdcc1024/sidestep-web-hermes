@@ -7,7 +7,6 @@ import type { NamesMode } from "@/lib/orderForm";
 import {
   jerseyCountText,
   playerCountText,
-  sizeChip,
   type RosterSummary,
 } from "@/lib/orderItem";
 import { DesignThumbnail } from "@/components/design/DesignThumbnail";
@@ -18,6 +17,7 @@ import { CopyFromDesign } from "./CopyFromDesign";
 import { PasteList } from "./PasteList";
 import { PlayerRow } from "./PlayerRow";
 import { PlayerSheet } from "./PlayerSheet";
+import { SizeQty } from "./SizeQty";
 import {
   CustomQuestionsProvider,
   type CustomQuestion,
@@ -200,9 +200,9 @@ function DesignGroup({
           {summary.bySize.map((entry) => (
             <li
               key={entry.size}
-              className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-foreground"
+              className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums"
             >
-              {sizeChip(entry)}
+              <SizeQty size={entry.size} qty={entry.qty} />
             </li>
           ))}
         </ul>
@@ -307,17 +307,35 @@ function DesignGroup({
   );
 }
 
-// The whole order's line: `10 jerseys · S×1 M×5 …`, and how many players
-// still need sizes beside it. Only the linked designs — a removed design's
-// jerseys are out of the summary already (they keep their own section, O-08).
+// The whole order's line: `10 jerseys`, then each size as its own list item
+// (`S×1  M×5 …`, no separator but the gap), and how many players still need
+// sizes beside it. The sizes sit beside the total on a wide screen and wrap
+// below it on a phone. Only the linked designs — a removed design's jerseys
+// are out of the summary already (they keep their own section, O-08).
 function Footer({ summary }: { summary: RosterSummary }) {
-  const sizes = summary.bySize.map(sizeChip).join(" ");
-  const jerseys = jerseyCountText(summary.jerseyCount);
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border bg-muted/50 px-4 py-3 sm:px-6">
-      <p className="font-semibold tabular-nums text-foreground">
-        {sizes ? `${jerseys} · ${sizes}` : jerseys}
-      </p>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1">
+        <p className="font-semibold tabular-nums text-foreground">
+          {jerseyCountText(summary.jerseyCount)}
+        </p>
+        {summary.bySize.length > 0 && (
+          <ul
+            aria-label="Sizes on this order"
+            className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums"
+          >
+            {summary.bySize.map((entry) => (
+              <li key={entry.size} className="whitespace-nowrap">
+                <SizeQty
+                  size={entry.size}
+                  qty={entry.qty}
+                  countWeight="medium"
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {summary.needsSizes > 0 && (
         <p className="font-medium text-amber-800 dark:text-amber-200">
           {`${playerCountText(summary.needsSizes)} ${summary.needsSizes === 1 ? "needs" : "need"} sizes`}
