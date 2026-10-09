@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { describeSubmitters } from "@/lib/designRemoval";
 import { REVEAL_TRANSITION } from "@/lib/motion";
-import { itemCountText, jerseyCountText } from "@/lib/orderItem";
+import { jerseyCountText } from "@/lib/orderItem";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,12 +52,12 @@ export function DesignRemovalWarning({
       <TriangleAlert aria-hidden />
       <AlertTitle>
         Removing {title ? `“${title}”` : "this design"} drops{" "}
-        {itemCountText(affected.itemCount)} from your order
+        {jerseyCountText(affected.itemCount)} from your order
       </AlertTitle>
       <AlertDescription className="text-amber-800 dark:text-amber-200/90">
-        {submitters && `${submitters} sent items for it. `}
-        Nothing is deleted: the items stay saved and show as removed on the
-        order page, so you can link the design again any time.
+        {submitters && `${submitters} added jerseys to it. `}
+        Nothing is deleted: their names and sizes stay saved and show as
+        removed on the order page, so you can link the design again any time.
       </AlertDescription>
     </Alert>
   );
@@ -121,8 +121,8 @@ export function RemovedDesigns({ orderId }: { orderId: Id<"orders"> }) {
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               These are off the order, so they don&apos;t count toward
-              production — but their items are still here. Nothing was
-              deleted.
+              production. Their names and sizes are still here, and nothing
+              was deleted.
             </p>
 
             <div className="mt-4 space-y-4">
@@ -146,7 +146,7 @@ export function RemovedDesigns({ orderId }: { orderId: Id<"orders"> }) {
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground">
                     {design.submitters.length > 0 &&
-                      `${describeSubmitters(design.submitters)} sent items for this. `}
+                      `${describeSubmitters(design.submitters)} added jerseys to this. `}
                     The {jerseyCountText(design.jerseyCount)} on it no longer
                     count. Link the design again from Edit order to bring them
                     back in.

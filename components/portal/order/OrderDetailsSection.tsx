@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DesignThumbnail } from "@/components/design/DesignThumbnail";
+import { jerseyCountText } from "@/lib/orderItem";
 import { cn } from "@/lib/utils";
 import { formatDate, type OrderDesign, type OrderRecord } from "./shared";
 
@@ -39,11 +40,10 @@ export function OrderDetailsSection({
             <Field label="Team name" value={order.teamName} />
             <Field label="Sport" value={order.sport} />
             {/* The live total is the real quantity (O-07); the intake estimate
-                sits beside it, plainly labelled as the seed it was. */}
-            <Field
-              label="Items"
-              value={`${total} item${total === 1 ? "" : "s"}`}
-            />
+                sits beside it, plainly labelled as the seed it was. "On the
+                list", not "Jerseys", so the pair doesn't read "Jerseys ·
+                47 jerseys" (0004 size chips §7). */}
+            <Field label="On the list" value={jerseyCountText(total)} />
             <Field
               label="Estimated at intake"
               value={`${order.estimatedQuantity} jerseys`}
