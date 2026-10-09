@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   isPlayerItem,
-  itemAddedBy,
-  itemCountText,
   itemLabel,
   removedItemMessage,
   sizeChip,
+  sizeQtyText,
 } from "./label";
 
 describe("itemLabel", () => {
@@ -21,27 +20,6 @@ describe("itemLabel", () => {
   it("should say `No name` when the item has neither", () => {
     expect(itemLabel({})).toBe("No name");
     expect(itemLabel({ name: "  ", number: "" })).toBe("No name");
-  });
-});
-
-describe("itemAddedBy", () => {
-  it("should credit the captain's own items to them", () => {
-    expect(itemAddedBy({})).toBe("Added by you");
-  });
-
-  it("should credit a player by first name only", () => {
-    expect(
-      itemAddedBy({
-        submitterName: "Riley Chen",
-        submitterEmail: "r@example.test",
-      }),
-    ).toBe("Added by Riley");
-  });
-
-  it("should still credit a player who left no name", () => {
-    expect(itemAddedBy({ submitterEmail: "r@example.test" })).toBe(
-      "Added by a player",
-    );
   });
 });
 
@@ -72,14 +50,23 @@ describe("removedItemMessage", () => {
   });
 });
 
-describe("count text", () => {
-  it("should pluralise items", () => {
-    expect(itemCountText(0)).toBe("0 items");
-    expect(itemCountText(1)).toBe("1 item");
-    expect(itemCountText(6)).toBe("6 items");
+// 0004 size chips (UX §6): one rule, `${size}×${qty}` always, so a single
+// jersey reads `S×1` and the breakdown and the row say the same thing.
+// The itemAddedBy / itemCountText tests are gone: the spec deletes both
+// functions (§5, §7), and playerAddedBy had no test here.
+describe.each([
+  ["sizeQtyText", sizeQtyText],
+  ["sizeChip", sizeChip],
+])("%s", (_name, text) => {
+  it("should show ×1 for a single jersey", () => {
+    expect(text({ size: "S", qty: 1 })).toBe("S×1");
   });
 
-  it("should write a size chip with no space around the ×", () => {
-    expect(sizeChip({ size: "2XL", qty: 2 })).toBe("2XL×2");
+  it("should show the count for several jerseys, with no space around the ×", () => {
+    expect(text({ size: "M", qty: 3 })).toBe("M×3");
+  });
+
+  it("should keep a digit-led size distinct from its count", () => {
+    expect(text({ size: "2XL", qty: 1 })).toBe("2XL×1");
   });
 });

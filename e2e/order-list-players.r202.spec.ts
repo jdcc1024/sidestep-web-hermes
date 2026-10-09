@@ -23,7 +23,7 @@ import { seedOrder } from "./support/convex";
 //   button  /^edit sidestep/i                a row's edit control
 //   button  /^save/i                         edit sheet save
 //   button  /remove player/i, toast /undo/i
-//   row text: chips "M×3", "<n> jerseys", "Added by"; design line "<n> player(s)"
+//   row text: chips "M×3", "<n> jerseys" (no "Added by": 0004 size chips); design line "<n> player(s)"
 
 test.use({ viewport: { width: 375, height: 812 } });
 
@@ -109,7 +109,7 @@ test("adding ' sidestep ' #72 again with an L joins the player; lowering M to 2 
   await expectNoHorizontalScroll(page);
 });
 
-test("removing Sidestep #72 and pressing Undo brings the row back with the same sizes and 'Added by'", async ({
+test("removing Sidestep #72 and pressing Undo brings the row back with the same sizes", async ({
   page,
   tag,
 }) => {
@@ -117,7 +117,6 @@ test("removing Sidestep #72 and pressing Undo brings the row back with the same 
   await page.goto(`/portal/orders/${order.orderId}`);
   await addSidestep(page);
   await expect(rows(page)).toHaveCount(1);
-  await expect(rows(page).first()).toContainText(/added by/i);
 
   await page.getByRole("button", { name: /^edit sidestep/i }).click();
   await sheet(page).getByRole("button", { name: /remove player/i }).click();
@@ -129,6 +128,5 @@ test("removing Sidestep #72 and pressing Undo brings the row back with the same 
   await expect(row).toContainText(/M\s*×\s*3/);
   await expect(row).toContainText("XL");
   await expect(row).toContainText(/5 jerseys/i);
-  await expect(row).toContainText(/added by/i);
   await expectNoHorizontalScroll(page);
 });

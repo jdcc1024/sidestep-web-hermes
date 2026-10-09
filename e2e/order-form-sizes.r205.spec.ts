@@ -15,7 +15,7 @@ import { seedOrder } from "./support/convex";
 //            /remove one <SIZE>\b/i             (R2-02 component, sizeOptions only)
 //   button   /^submit/i                         (exists today)
 //   status   role=status                        after a successful submit
-// Captain's list (R2-02 names): row chips "M×3", "<n> jerseys", "Added by";
+// Captain's list (R2-02 names): row chips "M×3", "<n> jerseys" (no "Added by" on rows: 0004 size chips);
 // edit control /^edit sidestep/i; the sheet's region "Sizes added by".
 // The old single size radio and Quantity box are gone from this form.
 
@@ -115,9 +115,8 @@ test("375px: a player fills one card as Sidestep #72 with S, M×3, XL and the ca
   await expect(row).toContainText(/M\s*×\s*3/);
   await expect(row).toContainText("XL");
   await expect(row).toContainText(/5 jerseys/i);
-  await expect(row).toContainText(/added by/i);
-  // "Added by" credits first names only (R2-02, UX §8).
-  await expect(row).toContainText(first.name.split(" ")[0]);
+  // The row credits nobody (0004 size chips); the sheet does (size-chips spec).
+  await expect(row).not.toContainText(/added by/i);
   await expectNoHorizontalScroll(page);
   await expect(
     page.getByRole("main").getByText(/CONVEX|ConvexError|Request ID/),
@@ -145,16 +144,13 @@ test("375px: a second player with a different email adding Sidestep #72 in L joi
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto(`/portal/orders/${order.orderId}`);
 
-  // Still one player, now with L and 6 jerseys, both people under "Added by".
+  // Still one player, now with L and 6 jerseys, both people in the sheet below.
   await expect(rows(page)).toHaveCount(1);
   const row = rows(page).first();
   await expect(row).toContainText("L");
   await expect(row).toContainText(/M\s*×\s*3/);
   await expect(row).toContainText(/6 jerseys/i);
-  await expect(row).toContainText(/added by/i);
-  // "Added by" credits first names only (R2-02, UX §8).
-  await expect(row).toContainText(first.name.split(" ")[0]);
-  await expect(row).toContainText(second.name.split(" ")[0]);
+  await expect(row).not.toContainText(/added by/i);
   // Gate 1b Q5: no flag, no warning on the list.
   await expect(
     page.getByRole("main").getByText(/sizes from|conflict|duplicate|check with/i),
