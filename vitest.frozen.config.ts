@@ -5,7 +5,7 @@ import path from "node:path";
 // settles; expect rot. Run on demand with `npm run test:frozen`.
 export default defineConfig({
   test: {
-    setupFiles: ["./vitest.setup.ts"],
+    setupFiles: ["./vitest.setup.ts", "./vitest.nextImage.setup.ts"],
     include: ["**/*.test.tsx"],
     exclude: [...configDefaults.exclude, "e2e/**"],
     server: { deps: { inline: ["convex-test"] } },
