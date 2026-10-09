@@ -348,7 +348,7 @@ describe("the preview: one item per player and per skipped row (R2-04, UX §7)",
       kind: "player",
       status: "updated",
       sizes: [{ size: "L", qty: 1 }],
-      notes: ["Already on your list with M, XL×2. Adds an L."],
+      notes: ["Already on your list with M×1, XL×2. Adds an L."],
     });
   });
 
