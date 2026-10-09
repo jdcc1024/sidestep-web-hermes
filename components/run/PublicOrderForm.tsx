@@ -853,6 +853,7 @@ function DesignTile({ design }: { design: PublicDesign }) {
         <DesignThumbnail
           title={design.title}
           mainImage={design.mainImage}
+          preset="designChip"
           className="size-10"
           iconClassName="size-4"
         />
@@ -932,6 +933,7 @@ function RosterList({
               <DesignThumbnail
                 title={design.title}
                 mainImage={design.mainImage}
+                preset="designChip"
                 className="size-10 shrink-0"
                 iconClassName="size-4"
               />
@@ -1164,6 +1166,7 @@ function Header({
             zoomable
             priority
             fit="contain"
+            preset="publicHero"
             className="block h-48 w-full rounded-xl sm:h-64"
           />
           <figcaption className="mt-2 flex items-baseline justify-between gap-3 text-sm">
@@ -1189,6 +1192,7 @@ function Header({
                 mainImage={d.mainImage}
                 zoomable
                 fit="contain"
+                preset="publicTile"
                 className="block h-36 w-full rounded-xl sm:h-40"
               />
               <p className="mt-1.5 line-clamp-2 text-sm font-medium text-foreground">
