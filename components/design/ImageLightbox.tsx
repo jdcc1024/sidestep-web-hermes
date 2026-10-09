@@ -6,6 +6,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { StoredImage } from "@/components/image/StoredImage";
+import type { ImagePreset } from "@/lib/images";
 import { cn } from "@/lib/utils";
 
 // Click a picture, see it full size (D-11). Every surface that shows design
@@ -26,6 +28,8 @@ export function ImageLightbox({
   alt,
   triggerLabel,
   triggerClassName,
+  contentType = "",
+  preset = "original",
   children,
 }: {
   src: string;
@@ -34,6 +38,11 @@ export function ImageLightbox({
   // "View crest.png full size" beats hearing the alt text read twice.
   triggerLabel: string;
   triggerClassName?: string;
+  // Only read when a preset resizes the picture; without it the full-size
+  // view is the plain URL, as before presets existed.
+  contentType?: string;
+  // How big a picture to fetch (lib/images.ts); `original` by default.
+  preset?: ImagePreset;
   // The thumbnail to render inside the trigger.
   children: React.ReactNode;
 }) {
@@ -53,12 +62,10 @@ export function ImageLightbox({
           half the screen wide. A tall image is capped so it scales down. */}
       <DialogContent className="w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] gap-3 p-2 sm:w-fit sm:max-w-[min(90vw,64rem)] sm:p-3">
         <DialogTitle className="sr-only">{alt}</DialogTitle>
-        {/* Convex storage serves short-lived signed URLs from a per-deployment
-            host, so next/image optimization doesn't apply. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <StoredImage
+          image={{ url: src, contentType }}
+          preset={preset}
           data-testid="lightbox-image"
-          src={src}
           alt={alt}
           className="mx-auto max-h-[80vh] w-full max-w-full rounded-md object-contain sm:w-auto"
         />

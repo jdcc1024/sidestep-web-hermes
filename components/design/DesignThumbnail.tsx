@@ -7,7 +7,9 @@ import {
   type DesignMainImage,
   type PublicDesignImage,
 } from "@/lib/designAsset";
+import type { ImagePreset } from "@/lib/images";
 import { cn } from "@/lib/utils";
+import { StoredImage } from "@/components/image/StoredImage";
 import { ImageLightbox } from "./ImageLightbox";
 
 // The picture that stands in for a design on a summary surface (D-07) — the
@@ -18,7 +20,7 @@ import { ImageLightbox } from "./ImageLightbox";
 // Three things stop an image rendering, and all of them land on the same
 // placeholder: the design has no files, the main file isn't something a
 // browser draws (a print template can be the owner's explicit pick), or its
-// short-lived storage URL went stale between the query and the render.
+// storage URL went missing between the query and the render.
 export function DesignThumbnail({
   title,
   mainImage,
@@ -27,6 +29,7 @@ export function DesignThumbnail({
   zoomable = false,
   fit = "cover",
   priority = false,
+  preset = "original",
 }: {
   title: string;
   // Only the url and content type are read, so both the captain's summary
@@ -45,12 +48,17 @@ export function DesignThumbnail({
   fit?: "cover" | "contain";
   // Load straight away rather than lazily: for a picture above the fold.
   priority?: boolean;
+  // How big a picture to fetch (lib/images.ts). The default, `original`, is
+  // the plain storage URL; any other preset also opens a screen-sized
+  // lightbox rather than the print file.
+  preset?: ImagePreset;
 }) {
   const [failed, setFailed] = useState(false);
   const src =
     !failed && mainImage?.url && isWebSafeImage(mainImage.contentType)
       ? mainImage.url
       : null;
+  const contentType = mainImage?.contentType ?? "";
 
   const boxClassName = cn(
     "overflow-hidden rounded-md border border-border bg-muted/50",
@@ -58,12 +66,10 @@ export function DesignThumbnail({
   );
 
   const picture = src ? (
-    // Convex storage serves short-lived signed URLs from a per-deployment
-    // host, so next/image optimization doesn't apply.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
+    <StoredImage
+      image={{ url: src, contentType }}
       alt={`${title} main image`}
+      preset={preset}
       className={cn(
         "size-full",
         fit === "contain" ? "object-contain" : "object-cover",
@@ -91,6 +97,8 @@ export function DesignThumbnail({
       alt={`${title} main image`}
       triggerLabel={`View ${title} full size`}
       triggerClassName={boxClassName}
+      contentType={contentType}
+      preset={preset === "original" ? undefined : "lightbox"}
     >
       {picture}
     </ImageLightbox>
