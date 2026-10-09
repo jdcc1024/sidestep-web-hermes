@@ -1011,7 +1011,8 @@ function RosterRow({
         onClick={onToggle}
         className={cn(
           // min-h rather than h: the open row shows the full name, wrapped.
-          "flex min-h-12 w-full items-center gap-3 px-3 text-left text-sm outline-none transition-colors sm:px-5",
+          // 16px on a phone, like the inputs and the approved mock; 14px from sm.
+          "flex min-h-12 w-full items-center gap-3 px-3 text-left text-base outline-none transition-colors sm:px-5 sm:text-sm",
           "hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50",
           open && "bg-primary/[.04]",
         )}
