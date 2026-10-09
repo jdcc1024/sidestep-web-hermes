@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0004 mockup: paste preview for an imported roster</title>
+<!--
+  UX mockup for docs/ux/0004-roster-import.md. Static, no build, no network.
+    ?state=before   main today (4a999e1): the customer's message pasted as-is
+    ?state=after    proposal: the converted "Light" block pasted, with the
+                    optional "Ordered by" column (P2) and the
+                    blank-number fix (P1)
+    &theme=light|dark
+  Names are PSEUDONYMS. The real sample stays local
+  (~/sidestep/initiatives/0004-roster-collection/artifacts/), because this
+  repo is public. Numbers, sizes and line shapes are the real ones.
+  The "before" preview is what parseRosterPaste returns for the sample today
+  (probe run 2026-10-09: 18 new players, 0 jerseys, 18 need sizes, 0 skipped).
+  Rendered by render.mjs next to this file.
+-->
+<style>
+  :root {
+    --background:#ffffff; --foreground:#0a0a0a; --card:#ffffff; --muted:#f5f5f5;
+    --muted-fg:#737373; --border:#e5e5e5; --count:#0f766e; --btn:#0d9488;
+    --amber-bg:#fef3c7; --amber-fg:#92400e; --overlay:rgba(0,0,0,.35); --new:#0f766e;
+  }
+  .dark {
+    --background:#0a0a0a; --foreground:#fafafa; --card:#171717; --muted:#262626;
+    --muted-fg:#a1a1a1; --border:rgba(255,255,255,.10); --count:#5eead4; --btn:#0d9488;
+    --amber-bg:rgba(245,158,11,.20); --amber-fg:#fde68a; --overlay:rgba(0,0,0,.6); --new:#5eead4;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--overlay); color:var(--foreground); }
+  body { font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:14px; line-height:1.43; }
+  .sheet { margin-top:48px; background:var(--card); border-top-left-radius:16px; border-top-right-radius:16px; border-top:1px solid var(--border); }
+  @media (min-width:640px) { .sheet { max-width:512px; margin:48px auto 0; border-left:1px solid var(--border); border-right:1px solid var(--border); } }
+  .head { position:relative; padding:16px 56px 12px 16px; border-bottom:1px solid var(--border); }
+  .head h2 { margin:0; font-size:18px; font-weight:600; }
+  .head p { margin:4px 0 0; color:var(--muted-fg); font-size:14px; }
+  .x { position:absolute; top:10px; right:10px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--muted-fg); }
+  .body { padding:16px; }
+  textarea { width:100%; height:112px; resize:none; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:transparent; color:var(--foreground);
+             font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space:pre; overflow:hidden; tab-size:8; }
+  .count { margin:12px 0 0; font-weight:500; font-variant-numeric:tabular-nums; }
+  ul { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:6px; }
+  li { border:1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius:8px; padding:8px 12px; background:var(--background); }
+  .who { margin:0; font-weight:500; overflow-wrap:anywhere; }
+  .num { color:var(--muted-fg); font-weight:400; }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0 0; font-size:12px; font-variant-numeric:tabular-nums; }
+  .chip { display:inline-flex; align-items:baseline; border-radius:999px; background:var(--muted); padding:2px 8px; }
+  .sz { font-weight:600; } .qty { color:var(--count); margin-left:1px; }
+  .need { border-radius:999px; padding:2px 8px; font-weight:600; background:var(--amber-bg); color:var(--amber-fg); }
+  .note { margin:4px 0 0; font-size:12px; color:var(--muted-fg); overflow-wrap:anywhere; }
+  .from { margin:4px 0 0; font-size:12px; color:var(--foreground); }
+  .from b { font-weight:500; color:var(--muted-fg); }
+  .newbit { outline:2px dashed #f59e0b; outline-offset:2px; border-radius:4px; }
+  .foot { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px 16px; border-top:1px solid var(--border); }
+  .btn { height:44px; display:inline-flex; align-items:center; padding:0 14px; border-radius:8px; font-weight:600; }
+  .btn.p { background:var(--btn); color:#fff; }
+  .tag { position:fixed; top:8px; left:8px; padding:2px 8px; border-radius:999px; background:#111; color:#fff; font:600 11px system-ui; letter-spacing:.06em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+<span class="tag" id="tag"></span>
+<div class="sheet" id="sheet">
+  <div class="head">
+    <h2>Paste a list</h2>
+    <p>Light. Paste name, number and size straight from Excel or Google Sheets. One row per jersey, or add a &ldquo;how many&rdquo; column after the size. Nothing is added until you confirm.</p>
+    <span class="x" aria-hidden="true">&times;</span>
+  </div>
+  <div class="body">
+    <textarea id="box" aria-label="Paste your list" readonly></textarea>
+    <p class="count" id="count"></p>
+    <ul id="list" aria-label="Paste preview"></ul>
+  </div>
+  <div class="foot">
+    <span class="btn">Cancel</span>
+    <span class="btn p">Add to Light</span>
+  </div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const state = q.get("state") || "after";
+  if ((q.get("theme") || "light") === "dark") document.documentElement.classList.add("dark");
+  document.getElementById("tag").textContent = state === "before" ? "Before: main today" : "After: proposal";
+
+  // The customer's message with pseudonyms (same shape, numbers, sizes,
+  // spacing and tags as the real sample).
+  const raw = [
+    "[Light Jersey Order]",
+    "Kai - [Abbott - 8 - M] ",
+    "Lee - [Brennan - 15 - 2XL] ",
+    "Max - [Carver - 23 - L] ",
+    "Sam - [Dhillon - 44 - 2XL]",
+    "Sam - [Dhillon - 44 - 2XL]",
+    "Jo - [Evans - 30 - 2XL]",
+    "Rob - [Fraser - 43 - 3XL]",
+    "Rob - [Fraser - 43 - 2XL]",
+    "Rob - [Fraser - 43 - 2XL]",
+    "Rob - [Fraser - 43 - XL]",
+    "Rob - [Fraser - 43 - L]",
+    "Rob - [Fraser - 43 - M]",
+    "Rob - [Fraser - 43 - S]",
+    "Tess - [Gill - 21 - 2XL] ",
+    "Ash - [Hughes - 3 - 2XL] ",
+    "Ash - [Hughes - 3 - 2XL] (sleeveless)",
+    "Mo - [Ivanov - 34 - 2XL]",
+    "Mo - [Ivanov - 34 - 2XL]",
+    "Pat - [Jensen - 24 - M] ",
+    "Robin - [COACH R - S ] (no number)",
+  ];
+
+  // The converted "Light" block: Name, Number, Size, How many, Ordered by.
+  // Commas. The "Ordered by" line in the preview (dashed outline) exists only
+  // if JCC picks Q1 option A (owner lands on the size lines); doc §4.1.
+  // The COACH row needs paste fix P1 (doc §6); today it would read as "#S".
+  const light = [
+    ["Abbott","8","M","1","Kai"], ["Brennan","15","2XL","1","Lee"], ["Carver","23","L","1","Max"],
+    ["Dhillon","44","2XL","1","Sam"], ["Dhillon","44","2XL","1","Sam"], ["Evans","30","2XL","1","Jo"],
+    ["Fraser","43","3XL","1","Rob"], ["Fraser","43","2XL","1","Rob"], ["Fraser","43","2XL","1","Rob"],
+    ["Fraser","43","XL","1","Rob"], ["Fraser","43","L","1","Rob"], ["Fraser","43","M","1","Rob"],
+    ["Fraser","43","S","1","Rob"], ["Gill","21","2XL","1","Tess"], ["Hughes","3","2XL","1","Ash"],
+    ["Ivanov","34","2XL","1","Mo"], ["Ivanov","34","2XL","1","Mo"], ["Jensen","24","M","1","Pat"],
+    ["COACH R","","S","1","Robin"],
+  ];
+
+  const box = document.getElementById("box");
+  const list = document.getElementById("list");
+  const count = document.getElementById("count");
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const chip = (size, qty) => `<span class="chip"><span class="sz">${size}</span><span class="qty">×${qty}</span></span>`;
+
+  if (state === "before") {
+    box.value = raw.join("\n");
+    // parseRosterPaste today: no tab or comma, no trailing digits, so every
+    // line is one name with no number and no size. Same text groups.
+    const groups = [];
+    raw.forEach((line, i) => {
+      const name = line.trim();
+      const g = groups.find((x) => x.name === name);
+      if (g) g.lines.push(i + 1); else groups.push({ name, lines: [i + 1] });
+    });
+    count.textContent = `${groups.length} new players · ${groups.length} need sizes`;
+    list.innerHTML = groups.map((g) => `<li><p class="who">${esc(g.name)}</p>
+      <p class="chips"><span class="need">Needs sizes</span></p>
+      ${g.lines.length > 1 ? `<p class="note">${g.lines.length} rows, one player.</p>` : ""}</li>`).join("");
+  } else {
+    box.value = light.map((r) => r.join(",")).join("\n");
+    const groups = [];
+    light.forEach(([name, number, size, qty, from], i) => {
+      let g = groups.find((x) => x.name === name && x.number === number);
+      if (!g) groups.push(g = { name, number, sizes: [], rows: 0, from: [] });
+      g.rows++;
+      const s = g.sizes.find((x) => x.size === size);
+      if (s) s.qty += +qty; else g.sizes.push({ size, qty: +qty });
+      if (!g.from.includes(from)) g.from.push(from);
+    });
+    const jerseys = groups.reduce((n, g) => n + g.sizes.reduce((m, s) => m + s.qty, 0), 0);
+    count.textContent = `${groups.length} new players · ${jerseys} jerseys`;
+    list.innerHTML = groups.map((g) => `<li><p class="who">${esc(g.name)}${g.number ? ` <span class="num">#${g.number}</span>` : ""}</p>
+      <p class="chips">${g.sizes.map((s) => chip(s.size, s.qty)).join("")}</p>
+      <p class="from newbit"><b>Ordered by</b> ${esc(g.from.join(", "))}</p>
+      ${g.rows > 1 ? `<p class="note">${g.rows} rows, one player.</p>` : ""}</li>`).join("");
+  }
+</script>
+</body>
+</html>
