@@ -7,6 +7,8 @@
 // resolver can run over a Convex doc, a query result carrying a signed URL, or
 // a fixture in a test.
 
+import { OPTIMIZABLE_SOURCE_MAX_BYTES, canOptimize } from "./images";
+
 // Only types a browser renders inline in an <img>. A "mockup" may well be a
 // PSD or AI file, so the render decision keys off content type, never the
 // filename or a tag (PRD §6).
@@ -58,7 +60,8 @@ export type DesignMainImage = {
 
 // The public order form is unauthenticated and opened on phones, often on cell
 // data, so it only gets a picture a browser can draw and that is small enough
-// to load quickly (docs/architecture/0004-public-form.md, Q2).
+// to load quickly (docs/architecture/0004-public-form.md, Q2). Since R3-02 this
+// cap only applies to types the optimizer can't resize (GIF, SVG).
 export const PUBLIC_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 // What the public form may see of a design's main file: no filename (names
@@ -66,7 +69,10 @@ export const PUBLIC_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 export type PublicDesignImage = { url: string; contentType: string };
 
 // Null unless the main file is web-safe, still in storage, and its size is
-// known and within the cap. A flagged PDF/AI/PSD returns null here, on the
+// known and within the cap for its type. PNG/JPEG/WebP are resized on the way
+// out (0004 R3-02, docs/architecture/0004-image-previews.md), so they may be
+// as big as the optimizer will fetch; GIF and SVG reach the phone as stored,
+// so they keep the 2 MB cap. A flagged PDF/AI/PSD returns null here, on the
 // server, so its URL never reaches the public. Builds a fresh object so no
 // other field of the asset row can ride along.
 export function toPublicImage(
@@ -76,7 +82,10 @@ export function toPublicImage(
 ): PublicDesignImage | null {
   if (!isWebSafeImage(main.contentType)) return null;
   if (url === null) return null;
-  if (sizeBytes === null || sizeBytes > PUBLIC_IMAGE_MAX_BYTES) return null;
+  const maxBytes = canOptimize(main.contentType)
+    ? OPTIMIZABLE_SOURCE_MAX_BYTES
+    : PUBLIC_IMAGE_MAX_BYTES;
+  if (sizeBytes === null || sizeBytes > maxBytes) return null;
   return { url, contentType: main.contentType };
 }
 
