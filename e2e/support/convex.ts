@@ -102,3 +102,39 @@ export const sweepStale = () => {
     }
   }
 };
+
+/** Adds a second (third, ...) design to a seeded order. Title: `E2E <tag> <title>`. */
+export const addDesign = (
+  tag: string,
+  orderId: string,
+  title: string,
+  as: As = "admin",
+) =>
+  run<{ designId: string }>("_e2e:addDesign", {
+    email: email(as),
+    tag,
+    orderId,
+    title,
+  });
+
+/**
+ * Stores a small generated file and attaches it to an E2E design (0004
+ * R3-01). `kind: "png"` is a 1x1 picture, `"pdf"` a minimal PDF. `isMain`
+ * flags it as the design's main file.
+ */
+const PNG_1X1 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const PDF_MIN = Buffer.from("%PDF-1.1\n%%EOF\n").toString("base64");
+
+export const attachFile = (
+  designId: string,
+  kind: "png" | "pdf",
+  isMain = true,
+) =>
+  run<{ ok: true }>("_e2e:attachFile", {
+    designId,
+    base64: kind === "png" ? PNG_1X1 : PDF_MIN,
+    contentType: kind === "png" ? "image/png" : "application/pdf",
+    filename: kind === "png" ? "e2e-main.png" : "e2e-print.pdf",
+    isMain,
+  });

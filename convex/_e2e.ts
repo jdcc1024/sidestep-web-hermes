@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalAction, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { prepareBlocks } from "./_designBlocks";
@@ -216,5 +217,87 @@ export const cleanup = internalMutation({
     }
 
     return { orders, designs, rows };
+  },
+});
+
+// ─── 0004 R3-01 seeds: a second design, and a picture on a design ─────────────
+
+// Test-only: adds a second design to an E2E order (title `E2E <tag> <suffix>`),
+// so a test can open a two-design public form.
+export const addDesign = internalMutation({
+  args: {
+    email: v.string(),
+    tag: v.string(),
+    orderId: v.id("orders"),
+    title: v.string(),
+  },
+  handler: async (ctx, { email, tag, orderId, title }) => {
+    checkTag(tag);
+    const user = await userByEmail(ctx, email);
+    const order = await ctx.db.get(orderId);
+    if (!order || order.captainId !== user._id || !order.teamName.startsWith(`${PREFIX}${tag}`))
+      throw new ConvexError("Not an E2E order for this tag.");
+    const now = Date.now();
+    const designId = await ctx.db.insert("designs", {
+      ownerId: user._id,
+      title: `${PREFIX}${tag} ${title}`,
+      blocks: prepareBlocks(overviewBlocks("E2E fixture kit.")),
+      jerseyStyle: "Soccer jersey",
+      neckline: "Crew Neck",
+      sleeveStyle: "Regular",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(orderId, {
+      designIds: [...order.designIds, designId],
+      updatedAt: now,
+    });
+    return { designId };
+  },
+});
+
+export const insertAsset = internalMutation({
+  args: {
+    designId: v.id("designs"),
+    storageId: v.id("_storage"),
+    filename: v.string(),
+    contentType: v.string(),
+    isMain: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const design = await ctx.db.get(args.designId);
+    if (!design || !design.title.startsWith(PREFIX))
+      throw new ConvexError("Not an E2E design.");
+    await ctx.db.insert("designAssets", {
+      ...args,
+      uploadedByUserId: design.ownerId,
+      uploadedByAdmin: false,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+// Test-only: stores a small generated file (base64 from the test) and attaches
+// it to an E2E design. A mutation can't write storage, so this is an action.
+// `_e2e:cleanup` already deletes asset blobs.
+export const attachFile = internalAction({
+  args: {
+    designId: v.id("designs"),
+    base64: v.string(),
+    contentType: v.string(),
+    filename: v.string(),
+    isMain: v.boolean(),
+  },
+  handler: async (ctx, { base64, contentType, ...rest }) => {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const storageId = await ctx.storage.store(
+      new Blob([bytes], { type: contentType }),
+    );
+    await ctx.runMutation(internal._e2e.insertAsset, {
+      ...rest,
+      contentType,
+      storageId,
+    });
+    return { ok: true as const };
   },
 });
