@@ -5,7 +5,15 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import type { Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CheckIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  Maximize2Icon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
+import { Radio as RadioPrimitive } from "@base-ui/react/radio";
+import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -17,9 +25,15 @@ import {
   addOneSize,
   cardJerseyCount,
   cardToLines,
+  lineQty,
+  pickedSizes,
+  pictureBlock,
   removeOneSize,
+  rosterRowLabel,
+  toggleOpenRow,
 } from "@/lib/orderEntry";
-import type { CardSizes } from "@/lib/orderEntry";
+import type { CardSizes, PickedSize } from "@/lib/orderEntry";
+import type { PublicDesignImage } from "@/lib/designAsset";
 import {
   ROSTER_NAME_MAX_LENGTH,
   ROSTER_NUMBER_MAX_LENGTH,
@@ -27,7 +41,10 @@ import {
 import { ANSWER_MAX_LENGTH, isOrderFormClosed } from "@/lib/orderFormResponse";
 import { sortSizes } from "@/lib/orderForm";
 import { userMessage } from "@/lib/userMessage";
+import { cn } from "@/lib/utils";
+import { DesignThumbnail } from "@/components/design/DesignThumbnail";
 import { SizeCounter } from "@/components/orderList/SizeCounter";
+import { SizeQty } from "@/components/orderList/SizeQty";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,25 +63,27 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  useFormField,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
-// The form's view of a design the fan can order under, plus the seeded
-// roster slots that back the fixed-mode name picker.
+// The form's view of a design the fan can order under, the seeded roster
+// slots that back the fixed-mode name picker, and its main picture when the
+// server found one a browser can draw (null otherwise).
 type PublicDesign = {
   _id: Id<"designs">;
   title: string;
   roster: { _id: Id<"rosterEntries">; name: string; number?: string }[];
+  mainImage: PublicDesignImage | null;
 };
+
+// One control height on this form (0004 UX §4.2): what you type into or
+// choose with is 40px. The size buttons go in an even grid rather than
+// wrapping, so every button is the same width.
+const SIZE_GRID_CLASS = "grid grid-cols-3 gap-1.5 sm:grid-cols-4";
+const SIZE_COUNTER_CLASS = "h-10 w-full min-w-0";
 
 type PublicRun = {
   namesMode: "open" | "fixed";
@@ -137,7 +156,7 @@ type FormValues = {
 
 function emptyCard(designs: PublicDesign[]): CardValues {
   return {
-    // A single-design order collapses the picker — preselect that design
+    // A single-design order shows no design choice — preselect that design
     // so the fan never has to choose.
     designId: designs.length === 1 ? designs[0]._id : "",
     name: "",
@@ -230,7 +249,7 @@ function buildSchema(run: PublicRun, designs: PublicDesign[]) {
           });
         }
 
-        // Grid taps only offer sizeOptions, so this guards stale state only.
+        // Size taps only offer sizeOptions, so this guards stale state only.
         if (!run.sizeOptions.includes(line.size)) {
           ctx.addIssue({
             code: "custom",
@@ -346,7 +365,7 @@ function PublicOrderFormBody({
       submitterName: "",
       submitterEmail: "",
       customAnswers: emptyCustomAnswers,
-      // Fixed mode builds its lines from the roster grid (starts empty);
+      // Fixed mode builds its lines from the pick-your-name list (starts empty);
       // open mode seeds one blank card for the fan to fill in.
       lines: [],
       cards: run.namesMode === "fixed" ? [] : [emptyCard(designs)],
@@ -465,7 +484,12 @@ function PublicOrderFormBody({
 
   return (
     <>
-      <Header teamName={teamName} captainName={captainName} run={run} />
+      <Header
+        teamName={teamName}
+        captainName={captainName}
+        run={run}
+        designs={designs}
+      />
 
       <Form {...form}>
         <form
@@ -485,6 +509,7 @@ function PublicOrderFormBody({
                 </FormLabel>
                 <FormControl>
                   <Input
+                    className="h-10"
                     autoComplete="name"
                     maxLength={SUBMITTER_NAME_MAX_LENGTH}
                     {...field}
@@ -508,7 +533,12 @@ function PublicOrderFormBody({
                   So your captain can reach you with updates.
                 </FormDescription>
                 <FormControl>
-                  <Input type="email" autoComplete="email" {...field} />
+                  <Input
+                    className="h-10"
+                    type="email"
+                    autoComplete="email"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -526,7 +556,7 @@ function PublicOrderFormBody({
             </div>
 
             {run.namesMode === "fixed" ? (
-              <RosterGrid
+              <RosterList
                 run={run}
                 designs={designs}
                 singleDesign={singleDesign}
@@ -612,7 +642,12 @@ function PublicOrderFormBody({
             <p className="text-sm text-muted-foreground">
               Your captain will see your submission right away.
             </p>
-            <Button type="submit" disabled={busy} data-submit-mode="final">
+            <Button
+              type="submit"
+              disabled={busy}
+              data-submit-mode="final"
+              className="h-10 w-full sm:w-auto sm:px-6"
+            >
               {busy ? "Submitting…" : "Submit"}
             </Button>
           </div>
@@ -634,9 +669,10 @@ function PublicOrderFormBody({
   );
 }
 
-// One open-mode jersey card: design (when the order has more than one),
-// free-text name/number, and a counter per size (R2-05). Fixed-mode runs
-// render the roster grid (below) instead of these cards.
+// One open-mode jersey card: design tiles (when the order has more than one),
+// free-text name and number side by side with one shared helper line, and a
+// counter per size (R2-05, 0004 UX §4.3). Fixed-mode runs render the
+// pick-your-name list (below) instead of these cards.
 function JerseyLine({
   control,
   index,
@@ -656,11 +692,13 @@ function JerseyLine({
 }) {
   const sizes = useMemo(() => sortSizes(run.sizeOptions), [run.sizeOptions]);
   const sizesLabelId = useId();
+  const designLabelId = useId();
+  const nameNumberHelpId = useId();
 
   return (
     <fieldset
       aria-label={`Jersey ${index + 1}`}
-      className="space-y-5 rounded-xl border border-border bg-muted/30 p-5"
+      className="space-y-4 rounded-xl border border-border bg-muted/30 p-3 sm:p-5"
     >
       <div className="flex items-center justify-between">
         <legend className="text-sm font-semibold text-foreground">
@@ -686,66 +724,74 @@ function JerseyLine({
           name={`cards.${index}.designId`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel>
+              <FormLabel id={designLabelId}>
                 Design
                 <RequiredMark />
               </FormLabel>
-              <Select
-                value={field.value}
-                onValueChange={(value) => field.onChange(value)}
-              >
-                <FormControl>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Pick a design…" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
+              {/* Tiles, not a dropdown: the picture shows without opening
+                  anything, and the pick reads as the design's title. */}
+              <FormControl>
+                <RadioGroupPrimitive
+                  aria-labelledby={designLabelId}
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value)}
+                  className="grid grid-cols-2 gap-2"
+                >
                   {designs.map((d) => (
-                    <SelectItem key={d._id} value={d._id}>
-                      {d.title}
-                    </SelectItem>
+                    <DesignTile key={d._id} design={d} />
                   ))}
-                </SelectContent>
-              </Select>
+                </RadioGroupPrimitive>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
       )}
 
-      <div className="grid gap-5 sm:grid-cols-[1fr_140px]">
-        <FormField
-          control={control}
-          name={`cards.${index}.name`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name on jersey</FormLabel>
-              <FormDescription>Leave blank for no name.</FormDescription>
-              <FormControl>
-                <Input maxLength={ROSTER_NAME_MAX_LENGTH} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={control}
-          name={`cards.${index}.number`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Number</FormLabel>
-              <FormDescription>Leave blank for none.</FormDescription>
-              <FormControl>
-                <Input
+      {/* Name and number on one row at every width; minmax(0,1fr) lets a
+          long name scroll inside its box instead of widening the card. */}
+      <div className="space-y-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-3">
+          <FormField
+            control={control}
+            name={`cards.${index}.name`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name on jersey</FormLabel>
+                <HelpedInput
+                  helpId={nameNumberHelpId}
+                  className="h-10"
+                  maxLength={ROSTER_NAME_MAX_LENGTH}
+                  {...field}
+                />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name={`cards.${index}.number`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Number</FormLabel>
+                <HelpedInput
+                  helpId={nameNumberHelpId}
+                  className="h-10 text-center font-medium tabular-nums"
                   inputMode="numeric"
                   maxLength={ROSTER_NUMBER_MAX_LENGTH}
                   {...field}
                 />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <p
+          id={nameNumberHelpId}
+          className="text-[0.8rem] text-muted-foreground"
+        >
+          Leave either one blank and we won&apos;t print it.
+        </p>
       </div>
 
       <FormField
@@ -761,11 +807,12 @@ function JerseyLine({
               <div
                 role="group"
                 aria-labelledby={sizesLabelId}
-                className="flex flex-wrap gap-2"
+                className={SIZE_GRID_CLASS}
               >
                 {sizes.map((size) => (
                   <SizeCounter
                     key={size}
+                    className={SIZE_COUNTER_CLASS}
                     size={size}
                     qty={field.value[size] ?? 0}
                     max={MAX_QTY}
@@ -789,11 +836,60 @@ function JerseyLine({
   );
 }
 
-// Fixed-mode order editor: the captain's roster, one row per slot, with a
-// tappable counter per size. There's no free-text entry — every jersey is
-// tied to a pre-seeded name. Each (slot × size) the fan picks maps to one
-// line in the shared `lines` model, so submit reuses the open-mode path.
-function RosterGrid({
+// One design choice in a jersey card: a 40px picture and the title. The
+// picture is decoration here (the title names the radio), and it isn't
+// zoomable because it sits inside the radio.
+function DesignTile({ design }: { design: PublicDesign }) {
+  return (
+    <RadioPrimitive.Root
+      value={design._id}
+      className={cn(
+        "flex h-14 min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-input bg-background px-2 text-left text-sm outline-none transition-colors",
+        "hover:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+        "data-checked:border-primary data-checked:bg-primary/10 data-checked:ring-1 data-checked:ring-primary",
+      )}
+    >
+      <span aria-hidden className="shrink-0">
+        <DesignThumbnail
+          title={design.title}
+          mainImage={design.mainImage}
+          className="size-10"
+          iconClassName="size-4"
+        />
+      </span>
+      <span className="line-clamp-2 min-w-0 font-medium text-foreground">
+        {design.title}
+      </span>
+    </RadioPrimitive.Root>
+  );
+}
+
+// A text input described by a helper line it shares with a sibling field
+// (name + number have one), plus its own error once there is one. Lives
+// under the field's FormItem so it can read that field's message id.
+function HelpedInput({
+  helpId,
+  ...props
+}: React.ComponentProps<typeof Input> & { helpId: string }) {
+  const { error, formMessageId } = useFormField();
+  return (
+    <FormControl>
+      <Input
+        {...props}
+        aria-describedby={error ? `${helpId} ${formMessageId}` : helpId}
+      />
+    </FormControl>
+  );
+}
+
+// Fixed-mode order editor ("pick your name", 0004 UX §4.4): the captain's
+// roster as a list, one row per slot. Tapping a row opens its size counters;
+// one row is open at a time and none to start, so a long roster stays a
+// list you can scan for your name. A closed row shows what was picked as
+// chips. There's no free-text entry — every jersey is tied to a pre-seeded
+// name. Each (slot × size) the fan picks maps to one line in the shared
+// `lines` model, so submit reuses the open-mode path.
+function RosterList({
   run,
   designs,
   singleDesign,
@@ -809,15 +905,8 @@ function RosterGrid({
   onRemove: (rosterEntryId: string, size: string) => void;
 }) {
   const sizes = useMemo(() => sortSizes(run.sizeOptions), [run.sizeOptions]);
-
-  const qtyFor = (rosterEntryId: string, size: string) => {
-    const line = lines.find(
-      (l) => l.rosterEntryId === rosterEntryId && l.size === size,
-    );
-    if (!line) return 0;
-    const n = Number.parseInt(line.qty, 10);
-    return Number.isFinite(n) ? n : 0;
-  };
+  // Slot ids are unique across designs, so one id covers the whole form.
+  const [openRow, setOpenRow] = useState<string | null>(null);
 
   const anyRoster = designs.some((d) => d.roster.length > 0);
   if (!anyRoster) {
@@ -832,57 +921,161 @@ function RosterGrid({
   return (
     <div className="space-y-6">
       {designs.map((design) => (
-        <fieldset
+        <div
           key={design._id}
+          role="group"
           aria-label={design.title}
-          className="space-y-4 rounded-xl border border-border bg-muted/30 p-5"
+          className="overflow-hidden rounded-xl border border-border bg-muted/30"
         >
-          {!singleDesign && (
-            <legend className="text-sm font-semibold text-foreground">
-              {design.title}
-            </legend>
-          )}
+          <div className="flex items-center gap-3 px-3 py-3 sm:px-5">
+            {!singleDesign && (
+              <DesignThumbnail
+                title={design.title}
+                mainImage={design.mainImage}
+                className="size-10 shrink-0"
+                iconClassName="size-4"
+              />
+            )}
+            <div className="min-w-0">
+              {!singleDesign && (
+                <p className="text-sm font-semibold text-foreground">
+                  {design.title}
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">
+                {design.roster.length === 0
+                  ? "No names for this design yet."
+                  : "Find your name and tap it to pick sizes."}
+              </p>
+            </div>
+          </div>
 
-          {design.roster.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No names for this design yet.
-            </p>
-          ) : (
-            <ul className="space-y-4">
+          {design.roster.length > 0 && (
+            <ul>
               {design.roster.map((slot) => (
-                <li
+                <RosterRow
                   key={slot._id}
-                  className="flex flex-col gap-3 border-b border-border/60 pb-4 last:border-b-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <span className="flex flex-wrap items-baseline gap-2 text-sm">
-                    <span className="font-medium text-foreground">
-                      {slot.name}
-                    </span>
-                    {slot.number ? (
-                      <span className="text-muted-foreground">
-                        #{slot.number}
-                      </span>
-                    ) : null}
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {sizes.map((size) => (
-                      <SizeCounter
-                        key={size}
-                        size={size}
-                        playerName={slot.name}
-                        qty={qtyFor(slot._id, size)}
-                        onAdd={() => onAdd(design._id, slot._id, size)}
-                        onRemove={() => onRemove(slot._id, size)}
-                      />
-                    ))}
-                  </div>
-                </li>
+                  slot={slot}
+                  sizes={sizes}
+                  picked={pickedSizes(lines, slot._id, sizes)}
+                  qtyFor={(size) => lineQty(lines, slot._id, size)}
+                  open={openRow === slot._id}
+                  onToggle={() =>
+                    setOpenRow((open) => toggleOpenRow(open, slot._id))
+                  }
+                  onAdd={(size) => onAdd(design._id, slot._id, size)}
+                  onRemove={(size) => onRemove(slot._id, size)}
+                />
               ))}
             </ul>
           )}
-        </fieldset>
+        </div>
       ))}
     </div>
+  );
+}
+
+// One player on the pick-your-name list: a 48px row (number, name, picked
+// sizes) that opens their size counters underneath. The `#` and the digits
+// are separate nodes so the digits right-align in their column on their own.
+// Opening moves no focus: the counters are next in tab order (UX §8).
+function RosterRow({
+  slot,
+  sizes,
+  picked,
+  qtyFor,
+  open,
+  onToggle,
+  onAdd,
+  onRemove,
+}: {
+  slot: PublicDesign["roster"][number];
+  sizes: string[];
+  picked: PickedSize[];
+  qtyFor: (size: string) => number;
+  open: boolean;
+  onToggle: () => void;
+  onAdd: (size: string) => void;
+  onRemove: (size: string) => void;
+}) {
+  const panelId = useId();
+  const number = slot.number?.trim();
+
+  return (
+    <li className="border-t border-border/60">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={rosterRowLabel(slot, picked)}
+        onClick={onToggle}
+        className={cn(
+          // min-h rather than h: the open row shows the full name, wrapped.
+          "flex min-h-12 w-full items-center gap-3 px-3 text-left text-sm outline-none transition-colors sm:px-5",
+          "hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50",
+          open && "bg-primary/[.04]",
+        )}
+      >
+        <span className="w-10 shrink-0 text-right font-semibold tabular-nums text-foreground">
+          {number ? (
+            <>
+              <span className="text-muted-foreground">#</span>
+              <span>{number}</span>
+            </>
+          ) : null}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 font-medium text-foreground",
+            open ? "py-2 break-words" : "truncate",
+          )}
+        >
+          {slot.name}
+        </span>
+        {!open && picked.length > 0 && (
+          <span className="flex shrink-0 gap-2">
+            {picked.map((p) => (
+              <span key={p.size}>
+                <SizeQty size={p.size} qty={p.qty} />
+              </span>
+            ))}
+          </span>
+        )}
+        <ChevronDownIcon
+          aria-hidden
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      <div
+        id={panelId}
+        hidden={!open}
+        className="space-y-2 bg-primary/[.04] px-3 pt-1 pb-4 sm:pr-5 sm:pl-[4.5rem]"
+      >
+        {open && (
+          <>
+            <div className={SIZE_GRID_CLASS}>
+              {sizes.map((size) => (
+                <SizeCounter
+                  key={size}
+                  className={SIZE_COUNTER_CLASS}
+                  size={size}
+                  playerName={slot.name}
+                  qty={qtyFor(size)}
+                  onAdd={() => onAdd(size)}
+                  onRemove={() => onRemove(size)}
+                />
+              ))}
+            </div>
+            <p className="text-[0.8rem] text-muted-foreground">
+              Tap a size once for each jersey you want.
+            </p>
+          </>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -922,15 +1115,21 @@ function BlankNameNumberDialog({
   );
 }
 
+// The intro, then the design picture (0004 UX §4.5) above "Your name": the
+// player's first question is "is this my team's jersey?", so it's answered
+// before they type anything.
 function Header({
   teamName,
   captainName,
   run,
+  designs,
 }: {
   teamName: string;
   captainName: string;
   run: PublicRun;
+  designs: PublicDesign[];
 }) {
+  const picture = pictureBlock(designs);
   return (
     <header>
       <p className="text-sm font-semibold uppercase tracking-wider text-primary">
@@ -947,6 +1146,57 @@ function Header({
       <p className="mt-1 text-sm text-muted-foreground">
         Submissions close {formatDeadline(run.deadline)}.
       </p>
+
+      {picture.kind === "designLine" && (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Design: {picture.title}
+        </p>
+      )}
+
+      {picture.kind === "single" && (
+        <figure className="mt-6">
+          {/* contain, not cover: a jersey mustn't be cropped. Above the
+              fold, so it loads straight away. */}
+          <DesignThumbnail
+            title={picture.design.title}
+            mainImage={picture.design.mainImage}
+            zoomable
+            priority
+            fit="contain"
+            className="block h-48 w-full rounded-xl sm:h-64"
+          />
+          <figcaption className="mt-2 flex items-baseline justify-between gap-3 text-sm">
+            <span className="min-w-0 truncate font-medium text-foreground">
+              {picture.design.title}
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+              <Maximize2Icon aria-hidden className="size-3" />
+              Tap to enlarge
+            </span>
+          </figcaption>
+        </figure>
+      )}
+
+      {/* A tile per design; one without a picture keeps its slot with the
+          placeholder, which has nothing to enlarge. */}
+      {picture.kind === "tiles" && (
+        <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {designs.map((d) => (
+            <li key={d._id} className="min-w-0">
+              <DesignThumbnail
+                title={d.title}
+                mainImage={d.mainImage}
+                zoomable
+                fit="contain"
+                className="block h-36 w-full rounded-xl sm:h-40"
+              />
+              <p className="mt-1.5 line-clamp-2 text-sm font-medium text-foreground">
+                {d.title}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </header>
   );
 }

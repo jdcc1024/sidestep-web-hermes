@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { ImageIcon } from "lucide-react";
-import { isWebSafeImage, type DesignMainImage } from "@/lib/designAsset";
+import {
+  isWebSafeImage,
+  type DesignMainImage,
+  type PublicDesignImage,
+} from "@/lib/designAsset";
 import { cn } from "@/lib/utils";
 import { ImageLightbox } from "./ImageLightbox";
 
@@ -21,9 +25,13 @@ export function DesignThumbnail({
   className,
   iconClassName,
   zoomable = false,
+  fit = "cover",
+  priority = false,
 }: {
   title: string;
-  mainImage: DesignMainImage | null;
+  // Only the url and content type are read, so both the captain's summary
+  // (which carries a filename) and the public form (which doesn't) fit.
+  mainImage: DesignMainImage | PublicDesignImage | null;
   // Sizing lives with the caller: a card wants a wide cover band, the order
   // page a small square beside the title.
   className?: string;
@@ -32,6 +40,11 @@ export function DesignThumbnail({
   // the whole card in a <Link>, and a button inside an anchor is invalid HTML.
   // Only a thumbnail standing on its own may become a lightbox trigger.
   zoomable?: boolean;
+  // `contain` where people look at the picture to recognise a kit (the public
+  // form), so a jersey is never cropped; `cover` for a filled tile.
+  fit?: "cover" | "contain";
+  // Load straight away rather than lazily: for a picture above the fold.
+  priority?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const src =
@@ -51,8 +64,11 @@ export function DesignThumbnail({
     <img
       src={src}
       alt={`${title} main image`}
-      className="size-full object-cover"
-      loading="lazy"
+      className={cn(
+        "size-full",
+        fit === "contain" ? "object-contain" : "object-cover",
+      )}
+      loading={priority ? "eager" : "lazy"}
       onError={() => setFailed(true)}
     />
   ) : (

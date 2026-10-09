@@ -34,7 +34,9 @@ export default function PublicOrderFormPage({ params }: PageProps) {
 
       <main className="flex-1">
         <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10">
+          {/* On a phone the frame goes: a card inside a card inside a card on
+              a 375px screen is where the form gets squished (0004 UX §4.1). */}
+          <div className="rounded-none border-0 bg-transparent p-0 shadow-none sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-10 sm:shadow-sm">
             <PublicOrderForm orderFormId={orderFormId} />
           </div>
         </div>
