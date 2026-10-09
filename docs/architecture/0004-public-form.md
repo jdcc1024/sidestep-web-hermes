@@ -75,6 +75,11 @@ Why it's safe enough:
 
 ## Q2: weight. Decided: 2 MB cap now, web preview as R3-02
 
+> **Superseded in part (2026-10-09, Gate 2c):** the web preview is now built
+> with Next's image optimizer, not a sharp derivative in Convex (option C
+> below). See `docs/architecture/0004-image-previews.md`. The 2 MB cap stays
+> for GIF and SVG.
+
 Options:
 
 - A. Ship as-is. A player on cell data downloads 10.6 MB before seeing the
