@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import zlib from "node:zlib";
 
 // Thin wrapper over `npx convex run` for the internal E2E helpers in
 // convex/_e2e.ts. Runs against the deployment in .env.local (dev only).
@@ -14,7 +15,9 @@ function run<T>(fn: string, args: Record<string, unknown>): T {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
-  return JSON.parse(out.slice(out.search(/[[{]/))) as T;
+  const start = out.search(/[[{]/);
+  // A function that returns null prints no JSON object (e.g. insertAsset).
+  return (start < 0 ? null : JSON.parse(out.slice(start))) as T;
 }
 
 /**
@@ -138,3 +141,64 @@ export const attachFile = (
     filename: kind === "png" ? "e2e-main.png" : "e2e-print.pdf",
     isMain,
   });
+
+/**
+ * A print-size PNG (0004 R3-02): a 1200x900 RGB gradient stored uncompressed
+ * (zlib level 0), so the file is ~3.2 MB but its WebP is tiny. A gradient, not
+ * noise: noise makes the resized WebP heavy and the byte budget flaky. Built
+ * in Node, POSTed to a test-only upload URL (too big for `convex run` args),
+ * then attached as the design's main picture.
+ */
+export function buildBigPng(): Buffer {
+  const w = 1200;
+  const h = 900;
+  const raw = Buffer.alloc(h * (1 + w * 3));
+  let o = 0;
+  for (let y = 0; y < h; y++) {
+    raw[o++] = 0; // filter: none
+    for (let x = 0; x < w; x++) {
+      raw[o++] = Math.floor((x * 255) / w);
+      raw[o++] = Math.floor((y * 255) / h);
+      raw[o++] = 128;
+    }
+  }
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // colour type: RGB
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", zlib.deflateSync(raw, { level: 0 })),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+export async function attachBigPng(designId: string, isMain = true) {
+  const png = buildBigPng();
+  const { url } = run<{ url: string }>("_e2e:uploadUrl", {});
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "image/png" },
+    body: new Uint8Array(png),
+  });
+  if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+  const { storageId } = (await res.json()) as { storageId: string };
+  run("_e2e:insertAsset", {
+    designId,
+    storageId,
+    filename: "e2e-big.png",
+    contentType: "image/png",
+    isMain,
+  });
+  return { bytes: png.length };
+}

@@ -32,7 +32,10 @@ function checkTag(tag: string) {
   if (!TAG.test(tag)) throw new ConvexError(`Bad E2E tag "${tag}".`);
 }
 
-async function userByEmail(ctx: MutationCtx, email: string): Promise<Doc<"users">> {
+async function userByEmail(
+  ctx: MutationCtx,
+  email: string,
+): Promise<Doc<"users">> {
   const wanted = email.trim().toLowerCase();
   const users = await ctx.db.query("users").collect();
   const user = users.find((u) => u.email.trim().toLowerCase() === wanted);
@@ -107,7 +110,11 @@ export const seedItems = internalMutation({
     checkTag(tag);
     const user = await userByEmail(ctx, email);
     const order = await ctx.db.get(orderId);
-    if (!order || order.captainId !== user._id || !order.teamName.startsWith(`${PREFIX}${tag}`))
+    if (
+      !order ||
+      order.captainId !== user._id ||
+      !order.teamName.startsWith(`${PREFIX}${tag}`)
+    )
       throw new ConvexError("Not an E2E order for this tag.");
     const designId = order.designIds[0];
     const { entries } = await loadRoster(ctx, orderId);
@@ -143,9 +150,15 @@ export const setConfirmed = internalMutation({
     checkTag(tag);
     const user = await userByEmail(ctx, email);
     const order = await ctx.db.get(orderId);
-    if (!order || order.captainId !== user._id || !order.teamName.startsWith(`${PREFIX}${tag}`))
+    if (
+      !order ||
+      order.captainId !== user._id ||
+      !order.teamName.startsWith(`${PREFIX}${tag}`)
+    )
       throw new ConvexError("Not an E2E order for this tag.");
-    const rest = order.internalStages.filter((s) => s.name !== "Order Size Confirmed");
+    const rest = order.internalStages.filter(
+      (s) => s.name !== "Order Size Confirmed",
+    );
     await ctx.db.patch(orderId, {
       internalStages: confirmed
         ? [...rest, { name: "Order Size Confirmed", completedAt: Date.now() }]
@@ -171,10 +184,12 @@ export const cleanup = internalMutation({
     if (tag === undefined && olderThanMs === undefined)
       throw new ConvexError("Pass a tag, olderThanMs, or both.");
     const user = await userByEmail(ctx, email);
-    const cutoff = olderThanMs === undefined ? -Infinity : Date.now() - olderThanMs;
+    const cutoff =
+      olderThanMs === undefined ? -Infinity : Date.now() - olderThanMs;
     const ours = (name: string, createdAt: number) =>
       name.startsWith(PREFIX) &&
-      ((tag !== undefined && name.startsWith(`${PREFIX}${tag}`)) || createdAt < cutoff);
+      ((tag !== undefined && name.startsWith(`${PREFIX}${tag}`)) ||
+        createdAt < cutoff);
 
     let orders = 0;
     let designs = 0;
@@ -184,7 +199,9 @@ export const cleanup = internalMutation({
       .query("orders")
       .withIndex("by_captain", (q) => q.eq("captainId", user._id))
       .collect();
-    for (const order of userOrders.filter((o) => ours(o.teamName, o.createdAt))) {
+    for (const order of userOrders.filter((o) =>
+      ours(o.teamName, o.createdAt),
+    )) {
       const runs = await ctx.db
         .query("orderForms")
         .withIndex("by_order", (q) => q.eq("orderId", order._id))
@@ -202,7 +219,9 @@ export const cleanup = internalMutation({
       .query("designs")
       .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
       .collect();
-    for (const design of userDesigns.filter((d) => ours(d.title, d.createdAt))) {
+    for (const design of userDesigns.filter((d) =>
+      ours(d.title, d.createdAt),
+    )) {
       const assets = await ctx.db
         .query("designAssets")
         .withIndex("by_design", (q) => q.eq("designId", design._id))
@@ -235,7 +254,11 @@ export const addDesign = internalMutation({
     checkTag(tag);
     const user = await userByEmail(ctx, email);
     const order = await ctx.db.get(orderId);
-    if (!order || order.captainId !== user._id || !order.teamName.startsWith(`${PREFIX}${tag}`))
+    if (
+      !order ||
+      order.captainId !== user._id ||
+      !order.teamName.startsWith(`${PREFIX}${tag}`)
+    )
       throw new ConvexError("Not an E2E order for this tag.");
     const now = Date.now();
     const designId = await ctx.db.insert("designs", {
@@ -275,6 +298,13 @@ export const insertAsset = internalMutation({
       createdAt: Date.now(),
     });
   },
+});
+
+// Test-only (0004 R3-02): a one-shot upload URL, so a test can POST a file too
+// big for `npx convex run` args (Linux caps one argv string at 128 KB).
+export const uploadUrl = internalMutation({
+  args: {},
+  handler: async (ctx) => ({ url: await ctx.storage.generateUploadUrl() }),
 });
 
 // Test-only: stores a small generated file (base64 from the test) and attaches

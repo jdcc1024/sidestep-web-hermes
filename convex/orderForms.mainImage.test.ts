@@ -37,6 +37,7 @@ async function seedForm(t: ReturnType<typeof convexTest>) {
       pdfOnly: await mk("PDF only"),
       flaggedPdf: await mk("Flagged PDF + PNG"),
       big: await mk("Big PNG"),
+      bigGif: await mk("Big GIF"),
     };
     const orderId = await ctx.db.insert("orders", {
       captainId: userId,
@@ -120,7 +121,7 @@ describe("getPublic mainImage", () => {
     expect(payload).not.toContain("second.png");
   });
 
-  it("no files, a PDF only, a flagged PDF beside a PNG, and a PNG over 2 MB all return mainImage null", async () => {
+  it("no files, a PDF only, and a flagged PDF beside a PNG all return mainImage null", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderFormId, ids } = await seedForm(t);
     await attach(t, userId, ids.pdfOnly, {
@@ -138,19 +139,48 @@ describe("getPublic mainImage", () => {
       contentType: "image/png",
       createdAt: 2000,
     });
-    await attach(t, userId, ids.big, {
-      filename: "huge.png",
-      contentType: "image/png",
-      bytes: 2 * 1024 * 1024 + 1,
-      isMain: true,
-    });
     const data = await t.query(api.orderForms.getPublic, { orderFormId });
-    for (const id of [ids.none, ids.pdfOnly, ids.flaggedPdf, ids.big]) {
+    for (const id of [ids.none, ids.pdfOnly, ids.flaggedPdf]) {
       const d = data!.designs.find((x) => x._id === id)! as unknown as Pub;
       expect(d.mainImage, String(id)).toBeNull();
     }
-    expect(JSON.stringify(data)).not.toMatch(
-      /flagged\.pdf|preview\.png|huge\.png/,
-    );
+    expect(JSON.stringify(data)).not.toMatch(/flagged\.pdf|preview\.png/);
+  });
+
+  // 0004 R3-02: a big PNG is resized by next/image, so it shows. A big GIF
+  // can't be resized, so it still doesn't.
+  it("a 3 MB PNG main returns its url + contentType", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderFormId, ids } = await seedForm(t);
+    await attach(t, userId, ids.big, {
+      filename: "huge.png",
+      contentType: "image/png",
+      bytes: 3 * 1024 * 1024,
+      isMain: true,
+    });
+    const data = await t.query(api.orderForms.getPublic, { orderFormId });
+    const d = data!.designs.find((x) => x._id === ids.big)! as unknown as Pub;
+    expect(d.mainImage).not.toBeNull();
+    expect(Object.keys(d.mainImage!).sort()).toEqual(["contentType", "url"]);
+    expect(d.mainImage!.contentType).toBe("image/png");
+    expect(typeof d.mainImage!.url).toBe("string");
+    expect(JSON.stringify(data)).not.toContain("huge.png");
+  });
+
+  it("a 3 MB GIF main returns mainImage null", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, orderFormId, ids } = await seedForm(t);
+    await attach(t, userId, ids.bigGif, {
+      filename: "huge.gif",
+      contentType: "image/gif",
+      bytes: 3 * 1024 * 1024,
+      isMain: true,
+    });
+    const data = await t.query(api.orderForms.getPublic, { orderFormId });
+    const d = data!.designs.find(
+      (x) => x._id === ids.bigGif,
+    )! as unknown as Pub;
+    expect(d.mainImage).toBeNull();
+    expect(JSON.stringify(data)).not.toContain("huge.gif");
   });
 });
