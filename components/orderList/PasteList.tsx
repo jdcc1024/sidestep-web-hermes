@@ -10,6 +10,7 @@ import { jerseyLabel } from "@/lib/jerseyBreakdown";
 import {
   ROSTER_PASTE_MAX_ROWS,
   jerseyCountText,
+  looksLikeNotColumns,
   parseRosterPaste,
   playerCountText,
   type RosterPastePreview,
@@ -108,6 +109,7 @@ function PasteForm({
   );
   const { counts, preview, rows, tooManyRows } = parsed;
   const toSend = parsed.players;
+  const notColumns = useMemo(() => looksLikeNotColumns(parsed), [parsed]);
   async function onConfirm() {
     setBusy(true);
     try {
@@ -175,6 +177,18 @@ function PasteForm({
           </p>
         ) : (
           <>
+            {/* A hint, not a gate: a list of names only is real (sizes come
+                later), so Add stays enabled (R3-05). */}
+            {notColumns && (
+              <p
+                role="note"
+                className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+              >
+                None of these rows has a number or a size. Put a comma or a tab
+                between name, number and size, like{" "}
+                <code className="font-mono">Abbott,8,M</code>.
+              </p>
+            )}
             <p className="text-sm font-medium">
               {countLine(counts) || "Nothing to add"}
             </p>

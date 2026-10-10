@@ -508,3 +508,13 @@ export function parseRosterPaste(
     tooManyRows: false,
   };
 }
+
+// R3-05: a paste of 3+ readable rows where none has a number or a size is
+// most likely a raw message, not columns (`Kai - [Abbott - 8 - M]` reads as
+// a name only). A separate function rather than a field on the result: the
+// hint is presentation-only, and the result stays "what the paste means".
+// An unknown size leaves `size` unset, so it counts as no size.
+export function looksLikeNotColumns(result: RosterPasteResult): boolean {
+  const valid = result.rows.filter((row) => row.status !== "invalid");
+  return valid.length >= 3 && valid.every((row) => !row.number && !row.size);
+}
