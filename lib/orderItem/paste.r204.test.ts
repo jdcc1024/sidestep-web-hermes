@@ -81,9 +81,9 @@ describe("rows for one player group into one player (R2-04 Logic)", () => {
 });
 
 describe("a row with too many cells, or a bad 'how many', is invalid (R2-04 Logic)", () => {
-  it("a row with 5 cells is invalid and adds nothing", () => {
+  it("a row with 6 cells is invalid and adds nothing", () => {
     const { rows, players, counts } = parseRosterPaste(
-      "Sidestep\t72\tM\t2\textra",
+      "Sidestep\t72\tM\t2\tRob\textra",
     );
     expect(rows[0].status).toBe("invalid");
     expect(rows[0].problem).toBeTruthy();
