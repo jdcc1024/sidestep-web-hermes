@@ -5,11 +5,13 @@
 //
 // Every write goes through `requireListWriter`, and every by-id call resolves
 // the order from the stored entry. No function here accepts `isAdmin`, a user
-// id, `source`, or any submitter field or answer: identity comes from the
-// server, and only the public form may record who sent a jersey. Validators
-// are strict, so a client that sends one of those is refused before the
-// handler runs. A merge moves items by `rosterEntryId` only, so every line
-// keeps its own submitter (invariant 5).
+// id, `source`, an email, an answer or a form id: identity comes from the
+// server. The public form sets a submitter's name and email; a paste
+// (`addMany`) may set a name only, as each size line's `orderedBy` (R3-04),
+// stored as `submitterName` with `source: "captain"`. No other function here
+// takes a submitter. Validators are strict, so a client that sends anything
+// else is refused before the handler runs. A merge moves items by
+// `rosterEntryId` only, so every line keeps its own submitter (invariant 5).
 
 import { ConvexError, v } from "convex/values";
 import { mutation, type MutationCtx } from "./_generated/server";
@@ -32,7 +34,12 @@ import {
   playerKey,
 } from "../lib/rosterEntry/rules";
 import { planRosterCopy } from "../lib/rosterEntry/mirror";
-import { checkQty, MAX_QTY, type CheckResult } from "../lib/orderEntry/rules";
+import {
+  checkOrderedBy,
+  checkQty,
+  MAX_QTY,
+  type CheckResult,
+} from "../lib/orderEntry/rules";
 import { SIZE_OPTIONS } from "../lib/orderForm/rules";
 
 // The printed values a captain or admin may set. Strings, not literals, for
@@ -46,7 +53,18 @@ const playerValueArgs = {
 
 const sizesArg = v.array(v.object({ size: v.string(), qty: v.number() }));
 
+// A paste's sizes, which may say who ordered each one (R3-04). `addMany` only:
+// every other write takes the plain `sizesArg`.
+const pastedSizesArg = v.array(
+  v.object({
+    size: v.string(),
+    qty: v.number(),
+    orderedBy: v.optional(v.string()),
+  }),
+);
+
 type SizeQty = { size: string; qty: number };
+type PastedLine = SizeQty & { orderedBy?: string };
 
 function orThrow<T>(result: CheckResult<T>): T {
   if (!result.ok) throw new ConvexError(result.error);
@@ -105,6 +123,23 @@ function checkSizesToAdd(
     if ((current.get(size) ?? 0) + qty > MAX_QTY)
       throw new ConvexError(`Order at most ${MAX_QTY} in one size.`);
   return [...adding].map(([size, qty]) => ({ size, qty }));
+}
+
+// A pasted player's lines to insert: one per size and owner, so each owner's
+// jerseys are recorded apart. The owner is trimmed and an empty one is none.
+// Sizes and qty are checked by `checkSizesToAdd`; this checks the owner only.
+function pastedLines(sizes: readonly PastedLine[]): PastedLine[] {
+  const lines: PastedLine[] = [];
+  for (const { size: raw, qty, orderedBy: rawOwner } of sizes) {
+    const size = raw.trim();
+    const orderedBy = orThrow(checkOrderedBy(rawOwner));
+    const line = lines.find(
+      (l) => l.size === size && l.orderedBy === orderedBy,
+    );
+    if (line) line.qty += qty;
+    else lines.push({ size, qty, ...(orderedBy !== undefined && { orderedBy }) });
+  }
+  return lines;
 }
 
 async function requireEntry(ctx: MutationCtx, entryId: Id<"rosterEntries">) {
@@ -375,7 +410,9 @@ export const restore = mutation({
 
 // Paste a list of players with their sizes (≤ ROSTER_PASTE_MAX_ROWS). All or
 // nothing: every player is checked before any is written. A player matching
-// an existing one (or an earlier one in the paste) adds sizes to it.
+// an existing one (or an earlier one in the paste) adds sizes to it. A size
+// that says who ordered it is stored with that name as its submitter, and
+// MAX_QTY of one size holds across all of a player's owners.
 export const addMany = mutation({
   args: {
     orderId: v.id("orders"),
@@ -384,7 +421,7 @@ export const addMany = mutation({
       v.object({
         name: v.optional(v.string()),
         number: v.optional(v.string()),
-        sizes: sizesArg,
+        sizes: pastedSizesArg,
       }),
     ),
   },
@@ -417,10 +454,9 @@ export const addMany = mutation({
           );
           totals.set(key, current);
         }
-        const lines = checkSizesToAdd(player.sizes, current);
-        for (const { size, qty } of lines)
+        for (const { size, qty } of checkSizesToAdd(player.sizes, current))
           current.set(size, (current.get(size) ?? 0) + qty);
-        return { values, lines };
+        return { values, lines: pastedLines(player.sizes) };
       } catch (err) {
         if (err instanceof ConvexError && typeof err.data === "string")
           throw new ConvexError(`Line ${index + 1}: ${err.data}`);
@@ -441,11 +477,14 @@ export const addMany = mutation({
       );
       if (matched) updated += 1;
       else added += 1;
-      for (const line of lines) {
+      for (const { orderedBy, ...line } of lines) {
         await insertSizeLine(ctx, entry, {
           ...line,
           source: "captain",
           updatedBy: user._id,
+          ...(orderedBy !== undefined && {
+            submission: { submitterName: orderedBy },
+          }),
         });
         jerseys += line.qty;
       }

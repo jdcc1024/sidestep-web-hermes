@@ -513,7 +513,8 @@ function matchSizes(player: OrderPlayer): string {
 
 // Who added this player's sizes, one line per person, read-only above the
 // fields (UX frame 4): `You · S×1, M×2 · Oct 2`, `Riley Chen · M×1, XL×1 ·
-// Oct 4, through the order form`, plus what each player answered on the form.
+// Oct 4, through the order form` (or `, from a pasted list` for a paste's
+// "Ordered by", R3-04), plus what each player answered on the form.
 function SizesAddedBy({
   lines,
 }: {
@@ -545,7 +546,8 @@ function SizesAddedBy({
             <li key={sender.key} className="break-words">
               <p>
                 {`${who} · ${sizes} · ${day}`}
-                {!sender.isYou && ", through the order form"}
+                {sender.via === "form" && ", through the order form"}
+                {sender.via === "paste" && ", from a pasted list"}
               </p>
               {sender.email && sender.name && (
                 <p className="text-xs text-muted-foreground">{sender.email}</p>

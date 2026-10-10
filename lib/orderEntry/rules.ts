@@ -62,6 +62,22 @@ export function checkSubmitterName(raw: string): CheckResult<string> {
   return { ok: true, value: name };
 }
 
+// "Ordered by" on a pasted row (R3-04): who a captain's jersey is for, stored
+// as the line's `submitterName`. Optional, so empty is none (`undefined`),
+// and bounded like the name the public form takes.
+export function checkOrderedBy(
+  raw: string | undefined,
+): CheckResult<string | undefined> {
+  const name = raw?.trim() ?? "";
+  if (name.length === 0) return { ok: true, value: undefined };
+  if (name.length > SUBMITTER_NAME_MAX_LENGTH)
+    return {
+      ok: false,
+      error: `Keep "Ordered by" under ${SUBMITTER_NAME_MAX_LENGTH} characters.`,
+    };
+  return { ok: true, value: name };
+}
+
 // Normalizes to lowercase so a submitter's entries group together by
 // email (R-02 submission grouping) regardless of how they typed it.
 export function checkSubmitterEmail(raw: string): CheckResult<string> {

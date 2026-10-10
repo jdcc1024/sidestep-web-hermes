@@ -5,7 +5,10 @@
 // never disagree about what a paste meant. There is no undo; this preview is
 // the safety net (PRD §6).
 //
-// Columns are name, number, size and an optional "how many" after the size.
+// Columns are name, number, size, an optional "how many" after the size, and
+// an optional "Ordered by" after that (R3-04): who the jersey is for, stored
+// as the size line's submitter. Columns are positional; an owner is never
+// read from any other cell.
 // Rows naming the same player (`playerKey`) become one player whose sizes are
 // summed, so "Sidestep 72 S / Sidestep 72 M 3 / Sidestep 72 XL" is one
 // Sidestep #72 with S×1, M×3, XL×1. A player already on the design is "updated":
@@ -13,7 +16,7 @@
 // again on commit, so the preview is advisory, R2-01).
 
 import { SIZE_OPTIONS, type SizeOption } from "../orderForm/rules";
-import { checkQty, MAX_QTY } from "../orderEntry/rules";
+import { checkOrderedBy, checkQty, MAX_QTY } from "../orderEntry/rules";
 import {
   checkRosterName,
   checkRosterNumber,
@@ -48,6 +51,8 @@ export type RosterPasteRow = {
   // column or it's a size we don't make — the row then adds no line.
   size?: SizeOption;
   qty?: number;
+  // Who ordered this row's jerseys (the 5th cell), when it says.
+  orderedBy?: string;
   // Something worth a second look on a row that is still valid: a size we
   // don't make, or a player already on the list. Never on an invalid row.
   note?: string;
@@ -57,11 +62,15 @@ export type RosterPasteRow = {
 
 export type RosterPasteSize = { size: SizeOption; qty: number };
 
+// One size line to send: per size *and* owner, so the server records each
+// owner's jerseys apart. `orderedBy` is absent (not undefined) with no owner.
+export type RosterPasteLine = RosterPasteSize & { orderedBy?: string };
+
 // What goes to `addMany`, one per player with something to send.
 export type RosterPastePlayer = {
   name: string;
   number: string | undefined;
-  sizes: RosterPasteSize[];
+  sizes: RosterPasteLine[];
 };
 
 // One preview item per player (including a matched player with nothing to
@@ -75,8 +84,12 @@ export type RosterPastePreview =
       number: string | undefined;
       // "updated" with no `sizes` is a match that adds nothing.
       status: "new" | "updated";
-      // What this paste adds, not what the player will end up with.
+      // What this paste adds, not what the player will end up with. Summed
+      // per size, whoever ordered it.
       sizes: RosterPasteSize[];
+      // Who ordered the jerseys this paste adds: distinct, in first-seen
+      // order, empty when no row says.
+      orderedBy: string[];
       lines: number[];
       notes: string[];
     }
@@ -217,14 +230,23 @@ function readRow(line: number, raw: string, cells: string[]): ReadRow {
     problem,
   });
 
-  if (cells.length > 4)
+  if (cells.length > 5)
     return invalid(
-      "Expected a name, a number, a size and how many. This row has more.",
+      "Expected a name, a number, a size, how many and who ordered. This row has more.",
     );
 
-  // The fourth cell is always "how many": it comes after the size.
+  // The fifth cell is always who ordered.
+  let orderedBy: string | undefined;
+  if (cells.length === 5) {
+    const owner = checkOrderedBy(cells[4]);
+    if (!owner.ok) return invalid(owner.error);
+    orderedBy = owner.value;
+  }
+
+  // The fourth cell is always "how many": it comes after the size. Left
+  // empty before an owner, it's one.
   let qty = 1;
-  if (cells.length === 4) {
+  if (cells.length >= 4 && cells[3] !== "") {
     const howMany = howManyOf(cells[3]);
     if (howMany === undefined)
       return invalid(
@@ -258,6 +280,7 @@ function readRow(line: number, raw: string, cells: string[]): ReadRow {
     name: nameCheck.value,
     number: numberCheck.value,
     ...(size && { size, qty }),
+    ...(orderedBy !== undefined && { orderedBy }),
     ...(unknownSize !== undefined && { unknownSize }),
   };
 }
@@ -293,7 +316,11 @@ type Group = {
   name: string;
   number: string | undefined;
   rows: ReadRow[];
+  // The chips: per size.
   sizes: RosterPasteSize[];
+  // The payload: per size and owner.
+  lines: RosterPasteLine[];
+  orderedBy: string[];
   existingSizes?: { size: string; qty: number }[];
 };
 
@@ -346,6 +373,8 @@ export function parseRosterPaste(
       number: row.number,
       rows: [],
       sizes: [],
+      lines: [],
+      orderedBy: [],
       existingSizes: existingSizes.get(key),
     };
 
@@ -364,6 +393,24 @@ export function parseRosterPaste(
         };
       if (line) line.qty += row.qty;
       else group.sizes.push({ size: row.size, qty: row.qty });
+
+      const owned = group.lines.find(
+        (s) => s.size === row.size && s.orderedBy === row.orderedBy,
+      );
+      if (owned) owned.qty += row.qty;
+      else
+        group.lines.push({
+          size: row.size,
+          qty: row.qty,
+          ...(row.orderedBy !== undefined && { orderedBy: row.orderedBy }),
+        });
+      // Only rows that add a jersey name an owner: a row that adds no line
+      // records no one.
+      if (
+        row.orderedBy !== undefined &&
+        !group.orderedBy.includes(row.orderedBy)
+      )
+        group.orderedBy.push(row.orderedBy);
     }
 
     group.rows.push(row);
@@ -421,6 +468,7 @@ export function parseRosterPaste(
         number: group.number,
         status: matched ? "updated" : "new",
         sizes: group.sizes,
+        orderedBy: group.orderedBy,
         lines: group.rows.map((row) => row.line),
         notes,
       },
@@ -428,7 +476,7 @@ export function parseRosterPaste(
 
     // A matched player with no sizes has nothing to send.
     if (matched && group.sizes.length === 0) continue;
-    players.push({ name: group.name, number: group.number, sizes: group.sizes });
+    players.push({ name: group.name, number: group.number, sizes: group.lines });
     if (matched) updated += 1;
     else {
       added += 1;

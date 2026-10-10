@@ -69,11 +69,16 @@ export const sizeChip = sizeQtyText;
 // lines (no submitter) are "you", a player's are keyed by email. In order of
 // each person's first line, the captain first. The sheet's "Sizes added by"
 // reads this.
+//
+// A named sender came `via` the order form or a pasted list's "Ordered by"
+// column (R3-04). Decided from `source` and email only, never the name: a
+// paste can set a name, but only the form writes `source: "fan"` or an email.
 export type LineSender<L extends AddedByLine = AddedByLine> = {
   key: string;
   isYou: boolean;
   name?: string;
   email?: string;
+  via?: "form" | "paste";
   lines: L[];
 };
 
@@ -95,6 +100,9 @@ export function sendersOf<L extends AddedByLine>(
       lines: [],
     };
     sender.lines.push(line);
+    if (!isYou)
+      sender.via =
+        sender.via === "form" || isPlayerItem(line) ? "form" : "paste";
     byKey.set(key, sender);
   }
   const senders = [...byKey.values()];

@@ -300,6 +300,12 @@ function PreviewItem({ item }: { item: RosterPastePreview }) {
           )}
         </p>
       )}
+      {item.orderedBy.length > 0 && (
+        <p className="mt-1 text-xs break-words text-muted-foreground">
+          Ordered by{" "}
+          <span className="text-foreground">{item.orderedBy.join(", ")}</span>
+        </p>
+      )}
       {item.notes.map((note) => (
         <p key={note} className="mt-1 text-xs break-words text-muted-foreground">
           {note}
