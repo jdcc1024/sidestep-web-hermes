@@ -135,16 +135,21 @@ function sizeOf(cell: string): SizeOption | undefined {
 // Splits one line into its cells. Tabs win over commas because that's what
 // Sheets and Excel put on the clipboard, and a name may legitimately contain
 // a comma. Falls back to the hand-typed single-column shape: everything up
-// to a trailing run of digits is the name.
+// to a trailing run of digits is the name. No cells at all means a blank
+// line, such as a row of nothing but separators.
 function cellsOf(line: string): string[] {
+  if (line.length === 0) return [];
   const delimiter = line.includes("\t") ? "\t" : line.includes(",") ? "," : null;
   if (delimiter) {
     // A spreadsheet selection carries the empty columns either side of the
-    // ones that matter; dropping them keeps the shape without reordering.
-    return line
-      .split(delimiter)
-      .map((cell) => cell.trim())
-      .filter((cell) => cell.length > 0);
+    // ones that matter, so those go. An empty cell *inside* the row stays as
+    // "": it's an empty value (no number, R3-03), and dropping it would shift
+    // the next column into its place.
+    const cells = line.split(delimiter).map((cell) => cell.trim());
+    const first = cells.findIndex((cell) => cell.length > 0);
+    if (first === -1) return [];
+    const last = cells.findLastIndex((cell) => cell.length > 0);
+    return cells.slice(first, last + 1);
   }
   const trailing = /^(.+?)\s+(\d+)$/.exec(line);
   return trailing ? [trailing[1].trim(), trailing[2]] : [line];
@@ -154,11 +159,29 @@ function cellsOf(line: string): string[] {
 // preferring the documented third column. When none does, it's a size we
 // don't make — the row is kept but adds no line — and the cell is the last
 // non-numeric one, since the name and number are the other two.
+//
+// An empty cell among the three means one of name, number and size is
+// missing, so the blanks go and the size is looked for among what's left,
+// even when that's only two cells. Two cells with no size among them are a
+// name and a number when one is numeric (`Gretzky⇥⇥99`), and otherwise a name
+// and a size we don't make (`Chen,,youth L`).
 function splitSize(cells: string[]): {
   rest: string[];
   size?: SizeOption;
   unknownSize?: string;
 } {
+  if (cells.includes("")) {
+    const filled = cells.filter((cell) => cell.length > 0);
+    const at = filled.findLastIndex((cell) => sizeOf(cell) !== undefined);
+    if (at !== -1)
+      return {
+        rest: filled.filter((_, i) => i !== at),
+        size: sizeOf(filled[at]),
+      };
+    if (filled.length === 2 && !filled.some(isNumeric))
+      return { rest: [filled[0]], unknownSize: filled[1] };
+    return { rest: filled };
+  }
   if (cells.length < 3) return { rest: cells };
   const without = (at: number) => cells.filter((_, i) => i !== at);
 
@@ -184,8 +207,7 @@ type ReadRow = RosterPasteRow & { unknownSize?: string };
 // in any order, and at ~15 rows a wrong global guess costs more than deciding
 // per row does (PRD §6) — so the numeric cell is the number, and a row where
 // that's ambiguous falls back to the documented Name, Number order.
-function readRow(line: number, raw: string): ReadRow {
-  const cells = cellsOf(raw);
+function readRow(line: number, raw: string, cells: string[]): ReadRow {
   const invalid = (problem: string, name = raw, number?: string): ReadRow => ({
     line,
     raw,
@@ -282,12 +304,14 @@ export function parseRosterPaste(
   text: string,
   existing: readonly RosterPasteExisting[] = [],
 ): RosterPasteResult {
-  // Real clipboard data arrives with \r\n and trailing empty lines.
+  // Real clipboard data arrives with \r\n and trailing empty lines. A line of
+  // only separators is blank too, and like a blank line it isn't numbered.
   const lines = text
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+    .map((raw) => ({ raw, cells: cellsOf(raw) }))
+    .filter(({ cells }) => cells.length > 0);
 
   if (lines.length > ROSTER_PASTE_MAX_ROWS)
     return {
@@ -311,8 +335,8 @@ export function parseRosterPaste(
   }
 
   const groups = new Map<string, Group>();
-  const rows: ReadRow[] = lines.map((raw, index) => {
-    const row = readRow(index + 1, raw);
+  const rows: ReadRow[] = lines.map(({ raw, cells }, index) => {
+    const row = readRow(index + 1, raw, cells);
     if (row.status === "invalid") return row;
 
     const key = playerKey(row);

@@ -82,7 +82,7 @@ describe("two-column paste behaves as before (L-04: existing paste tests pass)",
     expect(players).toHaveLength(2);
   });
 
-  it("drops the empty columns a spreadsheet selection carries", () => {
+  it("drops the empty columns at either end, and an empty column a size can't explain", () => {
     const { players } = parseRosterPaste("Gretzky\t\t99");
     expect(players).toEqual([{ name: "Gretzky", number: "99", sizes: [] }]);
   });
