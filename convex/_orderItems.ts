@@ -124,9 +124,10 @@ export async function resolveEntry(
 }
 
 // Inserts one size line under `entry`. The printed values stay on the entry.
-// Size and qty must already be checked. Only the public form passes a
-// submission (who sent it, their answers, the form): a captain's line has
-// none.
+// Size and qty must already be checked. The public form passes a full
+// submission (name, email, answers, form) with `source: "fan"`. A paste may
+// pass a name only (`submitterName`, from "Ordered by", R3-04) with
+// `source: "captain"`. Every other captain line has none.
 export async function insertSizeLine(
   ctx: MutationCtx,
   entry: Doc<"rosterEntries">,

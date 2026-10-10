@@ -103,7 +103,9 @@ export default defineSchema({
     size: v.string(), // a player who needs sizes has no lines
     qty: v.number(), // integer 1..MAX_QTY
     source: v.union(v.literal("captain"), v.literal("fan")), // who created the row
-    // Set only by the public form: no captain or admin mutation accepts these.
+    // The public form sets name + email (+ answers, form id). A paste
+    // (`rosterEntries.addMany`, "Ordered by") may set a name only, with
+    // source "captain". No other captain or admin mutation accepts these.
     submitterName: v.optional(v.string()),
     submitterEmail: v.optional(v.string()), // normalized lowercase
     customAnswers: v.optional(v.record(v.string(), v.string())),

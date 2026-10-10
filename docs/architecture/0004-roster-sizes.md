@@ -379,7 +379,11 @@ item and order rules. None of them needs a schema change.
 | `orderForms.listMyResponses` | query | signed-in user | their own items by normalised email, joined to entries; removed excluded |
 | `_migrations.groupOrderItemsIntoRosterEntries`, `…stripFlatItemFields` | internalMutation | CLI only | whole tables |
 
-Spoofing check: a captain can't forge "Added by Riley". No captain/admin
+Spoofing check: a captain can't forge an order-form submission. The public
+form sets the submitter's name and email (`source: "fan"`). A paste
+(`addMany`, "Ordered by", R3-04) may set a name only, with `source:
+"captain"` and never an email, answers or form id, so the sheet reads it as
+"from a pasted list", never "through the order form". No other captain/admin
 mutation accepts submitter fields, and merge *moves* items without rewriting
 them. A fan can't attach to another order's player: `rosterEntryId` is checked
 against the form's order and the line's design. A fan *can* add sizes to a
