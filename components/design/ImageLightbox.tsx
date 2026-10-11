@@ -49,9 +49,9 @@ export function ImageLightbox({
         {children}
       </DialogTrigger>
 
-      {/* Wide enough to be worth opening, and capped so a tall image scales
-          down rather than running off the screen. */}
-      <DialogContent className="w-fit max-w-[calc(100%-2rem)] gap-3 p-3 sm:max-w-[min(90vw,64rem)]">
+      {/* Phones get a set width: a fixed, left-50% box sized w-fit can only be
+          half the screen wide. A tall image is capped so it scales down. */}
+      <DialogContent className="w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] gap-3 p-2 sm:w-fit sm:max-w-[min(90vw,64rem)] sm:p-3">
         <DialogTitle className="sr-only">{alt}</DialogTitle>
         {/* Convex storage serves short-lived signed URLs from a per-deployment
             host, so next/image optimization doesn't apply. */}
@@ -60,7 +60,7 @@ export function ImageLightbox({
           data-testid="lightbox-image"
           src={src}
           alt={alt}
-          className="mx-auto max-h-[80vh] w-auto max-w-full rounded-md object-contain"
+          className="mx-auto max-h-[80vh] w-full max-w-full rounded-md object-contain sm:w-auto"
         />
       </DialogContent>
     </Dialog>
