@@ -108,12 +108,51 @@ Checked against the 16.3.0 and 16.4.0 release notes and blog posts, the
 |---|---|---|---|
 | U-01 | Next 16.4 + React 19.3 (`backlog/U-01-next-16-4-react-19-3.md`) | none | S: ~5 files, Claude ≤ $2 (only for lint/type fixes), SDET ~$1 |
 | R3-02 | rebase on U-01; direct dependency becomes `sharp ^0.35.5` | U-01 | already built: rebase, re-run step-1 optimizer check + e2e, ≤ $1 |
-| U-02 | Clerk 7.9.x, drop the stale overrides, `middleware.ts` → `proxy.ts` (not filed yet) | U-01 | S, ~$2–3 |
-| U-03 | Convex 1.46 + `convex-test`, redeploy dev (not filed yet) | U-01 | S, ~$2 |
+| U-02 | Clerk 7.9.x, drop the stale overrides, `middleware.ts` → `proxy.ts` (`backlog/U-02-clerk-7-9-proxy.md`) | U-01, after U-03 | S, ~$2–3 |
+| U-03 | Convex 1.46 + `convex-test`, redeploy dev (`backlog/U-03-convex-1-46.md`) | U-01, R3-02 landed | S, ~$2 |
 
 U-01 has 3 build steps: (1) bump + install, (2) verify + fix lint/type
 fallout, (3) optimizer check + full e2e. I'll file U-02 and U-03 if JCC
 wants Clerk and Convex moved at all.
+
+## U-02 and U-03, as filed (2026-10-12)
+
+Filed after U-01 landed (636dad6), as JCC approved (Q3 "yes"). Versions
+re-checked with `npm view` on 2026-10-12: `@clerk/nextjs` 7.9.14,
+`@clerk/testing` 2.2.45, `@clerk/shared` 4.40.0, `convex` 1.46.0,
+`convex-test` 0.0.61 (peer `convex ^1.43.0`).
+
+**Correction to the table above:** `npm audit --omit=dev` now rates `ws`
+8.0.0–8.20.1 **High** (GHSA-58qx, GHSA-96hv), not moderate. We have
+`ws@8.18.0` through `convex@1.39.1`. `convex@1.46.0` pins `ws 8.21.0`.
+Exposure is low (Node-side Convex clients only: CLI, `npx convex run`),
+but it makes U-03 the one of the two that clears a live finding. No
+`@clerk/*` package shows up in the audit.
+
+**Order: sequential, R3-02 → U-03 → U-02.**
+
+```
+main (U-01) ─► R3-02 lands ─► U-03 Convex ─► U-02 Clerk + proxy.ts
+```
+
+| Option | For | Against |
+|---|---|---|
+| **Sequential, U-03 first (picked)** | One variable per e2e run. A regression points at one bump. U-03 clears the High `ws` finding, and it is the smaller blast radius (no auth path) | ~1 day longer wall-clock |
+| Parallel | Shorter wall-clock | Both rewrite `package.json` + `package-lock.json`, so the second one rebases and re-locks. Both need the one shared **dev** Convex deployment for e2e, and U-03 redeploys it. `max_in_progress: 1` serialises the build cards anyway, so parallel only overlaps SDET and gate time |
+| Sequential, U-02 first | Clears the `middleware` deprecation warnings sooner | Leaves the only live audit finding open longer, and puts the riskier (auth) slice first |
+
+U-03 must wait for **R3-02 to land**, not just for U-01. R3-02's branch
+deployed its own `convex/_e2e.ts` (`_e2e:uploadUrl`) to dev. A `convex dev
+--once` from a branch without it would remove that function from dev and
+break R3-02's e2e until someone redeploys.
+
+What U-02 deliberately does not do: replace `createRouteMatcher()` with
+per-resource auth checks (Clerk 7.6 deprecated the matcher in favour of
+that). Our data is already guarded per function in Convex
+(`convex/_auth.ts`), and `app/admin/layout.tsx` re-reads private metadata
+server-side. The proxy only decides redirects. Moving those redirects is a
+behaviour change with its own e2e cost, so U-02 keeps the matcher as it is
+and only renames the file.
 
 ## Order relative to R3-02
 
