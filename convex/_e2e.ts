@@ -1,5 +1,9 @@
 import { ConvexError, v } from "convex/values";
-import { internalAction, internalMutation } from "./_generated/server";
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
@@ -170,16 +174,54 @@ export const setConfirmed = internalMutation({
 
 export type CleanupResult = { orders: number; designs: number; rows: number };
 
+// IMG-02: E2E runs share one stored big-PNG fixture instead of uploading it
+// each run, so its optimizer URL stays stable and warm runs are cache hits.
+// Finds a stored file by content hash (base64 sha256, as `_storage` keeps it).
+// A scan of `_storage` is fine: the dev deployment holds a handful of files.
+export const findFixture = internalQuery({
+  args: { sha256: v.string() },
+  handler: async (ctx, { sha256 }): Promise<Id<"_storage"> | null> => {
+    for await (const file of ctx.db.system.query("_storage")) {
+      if (file.sha256 === sha256) return file._id;
+    }
+    return null;
+  },
+});
+
+// Deletes an asset row, then its blob, unless another design asset (E2E or
+// not) still points at the blob, or its sha256 is in `keep` (the shared
+// fixture, which must outlive every run).
+async function deleteAsset(
+  ctx: MutationCtx,
+  asset: Doc<"designAssets">,
+  keep: string[],
+) {
+  await ctx.db.delete(asset._id);
+  const stillUsed = await ctx.db
+    .query("designAssets")
+    .withIndex("by_storage", (q) => q.eq("storageId", asset.storageId))
+    .first();
+  if (stillUsed) return;
+  const file = await ctx.db.system.get("_storage", asset.storageId);
+  if (file && !keep.includes(file.sha256))
+    await ctx.storage.delete(asset.storageId);
+}
+
 // Deletes the named account's E2E rows: those carrying `tag`, plus (when
 // `olderThanMs` is given) any E2E row older than that — the sweep for runs
-// that crashed before their own cleanup.
+// that crashed before their own cleanup. Blobs whose sha256 is in
+// `keepSha256` are never deleted (see `deleteAsset`).
 export const cleanup = internalMutation({
   args: {
     email: v.string(),
     tag: v.optional(v.string()),
     olderThanMs: v.optional(v.number()),
+    keepSha256: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, { email, tag, olderThanMs }): Promise<CleanupResult> => {
+  handler: async (
+    ctx,
+    { email, tag, olderThanMs, keepSha256 = [] },
+  ): Promise<CleanupResult> => {
     if (tag !== undefined) checkTag(tag);
     if (tag === undefined && olderThanMs === undefined)
       throw new ConvexError("Pass a tag, olderThanMs, or both.");
@@ -226,10 +268,7 @@ export const cleanup = internalMutation({
         .query("designAssets")
         .withIndex("by_design", (q) => q.eq("designId", design._id))
         .collect();
-      for (const asset of assets) {
-        await ctx.storage.delete(asset.storageId);
-        await ctx.db.delete(asset._id);
-      }
+      for (const asset of assets) await deleteAsset(ctx, asset, keepSha256);
       rows += assets.length;
       await ctx.db.delete(design._id);
       designs += 1;
@@ -309,7 +348,8 @@ export const uploadUrl = internalMutation({
 
 // Test-only: stores a small generated file (base64 from the test) and attaches
 // it to an E2E design. A mutation can't write storage, so this is an action.
-// `_e2e:cleanup` already deletes asset blobs.
+// `_e2e:cleanup` deletes the blob with its row (each call stores a new one,
+// so nothing else shares it).
 export const attachFile = internalAction({
   args: {
     designId: v.id("designs"),

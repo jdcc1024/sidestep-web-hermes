@@ -46,7 +46,9 @@ export default defineSchema({
     uploadedByUserId: v.id("users"),
     uploadedByAdmin: v.boolean(),
     createdAt: v.number(),
-  }).index("by_design", ["designId"]),
+  })
+    .index("by_design", ["designId"])
+    .index("by_storage", ["storageId"]),
 
   orders: defineTable({
     captainId: v.id("users"),
