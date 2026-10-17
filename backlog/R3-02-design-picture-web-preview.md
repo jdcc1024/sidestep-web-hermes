@@ -124,7 +124,9 @@ Out of scope:
     `dangerouslyAllowSVG` and `dangerouslyAllowLocalIP` are not set.
   - `qualities` stays at the default `[75]`.
   - Captain pages look and load the same: the order page thumbnail's `src` is
-    still the plain storage URL (no `/_next/image`).
+    still the plain storage URL (no `/_next/image`). IMG-01 reverses this on
+    purpose: captain and admin pictures now use resized presets
+    (`backlog/IMG-01-captain-pictures-use-presets.md`).
   - No new public Convex function. `_e2e:uploadUrl` is an `internalMutation`.
   - Every `<img>` for a stored file on the public form comes from
     `StoredImage`.
