@@ -90,6 +90,7 @@ function DesignCard({
         // bottom rule separating the picture from the text.
         className="aspect-[4/3] w-full rounded-none border-0 border-b"
         iconClassName="size-8"
+        preset="designCard"
       />
       <div className="flex flex-1 flex-col p-5">
         <h3 className="text-lg font-semibold text-foreground">{design.title}</h3>

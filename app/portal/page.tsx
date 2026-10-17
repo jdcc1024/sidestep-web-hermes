@@ -232,6 +232,7 @@ function DesignCard({
           title={design.title}
           mainImage={design.mainImage}
           className="size-14 shrink-0"
+          preset="captainChip"
         />
         <div className="min-w-0">
           <h3 className="text-lg font-semibold text-foreground">

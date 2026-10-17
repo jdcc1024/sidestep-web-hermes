@@ -9,6 +9,7 @@ import {
   type PaletteBlock,
   type TextBlock,
 } from "@/lib/designBlock";
+import { StoredImage } from "@/components/image/StoredImage";
 import { ImageLightbox } from "./ImageLightbox";
 
 // Read-only rendering of a design's structured brief (D-02), shared by the
@@ -136,13 +137,13 @@ function GalleryItem({ asset }: { asset: BlockAsset }) {
           alt={asset.filename}
           triggerLabel={`View ${asset.filename} full size`}
           triggerClassName="block w-full"
+          contentType={asset.contentType}
+          preset="lightbox"
         >
-          {/* Convex storage serves short-lived signed URLs from a host that
-              changes per deployment, so next/image optimization doesn't apply. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={asset.url}
+          <StoredImage
+            image={{ url: asset.url, contentType: asset.contentType }}
             alt={asset.filename}
+            preset="poolTile"
             className="aspect-square w-full object-cover"
             loading="lazy"
           />

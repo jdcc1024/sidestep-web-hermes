@@ -5,6 +5,7 @@ import { isWebSafeImage } from "@/lib/designAsset";
 import { CAPTION_MAX_LENGTH, toggleGalleryAsset } from "@/lib/designBlock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StoredImage } from "@/components/image/StoredImage";
 import type { PoolAsset } from "./DesignAssetPool";
 
 // Typed against the stored shape rather than the pure one, because a gallery
@@ -133,13 +134,12 @@ export function GalleryEditor({
 function AssetThumb({ asset }: { asset: PoolAsset }) {
   if (asset.url && isWebSafeImage(asset.contentType))
     return (
-      // Convex storage serves short-lived signed URLs from a per-deployment
-      // host, so next/image optimization doesn't apply. Alt is empty because
-      // the filename sits beside the tile as the checkbox's own label.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={asset.url}
+      // Alt is empty because the filename sits beside the tile as the
+      // checkbox's own label.
+      <StoredImage
+        image={{ url: asset.url, contentType: asset.contentType }}
         alt=""
+        preset="poolTile"
         className="aspect-square w-full object-cover"
         loading="lazy"
       />

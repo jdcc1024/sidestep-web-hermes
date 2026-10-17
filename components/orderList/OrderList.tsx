@@ -181,6 +181,7 @@ function DesignGroup({
           title={design.title}
           mainImage={design.mainImage}
           className="size-10 shrink-0 rounded-lg"
+          preset="captainChip"
         />
         <div className="min-w-0">
           <p className="truncate font-semibold text-foreground">

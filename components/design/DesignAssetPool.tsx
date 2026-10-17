@@ -15,6 +15,7 @@ import {
   type AssetViewer,
 } from "@/lib/designAsset";
 import { Button } from "@/components/ui/button";
+import { StoredImage } from "@/components/image/StoredImage";
 import { cn } from "@/lib/utils";
 import type { BlockAsset } from "./DesignBlocks";
 
@@ -246,12 +247,10 @@ function AssetPreview({
   return (
     <div className="relative">
       {renderable ? (
-        // Convex storage serves short-lived signed URLs from a per-deployment
-        // host, so next/image optimization doesn't apply.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={asset.url!}
+        <StoredImage
+          image={{ url: asset.url!, contentType: asset.contentType }}
           alt={asset.filename}
+          preset="poolTile"
           className="aspect-square w-full object-cover"
           loading="lazy"
         />

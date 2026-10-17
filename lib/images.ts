@@ -21,6 +21,15 @@ export const IMAGE_PRESETS = {
   publicTile: { sizes: "(min-width: 640px) 224px, 50vw", optimize: true },
   // 40px chip beside a design's name.
   designChip: { sizes: "40px", optimize: true },
+  // Captain/admin summary chips: 40–56px squares (dashboard, order list, order page).
+  captainChip: { sizes: "56px", optimize: true },
+  // Designs list card band: `aspect-[4/3] w-full`, 2 across from `sm`.
+  designCard: { sizes: "(min-width: 640px) 50vw, 100vw", optimize: true },
+  // Asset pool, gallery block and gallery editor tiles: 2 / 3 / 4 across.
+  poolTile: {
+    sizes: "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw",
+    optimize: true,
+  },
   // "Tap to enlarge": screen-sized (<= 2048w), never the print file.
   lightbox: { sizes: "(min-width: 640px) 90vw, 100vw", optimize: true },
 } as const satisfies Record<string, { sizes: string; optimize: boolean }>;
