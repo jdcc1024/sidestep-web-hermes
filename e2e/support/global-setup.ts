@@ -4,14 +4,17 @@ import {
   clerkSetup,
   setupClerkTestingToken,
 } from "@clerk/testing/playwright";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { captainConfigured, sweepStale } from "./convex";
+import { EGRESS_LOG } from "./global-teardown";
 
 // Signs in once per test account and saves each session:
 //  - SNAP_UID / SNAP_PWD (an admin) → .auth/e2e-state.json, the default.
 //  - E2E_CAPTAIN_UID / E2E_CAPTAIN_PWD (a non-admin, optional) →
 //    .auth/e2e-captain.json, for checks of what a plain captain can't do.
-// Then sweeps E2E rows left behind by a run that crashed before cleanup.
+// Then sweeps E2E rows left behind by a run that crashed before cleanup, and
+// starts this run's egress log (IMG-02, see global-teardown.ts).
 async function signIn(
   browser: Browser,
   baseURL: string,
@@ -40,6 +43,9 @@ export default async function globalSetup(config: FullConfig) {
   const pwd = process.env.SNAP_PWD;
   if (!uid || !pwd)
     throw new Error("SNAP_UID and SNAP_PWD must be set in .env.local");
+
+  mkdirSync(path.dirname(EGRESS_LOG), { recursive: true });
+  writeFileSync(EGRESS_LOG, "");
 
   await clerkSetup();
   const baseURL = config.projects[0].use.baseURL!;
