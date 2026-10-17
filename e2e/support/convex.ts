@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import zlib from "node:zlib";
 
 // Thin wrapper over `npx convex run` for the internal E2E helpers in
@@ -15,8 +15,9 @@ function run<T>(fn: string, args: Record<string, unknown>): T {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const start = out.search(/[[{]/);
-  // A function that returns null prints no JSON object (e.g. insertAsset).
+  // JSON starts at the first `{`, `[` or `"` (a string, e.g. findFixture's id).
+  const start = out.search(/[[{"]/);
+  // A function that returns null prints no JSON value (e.g. insertAsset).
   return (start < 0 ? null : JSON.parse(out.slice(start))) as T;
 }
 
@@ -92,14 +93,23 @@ const accounts = (): As[] =>
   captainConfigured() ? ["admin", "captain"] : ["admin"];
 
 export const cleanup = (tag: string) => {
-  for (const as of accounts()) run("_e2e:cleanup", { email: email(as), tag });
+  for (const as of accounts())
+    run("_e2e:cleanup", {
+      email: email(as),
+      tag,
+      keepSha256: [bigPngSha256()],
+    });
 };
 
 /** Rows from crashed runs: any E2E row older than an hour. */
 export const sweepStale = () => {
   for (const as of accounts()) {
     try {
-      run("_e2e:cleanup", { email: email(as), olderThanMs: 60 * 60 * 1000 });
+      run("_e2e:cleanup", {
+        email: email(as),
+        olderThanMs: 60 * 60 * 1000,
+        keepSha256: [bigPngSha256()],
+      });
     } catch {
       // A captain who has never signed in has no users row yet: nothing to sweep.
     }
@@ -183,16 +193,39 @@ export function buildBigPng(): Buffer {
   ]);
 }
 
+// IMG-02: built once per process and stored once per deployment. Its sha256
+// (base64, as `_storage` keeps it) finds the stored copy, and pins it so
+// `_e2e:cleanup` never deletes it.
+let bigPng: { png: Buffer; sha256: string } | undefined;
+function bigPngFixture() {
+  if (!bigPng) {
+    const png = buildBigPng();
+    bigPng = { png, sha256: createHash("sha256").update(png).digest("base64") };
+  }
+  return bigPng;
+}
+
+export const bigPngSha256 = () => bigPngFixture().sha256;
+
+/**
+ * Attaches the big PNG to an E2E design. Reuses the stored blob when the
+ * deployment already has it, so its `/_next/image` URL stays the same across
+ * runs and warm runs are cache hits; uploads only on a miss.
+ */
 export async function attachBigPng(designId: string, isMain = true) {
-  const png = buildBigPng();
-  const { url } = run<{ url: string }>("_e2e:uploadUrl", {});
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "image/png" },
-    body: new Uint8Array(png),
-  });
-  if (!res.ok) throw new Error(`upload failed: ${res.status}`);
-  const { storageId } = (await res.json()) as { storageId: string };
+  const { png, sha256 } = bigPngFixture();
+  let storageId = run<string | null>("_e2e:findFixture", { sha256 });
+  const reused = storageId !== null;
+  if (storageId === null) {
+    const { url } = run<{ url: string }>("_e2e:uploadUrl", {});
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "image/png" },
+      body: new Uint8Array(png),
+    });
+    if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+    ({ storageId } = (await res.json()) as { storageId: string });
+  }
   run("_e2e:insertAsset", {
     designId,
     storageId,
@@ -200,5 +233,5 @@ export async function attachBigPng(designId: string, isMain = true) {
     contentType: "image/png",
     isMain,
   });
-  return { bytes: png.length };
+  return { bytes: png.length, storageId, reused };
 }
