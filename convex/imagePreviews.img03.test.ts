@@ -96,9 +96,9 @@ describe("imagePreviews.generate", () => {
 
     const bytes = await t.run(async (ctx) => {
       const blob = await ctx.storage.get(after!.previewStorageId!);
-      return new Uint8Array(await blob!.arrayBuffer());
+      return await blob!.arrayBuffer();
     });
-    const meta = await sharp(bytes).metadata();
+    const meta = await sharp(Buffer.from(bytes)).metadata();
     expect(meta.format).toBe("webp");
     expect(meta.width!).toBeLessThanOrEqual(2048);
     expect(meta.height!).toBeLessThanOrEqual(2048);
