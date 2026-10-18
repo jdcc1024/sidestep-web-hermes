@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
-    "@clerk/nextjs": "^7.3.5",
+    "@clerk/nextjs": "^7.9.17",
     "@hookform/resolvers": "^5.4.0",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-slot": "^1.2.4",
@@ -41,7 +41,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@clerk/testing": "^2.2.10",
+    "@clerk/testing": "^2.2.47",
     "@edge-runtime/vm": "^5.0.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
@@ -59,9 +59,5 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.6"
-  },
-  "overrides": {
-    "@clerk/react": "6.6.4",
-    "@clerk/backend": "3.4.9"
   }
 }
