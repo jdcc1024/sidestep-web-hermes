@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ImageIcon } from "lucide-react";
 import {
   isWebSafeImage,
+  pictureUrl,
   type DesignMainImage,
   type PublicDesignImage,
 } from "@/lib/designAsset";
@@ -54,10 +55,11 @@ export function DesignThumbnail({
   preset?: ImagePreset;
 }) {
   const [failed, setFailed] = useState(false);
+  // The stored preview when the captain's summary has one (IMG-03); the
+  // public form's `url` already is the preview.
+  const shown = mainImage ? pictureUrl(mainImage) : null;
   const src =
-    !failed && mainImage?.url && isWebSafeImage(mainImage.contentType)
-      ? mainImage.url
-      : null;
+    !failed && shown && isWebSafeImage(mainImage!.contentType) ? shown : null;
   const contentType = mainImage?.contentType ?? "";
 
   const boxClassName = cn(

@@ -11,6 +11,7 @@ import type { UploadedFile } from "@/convex/_designAssets";
 import {
   canDeleteDesignAsset,
   isWebSafeImage,
+  pictureUrl,
   resolveMainAsset,
   type AssetViewer,
 } from "@/lib/designAsset";
@@ -242,13 +243,14 @@ function AssetPreview({
   asset: PoolAsset;
   isMain: boolean;
 }) {
-  const renderable = asset.url && isWebSafeImage(asset.contentType);
+  const src = pictureUrl(asset);
+  const renderable = src && isWebSafeImage(asset.contentType);
 
   return (
     <div className="relative">
       {renderable ? (
         <StoredImage
-          image={{ url: asset.url!, contentType: asset.contentType }}
+          image={{ url: src, contentType: asset.contentType }}
           alt={asset.filename}
           preset="poolTile"
           className="aspect-square w-full object-cover"

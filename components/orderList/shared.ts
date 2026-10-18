@@ -40,6 +40,7 @@ export type OrderListDesign = {
   title: string;
   mainImage: {
     url: string | null;
+    displayUrl?: string | null;
     filename: string;
     contentType: string;
   } | null;

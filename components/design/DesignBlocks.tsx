@@ -1,6 +1,6 @@
 import { FileDown } from "lucide-react";
 
-import { isWebSafeImage } from "@/lib/designAsset";
+import { isWebSafeImage, pictureUrl } from "@/lib/designAsset";
 import {
   SWATCH_ROLE_LABELS,
   blockHeading,
@@ -29,6 +29,8 @@ export type BlockAsset = {
   filename: string;
   contentType: string;
   url: string | null;
+  // The stored preview (IMG-03); pictures load it, downloads keep `url`.
+  displayUrl?: string | null;
 };
 
 export function DesignBlocks({
@@ -126,14 +128,15 @@ function GalleryItem({ asset }: { asset: BlockAsset }) {
   // Inline vs card keys off content type, never the filename or a tag: a
   // "mockup" may well be a PSD (PRD §6). A null URL means the underlying
   // file is gone, so even an image degrades to the card.
-  if (asset.url && isWebSafeImage(asset.contentType)) {
+  const src = pictureUrl(asset);
+  if (src && isWebSafeImage(asset.contentType)) {
     return (
       <figure className="overflow-hidden rounded-lg border border-border bg-card">
         {/* The tile is a square crop, so the picture is never fully visible
             here — clicking opens it uncropped (D-11). Only the image is the
             trigger; the caption stays selectable text. */}
         <ImageLightbox
-          src={asset.url}
+          src={src}
           alt={asset.filename}
           triggerLabel={`View ${asset.filename} full size`}
           triggerClassName="block w-full"
@@ -141,7 +144,7 @@ function GalleryItem({ asset }: { asset: BlockAsset }) {
           preset="lightbox"
         >
           <StoredImage
-            image={{ url: asset.url, contentType: asset.contentType }}
+            image={{ url: src, contentType: asset.contentType }}
             alt={asset.filename}
             preset="poolTile"
             className="aspect-square w-full object-cover"

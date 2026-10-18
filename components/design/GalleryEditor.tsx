@@ -1,7 +1,7 @@
 "use client";
 
 import type { StoredDesignBlock } from "@/convex/_designBlocks";
-import { isWebSafeImage } from "@/lib/designAsset";
+import { isWebSafeImage, pictureUrl } from "@/lib/designAsset";
 import { CAPTION_MAX_LENGTH, toggleGalleryAsset } from "@/lib/designBlock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,12 +132,13 @@ export function GalleryEditor({
 // Small square preview. Non-images get a neutral tile rather than a broken
 // <img> — the content type decides, never the filename (PRD §6).
 function AssetThumb({ asset }: { asset: PoolAsset }) {
-  if (asset.url && isWebSafeImage(asset.contentType))
+  const src = pictureUrl(asset);
+  if (src && isWebSafeImage(asset.contentType))
     return (
       // Alt is empty because the filename sits beside the tile as the
       // checkbox's own label.
       <StoredImage
-        image={{ url: asset.url, contentType: asset.contentType }}
+        image={{ url: src, contentType: asset.contentType }}
         alt=""
         preset="poolTile"
         className="aspect-square w-full object-cover"
