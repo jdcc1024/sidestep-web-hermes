@@ -77,6 +77,8 @@ instead, and Convex serves the original only for downloads.
     scheduled for.
   - `getPublic` returns no filename and no original URL when a preview
     exists.
+- Backfill, once per deployment after deploy: `npx convex run
+  imagePreviews:backfill` (returns how many it scheduled; safe to re-run).
 - Egress accounting: each upload costs one original read (counted as
   "accessing user files inside functions"). The backfill on dev reads 25 MB
   once.
