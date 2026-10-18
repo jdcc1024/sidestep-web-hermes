@@ -190,13 +190,15 @@ export const findFixture = internalQuery({
 
 // Deletes an asset row, then its blob, unless another design asset (E2E or
 // not) still points at the blob, or its sha256 is in `keep` (the shared
-// fixture, which must outlive every run).
+// fixture, which must outlive every run). The stored preview (IMG-03) is made
+// per row and never shared, so it always goes.
 async function deleteAsset(
   ctx: MutationCtx,
   asset: Doc<"designAssets">,
   keep: string[],
 ) {
   await ctx.db.delete(asset._id);
+  if (asset.previewStorageId) await ctx.storage.delete(asset.previewStorageId);
   const stillUsed = await ctx.db
     .query("designAssets")
     .withIndex("by_storage", (q) => q.eq("storageId", asset.storageId))

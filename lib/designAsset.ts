@@ -51,12 +51,25 @@ export function isWebSafeImage(value: string | null | undefined): boolean {
 // because both the Convex reads and the pure derivations that carry it
 // through need the shape without importing UI. A null
 // `url` means the file itself has gone from storage; callers hold
-// `DesignMainImage | null` for "this design has no image at all".
+// `DesignMainImage | null` for "this design has no image at all". `url` is the
+// original (downloads); `displayUrl` is what an <img> loads: the stored web
+// preview when there is one (IMG-03), else the same as `url`. Optional so a
+// shape built without it (a fixture, the public form) still draws.
 export type DesignMainImage = {
   url: string | null;
+  displayUrl?: string | null;
   filename: string;
   contentType: string;
 };
+
+// The URL an on-screen picture loads: the stored preview's, falling back to
+// the original's. Download and "open" links use `url` directly, never this.
+export function pictureUrl(asset: {
+  url: string | null;
+  displayUrl?: string | null;
+}): string | null {
+  return asset.displayUrl ?? asset.url;
+}
 
 // The public order form is unauthenticated and opened on phones, often on cell
 // data, so it only gets a picture a browser can draw and that is small enough

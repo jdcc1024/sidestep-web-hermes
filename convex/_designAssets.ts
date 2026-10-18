@@ -1,7 +1,9 @@
 import { ConvexError, v } from "convex/values";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireCurrentUser } from "./_auth";
+import { canOptimize } from "../lib/images";
 import {
   canDeleteDesignAsset,
   canUploadDesignAsset,
@@ -35,7 +37,23 @@ export type UploadedFile = {
   contentType: string;
 };
 
-export type ResolvedAsset = Doc<"designAssets"> & { url: string | null };
+// `url` is the original (downloads); `displayUrl` is what every on-screen
+// picture loads: the stored preview when there is one (IMG-03), else `url`.
+export type ResolvedAsset = Doc<"designAssets"> & {
+  url: string | null;
+  displayUrl: string | null;
+};
+
+// The preview's URL, or the original's while there's no preview (not made
+// yet, not a resizable type, or its blob is gone).
+async function displayUrlOf(
+  ctx: QueryCtx | MutationCtx,
+  asset: Doc<"designAssets">,
+  url: string | null,
+): Promise<string | null> {
+  if (!asset.previewStorageId) return url;
+  return (await ctx.storage.getUrl(asset.previewStorageId)) ?? url;
+}
 
 // Assets in upload order. `createdAt` is the ordering key rather than
 // `_creationTime` so a future backfill or re-import can preserve real order.
@@ -59,10 +77,10 @@ export async function resolveDesignAssets(
 ): Promise<ResolvedAsset[]> {
   const assets = await listDesignAssets(ctx, designId);
   return Promise.all(
-    assets.map(async (asset) => ({
-      ...asset,
-      url: await ctx.storage.getUrl(asset.storageId),
-    })),
+    assets.map(async (asset) => {
+      const url = await ctx.storage.getUrl(asset.storageId);
+      return { ...asset, url, displayUrl: await displayUrlOf(ctx, asset, url) };
+    }),
   );
 }
 
@@ -116,15 +134,16 @@ export async function assetSummariesByDesign(
     unique.map(async (designId): Promise<DesignAssetSummary> => {
       const assets = await listDesignAssets(ctx, designId);
       const main = resolveMainAsset(assets);
+      if (!main) return { fileCount: assets.length, mainImage: null };
+      const url = await ctx.storage.getUrl(main.storageId);
       return {
         fileCount: assets.length,
-        mainImage: main
-          ? {
-              url: await ctx.storage.getUrl(main.storageId),
-              filename: main.filename,
-              contentType: main.contentType,
-            }
-          : null,
+        mainImage: {
+          url,
+          displayUrl: await displayUrlOf(ctx, main, url),
+          filename: main.filename,
+          contentType: main.contentType,
+        },
       };
     }),
   );
@@ -134,7 +153,10 @@ export async function assetSummariesByDesign(
 // The public order form's picture per design (0004). Same "which picture"
 // answer as `assetSummariesByDesign`, but narrower: a URL is built only for
 // a web-safe main, never for any other file, and `toPublicImage` drops it
-// when it's over the size cap. No filename or file count leaves here.
+// when it's over the size cap. No filename or file count leaves here. With a
+// stored preview (IMG-03) the preview is the only file it builds a URL for, so
+// the public form never carries the original's URL; `contentType` stays the
+// asset's (both are types the optimizer resizes).
 export async function publicMainImagesByDesign(
   ctx: QueryCtx | MutationCtx,
   designIds: readonly Id<"designs">[],
@@ -144,9 +166,13 @@ export async function publicMainImagesByDesign(
     unique.map(async (designId): Promise<PublicDesignImage | null> => {
       const main = resolveMainAsset(await listDesignAssets(ctx, designId));
       if (!main || !isWebSafeImage(main.contentType)) return null;
-      const file = await ctx.db.system.get("_storage", main.storageId);
+      const preview = main.previewStorageId
+        ? await ctx.db.system.get("_storage", main.previewStorageId)
+        : null;
+      const shownId = preview ? preview._id : main.storageId;
+      const file = preview ?? (await ctx.db.system.get("_storage", shownId));
       if (!file) return null;
-      const url = await ctx.storage.getUrl(main.storageId);
+      const url = await ctx.storage.getUrl(shownId);
       return toPublicImage(main, file.size, url);
     }),
   );
@@ -156,7 +182,8 @@ export async function publicMainImagesByDesign(
 // Records uploads against a design. Filename and content type are normalized
 // here (blank names and parameterized mime strings both arrive from real
 // browsers), and the uploader's admin status is snapshotted so the delete
-// rules stay stable if their role changes later.
+// rules stay stable if their role changes later. Each resizable picture gets
+// its stored web preview made right after this commits (IMG-03).
 export async function insertDesignAssets(
   ctx: MutationCtx,
   designId: Id<"designs">,
@@ -165,11 +192,12 @@ export async function insertDesignAssets(
 ): Promise<void> {
   const now = Date.now();
   for (const [index, file] of files.entries()) {
-    await ctx.db.insert("designAssets", {
+    const contentType = normalizeContentType(file.contentType);
+    const assetId = await ctx.db.insert("designAssets", {
       designId,
       storageId: file.storageId,
       filename: normalizeFilename(file.filename),
-      contentType: normalizeContentType(file.contentType),
+      contentType,
       isMain: false,
       uploadedByUserId: uploader._id,
       uploadedByAdmin: uploader.isAdmin,
@@ -177,6 +205,10 @@ export async function insertDesignAssets(
       // createdAt sort — Date.now() is the same for every row in a batch.
       createdAt: now + index,
     });
+    if (canOptimize(contentType))
+      await ctx.scheduler.runAfter(0, internal.imagePreviews.generate, {
+        assetId,
+      });
   }
 }
 
@@ -226,14 +258,16 @@ export async function setMainDesignAsset(
   }
 }
 
-// Deletes both the row and the bytes. The caller is responsible for the
-// permission check and for stripping the id out of the design's galleries —
-// see convex/designs.ts removeAsset, which does both in one mutation.
+// Deletes the row and the bytes, the stored preview's included. The caller is
+// responsible for the permission check and for stripping the id out of the
+// design's galleries — see convex/designs.ts removeAsset, which does both in
+// one mutation.
 export async function deleteDesignAsset(
   ctx: MutationCtx,
   asset: Doc<"designAssets">,
 ): Promise<void> {
   await ctx.storage.delete(asset.storageId);
+  if (asset.previewStorageId) await ctx.storage.delete(asset.previewStorageId);
   await ctx.db.delete(asset._id);
 }
 

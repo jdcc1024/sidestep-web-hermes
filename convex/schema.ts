@@ -36,10 +36,13 @@ export default defineSchema({
   // provenance snapshot (admin status can change later) that drives the
   // delete rules in lib/designAsset. `isMain` is the owner's explicit pick
   // for the design's representative image — see resolveMainAsset for the
-  // fallback when it's unset.
+  // fallback when it's unset. `previewStorageId` is the ≤2048px WebP made once
+  // from a PNG/JPEG/WebP upload (IMG-03); every on-screen picture is resized
+  // from it, downloads keep `storageId`. Unset until the action has run.
   designAssets: defineTable({
     designId: v.id("designs"),
     storageId: v.id("_storage"),
+    previewStorageId: v.optional(v.id("_storage")),
     filename: v.string(),
     contentType: v.string(),
     isMain: v.boolean(),

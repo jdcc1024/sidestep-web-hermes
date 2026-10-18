@@ -20,6 +20,8 @@ import type * as _users from "../_users.js";
 import type * as admin from "../admin.js";
 import type * as crons from "../crons.js";
 import type * as designs from "../designs.js";
+import type * as imagePreviews from "../imagePreviews.js";
+import type * as imagePreviewsDb from "../imagePreviewsDb.js";
 import type * as intakes from "../intakes.js";
 import type * as orderEntries from "../orderEntries.js";
 import type * as orderFormActions from "../orderFormActions.js";
@@ -48,6 +50,8 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   crons: typeof crons;
   designs: typeof designs;
+  imagePreviews: typeof imagePreviews;
+  imagePreviewsDb: typeof imagePreviewsDb;
   intakes: typeof intakes;
   orderEntries: typeof orderEntries;
   orderFormActions: typeof orderFormActions;
