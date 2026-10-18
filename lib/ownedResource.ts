@@ -26,7 +26,7 @@ export function resolveOwnedResource<T>({
   result: T | null | undefined;
 }): OwnedResourceState<T> {
   // Until Convex has an authenticated identity, nothing it returned is a
-  // statement about this user's data. `/portal` is middleware-protected, so a
+  // statement about this user's data. `/portal` is proxy-protected, so a
   // genuinely signed-out visitor is redirected rather than left here loading.
   if (authLoading || !isAuthenticated) return { status: "loading" };
   if (result === undefined) return { status: "loading" };

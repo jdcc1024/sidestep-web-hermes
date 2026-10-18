@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 // This page renders only when /invite is visited without a token.
-// Valid invite links (/invite?token=<id>) are intercepted by middleware,
+// Valid invite links (/invite?token=<id>) are intercepted by the proxy (proxy.ts),
 // which sets the sidestep_invite_token cookie and redirects to /sign-up.
 export default function InvitePage() {
   return (

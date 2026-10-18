@@ -56,7 +56,7 @@ sidestep-website/
 ├── components/         React components grouped by surface
 ├── convex/             Backend: schema, queries, mutations, actions, cron
 ├── lib/                Framework-free domain logic + Vitest tests
-├── middleware.ts       Clerk auth middleware + invite-link handler
+├── proxy.ts            Clerk auth gate (Next proxy) + invite-link handler
 ├── docs/               PRD, this overview, architecture notes
 ├── backlog/            Vertical-slice issue specs (the AI workflow)
 └── scripts/            verify.mjs (quality gate), snap.mjs (screenshots)
@@ -111,7 +111,7 @@ The App Router uses three top-level surfaces. Each has its own layout:
 | `/`                  | Public         | `MarketingShell`      | Hero, pricing, process, FAQ.     |
 | `/intake`            | Public         | `MarketingShell`      | Lead-capture form.               |
 | `/sign-in`, `/sign-up` | Public       | `(auth)` route group  | Clerk-hosted UI.                 |
-| `/invite?token=…`    | Public         | (middleware-only)     | Sets invite cookie → `/sign-up`. |
+| `/invite?token=…`    | Public         | (proxy-only)          | Sets invite cookie → `/sign-up`. |
 | `/run/[id]`          | Public         | (none)                | Jersey-run submission form.      |
 | `/portal/*`          | Authenticated  | `PortalShell`         | Customer area.                   |
 | `/admin/*`           | Admin only     | `AdminShell`          | Staff area.                      |
@@ -128,8 +128,9 @@ Portal subroutes worth knowing:
 Admin subroutes mirror portal: `/admin/orders`, `/admin/orders/[id]`,
 `/admin/designs`, `/admin/jersey-runs`, `/admin/jersey-runs/[id]`.
 
-### `middleware.ts`
+### `proxy.ts`
 
+Next 16's proxy (formerly `middleware.ts`; runs on the Node runtime).
 Two responsibilities:
 
 1. **Auth gate** — every route is protected by Clerk **except** the
@@ -264,7 +265,7 @@ single file in isolation will confuse you:
 
 1. Admin sends the lead a URL like
    `https://…/invite?token=<intakeId>`.
-2. Middleware sets the `sidestep_invite_token` cookie and redirects to
+2. The proxy sets the `sidestep_invite_token` cookie and redirects to
    `/sign-up`.
 3. After sign-up, the captain hits `/portal/orders/new`, which reads
    the cookie and pre-fills team name, sport, quantity from the
@@ -356,7 +357,7 @@ In this order:
 1. `docs/prd/sidestep-website-phase1.md` — the spec.
 2. `convex/schema.ts` — the data model.
 3. `lib/orderStages.ts` — the most opinionated bit of domain logic.
-4. `app/providers.tsx` + `middleware.ts` — how auth threads through.
+4. `app/providers.tsx` + `proxy.ts` — how auth threads through.
 5. A vertical slice end-to-end, e.g. jersey runs:
    `lib/jerseyRun.ts` → `convex/jerseyRuns.ts` →
    `components/portal/JerseyRunSetup.tsx` →
