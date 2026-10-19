@@ -59,15 +59,21 @@ export function ImageLightbox({
       </DialogTrigger>
 
       {/* Phones get a set width: a fixed, left-50% box sized w-fit can only be
-          half the screen wide. A tall image is capped so it scales down. */}
-      <DialogContent className="w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] gap-3 p-2 sm:w-fit sm:max-w-[min(90vw,64rem)] sm:p-3">
+          half the screen wide. A tall image is capped so it scales down.
+          From sm up the picture uses the screen, at most 90vw x 90vh with its
+          shape kept (docs/ux/0004-public-form.md §4.6). The frame is pinned to
+          both edges and centred with auto margins instead of left-50% plus a
+          -50% shift, because that shift is what held w-fit to half the screen.
+          The close ✕ gets a round backing so it stays visible over a dark
+          picture; it is scoped here so other dialogs keep the ghost button. */}
+      <DialogContent className="w-[calc(100%-1rem)] max-w-[calc(100%-1rem)] gap-3 p-2 sm:inset-x-0 sm:mx-auto sm:w-fit sm:max-w-[90vw] sm:translate-x-0 sm:p-3 [&_[data-slot=dialog-close]]:rounded-full [&_[data-slot=dialog-close]]:bg-background/85 [&_[data-slot=dialog-close]]:shadow-sm">
         <DialogTitle className="sr-only">{alt}</DialogTitle>
         <StoredImage
           image={{ url: src, contentType }}
           preset={preset}
           data-testid="lightbox-image"
           alt={alt}
-          className="mx-auto max-h-[80vh] w-full max-w-full rounded-md object-contain sm:w-auto"
+          className="mx-auto max-h-[80vh] w-full max-w-full rounded-md object-contain sm:max-h-[90vh] sm:w-auto"
         />
       </DialogContent>
     </Dialog>
