@@ -5,16 +5,34 @@ import zlib from "node:zlib";
 // Thin wrapper over `npx convex run` for the internal E2E helpers in
 // convex/_e2e.ts. Runs against the deployment in .env.local (dev only).
 
+// `npx convex run` makes one HTTPS call to the dev deployment. A dropped
+// connection ("TypeError: fetch failed") fails the CLI before the function
+// runs, which killed a test in seedOrder (order-form-player, 1 in 44 runs).
+// Retry only that transport failure, never a Convex function error. Every
+// row carries the test's tag, so a retry that did land twice is still swept.
+const TRANSIENT = /fetch failed|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up/;
+
+function execConvexRun(fn: string, args: Record<string, unknown>): string {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return execFileSync("npx", ["convex", "run", fn, JSON.stringify(args)], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (e) {
+      const text = `${(e as Error).message}\n${(e as { stderr?: string }).stderr ?? ""}`;
+      if (attempt >= 3 || !TRANSIENT.test(text)) throw e;
+    }
+  }
+}
+
 function run<T>(fn: string, args: Record<string, unknown>): T {
   if (!/^dev:/.test(process.env.CONVEX_DEPLOYMENT ?? "")) {
     throw new Error(
       "E2E refuses to run: CONVEX_DEPLOYMENT is not a dev deployment.",
     );
   }
-  const out = execFileSync("npx", ["convex", "run", fn, JSON.stringify(args)], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const out = execConvexRun(fn, args);
   // JSON starts at the first `{`, `[` or `"` (a string, e.g. findFixture's id).
   const start = out.search(/[[{"]/);
   // A function that returns null prints no JSON value (e.g. insertAsset).
