@@ -285,3 +285,106 @@ sharp, same settings as Next, on an 11.7 MB 3732×4406 PNG (the dev "Never OK" s
 Convex storage GET (0.48 MB file): 200 in 0.34 s, Cache-Control: private, max-age=2592000
 getPublic on dev today: "Never OK Design" mainImage null (10.6 MB main, over the 2 MB cap)
 ```
+
+## Original-file rule (audit t_6007d6c8, 2026-10-19)
+
+**Rule (JCC, Discord #office-hours msgs 1561641336816402513, 1561646857820577813):**
+1. **No image is the original.** No `<img>`, `/_next/image` source,
+   background or lightbox anywhere in the app shows the print file. Every
+   picture comes from the stored WebP preview (IMG-03).
+2. **Download link only.** The original is reachable only through an
+   explicit Download control: the design page (`DesignAssetPool`,
+   `DesignBlocks` file card) and the admin order page.
+3. **Owner or admin only, enforced in Convex.** "Owner" = the captain: the
+   user who created the order, whose designs that order links. Admin also
+   has access. No co-owners (that is register 0007, parked).
+
+**Verdict: holds on screen today on dev, with 2 gaps in code paths the dev
+data doesn't exercise.** The Gate 2 premise "captain pages still load the
+full print file" is stale: 0 bytes of originals on every page measured.
+
+### Measured (main @ 189f608, `next dev`, fresh browser context, no Download click)
+
+Script: Playwright, one fresh context per (page, width), scroll to load lazy
+images, open the lightbox where there is one. It records responses from
+`/api/storage/` and `/_next/image`, every `<img>` `currentSrc`, and storage
+ids inside Convex websocket frames. The 5 original ids were read from the
+design pages' Download hrefs. Dev has 5 assets, all PNG/JPEG, all with a
+preview (front 11.6 MB → 184 KB, back 10.6 MB → 140 KB, colors 812 KB →
+62 KB, logo 1.4 MB → 84 KB, template 483 KB → 111 KB).
+
+| Page | Width | Direct storage bytes | Originals as optimizer source | Optimized bytes | Original URLs in Convex payload | Download links |
+|---|---|---|---|---|---|---|
+| `/portal` | 1280 / 375 | 0 / 0 | 0 | 2 KB / 2 KB | **2** | 0 |
+| `/portal/designs` | 1280 / 375 | 0 / 0 | 0 | 47 KB / 24 KB | **2** | 0 |
+| design page (Never OK) | 1280 / 375 | 0 / 0 | 0 | 54 KB / 30 KB | 3 | 3 |
+| design page (Alpacallama) | 1280 / 375 | 0 / 0 | 0 | 25 KB / 15 KB | 2 | 2 |
+| `/portal/orders/<S39>` + lightbox | 1280 / 375 | 0 / 0 | 0 | 69 KB / 32 KB | **2** | 0 |
+| `/admin/orders/<S39>` | 1280 / 375 | 0 / 0 | 0 | 2 KB / 2 KB | 5 | 5 |
+| `/admin/designs/<Never OK>` | 1280 / 375 | 0 / 0 | 0 | 54 KB / 30 KB | 3 | 3 |
+| `/run/<S39 form>` signed out + lightbox | 1280 / 375 | 0 / 0 | 0 | 93 KB / 55 KB | 0 | 0 |
+
+Lightboxes (order page, public form) load `/_next/image` from the preview.
+Part 1 holds for this data. Bold = an original URL shipped to a page that has
+no Download link (the owner's own file, so not a "who" breach, but the
+original is reachable without a download link).
+
+### Where the original can still be reached, and why
+
+| # | Path | Who gets it | Breaks | Why it exists |
+|---|---|---|---|---|
+| G1 | `displayUrlOf` (`convex/_designAssets.ts:49`) and `pictureUrl` (`lib/designAsset.ts:67`) fall back to the original when there is no preview: preview not made yet (seconds after upload), the action failed (corrupt or oversized file, logged and skipped), or the type isn't resizable (GIF, SVG: no preview is ever made, `canOptimize`) | owner / admin pages, as an `<img>` (GIF/SVG `unoptimized`, so straight from storage) or as the optimizer's source | rule 1 | IMG-03 kept the fallback so nothing went blank before the backfill. Pinned by `convex/imagePreviews.test.ts:288` |
+| G2 | `publicMainImagesByDesign` (`_designAssets.ts:160`) builds the URL from the original when the main has no preview: GIF/SVG ≤ 2 MB, PNG/JPEG/WebP ≤ 50 MB before or without a preview | **anyone with the form link** (`orderForms.getPublic` is public) | rules 1, 2, 3 | same fallback. Pinned by `convex/orderForms.previewImage.img03.test.ts:104` |
+| G3 | `assetSummariesByDesign` returns `mainImage.url` (original) to `designs.listMyDesigns`, `orders.getMyOrder` | the owner, on pages with no Download link (`/portal`, `/portal/designs`, order page) | rule 2 | the summary shape carried `url` before IMG-03 split `url` / `displayUrl` |
+| G4 | `resolveDesignAssets` returns every asset's `url` inside the reactive query payload of `designs.getMyDesign`, `admin.getDesign`, `admin.getOrder` | owner (getMyDesign throws for anyone else), admin (`requireAdmin`) | nothing today: these are the Download pages | the `<a href>` needs it |
+| — | Convex storage URLs are unauthenticated bearer URLs with no expiry (`/api/storage/<uuid>`, measured) | anyone the URL reaches | residual | how Convex storage works; see below |
+
+Server-side "who" check, every public query that touches storage:
+
+| Query | Caller gate | Original URL returned? |
+|---|---|---|
+| `designs.getMyDesign` | `design.ownerId === user._id`, else throws | yes, needed (Download) |
+| `designs.listMyDesigns` | own designs via `by_owner` | yes, **not needed** (G3) |
+| `orders.getMyOrder` | `order.captainId === user._id`, else throws | yes, **not needed** (G3) |
+| `admin.getOrder`, `admin.getDesign` | `requireAdmin` | yes, needed (Download) |
+| `orderForms.getPublic` | none (public form) | preview only; **original in the fallback** (G2) |
+| `orderForms.listMyResponses`, `admin.exportOrder`, admin lists, `/invite` | — | no storage URLs |
+
+"Captain who isn't the owner" can't get one: `createOrder`/`updateOrder` only
+link designs the caller owns (`convex/orders.ts:73-80`), and no mutation
+changes `designs.ownerId` or `orders.captainId`. So "captain of an order
+that links design D" and "`D.ownerId`" are the same user, and the check is
+`user.isAdmin || design.ownerId === user._id`.
+
+### Bearer URLs: recommendation
+
+Convex has no expiring or signed storage URLs. Options:
+
+| | A. On-click URL (recommended) | B. Stream through an auth-checked Next route | C. Accept as-is |
+|---|---|---|---|
+| How | Queries stop carrying `url`. Download calls `designs.originalUrl({ assetId })` (auth: `canAccessOriginal`) on click, then navigates to it | `/api/download/[assetId]`: Clerk session cookie → Convex query → Next fetches the blob and pipes it | keep `href={asset.url}` |
+| Original URL in page payloads | never; only after a Download click, only to owner/admin | never | yes, on 3 pages |
+| Once handed out | still a bearer URL (owner/admin chose to download it) | URL never leaves the server | bearer URL |
+| Cost | $0, ~1 request per click | every download (10 MB+) flows through our Next host: on Funnel that's JCC's home uplink, on Vercel it's function bandwidth | $0 |
+| UX change | Download becomes a button with the same look; "copy link address" / middle-click no longer give a URL | none | none |
+
+**Recommend A.** It makes rule 2 literally true (the URL exists only behind
+the click) and enforces rule 3 in one Convex helper, at no cost. The URL
+that remains after the click went to the file's owner or to staff, who could
+share the file itself anyway. B buys "URL never leaves the server", which
+protects nothing we're worried about, and pays for it with host bandwidth on
+every print file. If JCC wants B later, it reuses A's `canAccessOriginal`.
+
+### `canAccessOriginal` (the one gate)
+
+`canAccessOriginal(ctx, designId, user)` in `convex/_designAssets.ts`
+returns `user.isAdmin || design.ownerId === user._id`. Every path that hands
+out an original URL calls it, and only it. Register 0007 (co-owners) widens
+this one function; no query changes.
+
+### Gaps → issues
+
+| id | title | blocked by | size |
+|---|---|---|---|
+| IMG-04 | On-screen pictures only ever come from the stored preview (closes G1, G2) | none | M (~10 files, ~$3) |
+| IMG-05 | The original's URL leaves Convex only when an owner or admin clicks Download (closes G3, G4; option A) | IMG-04 (same files) | M (~12 files, ~$3.5) |
