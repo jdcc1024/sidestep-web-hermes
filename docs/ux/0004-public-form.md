@@ -361,6 +361,111 @@ is JCC's or the captain's deliberate pick, and every other surface follows the
 same rule. If JCC wants players to always see *some* picture, that's a
 one-line resolver variant for the architect, not a layout change.
 
+### 4.6 Tap to enlarge on desktop (t_bdd0f204, 2026-10-18)
+
+JCC, #office-hours 2026-10-10: "Let's have the bigger preview take advantage
+of the screen size." Measured on main `8050c38` (after R3-02, IMG, U-01..03).
+
+**The rule.** From `sm` (640px) up, the enlarged picture is as big as the
+screen allows: **at most 90vw wide and 90vh tall, aspect kept, never
+cropped.** The white frame hugs the picture and sits centred. No fixed rem/px
+cap. Below 640px nothing changes (t_4eacc2e8: 343px wide at 375, 80vh cap).
+
+| | Phone (< 640) | Desktop (≥ 640) today | Desktop (≥ 640) new |
+|---|---|---|---|
+| Frame width | `calc(100% - 1rem)` | hugs picture, but **≤ 50vw** (bug) | hugs picture, ≤ 90vw |
+| Picture height cap | 80vh | 80vh | **90vh** |
+| Fit | `w-full object-contain` | `w-auto object-contain` | `w-auto object-contain` |
+
+**Why it's stuck at 640 today.** The dialog is `fixed left-1/2
+-translate-x-1/2` (shadcn base). A `w-fit` box whose left edge is pinned at
+50% can only shrink-to-fit into the space to its right, which is half the
+screen. So `sm:max-w-[min(90vw,64rem)]` never gets a say:
+
+```
+ today                          new
+ |<------ 1280 ------->|        |<------ 1280 ------->|
+ |         |<- 640 ->  |        | |<----- 1152 ---->| |
+ |      left:50%       |        |  left:0 right:0     |
+ |  then -50% shift    |        |  margin auto        |
+ |   [  frame  ]       |        |[      frame       ] |
+```
+
+Suggested classes for ss-dev (dev may pick another way; the measurements
+below are the contract): on `DialogContent` add
+`sm:inset-x-0 sm:mx-auto sm:translate-x-0 sm:max-w-[90vw]` (replaces
+`sm:max-w-[min(90vw,64rem)]`; `sm:w-fit sm:p-3` stay); on the image add
+`sm:max-h-[90vh]`. Phone classes untouched.
+
+**Why 90vh and not just wider.** Most jersey mockups are portrait (the dev
+"Never OK" back view is ~0.85:1). Height is what limits them, so only widening
+the frame would leave the real pictures exactly as they are. 90vh still
+leaves 28px above and below the frame at 1280×800.
+
+**Why no 64rem cap.** It would stop a landscape picture at ~1000px on a
+1920 screen, which is the opposite of "use the screen". The stored web
+preview is 2048px wide (`convex/imagePreviews.ts:39`), so the picture only
+gets stretched on screens wider than ~2275px. Fine for a preview.
+
+**Measured** (mock = the new rule injected as CSS into the live page;
+`~/sidestep/logs/shots/lightbox-desktop/measurements.txt`, script
+`measure.mjs` beside it). Picture size in CSS px:
+
+| Viewport | Picture | Today | New |
+|---|---|---|---|
+| 375×812 | any | 343 wide | 343 wide (same) |
+| 768×1024 | landscape 16:9 | 360×203 | 667×375 |
+| 1280×800 | landscape 16:9 | 616×347 | **1128×635** |
+| 1280×800 | real jersey (portrait) | 542×640 | 610×720 |
+| 1280×800 | square | 616×616 | 720×720 |
+| 1280×800 | tall 1:3.6 | 178×640 | 200×720 |
+| 1366×657 | real jersey | 445×526 | 501×591 |
+| 1920×1080 | landscape 16:9 | 936×527 | **1704×959** |
+| 1920×1080 | real jersey | 732×864 | 823×972 |
+
+No horizontal scroll and the frame stayed fully on screen in every case.
+
+**Image weight: no change to `lib/images.ts`.** The `lightbox` preset already
+says `(min-width: 640px) 90vw`, so the browser was already fetching for the
+big box. Real requests: 375 → `w=640`, 1280@1x → `w=1200`, 1280@2x → `w=2048`,
+1920 → `w=1920`. Nobody gets an upscaled 640w file.
+
+**Close button (needs JCC, see handoff).** The ✕ is a ghost button over the
+picture's top-right corner. On a dark kit it disappears, at every size
+(`lightbox-closex-1280-ghost.png`). Bigger pictures make that corner more
+often a dark one. A light round backing fixes it (`lightbox-closex-1280-pill.png`):
+`bg-background/85 rounded-full shadow-sm` on the close button, set from
+`ImageLightbox` with `[&_[data-slot=dialog-close]]:…` so other dialogs don't
+change. It doesn't move anything, so 375 measurements stay identical.
+Esc and clicking outside already close it.
+
+Rejected: a borderless, full-bleed viewer (picture on the dark overlay, no
+white frame). It gains ~24px, adds a new pattern for one surface, and on a
+white-background mockup the picture edge vanishes into nothing. The frame
+we have is fine once it's allowed to grow.
+
+Screens (`docs/ux/0004-public-form/`): `lightbox-now-1280-real.png` vs
+`lightbox-proposed-1280-real.png`, `lightbox-now-1280-landscape.png` vs
+`lightbox-proposed-1280-landscape.png`, the same pair at 1920,
+`lightbox-proposed-1280-tall.png`, `lightbox-proposed-375-real.png`.
+
+**Done when (desktop lightbox)**, measured with the picture's bounding box:
+
+1. 1280×800, 16:9 landscape picture: picture is wider than 1100px (expect
+   1128 ± 2), whole frame inside the viewport, no scrollbars.
+2. 1280×800, portrait picture: picture height is 90vh (720 ± 2), ratio kept
+   within 1%.
+3. 1920×1080, 16:9 landscape: picture 1704 ± 2 wide; frame inside the viewport.
+4. 1:3.6 tall picture at 1280×800: 720 ± 2 tall, not stretched (ratio kept).
+5. Frame is centred: left and right gaps differ by ≤ 1px at 768, 1280, 1920.
+6. 375×812: frame 359 wide, picture 343 wide, tall picture capped at 80vh,
+   exactly as after t_4eacc2e8.
+7. 1280×800 @1x: the lightbox `<img>` loads a `/_next/image` URL with `w` ≥ 1080.
+8. Esc closes the lightbox and focus goes back to the picture button (no
+   regression).
+9. If JCC says yes to the close backing: the ✕ has a visible light backing
+   over a dark picture, in light and dark theme.
+
 ## 5. Copy
 
 Only these strings change (humanizer pass done; plain, shop-counter voice):
@@ -462,6 +567,10 @@ picture: reuse `assetSummariesByDesign` (`convex/_designAssets.ts:107`), as
 - **Fallback = no picture block**, not a grey placeholder at the top.
 - **Picture rule = the app's existing `resolveMainAsset`**, with no special case
   for the public form.
+- **Desktop lightbox (§4.6, 2026-10-18): ≤ 90vw × 90vh, aspect kept, frame
+  hugs and centres, no rem cap; phone unchanged.** Rejected: keeping the
+  `64rem` cap (stops at ~1000px on a 1920 screen) and a borderless viewer
+  (new pattern, little gain).
 
 ## 10. Open questions (`needs_decision`, for the mini gate)
 
