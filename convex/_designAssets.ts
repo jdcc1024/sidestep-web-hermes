@@ -69,9 +69,9 @@ export async function canAccessOriginal(
   designId: Id<"designs">,
   user: Doc<"users">,
 ): Promise<boolean> {
-  if (user.isAdmin) return true;
   const design = await ctx.db.get(designId);
-  return design !== null && design.ownerId === user._id;
+  if (!design) return false;
+  return user.isAdmin || design.ownerId === user._id;
 }
 
 // The preview's URL and type, or nulls while there's no preview (not made

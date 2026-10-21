@@ -89,6 +89,15 @@ describe("canAccessOriginal", () => {
     });
     expect(allowed).toBe(false);
   });
+
+  it("should refuse an admin when the design no longer exists", async () => {
+    const s = await seed();
+    const allowed = await s.t.run(async (ctx) => {
+      await ctx.db.delete(s.designId);
+      return canAccessOriginal(ctx, s.designId, (await ctx.db.get(s.staffId))!);
+    });
+    expect(allowed).toBe(false);
+  });
 });
 
 describe("when an original's bytes are gone", () => {
