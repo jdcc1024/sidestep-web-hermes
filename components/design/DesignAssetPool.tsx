@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { StoredImage } from "@/components/image/StoredImage";
 import { cn } from "@/lib/utils";
 import type { BlockAsset } from "./DesignBlocks";
+import { DownloadOriginal } from "./DownloadOriginal";
 
 // The design's file pool (D-05): every uploaded file, with the three things
 // you can do to one — add more, pick the main image, delete. It lives under
@@ -171,15 +172,13 @@ export function DesignAssetPool({
                 </div>
 
                 <div className="mt-auto flex flex-wrap items-center gap-1">
-                  {asset.url ? (
-                    <a
-                      href={asset.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
+                  {asset.hasFile ? (
+                    <DownloadOriginal
+                      assetId={asset._id}
                       className="text-xs font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"
                     >
                       Download
-                    </a>
+                    </DownloadOriginal>
                   ) : (
                     <span className="text-xs text-muted-foreground">
                       Unavailable

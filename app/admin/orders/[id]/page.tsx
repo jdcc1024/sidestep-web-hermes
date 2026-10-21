@@ -8,6 +8,7 @@ import { ArrowLeft, FileDown, Lock } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { ExportOrderButton } from "@/components/admin/ExportOrderButton";
+import { DownloadOriginal } from "@/components/design/DownloadOriginal";
 import { InlineEditField } from "@/components/InlineEditField";
 import { OrderStageChecklist } from "@/components/admin/OrderStageChecklist";
 import { OrderList } from "@/components/orderList/OrderList";
@@ -205,17 +206,15 @@ export default function AdminOrderDetailPage({
                   {design.assets.length > 0 && (
                     <ul className="mt-3 flex flex-wrap gap-2">
                       {design.assets.map((asset) =>
-                        asset.url ? (
+                        asset.hasFile ? (
                           <li key={asset._id}>
+                            {/* A button that asks for the original on click
+                                (IMG-05); `[a]:hover` in the variant no longer
+                                matches, so the hover is restated. */}
                             <Badge
                               variant="secondary"
-                              render={
-                                <a
-                                  href={asset.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                />
-                              }
+                              className="hover:bg-secondary/80"
+                              render={<DownloadOriginal assetId={asset._id} />}
                             >
                               <FileDown aria-hidden />
                               {asset.filename}

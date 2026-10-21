@@ -53,17 +53,22 @@ export function isWebSafeImage(value: string | null | undefined): boolean {
 // The picture that stands in for a design on a summary surface, with its URL
 // already resolved by the query. Lives here rather than beside a component
 // because both the Convex reads and the pure derivations that carry it
-// through need the shape without importing UI. A null
-// `url` means the file itself has gone from storage; callers hold
-// `DesignMainImage | null` for "this design has no image at all". `url` is the
-// original (downloads only); `displayUrl` is what an <img> loads: the stored
-// web preview (IMG-03), or null while there is none, and never the original
-// (IMG-04). `displayContentType` is the preview's type (always WebP), null
-// with no preview; `contentType` stays the asset's own for labels and "is
-// this an image?". Optional so a shape built without them (a fixture) still
-// typechecks; it then draws the placeholder.
+// through need the shape without importing UI. `hasFile: false` means the
+// original has gone from storage; callers hold `DesignMainImage | null` for
+// "this design has no image at all". The original's URL is never here: it
+// leaves Convex only on Download, through `designs.originalUrl` (IMG-05).
+// `displayUrl` is what an <img> loads: the stored web preview (IMG-03), or
+// null while there is none, and never the original (IMG-04).
+// `displayContentType` is the preview's type (always WebP), null with no
+// preview; `contentType` stays the asset's own for labels and "is this an
+// image?". Every field but the name and type is optional so a shape built
+// without them (a frozen render-test fixture) still typechecks; it then draws
+// the placeholder. The Convex reads always set `hasFile` (DesignAssetSummary).
 export type DesignMainImage = {
-  url: string | null;
+  hasFile?: boolean;
+  /** @deprecated No read returns the original's URL since IMG-05; only the
+   * frozen render-test fixtures still set it, and nothing renders it. */
+  url?: string | null;
   displayUrl?: string | null;
   displayContentType?: string | null;
   filename: string;
@@ -71,8 +76,10 @@ export type DesignMainImage = {
 };
 
 // The URL an on-screen picture loads: the stored preview's, or null (the
-// surface draws its placeholder). Never the original: download and "open"
-// links use `url` directly (IMG-04).
+// surface draws its placeholder). Never the original (IMG-04): that is only
+// fetched on Download, through `designs.originalUrl` (IMG-05). `url` is
+// accepted and ignored so IMG-04's "an original alone draws nothing" test
+// can still say so; no read returns one any more.
 export function pictureUrl(asset: {
   url?: string | null;
   displayUrl?: string | null;

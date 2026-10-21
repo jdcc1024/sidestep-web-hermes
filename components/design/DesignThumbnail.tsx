@@ -106,8 +106,7 @@ export function DesignThumbnail({
 }
 
 // The two shapes carry the preview differently. The captain's summary has a
-// filename, the original in `url` (downloads only) and the preview in
-// `displayUrl`. The public form's shape has no filename, and its `url` and
+// filename and the preview in `displayUrl` (never the original, IMG-05). The public form's shape has no filename, and its `url` and
 // `contentType` already are the preview's (IMG-04): reading it through
 // `displayImageOf` would find no `displayUrl` and blank the public form.
 function shownImageOf(

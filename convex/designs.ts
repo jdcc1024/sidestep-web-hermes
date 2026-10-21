@@ -8,6 +8,7 @@ import {
 } from "../lib/design/rules";
 import {
   assetSummariesByDesign,
+  canAccessOriginal,
   countDesignAssets,
   deleteDesignAsset,
   insertDesignAssets,
@@ -145,9 +146,10 @@ export const listMyDesigns = query({
   },
 });
 
-// Fetches one design with its assets already resolved (metadata + a
-// short-lived storage URL each) so the detail page can render thumbnails and
-// download links without a round-trip per file. `mainAsset` is the resolved
+// Fetches one design with its assets already resolved (metadata, whether the
+// file is still there, and the preview's URL) so the detail page can render
+// thumbnails without a round-trip per file. The originals' URLs are not here:
+// Download fetches one through `originalUrl` on click (IMG-05). `mainAsset` is the resolved
 // representative image — the same answer the order page will show (D-07).
 // Returns null for an unauthenticated caller or a not-found id; throws on
 // access violation so the UI can surface "you don't have access" instead
@@ -175,6 +177,24 @@ export const getMyDesign = query({
       // the client running the very predicate the mutation will re-run.
       viewer: { userId: user._id, isAdmin: user.isAdmin },
     };
+  },
+});
+
+// The only way out for an original print file (IMG-05). Download asks for it
+// on click; no read ships it, because a Convex storage URL is an unexpiring
+// bearer URL. Takes the asset id and nothing else, so the caller can't name a
+// storage id or a user. Null when the asset row is gone, or when its bytes
+// are (getUrl answers null).
+export const originalUrl = query({
+  args: { assetId: v.id("designAssets") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, { assetId }) => {
+    const user = await requireCurrentUser(ctx);
+    const asset = await ctx.db.get(assetId);
+    if (!asset) return null;
+    if (!(await canAccessOriginal(ctx, asset.designId, user)))
+      throw new ConvexError("You don't have access to this file.");
+    return await ctx.storage.getUrl(asset.storageId);
   },
 });
 

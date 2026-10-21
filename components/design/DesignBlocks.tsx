@@ -1,5 +1,6 @@
 import { FileDown } from "lucide-react";
 
+import type { Id } from "@/convex/_generated/dataModel";
 import { displayImageOf } from "@/lib/designAsset";
 import {
   SWATCH_ROLE_LABELS,
@@ -10,6 +11,7 @@ import {
   type TextBlock,
 } from "@/lib/designBlock";
 import { StoredImage } from "@/components/image/StoredImage";
+import { DownloadOriginal } from "./DownloadOriginal";
 import { ImageLightbox } from "./ImageLightbox";
 
 // Read-only rendering of a design's structured brief (D-02), shared by the
@@ -28,9 +30,15 @@ export type BlockAsset = {
   _id: string;
   filename: string;
   contentType: string;
-  url: string | null;
+  // Whether the original is still in storage. Its URL is never here: Download
+  // fetches it on click (IMG-05). Optional only for the frozen render-test
+  // fixtures; every read sets it, and a shape without it shows "Unavailable".
+  hasFile?: boolean;
+  /** @deprecated No read returns the original's URL since IMG-05; only the
+   * frozen render-test fixtures still set it, and nothing renders it. */
+  url?: string | null;
   // The stored preview (IMG-03) and its type (WebP); pictures load only it,
-  // never `url`, which downloads keep (IMG-04).
+  // never the original (IMG-04).
   displayUrl?: string | null;
   displayContentType?: string | null;
 };
@@ -171,15 +179,14 @@ function GalleryItem({ asset }: { asset: BlockAsset }) {
           {fileTypeLabel(asset)}
         </p>
       </div>
-      {asset.url ? (
-        <a
-          href={asset.url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"
+      {asset.hasFile ? (
+        <DownloadOriginal
+          // Structural `_id: string` (see BlockAsset); real assets are rows.
+          assetId={asset._id as Id<"designAssets">}
+          className="text-left text-sm font-medium text-teal-700 hover:text-teal-800 dark:text-teal-300 dark:hover:text-teal-200"
         >
           Download
-        </a>
+        </DownloadOriginal>
       ) : (
         <span className="text-sm text-muted-foreground">Unavailable</span>
       )}

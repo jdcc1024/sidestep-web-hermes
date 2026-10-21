@@ -37,15 +37,42 @@ export type UploadedFile = {
   contentType: string;
 };
 
-// `url` is the original (downloads only); `displayUrl` is what every on-screen
-// picture loads: the stored preview (IMG-03), or null while there is none,
-// never the original (IMG-04). `displayContentType` is the preview's type
-// when there's a `displayUrl`, else null; `contentType` stays the asset's.
-export type ResolvedAsset = Doc<"designAssets"> & {
-  url: string | null;
+// An asset row as a read hands it out: without the original's storage id,
+// because the id and the original's URL are both the file (IMG-05). The only
+// way to the original is `designs.originalUrl`, on Download. `hasFile` says
+// whether the original is still in storage (false → "Unavailable").
+// `displayUrl` is what every on-screen picture loads: the stored preview
+// (IMG-03), or null while there is none, never the original (IMG-04).
+// `displayContentType` is the preview's type when there's a `displayUrl`,
+// else null; `contentType` stays the asset's.
+export type ResolvedAsset = Omit<Doc<"designAssets">, "storageId"> & {
+  hasFile: boolean;
   displayUrl: string | null;
   displayContentType: string | null;
 };
+
+// Whether the original's bytes are still in storage. Reads the metadata row,
+// never a URL, so asking doesn't hand the file out.
+async function hasOriginal(
+  ctx: QueryCtx | MutationCtx,
+  storageId: Id<"_storage">,
+): Promise<boolean> {
+  return (await ctx.db.system.get("_storage", storageId)) !== null;
+}
+
+// The single gate for originals (IMG-05): the design's owner or an admin.
+// Every path that hands out an original's URL asks this and nothing else, so
+// widening who may download (co-owners, register 0007) is a one-function
+// change. False for a design that no longer exists.
+export async function canAccessOriginal(
+  ctx: QueryCtx | MutationCtx,
+  designId: Id<"designs">,
+  user: Doc<"users">,
+): Promise<boolean> {
+  if (user.isAdmin) return true;
+  const design = await ctx.db.get(designId);
+  return design !== null && design.ownerId === user._id;
+}
 
 // The preview's URL and type, or nulls while there's no preview (not made
 // yet, not previewable, the action failed, or its blob is gone). Never looks
@@ -76,9 +103,10 @@ export async function listDesignAssets(
   return assets.sort((a, b) => a.createdAt - b.createdAt);
 }
 
-// Storage URLs are short-lived signed URLs, so they're generated per query.
-// A null url means the underlying file is gone — callers render "Unavailable"
-// rather than a broken link.
+// Every asset of a design as the pages read it: metadata, whether the
+// original is still there, and the preview's URL. `hasFile: false` means the
+// original is gone, so callers render "Unavailable" rather than a Download
+// that can only fail.
 export async function resolveDesignAssets(
   ctx: QueryCtx | MutationCtx,
   designId: Id<"designs">,
@@ -86,8 +114,13 @@ export async function resolveDesignAssets(
   const assets = await listDesignAssets(ctx, designId);
   return Promise.all(
     assets.map(async (asset) => {
-      const url = await ctx.storage.getUrl(asset.storageId);
-      return { ...asset, url, ...(await displayOf(ctx, asset)) };
+      // Destructured out so the original's id can't ride along in the payload.
+      const { storageId, ...rest } = asset;
+      return {
+        ...rest,
+        hasFile: await hasOriginal(ctx, storageId),
+        ...(await displayOf(ctx, asset)),
+      };
     }),
   );
 }
@@ -126,13 +159,20 @@ export async function fileCountsByDesign(
 // whether an <img> can show it.
 export type DesignAssetSummary = {
   fileCount: number;
-  mainImage: DesignMainImage | null;
+  mainImage: SummaryMainImage | null;
+};
+
+// The shared shape with the server's guarantees: `hasFile` always set, and
+// no `url` (the original never leaves through a summary, IMG-05).
+type SummaryMainImage = Omit<DesignMainImage, "hasFile" | "url"> & {
+  hasFile: boolean;
 };
 
 // Everything a summary surface needs about a design's files in one read: how
 // many there are, and the one image that represents them (D-07). Resolution
 // happens over metadata, so storage is asked for exactly one URL per design —
-// the order page shows a thumbnail, not the whole pool.
+// the order page shows a thumbnail, not the whole pool. The original's URL is
+// never one of them (IMG-05).
 export async function assetSummariesByDesign(
   ctx: QueryCtx | MutationCtx,
   designIds: readonly Id<"designs">[],
@@ -146,7 +186,7 @@ export async function assetSummariesByDesign(
       return {
         fileCount: assets.length,
         mainImage: {
-          url: await ctx.storage.getUrl(main.storageId),
+          hasFile: await hasOriginal(ctx, main.storageId),
           ...(await displayOf(ctx, main)),
           filename: main.filename,
           contentType: main.contentType,

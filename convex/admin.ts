@@ -81,9 +81,8 @@ export const getOrder = query({
       await Promise.all(order.designIds.map((id) => ctx.db.get(id)))
     ).filter((d): d is Doc<"designs"> => d !== null);
 
-    // Convex storage URLs are short-lived signed URLs — generated per query
-    // so the admin can click through to the raw file. null is returned for
-    // storage ids that no longer exist.
+    // No original's URL here: the file badges fetch it on click through
+    // `designs.originalUrl` (IMG-05); `hasFile` is false once it's gone.
     // `mainImage` is the thumbnail the order list shows per design, the same
     // picture the captain's order page uses (L-06: admin edits that list).
     const assetSummaries = await assetSummariesByDesign(

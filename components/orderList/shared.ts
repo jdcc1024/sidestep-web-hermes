@@ -39,7 +39,7 @@ export type OrderListDesign = {
   _id: Id<"designs">;
   title: string;
   mainImage: {
-    url: string | null;
+    hasFile: boolean;
     displayUrl?: string | null;
     displayContentType?: string | null;
     filename: string;
