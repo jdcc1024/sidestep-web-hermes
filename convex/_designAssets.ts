@@ -3,7 +3,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireCurrentUser } from "./_auth";
-import { canOptimize } from "../lib/images";
+import { PREVIEW_CONTENT_TYPE, canMakePreview } from "../lib/images";
 import {
   canDeleteDesignAsset,
   canUploadDesignAsset,
@@ -37,22 +37,30 @@ export type UploadedFile = {
   contentType: string;
 };
 
-// `url` is the original (downloads); `displayUrl` is what every on-screen
-// picture loads: the stored preview when there is one (IMG-03), else `url`.
+// `url` is the original (downloads only); `displayUrl` is what every on-screen
+// picture loads: the stored preview (IMG-03), or null while there is none,
+// never the original (IMG-04). `displayContentType` is the preview's type
+// when there's a `displayUrl`, else null; `contentType` stays the asset's.
 export type ResolvedAsset = Doc<"designAssets"> & {
   url: string | null;
   displayUrl: string | null;
+  displayContentType: string | null;
 };
 
-// The preview's URL, or the original's while there's no preview (not made
-// yet, not a resizable type, or its blob is gone).
-async function displayUrlOf(
+// The preview's URL and type, or nulls while there's no preview (not made
+// yet, not previewable, the action failed, or its blob is gone). Never looks
+// at the original: the surface draws its placeholder instead.
+async function displayOf(
   ctx: QueryCtx | MutationCtx,
   asset: Doc<"designAssets">,
-  url: string | null,
-): Promise<string | null> {
-  if (!asset.previewStorageId) return url;
-  return (await ctx.storage.getUrl(asset.previewStorageId)) ?? url;
+): Promise<{ displayUrl: string | null; displayContentType: string | null }> {
+  const displayUrl = asset.previewStorageId
+    ? await ctx.storage.getUrl(asset.previewStorageId)
+    : null;
+  return {
+    displayUrl,
+    displayContentType: displayUrl ? PREVIEW_CONTENT_TYPE : null,
+  };
 }
 
 // Assets in upload order. `createdAt` is the ordering key rather than
@@ -79,7 +87,7 @@ export async function resolveDesignAssets(
   return Promise.all(
     assets.map(async (asset) => {
       const url = await ctx.storage.getUrl(asset.storageId);
-      return { ...asset, url, displayUrl: await displayUrlOf(ctx, asset, url) };
+      return { ...asset, url, ...(await displayOf(ctx, asset)) };
     }),
   );
 }
@@ -135,12 +143,11 @@ export async function assetSummariesByDesign(
       const assets = await listDesignAssets(ctx, designId);
       const main = resolveMainAsset(assets);
       if (!main) return { fileCount: assets.length, mainImage: null };
-      const url = await ctx.storage.getUrl(main.storageId);
       return {
         fileCount: assets.length,
         mainImage: {
-          url,
-          displayUrl: await displayUrlOf(ctx, main, url),
+          url: await ctx.storage.getUrl(main.storageId),
+          ...(await displayOf(ctx, main)),
           filename: main.filename,
           contentType: main.contentType,
         },
@@ -153,10 +160,11 @@ export async function assetSummariesByDesign(
 // The public order form's picture per design (0004). Same "which picture"
 // answer as `assetSummariesByDesign`, but narrower: a URL is built only for
 // a web-safe main, never for any other file, and `toPublicImage` drops it
-// when it's over the size cap. No filename or file count leaves here. With a
-// stored preview (IMG-03) the preview is the only file it builds a URL for, so
-// the public form never carries the original's URL; `contentType` stays the
-// asset's (both are types the optimizer resizes).
+// when it's over the size cap. No filename or file count leaves here. The
+// stored preview is the only file it ever builds a URL for (IMG-04): with no
+// preview (not made yet, failed, or its blob is gone) the form shows its
+// placeholder, and the original never reaches this unauthenticated query. The
+// whole object describes the preview: its URL, its size, its type (WebP).
 export async function publicMainImagesByDesign(
   ctx: QueryCtx | MutationCtx,
   designIds: readonly Id<"designs">[],
@@ -165,15 +173,15 @@ export async function publicMainImagesByDesign(
   const images = await Promise.all(
     unique.map(async (designId): Promise<PublicDesignImage | null> => {
       const main = resolveMainAsset(await listDesignAssets(ctx, designId));
-      if (!main || !isWebSafeImage(main.contentType)) return null;
-      const preview = main.previewStorageId
-        ? await ctx.db.system.get("_storage", main.previewStorageId)
-        : null;
-      const shownId = preview ? preview._id : main.storageId;
-      const file = preview ?? (await ctx.db.system.get("_storage", shownId));
-      if (!file) return null;
-      const url = await ctx.storage.getUrl(shownId);
-      return toPublicImage(main, file.size, url);
+      if (!main?.previewStorageId || !isWebSafeImage(main.contentType))
+        return null;
+      const preview = await ctx.db.system.get("_storage", main.previewStorageId);
+      if (!preview) return null;
+      return toPublicImage(
+        { contentType: PREVIEW_CONTENT_TYPE },
+        preview.size,
+        await ctx.storage.getUrl(preview._id),
+      );
     }),
   );
   return new Map(unique.map((designId, i) => [designId, images[i]!]));
@@ -182,8 +190,9 @@ export async function publicMainImagesByDesign(
 // Records uploads against a design. Filename and content type are normalized
 // here (blank names and parameterized mime strings both arrive from real
 // browsers), and the uploader's admin status is snapshotted so the delete
-// rules stay stable if their role changes later. Each resizable picture gets
-// its stored web preview made right after this commits (IMG-03).
+// rules stay stable if their role changes later. Each previewable picture
+// (GIF and SVG included, IMG-04) gets its stored web preview made right after
+// this commits (IMG-03).
 export async function insertDesignAssets(
   ctx: MutationCtx,
   designId: Id<"designs">,
@@ -205,7 +214,7 @@ export async function insertDesignAssets(
       // createdAt sort — Date.now() is the same for every row in a batch.
       createdAt: now + index,
     });
-    if (canOptimize(contentType))
+    if (canMakePreview(contentType))
       await ctx.scheduler.runAfter(0, internal.imagePreviews.generate, {
         assetId,
       });

@@ -1,6 +1,6 @@
 import { FileDown } from "lucide-react";
 
-import { isWebSafeImage, pictureUrl } from "@/lib/designAsset";
+import { displayImageOf } from "@/lib/designAsset";
 import {
   SWATCH_ROLE_LABELS,
   blockHeading,
@@ -29,8 +29,10 @@ export type BlockAsset = {
   filename: string;
   contentType: string;
   url: string | null;
-  // The stored preview (IMG-03); pictures load it, downloads keep `url`.
+  // The stored preview (IMG-03) and its type (WebP); pictures load only it,
+  // never `url`, which downloads keep (IMG-04).
   displayUrl?: string | null;
+  displayContentType?: string | null;
 };
 
 export function DesignBlocks({
@@ -126,25 +128,25 @@ function GalleryBody({
 
 function GalleryItem({ asset }: { asset: BlockAsset }) {
   // Inline vs card keys off content type, never the filename or a tag: a
-  // "mockup" may well be a PSD (PRD §6). A null URL means the underlying
-  // file is gone, so even an image degrades to the card.
-  const src = pictureUrl(asset);
-  if (src && isWebSafeImage(asset.contentType)) {
+  // "mockup" may well be a PSD (PRD §6). No preview yet (IMG-04: never the
+  // original instead) or a preview gone from storage degrades to the card.
+  const image = displayImageOf(asset);
+  if (image) {
     return (
       <figure className="overflow-hidden rounded-lg border border-border bg-card">
         {/* The tile is a square crop, so the picture is never fully visible
             here — clicking opens it uncropped (D-11). Only the image is the
             trigger; the caption stays selectable text. */}
         <ImageLightbox
-          src={src}
+          src={image.url}
           alt={asset.filename}
           triggerLabel={`View ${asset.filename} full size`}
           triggerClassName="block w-full"
-          contentType={asset.contentType}
+          contentType={image.contentType}
           preset="lightbox"
         >
           <StoredImage
-            image={{ url: src, contentType: asset.contentType }}
+            image={image}
             alt={asset.filename}
             preset="poolTile"
             className="aspect-square w-full object-cover"

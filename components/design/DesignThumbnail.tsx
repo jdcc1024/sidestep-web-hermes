@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { ImageIcon } from "lucide-react";
 import {
+  displayImageOf,
   isWebSafeImage,
-  pictureUrl,
   type DesignMainImage,
   type PublicDesignImage,
 } from "@/lib/designAsset";
@@ -20,8 +20,9 @@ import { ImageLightbox } from "./ImageLightbox";
 //
 // Three things stop an image rendering, and all of them land on the same
 // placeholder: the design has no files, the main file isn't something a
-// browser draws (a print template can be the owner's explicit pick), or its
-// storage URL went missing between the query and the render.
+// browser draws (a print template can be the owner's explicit pick), or it
+// has no stored preview yet (IMG-04: never the original instead) or the
+// preview's URL went missing between the query and the render.
 export function DesignThumbnail({
   title,
   mainImage,
@@ -33,8 +34,8 @@ export function DesignThumbnail({
   preset = "original",
 }: {
   title: string;
-  // Only the url and content type are read, so both the captain's summary
-  // (which carries a filename) and the public form (which doesn't) fit.
+  // The captain's summary (which carries a filename) or the public form's
+  // picture (which doesn't); `shownImageOf` reads the preview from either.
   mainImage: DesignMainImage | PublicDesignImage | null;
   // Sizing lives with the caller: a card wants a wide cover band, the order
   // page a small square beside the title.
@@ -55,12 +56,9 @@ export function DesignThumbnail({
   preset?: ImagePreset;
 }) {
   const [failed, setFailed] = useState(false);
-  // The stored preview when the captain's summary has one (IMG-03); the
-  // public form's `url` already is the preview.
-  const shown = mainImage ? pictureUrl(mainImage) : null;
-  const src =
-    !failed && shown && isWebSafeImage(mainImage!.contentType) ? shown : null;
-  const contentType = mainImage?.contentType ?? "";
+  const shown = mainImage ? shownImageOf(mainImage) : null;
+  const src = !failed && shown ? shown.url : null;
+  const contentType = shown?.contentType ?? "";
 
   const boxClassName = cn(
     "overflow-hidden rounded-md border border-border bg-muted/50",
@@ -105,4 +103,18 @@ export function DesignThumbnail({
       {picture}
     </ImageLightbox>
   );
+}
+
+// The two shapes carry the preview differently. The captain's summary has a
+// filename, the original in `url` (downloads only) and the preview in
+// `displayUrl`. The public form's shape has no filename, and its `url` and
+// `contentType` already are the preview's (IMG-04): reading it through
+// `displayImageOf` would find no `displayUrl` and blank the public form.
+function shownImageOf(
+  mainImage: DesignMainImage | PublicDesignImage,
+): { url: string; contentType: string } | null {
+  if ("filename" in mainImage) return displayImageOf(mainImage);
+  return isWebSafeImage(mainImage.contentType)
+    ? { url: mainImage.url, contentType: mainImage.contentType }
+    : null;
 }

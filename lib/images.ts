@@ -47,6 +47,23 @@ export function canOptimize(contentType: string | null | undefined): boolean {
   return OPTIMIZABLE_TYPES.has(bareType(contentType));
 }
 
+// Types `imagePreviews.generate` turns into a stored WebP preview (IMG-04).
+// Wider than `canOptimize`: sharp in the Convex action reads a GIF's first
+// frame and rasterises an SVG, which the Next optimizer won't do. Every
+// on-screen picture is that preview, never the original.
+const PREVIEWABLE_TYPES = new Set([
+  ...OPTIMIZABLE_TYPES,
+  "image/gif",
+  "image/svg+xml",
+]);
+
+export function canMakePreview(contentType: string | null | undefined): boolean {
+  return PREVIEWABLE_TYPES.has(bareType(contentType));
+}
+
+/** What every stored preview is, whatever the original was. */
+export const PREVIEW_CONTENT_TYPE = "image/webp";
+
 export function shouldOptimize(
   contentType: string | null | undefined,
   preset: ImagePreset,

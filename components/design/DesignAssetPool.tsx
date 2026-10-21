@@ -10,8 +10,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import type { UploadedFile } from "@/convex/_designAssets";
 import {
   canDeleteDesignAsset,
+  displayImageOf,
   isWebSafeImage,
-  pictureUrl,
   resolveMainAsset,
   type AssetViewer,
 } from "@/lib/designAsset";
@@ -243,14 +243,15 @@ function AssetPreview({
   asset: PoolAsset;
   isMain: boolean;
 }) {
-  const src = pictureUrl(asset);
-  const renderable = src && isWebSafeImage(asset.contentType);
+  // The stored preview, or the typed card until it exists (IMG-04); the query
+  // is reactive, so the tile swaps itself once `setPreview` lands.
+  const image = displayImageOf(asset);
 
   return (
     <div className="relative">
-      {renderable ? (
+      {image ? (
         <StoredImage
-          image={{ url: src, contentType: asset.contentType }}
+          image={image}
           alt={asset.filename}
           preset="poolTile"
           className="aspect-square w-full object-cover"

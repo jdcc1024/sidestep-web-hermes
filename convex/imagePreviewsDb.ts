@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { canOptimize } from "../lib/images";
+import { canMakePreview } from "../lib/images";
 
 // The database half of the stored web preview (IMG-03). The actions in
 // convex/imagePreviews.ts run in Node for sharp, and a Node file can't define
@@ -22,7 +22,7 @@ export const assetForPreview = internalQuery({
   },
 });
 
-// One page of the backfill: ids of resizable assets that have no preview yet.
+// One page of the backfill: ids of previewable assets that have no preview yet.
 // There's no index on a missing field, so this scans the table a page at a
 // time and filters; the backfill runs once per deployment.
 export const assetsNeedingPreview = internalQuery({
@@ -34,7 +34,7 @@ export const assetsNeedingPreview = internalQuery({
         .filter(
           (asset) =>
             asset.previewStorageId === undefined &&
-            canOptimize(asset.contentType),
+            canMakePreview(asset.contentType),
         )
         .map((asset) => asset._id),
       isDone: result.isDone,
