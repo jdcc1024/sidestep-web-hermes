@@ -382,6 +382,19 @@ returns `user.isAdmin || design.ownerId === user._id`. Every path that hands
 out an original URL calls it, and only it. Register 0007 (co-owners) widens
 this one function; no query changes.
 
+**As built in IMG-04, where it differs from the plan above:**
+- The public form's picture (`PublicDesignImage`, still exactly `{ url,
+  contentType }`) describes the preview as a whole: its `contentType` is
+  `image/webp`, not the asset's. `toPublicImage` itself is unchanged;
+  `publicMainImagesByDesign` hands it the preview (WebP, the preview's size,
+  the preview's URL), so the 2 MB GIF/SVG cap no longer applies to anything
+  served.
+- Captain/admin shapes carry `displayContentType` (`image/webp` with a
+  preview, else null) beside `displayUrl`; `contentType` stays the asset's.
+- SVG is rasterised at `density = 72 × 2048 / long side`, clamped to 1–2400
+  (72 when the SVG states no size), so a tiny viewBox can't ask for a huge
+  raster.
+
 ### Gaps → issues
 
 | id | title | blocked by | size |
