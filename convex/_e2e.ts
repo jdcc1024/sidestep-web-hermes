@@ -332,12 +332,50 @@ export const insertAsset = internalMutation({
     const design = await ctx.db.get(args.designId);
     if (!design || !design.title.startsWith(PREFIX))
       throw new ConvexError("Not an E2E design.");
-    await ctx.db.insert("designAssets", {
+    return await ctx.db.insert("designAssets", {
       ...args,
       uploadedByUserId: design.ownerId,
       uploadedByAdmin: false,
       createdAt: Date.now(),
     });
+  },
+});
+
+// Test-only (IMG-04): whether an asset sits on an E2E design, and whether it
+// has its stored preview yet. Lets `makePreview` refuse a real asset.
+export const e2eAssetState = internalQuery({
+  args: { assetId: v.id("designAssets") },
+  handler: async (ctx, { assetId }) => {
+    const asset = await ctx.db.get(assetId);
+    if (!asset) return null;
+    const design = await ctx.db.get(asset.designId);
+    return {
+      isE2e: Boolean(design?.title.startsWith(PREFIX)),
+      hasPreview: asset.previewStorageId !== undefined,
+    };
+  },
+});
+
+// Test-only (IMG-04): makes an E2E asset's stored preview now, the way an
+// upload does (`imagePreviews.generate`), and waits for it. `insertAsset`
+// makes none on its own, so a test that needs "a main with no preview yet"
+// still gets one; tests that expect a picture call this. Throws when no
+// preview was made, so a fixture can't silently fall to the placeholder.
+export const makePreview = internalAction({
+  args: { assetId: v.id("designAssets") },
+  handler: async (ctx, { assetId }): Promise<{ ok: true }> => {
+    type State = { isE2e: boolean; hasPreview: boolean } | null;
+    const before: State = await ctx.runQuery(internal._e2e.e2eAssetState, {
+      assetId,
+    });
+    if (!before?.isE2e) throw new ConvexError("Not an E2E asset.");
+    await ctx.runAction(internal.imagePreviews.generate, { assetId });
+    const after: State = await ctx.runQuery(internal._e2e.e2eAssetState, {
+      assetId,
+    });
+    if (!after?.hasPreview)
+      throw new ConvexError(`No preview was made for ${assetId}.`);
+    return { ok: true };
   },
 });
 
@@ -365,11 +403,10 @@ export const attachFile = internalAction({
     const storageId = await ctx.storage.store(
       new Blob([bytes], { type: contentType }),
     );
-    await ctx.runMutation(internal._e2e.insertAsset, {
-      ...rest,
-      contentType,
-      storageId,
-    });
-    return { ok: true as const };
+    const assetId: Id<"designAssets"> = await ctx.runMutation(
+      internal._e2e.insertAsset,
+      { ...rest, contentType, storageId },
+    );
+    return { ok: true as const, assetId };
   },
 });

@@ -60,7 +60,9 @@ test("a captain opening the dashboard and then a design with a print-size PNG se
   tag,
 }) => {
   const order = seedOrder(tag);
-  const { bytes } = await attachBigPng(order.designId);
+  const { bytes } = await attachBigPng(order.designId, true, {
+    withPreview: true,
+  });
   expect(bytes, "fixture is a print-size PNG").toBeGreaterThan(2 * 1024 * 1024);
 
   const images = collectImages(page);
@@ -102,7 +104,9 @@ test("375px: on the design page a gallery picture opens full size (<= 2048w) and
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   const order = seedOrder(tag);
-  const { bytes } = await attachBigPng(order.designId);
+  const { bytes } = await attachBigPng(order.designId, true, {
+    withPreview: true,
+  });
   const images = collectImages(page);
 
   await page.goto(`/portal/designs/${order.designId}`);

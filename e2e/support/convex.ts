@@ -35,7 +35,7 @@ function run<T>(fn: string, args: Record<string, unknown>): T {
   const out = execConvexRun(fn, args);
   // JSON starts at the first `{`, `[` or `"` (a string, e.g. findFixture's id).
   const start = out.search(/[[{"]/);
-  // A function that returns null prints no JSON value (e.g. insertAsset).
+  // A function that returns null prints no JSON value.
   return (start < 0 ? null : JSON.parse(out.slice(start))) as T;
 }
 
@@ -152,23 +152,38 @@ export const addDesign = (
  * Stores a small generated file and attaches it to an E2E design (0004
  * R3-01). `kind: "png"` is a 1x1 picture, `"pdf"` a minimal PDF. `isMain`
  * flags it as the design's main file.
+ *
+ * IMG-04: the app shows only the stored preview, and this attaches with none
+ * (like an upload whose preview isn't made yet). Pass `{ withPreview: true }`
+ * when the test expects the picture to show: it runs the real
+ * `imagePreviews.generate` and returns once the preview exists.
  */
 const PNG_1X1 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 const PDF_MIN = Buffer.from("%PDF-1.1\n%%EOF\n").toString("base64");
 
+export type AttachOptions = { withPreview?: boolean };
+
+/** Makes an E2E asset's stored preview now and waits for it (IMG-04). */
+export const makePreview = (assetId: string) =>
+  run<{ ok: true }>("_e2e:makePreview", { assetId });
+
 export const attachFile = (
   designId: string,
   kind: "png" | "pdf",
   isMain = true,
-) =>
-  run<{ ok: true }>("_e2e:attachFile", {
+  { withPreview = false }: AttachOptions = {},
+) => {
+  const out = run<{ ok: true; assetId: string }>("_e2e:attachFile", {
     designId,
     base64: kind === "png" ? PNG_1X1 : PDF_MIN,
     contentType: kind === "png" ? "image/png" : "application/pdf",
     filename: kind === "png" ? "e2e-main.png" : "e2e-print.pdf",
     isMain,
   });
+  if (withPreview) makePreview(out.assetId);
+  return out;
+};
 
 /**
  * A print-size PNG (0004 R3-02): a 1200x900 RGB gradient stored uncompressed
@@ -227,10 +242,16 @@ export const bigPngSha256 = () => bigPngFixture().sha256;
 
 /**
  * Attaches the big PNG to an E2E design. Reuses the stored blob when the
- * deployment already has it, so its `/_next/image` URL stays the same across
- * runs and warm runs are cache hits; uploads only on a miss.
+ * deployment already has it, so the upload is skipped on warm runs; uploads
+ * only on a miss. With no preview by default (IMG-04): pass
+ * `{ withPreview: true }` for a picture that shows. Previews are made per
+ * asset row, so two designs sharing the original still get two previews.
  */
-export async function attachBigPng(designId: string, isMain = true) {
+export async function attachBigPng(
+  designId: string,
+  isMain = true,
+  { withPreview = false }: AttachOptions = {},
+) {
   const { png, sha256 } = bigPngFixture();
   let storageId = run<string | null>("_e2e:findFixture", { sha256 });
   const reused = storageId !== null;
@@ -244,12 +265,13 @@ export async function attachBigPng(designId: string, isMain = true) {
     if (!res.ok) throw new Error(`upload failed: ${res.status}`);
     ({ storageId } = (await res.json()) as { storageId: string });
   }
-  run("_e2e:insertAsset", {
+  const assetId = run<string>("_e2e:insertAsset", {
     designId,
     storageId,
     filename: "e2e-big.png",
     contentType: "image/png",
     isMain,
   });
-  return { bytes: png.length, storageId, reused };
+  if (withPreview) makePreview(assetId);
+  return { bytes: png.length, storageId, assetId, reused };
 }

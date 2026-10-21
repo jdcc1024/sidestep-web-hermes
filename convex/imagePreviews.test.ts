@@ -236,7 +236,8 @@ describe("insertDesignAssets scheduling", () => {
 });
 
 describe("imagePreviews.backfill", () => {
-  it("should schedule generate only for resizable assets with no preview", async () => {
+  // IMG-04: a GIF gets a preview (its first frame) now, so it is scheduled too.
+  it("should schedule generate only for previewable assets with no preview", async () => {
     const s = await seed();
     const png = await insertAsset(s.t, s, { contentType: "image/png" });
     const jpeg = await insertAsset(s.t, s, { contentType: "image/jpeg" });
@@ -245,13 +246,13 @@ describe("imagePreviews.backfill", () => {
       previewStorageId: await blob(s.t, "image/webp"),
     });
     await insertAsset(s.t, s, { contentType: "application/pdf" });
-    await insertAsset(s.t, s, { contentType: "image/gif" });
+    const gif = await insertAsset(s.t, s, { contentType: "image/gif" });
 
     const count = await s.t.action(internal.imagePreviews.backfill, {});
 
-    expect(count).toBe(2);
+    expect(count).toBe(3);
     expect((await scheduledGenerates(s.t)).sort()).toEqual(
-      [png.assetId, jpeg.assetId].sort(),
+      [png.assetId, jpeg.assetId, gif.assetId].sort(),
     );
   });
 });

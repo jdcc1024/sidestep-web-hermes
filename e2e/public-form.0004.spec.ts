@@ -92,7 +92,7 @@ test("375px: a single-design form with a PNG main picture shows it above 'Your n
   browserErrors,
 }) => {
   const order = seedOrder(tag);
-  attachFile(order.designId, "png");
+  attachFile(order.designId, "png", true, { withPreview: true });
   const link = await makeOrderForm(page, order.orderId);
 
   const { player, close } = await openAsPlayer(browser, browserErrors, link);
@@ -152,8 +152,8 @@ test("375px: a two-design form has a picture tile per design, and picking 'Away 
 }) => {
   const order = seedOrder(tag);
   const away = addDesign(tag, order.orderId, "Away Kit");
-  attachFile(order.designId, "png");
-  attachFile(away.designId, "png");
+  attachFile(order.designId, "png", true, { withPreview: true });
+  attachFile(away.designId, "png", true, { withPreview: true });
   const link = await makeOrderForm(page, order.orderId);
 
   const { player, close } = await openAsPlayer(browser, browserErrors, link);

@@ -74,15 +74,22 @@ async function attach(
     bytes?: number;
     isMain?: boolean;
     createdAt?: number;
+    // IMG-04: the form shows only the stored preview, so a main that should
+    // show needs one (a small WebP blob, like `imagePreviews.generate` makes).
+    withPreview?: boolean;
   },
 ) {
-  await t.run(async (ctx) => {
+  return t.run(async (ctx) => {
     const storageId = await ctx.storage.store(
       new Blob(["x".repeat(file.bytes ?? 10)], { type: file.contentType }),
     );
+    const previewStorageId = file.withPreview
+      ? await ctx.storage.store(new Blob(["webp"], { type: "image/webp" }))
+      : undefined;
     await ctx.db.insert("designAssets", {
       designId,
       storageId,
+      ...(previewStorageId ? { previewStorageId } : {}),
       filename: file.filename,
       contentType: file.contentType,
       isMain: file.isMain ?? false,
@@ -90,20 +97,27 @@ async function attach(
       uploadedByAdmin: false,
       createdAt: file.createdAt ?? Date.now(),
     });
+    return {
+      originalUrl: await ctx.storage.getUrl(storageId),
+      previewUrl: previewStorageId
+        ? await ctx.storage.getUrl(previewStorageId)
+        : null,
+    };
   });
 }
 
 type Pub = { mainImage: { url: string; contentType: string } | null };
 
 describe("getPublic mainImage", () => {
-  it("a PNG main returns exactly { url, contentType }: no filename, no other file's URL", async () => {
+  it("a PNG main with a preview returns exactly { url, contentType } of the preview: no filename, no other file's URL", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderFormId, ids } = await seedForm(t);
-    await attach(t, userId, ids.png, {
+    const main = await attach(t, userId, ids.png, {
       filename: "client_final_v3_DO_NOT_SEND.png",
       contentType: "image/png",
       isMain: true,
       createdAt: 1000,
+      withPreview: true,
     });
     await attach(t, userId, ids.png, {
       filename: "second.png",
@@ -114,9 +128,10 @@ describe("getPublic mainImage", () => {
     const d = data!.designs.find((x) => x._id === ids.png)! as unknown as Pub;
     expect(d.mainImage).not.toBeNull();
     expect(Object.keys(d.mainImage!).sort()).toEqual(["contentType", "url"]);
-    expect(d.mainImage!.contentType).toBe("image/png");
-    expect(typeof d.mainImage!.url).toBe("string");
+    expect(d.mainImage!.contentType).toBe("image/webp");
+    expect(d.mainImage!.url).toBe(main.previewUrl);
     const payload = JSON.stringify(data);
+    expect(payload).not.toContain(main.originalUrl);
     expect(payload).not.toContain("DO_NOT_SEND");
     expect(payload).not.toContain("second.png");
   });
@@ -147,27 +162,30 @@ describe("getPublic mainImage", () => {
     expect(JSON.stringify(data)).not.toMatch(/flagged\.pdf|preview\.png/);
   });
 
-  // 0004 R3-02: a big PNG is resized by next/image, so it shows. A big GIF
-  // can't be resized, so it still doesn't.
-  it("a 3 MB PNG main returns its url + contentType", async () => {
+  // 0004 R3-02: a big PNG shows. Since IMG-04 what shows is its small stored
+  // preview, never the 3 MB original. A big GIF with no preview yet shows
+  // nothing.
+  it("a 3 MB PNG main with a preview returns the preview's url + image/webp", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderFormId, ids } = await seedForm(t);
-    await attach(t, userId, ids.big, {
+    const main = await attach(t, userId, ids.big, {
       filename: "huge.png",
       contentType: "image/png",
       bytes: 3 * 1024 * 1024,
       isMain: true,
+      withPreview: true,
     });
     const data = await t.query(api.orderForms.getPublic, { orderFormId });
     const d = data!.designs.find((x) => x._id === ids.big)! as unknown as Pub;
     expect(d.mainImage).not.toBeNull();
     expect(Object.keys(d.mainImage!).sort()).toEqual(["contentType", "url"]);
-    expect(d.mainImage!.contentType).toBe("image/png");
-    expect(typeof d.mainImage!.url).toBe("string");
+    expect(d.mainImage!.contentType).toBe("image/webp");
+    expect(d.mainImage!.url).toBe(main.previewUrl);
+    expect(JSON.stringify(data)).not.toContain(main.originalUrl);
     expect(JSON.stringify(data)).not.toContain("huge.png");
   });
 
-  it("a 3 MB GIF main returns mainImage null", async () => {
+  it("a 3 MB GIF main with no preview yet returns mainImage null", async () => {
     const t = convexTest(schema, modules);
     const { userId, orderFormId, ids } = await seedForm(t);
     await attach(t, userId, ids.bigGif, {

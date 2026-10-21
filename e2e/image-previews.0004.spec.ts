@@ -42,7 +42,9 @@ test("375px: a print-size PNG main picture shows on the form, the page downloads
   browserErrors,
 }) => {
   const order = seedOrder(tag);
-  const { bytes } = await attachBigPng(order.designId);
+  const { bytes } = await attachBigPng(order.designId, true, {
+    withPreview: true,
+  });
   expect(bytes, "fixture is a print-size PNG").toBeGreaterThan(2 * 1024 * 1024);
   const link = await makeOrderForm(page, order.orderId);
 

@@ -3,9 +3,10 @@ import type { Page, Response } from "@playwright/test";
 import { addDesign, attachBigPng, seedOrder } from "./support/convex";
 
 // IMG-02 (backlog/IMG-02-e2e-storage-egress-guard.md) "Done when" 1:
-// the big-PNG fixture is stored once and reused, so the optimizer's source
-// URL stays the same and later loads are cache hits instead of a fresh pull
-// from Convex storage.
+// the big-PNG fixture is stored once and reused, so warm runs don't upload
+// the print file again, and a second load of the form is all optimizer cache
+// hits instead of a fresh pull from Convex storage. Since IMG-04 the pictures
+// are the per-asset stored previews, not the shared original.
 //
 // "Done when" 2 (a plain <img> of a stored print file fails with its URL) is
 // proved at review by a throwaway scratch spec, not a committed failing test.
@@ -48,7 +49,7 @@ async function loadForm(page: Page, link: string) {
   return seen;
 }
 
-test("the big PNG is stored once and reused: two designs share one source, and a second visit is all cache hits", async ({
+test("the big PNG is stored once and reused: two designs share one original, each shows its own preview, and a second visit is all cache hits", async ({
   page,
   browser,
   tag,
@@ -56,8 +57,13 @@ test("the big PNG is stored once and reused: two designs share one source, and a
   test.setTimeout(120_000);
   const order = seedOrder(tag);
   const second = addDesign(tag, order.orderId, "second kit");
-  await attachBigPng(order.designId);
-  await attachBigPng(second.designId);
+  const a = await attachBigPng(order.designId, true, { withPreview: true });
+  const b = await attachBigPng(second.designId, true, { withPreview: true });
+  // IMG-02: the print file is uploaded at most once per deployment.
+  expect(b.reused, "the second attach reuses the stored original").toBe(true);
+  expect(b.storageId, "both designs share one stored original").toBe(
+    a.storageId,
+  );
   const link = await makeOrderForm(page, order.orderId);
 
   const visit = async () => {
@@ -71,11 +77,16 @@ test("the big PNG is stored once and reused: two designs share one source, and a
     return seen;
   };
 
+  // IMG-04: pictures come only from the stored preview, which is made per
+  // asset row. So the two designs show two different previews, and neither
+  // optimizer source is the shared original.
   const first = await visit();
   const sources = new Set(first.map((s) => s.source));
-  expect(sources.size, "both designs' pictures come from one stored blob").toBe(
-    1,
-  );
+  expect(sources.size, "one preview per design").toBe(2);
+  expect(
+    [...sources].filter((s) => decodeURIComponent(s).includes(a.storageId)),
+    "no optimizer source is the original",
+  ).toEqual([]);
 
   const again = await visit();
   expect(again.length, "second visit loads pictures through the optimizer").toBeGreaterThan(0);

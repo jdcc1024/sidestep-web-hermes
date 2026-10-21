@@ -190,7 +190,7 @@ async function setup(
   colorScheme: "light" | "dark" = "light",
 ) {
   const order = seedOrder(tag);
-  await attachBigPng(order.designId);
+  await attachBigPng(order.designId, true, { withPreview: true });
   const link = await makeOrderForm(page, order.orderId);
   const { player, close } = await openAsPlayer(
     browser,
