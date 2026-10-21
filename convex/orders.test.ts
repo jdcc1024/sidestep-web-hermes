@@ -470,7 +470,7 @@ describe("orders.getMyOrder", () => {
       filename: "crest.png",
       contentType: "image/png",
     });
-    expect(typeof design?.mainImage?.url).toBe("string");
+    expect(design?.mainImage).not.toHaveProperty("url"); // IMG-05
   });
 
   it("honours an explicitly flagged main image over upload order", async () => {

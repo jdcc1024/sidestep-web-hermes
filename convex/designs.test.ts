@@ -432,8 +432,11 @@ describe("designs.getMyDesign", () => {
       "spec.pdf",
       "crest.png",
     ]);
-    for (const asset of design?.assets ?? [])
-      expect(typeof asset.url).toBe("string");
+    // IMG-05: the original's URL is not in the read; the file's presence is.
+    for (const asset of design?.assets ?? []) {
+      expect(asset).not.toHaveProperty("url");
+      expect(asset.hasFile).toBe(true);
+    }
     // The PDF is older, so the first web-safe image wins.
     expect(design?.mainAsset?.filename).toBe("crest.png");
   });
@@ -523,7 +526,7 @@ describe("designs.listMyDesigns", () => {
       filename: "crest.png",
       contentType: "image/png",
     });
-    expect(typeof design?.mainImage?.url).toBe("string");
+    expect(design?.mainImage).not.toHaveProperty("url"); // IMG-05
   });
 
   it("honours an explicitly flagged main image over upload order", async () => {

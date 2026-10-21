@@ -258,7 +258,7 @@ describe("imagePreviews.backfill", () => {
 });
 
 describe("captain reads with a stored preview", () => {
-  it("should return displayUrl = preview and url = original from the summary and the design page", async () => {
+  it("should return displayUrl = preview and no original URL from the summary and the design page", async () => {
     const s = await seed();
     const previewStorageId = await blob(s.t, "image/webp");
     const { storageId } = await insertAsset(s.t, s, {
@@ -272,18 +272,15 @@ describe("captain reads with a stored preview", () => {
     ]);
 
     const [card] = await s.asOwner.query(api.designs.listMyDesigns, {});
-    expect(card!.mainImage).toMatchObject({
-      url: originalUrl,
-      displayUrl: previewUrl,
-    });
+    expect(card!.mainImage).toMatchObject({ displayUrl: previewUrl });
+    expect(card!.mainImage).not.toHaveProperty("url"); // IMG-05
 
     const design = await s.asOwner.query(api.designs.getMyDesign, {
       designId: s.designId,
     });
-    expect(design!.assets[0]).toMatchObject({
-      url: originalUrl,
-      displayUrl: previewUrl,
-    });
+    expect(design!.assets[0]).toMatchObject({ displayUrl: previewUrl });
+    expect(design!.assets[0]).not.toHaveProperty("url"); // IMG-05
+    expect(JSON.stringify(design)).not.toContain(originalUrl!);
   });
 
   it("should give displayUrl null, never the original's URL, while there's no preview (IMG-04)", async () => {
@@ -296,8 +293,8 @@ describe("captain reads with a stored preview", () => {
 
     const [card] = await s.asOwner.query(api.designs.listMyDesigns, {});
     expect(card!.mainImage!.displayUrl).toBeNull();
-    // `url` (the original) stays for downloads until IMG-05.
-    expect(card!.mainImage!.url).toBe(originalUrl);
+    // IMG-05: the original's URL isn't in the read at all.
+    expect(JSON.stringify(card)).not.toContain(originalUrl!);
 
     const design = await s.asOwner.query(api.designs.getMyDesign, {
       designId: s.designId,

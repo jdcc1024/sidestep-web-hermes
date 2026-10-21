@@ -1079,7 +1079,8 @@ describe("admin.getDesign", () => {
       "print-template.pdf",
       "crest.png",
     ]);
-    expect(result?.assets.every((a) => typeof a.url === "string")).toBe(true);
+    // IMG-05: no original URL in the read; each file reports it is present.
+    expect(result?.assets.every((a) => !("url" in a) && a.hasFile)).toBe(true);
     // The PDF is older but isn't web-safe, so the image is the main one.
     expect(result?.mainAsset?.filename).toBe("crest.png");
   });
