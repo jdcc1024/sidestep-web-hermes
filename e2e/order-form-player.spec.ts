@@ -12,7 +12,7 @@ function isoDate(daysAhead: number) {
   return d.toISOString().slice(0, 10);
 }
 
-test("a player submits through the captain's /run link and the captain sees the item", async ({
+test("a player submits through the captain's /run link and the captain sees the item", { tag: "@smoke" }, async ({
   page,
   browser,
   tag,

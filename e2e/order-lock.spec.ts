@@ -107,7 +107,7 @@ test.describe("as a non-admin captain", () => {
   });
 });
 
-test("admin order page shows the same list and edits it while confirmed; confirming is refused while an item needs a size", async ({
+test("admin order page shows the same list and edits it while confirmed; confirming is refused while an item needs a size", { tag: "@smoke" }, async ({
   page,
   tag,
   allowBrowserErrors,

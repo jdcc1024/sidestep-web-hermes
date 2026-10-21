@@ -18,7 +18,7 @@ test.use({
   viewport: { width: 375, height: 812 },
 });
 
-test("a phone visitor sees the first carousel jersey, resized by /_next/image as WebP", async ({
+test("a phone visitor sees the first carousel jersey, resized by /_next/image as WebP", { tag: ["@pinned-375", "@smoke"] }, async ({
   page,
 }) => {
   const imageResponses: { url: string; type: string; status: number }[] = [];

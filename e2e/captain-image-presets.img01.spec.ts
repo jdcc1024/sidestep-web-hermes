@@ -56,7 +56,7 @@ async function expectAllPicturesDecoded(page: Page, scope = "main") {
   }
 }
 
-test("a captain opening the dashboard and then a design with a print-size PNG sees every picture and downloads under 1 MB of images, none straight from storage", async ({
+test("a captain opening the dashboard and then a design with a print-size PNG sees every picture and downloads under 1 MB of images, none straight from storage", { tag: "@smoke" }, async ({
   page,
   tag,
 }) => {

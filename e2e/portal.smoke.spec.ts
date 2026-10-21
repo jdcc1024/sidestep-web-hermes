@@ -3,7 +3,7 @@ import { seedOrder } from "./support/convex";
 
 // Baseline: a signed-in captain can open the portal and one of their orders
 // with no browser errors, at desktop and 375px.
-test("captain opens the portal and an order", async ({ page, tag }) => {
+test("captain opens the portal and an order", { tag: "@smoke" }, async ({ page, tag }) => {
   const order = seedOrder(tag);
 
   await page.goto("/portal");

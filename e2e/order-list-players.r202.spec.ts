@@ -50,7 +50,7 @@ async function addSidestep(page: Page) {
   await expect(sheet(page)).toHaveCount(0);
 }
 
-test("375px: a captain adds Sidestep #72 with 1 S, 3 M and 1 XL in one sheet and sees one player row", async ({
+test("375px: a captain adds Sidestep #72 with 1 S, 3 M and 1 XL in one sheet and sees one player row", { tag: ["@pinned-375", "@smoke"] }, async ({
   page,
   tag,
 }) => {
@@ -71,7 +71,7 @@ test("375px: a captain adds Sidestep #72 with 1 S, 3 M and 1 XL in one sheet and
   ).toHaveCount(0);
 });
 
-test("adding ' sidestep ' #72 again with an L joins the player; lowering M to 2 updates row, design line and footer live", async ({
+test("adding ' sidestep ' #72 again with an L joins the player; lowering M to 2 updates row, design line and footer live", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -109,7 +109,7 @@ test("adding ' sidestep ' #72 again with an L joins the player; lowering M to 2 
   await expectNoHorizontalScroll(page);
 });
 
-test("removing Sidestep #72 and pressing Undo brings the row back with the same sizes", async ({
+test("removing Sidestep #72 and pressing Undo brings the row back with the same sizes", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {

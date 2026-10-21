@@ -11,7 +11,7 @@ import { seedItems, seedOrder } from "./support/convex";
 // screenshots, so locators match key words only. Uses SNAP_UID (an admin) on
 // the captain page, which shows the same list; no non-admin account needed.
 
-test("an order seeded with flat items shows the same list, counts and CSV after the roster tables arrive", async ({
+test("an order seeded with flat items shows the same list, counts and CSV after the roster tables arrive", { tag: "@smoke" }, async ({
   page,
   tag,
 }) => {

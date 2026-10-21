@@ -12,7 +12,7 @@ function isoDate(daysAhead: number) {
   return d.toISOString().slice(0, 10);
 }
 
-test("captain makes an order form, copies its link, and opens Form settings", async ({ page, context, tag }) => {
+test("captain makes an order form, copies its link, and opens Form settings", { tag: "@smoke" }, async ({ page, context, tag }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const order = seedOrder(tag);
 

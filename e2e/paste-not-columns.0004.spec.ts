@@ -75,7 +75,7 @@ const LIGHT = [
   "COACH R,,S,1,Robin",
 ].join("\n");
 
-test("375px: pasting the raw customer message shows the not-columns notice and Add stays enabled", async ({
+test("375px: pasting the raw customer message shows the not-columns notice and Add stays enabled", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -91,7 +91,7 @@ test("375px: pasting the raw customer message shows the not-columns notice and A
   await expectNoHorizontalScroll(page);
 });
 
-test("375px: pasting the converted Light block shows no not-columns notice, and Add is enabled", async ({
+test("375px: pasting the converted Light block shows no not-columns notice, and Add is enabled", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {

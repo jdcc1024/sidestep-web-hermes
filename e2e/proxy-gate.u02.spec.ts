@@ -21,7 +21,7 @@ function isoDate(daysAhead: number) {
   return new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
 }
 
-test("a signed-out visitor is sent from /portal to sign-in, but can open a player's /run form without signing in", async ({
+test("a signed-out visitor is sent from /portal to sign-in, but can open a player's /run form without signing in", { tag: "@smoke" }, async ({
   page,
   browser,
   tag,

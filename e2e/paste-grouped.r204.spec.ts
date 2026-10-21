@@ -36,7 +36,7 @@ async function paste(page: Page, text: string) {
   await sheet(page).getByRole("textbox", { name: /paste your list/i }).fill(text);
 }
 
-test("375px: pasting three rows for Sidestep #72 previews one player with S, M×3, XL and adds one row with 5 jerseys", async ({
+test("375px: pasting three rows for Sidestep #72 previews one player with S, M×3, XL and adds one row with 5 jerseys", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -69,7 +69,7 @@ test("375px: pasting three rows for Sidestep #72 previews one player with S, M×
   ).toHaveCount(0);
 });
 
-test("375px: pasting 'Avery Quinn 7 L' where Avery Quinn #7 has M shows the 'already on' note and leaves one row with M and L", async ({
+test("375px: pasting 'Avery Quinn 7 L' where Avery Quinn #7 has M shows the 'already on' note and leaves one row with M and L", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {

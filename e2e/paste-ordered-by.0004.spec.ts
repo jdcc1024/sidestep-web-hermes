@@ -63,7 +63,7 @@ const LIGHT_5 = [
   "COACH R,,S,1,Rob",
 ].join("\n");
 
-test("375px: the Light block with an Ordered by column previews every player's owner, and Sizes added by lists the owner 'from a pasted list'", async ({
+test("375px: the Light block with an Ordered by column previews every player's owner, and Sizes added by lists the owner 'from a pasted list'", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -110,7 +110,7 @@ const MIXED = [
   "Gill,21,M,1",
 ].join("\n");
 
-test("375px: a paste mixing 4- and 5-column rows is accepted in full; owners only where given", async ({
+test("375px: a paste mixing 4- and 5-column rows is accepted in full; owners only where given", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -179,7 +179,7 @@ function parseCsv(text: string): string[][] {
   return out.filter((r) => r.some((x) => x !== ""));
 }
 
-test("the admin order export's submitter name column holds the pasted owner, and is empty for a 4-column row", async ({
+test("the admin order export's submitter name column holds the pasted owner, and is empty for a 4-column row", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {

@@ -95,7 +95,7 @@ async function submitAsPlayer(
 
 // ── Done when 1, 7 ──────────────────────────────────────────────────────────
 
-test("375px: a player with S×1 and M×3 shows chips S×1 and M×3 and the row has no 'Added by'", async ({
+test("375px: a player with S×1 and M×3 shows chips S×1 and M×3 and the row has no 'Added by'", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -118,7 +118,7 @@ test("375px: a player with S×1 and M×3 shows chips S×1 and M×3 and the row h
 
 // ── Done when 2 ─────────────────────────────────────────────────────────────
 
-test("375px: no row says 'Added by', whether the captain or a player through the order form added the player", async ({
+test("375px: no row says 'Added by', whether the captain or a player through the order form added the player", { tag: "@pinned-375" }, async ({
   page,
   browser,
   tag,
@@ -149,7 +149,7 @@ test("375px: no row says 'Added by', whether the captain or a player through the
 
 // ── Done when 3 (JCC: "Nothing printed" removed) ────────────────────────────
 
-test("375px: the design's blank entry reads 'Blank jerseys' with no 'Nothing printed' and no 'Added by'", async ({
+test("375px: the design's blank entry reads 'Blank jerseys' with no 'Nothing printed' and no 'Added by'", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -171,7 +171,7 @@ test("375px: the design's blank entry reads 'Blank jerseys' with no 'Nothing pri
 // Moved here from r202/r205: who sent what is answered in the edit sheet, by
 // full name as before (the first-name-only rule belonged to the row's line).
 
-test("375px: ⋯ on a player with the captain's S×1 and Quinn's M×1 still lists both people and their sizes under 'Sizes added by'", async ({
+test("375px: ⋯ on a player with the captain's S×1 and Quinn's M×1 still lists both people and their sizes under 'Sizes added by'", { tag: "@pinned-375" }, async ({
   page,
   browser,
   tag,
@@ -232,7 +232,7 @@ function seedSevenSizes(tag: string, orderId: string) {
   );
 }
 
-test("375px: the order total reads '47 jerseys' then one list item per size in 'Sizes on this order', with no '·' between sizes", async ({
+test("375px: the order total reads '47 jerseys' then one list item per size in 'Sizes on this order', with no '·' between sizes", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -254,7 +254,7 @@ test("375px: the order total reads '47 jerseys' then one list item per size in '
   ).toHaveCount(0);
 });
 
-test("375px: with 7 sizes in the total line the page has no horizontal scroll and no size×count is split across two lines", async ({
+test("375px: with 7 sizes in the total line the page has no horizontal scroll and no size×count is split across two lines", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -284,7 +284,7 @@ test("375px: with 7 sizes in the total line the page has no horizontal scroll an
 
 // ── Done when 8 ─────────────────────────────────────────────────────────────
 
-test("375px: pasting 'Sidestep 72 S' and 'Sidestep 72 M 3' previews one player with chips S×1 and M×3", async ({
+test("375px: pasting 'Sidestep 72 S' and 'Sidestep 72 M 3' previews one player with chips S×1 and M×3", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {

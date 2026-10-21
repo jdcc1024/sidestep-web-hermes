@@ -54,7 +54,7 @@ const LIGHT = [
   "COACH R,,S,1",
 ].join("\n");
 
-test("375px: the Light block previews 11 new players and 19 jerseys, COACH R has no number and S×1, and Add keeps it that way", async ({
+test("375px: the Light block previews 11 new players and 19 jerseys, COACH R has no number and S×1, and Add keeps it that way", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
@@ -95,7 +95,7 @@ test("375px: the Light block previews 11 new players and 19 jerseys, COACH R has
   ).toHaveCount(0);
 });
 
-test("375px: a tab row with an empty number cell (Name⇥⇥S⇥1) is added with no number and size S", async ({
+test("375px: a tab row with an empty number cell (Name⇥⇥S⇥1) is added with no number and size S", { tag: "@pinned-375" }, async ({
   page,
   tag,
 }) => {
