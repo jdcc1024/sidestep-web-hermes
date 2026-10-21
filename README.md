@@ -48,6 +48,9 @@ npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
 npm test            # vitest
 npm run build       # production build (also typechecks)
+npm run e2e:full    # whole Playwright suite, one --last-failed rerun; writes .e2e-receipt.json on pass
+npm run e2e:check   # exit 0 only if .e2e-receipt.json matches the current tree
+npm run e2e:smoke   # the @smoke E2E tests only (post-merge), no receipt
 ```
 
 ### Environment variables
