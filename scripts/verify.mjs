@@ -13,26 +13,14 @@
  *   node scripts/verify.mjs --build   # also next build
  */
 
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { treeHash } from '../lib/treeHash.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RECEIPT = path.join(ROOT, '.verify-receipt.json');
-
-/** Hash of the full working tree (tracked changes + untracked non-ignored files). */
-function treeHash() {
-  const idx = path.join(os.tmpdir(), `verify-idx-${process.pid}-${Date.now()}`);
-  const env = { ...process.env, GIT_INDEX_FILE: idx };
-  try {
-    execSync('git add -A', { cwd: ROOT, env, stdio: 'pipe' });
-    return execSync('git write-tree', { cwd: ROOT, env, encoding: 'utf-8' }).trim();
-  } finally {
-    fs.rmSync(idx, { force: true });
-  }
-}
 
 const steps = [
   ['typecheck', 'npm run typecheck'],
@@ -54,7 +42,7 @@ for (const [name, cmd] of steps) {
 }
 
 const receipt = {
-  tree: treeHash(),
+  tree: treeHash(ROOT),
   verifiedAt: new Date().toISOString(),
   steps: steps.map(s => s[0]),
 };
