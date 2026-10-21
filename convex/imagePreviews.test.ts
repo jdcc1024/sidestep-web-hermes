@@ -285,7 +285,7 @@ describe("captain reads with a stored preview", () => {
     });
   });
 
-  it("should fall back to the original for displayUrl while there's no preview", async () => {
+  it("should give displayUrl null, never the original's URL, while there's no preview (IMG-04)", async () => {
     const s = await seed();
     const { storageId } = await insertAsset(s.t, s, {
       contentType: "image/png",
@@ -294,9 +294,45 @@ describe("captain reads with a stored preview", () => {
     const originalUrl = await s.t.run((ctx) => ctx.storage.getUrl(storageId));
 
     const [card] = await s.asOwner.query(api.designs.listMyDesigns, {});
-    expect(card!.mainImage).toMatchObject({
-      url: originalUrl,
-      displayUrl: originalUrl,
+    expect(card!.mainImage!.displayUrl).toBeNull();
+    // `url` (the original) stays for downloads until IMG-05.
+    expect(card!.mainImage!.url).toBe(originalUrl);
+
+    const design = await s.asOwner.query(api.designs.getMyDesign, {
+      designId: s.designId,
     });
+    expect(design!.assets[0]!.displayUrl).toBeNull();
+  });
+
+  it("getMyDesign: an asset with a preview has the preview's URL as displayUrl and image/webp as its display type (IMG-04)", async () => {
+    const s = await seed();
+    const previewStorageId = await blob(s.t, "image/webp", "preview-bytes");
+    const { storageId } = await insertAsset(s.t, s, {
+      contentType: "image/gif",
+      storageId: await blob(s.t, "image/gif", "original-bytes"),
+      previewStorageId,
+      isMain: true,
+    });
+    const [originalUrl, previewUrl] = await s.t.run(async (ctx) => [
+      await ctx.storage.getUrl(storageId),
+      await ctx.storage.getUrl(previewStorageId),
+    ]);
+
+    const design = await s.asOwner.query(api.designs.getMyDesign, {
+      designId: s.designId,
+    });
+    const asset = design!.assets[0]! as unknown as Record<string, unknown>;
+    expect(asset.displayUrl).toBe(previewUrl);
+    expect(asset.displayUrl).not.toBe(originalUrl);
+    // The display type's field name is the builder's call (IMG-04 step 3).
+    // Some field other than `contentType` says image/webp; `contentType`
+    // stays the asset's own.
+    expect(asset.contentType).toBe("image/gif");
+    expect(
+      Object.entries(asset).filter(
+        ([k, v]) => k !== "contentType" && v === "image/webp",
+      ),
+      "a display content type field = image/webp",
+    ).not.toEqual([]);
   });
 });

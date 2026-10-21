@@ -100,9 +100,10 @@ describe("getPublic mainImage with a stored preview", () => {
     expect(JSON.stringify(data)).not.toContain(originalUrl!);
   });
 
-  it("without one (not generated yet), it falls back to the original's URL", async () => {
+  it("without one (not generated yet), mainImage is null and the payload never contains the original's URL (IMG-04)", async () => {
     const { main, originalUrl } = await seed(false);
-    const { image } = await main();
-    expect(image?.url).toBe(originalUrl);
+    const { image, data } = await main();
+    expect(image).toBeNull();
+    expect(JSON.stringify(data)).not.toContain(originalUrl!);
   });
 });
