@@ -63,6 +63,11 @@ async function full() {
   }
 
   const summary = summarizeRun(fullRun.report, rerunRun?.report ?? null);
+  // The JSON reporter's spec.file is relative to testDir; print and record repo paths (e2e/…).
+  const rootDir = fullRun.report.config?.rootDir;
+  const repoPath = (t) => (rootDir ? { ...t, file: path.relative(ROOT, path.resolve(rootDir, t.file)) } : t);
+  summary.flaky = summary.flaky.map(repoPath);
+  summary.failed = summary.failed.map(repoPath);
   const logs = { full: fullRun.log, ...(rerunRun ? { rerun: rerunRun.log } : {}) };
   const { passed, failed, flaky, skipped } = summary.counts;
 
