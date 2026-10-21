@@ -1,6 +1,7 @@
 import { expect, test } from "./support/fixtures";
 import type { Page, Response } from "@playwright/test";
 import { buildBigPng, seedOrder } from "./support/convex";
+import { originalUrlFromDownload } from "./support/download";
 
 // IMG-03 (backlog/IMG-03-stored-web-preview.md) "Done when" 1 and 2.
 //
@@ -37,8 +38,8 @@ async function uploadBigPng(page: Page, designId: string) {
   });
   const tile = page.getByTestId("pool-asset").filter({ hasText: /e2e-upload\.png/i });
   await expect(tile).toBeVisible({ timeout: 30_000 });
-  const href = await tile.getByRole("link", { name: /download/i }).getAttribute("href");
-  const original = storageIdOf(href ?? "");
+  const href = await originalUrlFromDownload(page, tile);
+  const original = storageIdOf(href);
   expect(original, "download link points at the original in storage").not.toBeNull();
   return { original: original!, tile };
 }

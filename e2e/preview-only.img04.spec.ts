@@ -1,6 +1,7 @@
 import { expect, test } from "./support/fixtures";
 import type { Page } from "@playwright/test";
 import { attachBigPng, seedOrder } from "./support/convex";
+import { originalUrlFromDownload } from "./support/download";
 
 // IMG-04 (backlog/IMG-04-pictures-only-from-preview.md) "Done when" 1 and 2:
 // no picture on screen is ever the original print file. JCC (Gate 1,
@@ -60,10 +61,8 @@ test("a captain uploads an SVG: within 30 s the pool tile shows the picture, and
     .getByTestId("pool-asset")
     .filter({ hasText: /e2e-logo\.svg/i });
   await expect(tile).toBeVisible({ timeout: 30_000 });
-  const href = await tile
-    .getByRole("link", { name: /download/i })
-    .getAttribute("href");
-  const original = storageIdOf(href ?? "");
+  const href = await originalUrlFromDownload(page, tile);
+  const original = storageIdOf(href);
   expect(original, "download link points at the original in storage").not.toBeNull();
 
   // The picture appears (reactively, no reload) once the preview exists.

@@ -1,6 +1,7 @@
 import { expect, expectNoHorizontalScroll, test } from "./support/fixtures";
 import type { Page, Response } from "@playwright/test";
 import { attachBigPng, seedOrder } from "./support/convex";
+import { originalUrlFromDownload } from "./support/download";
 
 // IMG-01: captain and admin pages show stored pictures through StoredImage
 // presets, never the print file (backlog/IMG-01-captain-pictures-use-presets.md
@@ -149,11 +150,10 @@ test("375px: on the design page a gallery picture opens full size (<= 2048w) and
   expect(Math.max(...widths)).toBeLessThanOrEqual(2048);
 
   // The download link is still the original file, not an optimizer URL.
-  const download = page
-    .getByTestId("pool-asset")
-    .first()
-    .getByRole("link", { name: /download/i });
-  const href = await download.getAttribute("href");
+  const href = await originalUrlFromDownload(
+    page,
+    page.getByTestId("pool-asset").first(),
+  );
   expect(href).toMatch(/\/api\/storage\//);
   expect(href).not.toContain("/_next/image");
   const original = await page.request.get(href!);

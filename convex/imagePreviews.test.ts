@@ -260,7 +260,8 @@ describe("imagePreviews.backfill", () => {
 describe("captain reads with a stored preview", () => {
   it("should return displayUrl = preview and no original URL from the summary and the design page", async () => {
     const s = await seed();
-    const previewStorageId = await blob(s.t, "image/webp");
+    // Distinct body: convex-test derives a storage URL from the blob's hash.
+    const previewStorageId = await blob(s.t, "image/webp", "preview");
     const { storageId } = await insertAsset(s.t, s, {
       contentType: "image/png",
       previewStorageId,
