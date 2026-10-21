@@ -43,7 +43,24 @@ async function loadForm(page: Page, link: string) {
   page.on("response", onResponse);
   await page.goto(link);
   await expect(page.getByLabel(/your name/i)).toBeVisible();
-  await expect(page.locator('img[alt*="main image" i]').first()).toBeVisible();
+  const pictures = page.locator('img[alt*="main image" i]');
+  await expect(pictures.first()).toBeVisible();
+  // Each run's previews are new blobs, so the first visit is an optimizer
+  // miss and can be slow. `networkidle` returns at once if the page already
+  // went idle, so wait for every picture to decode before counting.
+  await expect
+    .poll(
+      () =>
+        pictures.evaluateAll((imgs) =>
+          imgs.every(
+            (img) =>
+              (img as HTMLImageElement).complete &&
+              (img as HTMLImageElement).naturalWidth > 0,
+          ),
+        ),
+      { timeout: 30_000, message: "every main picture decodes" },
+    )
+    .toBe(true);
   await page.waitForLoadState("networkidle");
   page.off("response", onResponse);
   return seen;
