@@ -16,7 +16,10 @@ if (!convexImages) {
 }
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["192.168.1.160"],
+  allowedDevOrigins: [
+    "192.168.1.160",
+    "jdcc-surface-pro.starling-carat.ts.net",
+  ],
   images: {
     remotePatterns: [convexImages],
     deviceSizes: IMAGE_DEVICE_SIZES,
