@@ -3,7 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // E2E layer (JCC, 2026-10-02): customer workflows in a real browser against the
 // dev Convex deployment. Every step asserts no console errors and no
 // horizontal scroll at 375px (see e2e/support/fixtures.ts). Not part of
-// `npm run verify`; ss-sdet runs `npm run e2e` at review.
+// `npm run verify`; `npm run e2e:full` runs the whole suite and writes a
+// tree-pinned receipt that `npm run e2e:check` reads (scripts/e2e.mjs).
 process.loadEnvFile?.(".env.local");
 
 const BASE = process.env.E2E_BASE ?? "http://localhost:8080";
@@ -28,7 +29,8 @@ export default defineConfig({
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
-    { name: "mobile", use: { ...devices["Desktop Chrome"], viewport: { width: 375, height: 812 }, isMobile: false } },
+    // @pinned-375 tests set a 375 viewport themselves, so mobile would only run them twice (PROC-01 §4).
+    { name: "mobile", grepInvert: /@pinned-375/, use: { ...devices["Desktop Chrome"], viewport: { width: 375, height: 812 }, isMobile: false } },
   ],
   webServer: {
     command: "npm run dev",
