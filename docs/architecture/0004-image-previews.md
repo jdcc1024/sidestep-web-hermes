@@ -395,6 +395,15 @@ this one function; no query changes.
   (72 when the SVG states no size), so a tiny viewBox can't ask for a huge
   raster.
 
+**As built in IMG-05, where it differs from the plan above:**
+- Reads drop the original's storage id as well as its URL (the id names the
+  file too): `ResolvedAsset` is the row without `storageId`, plus `hasFile`.
+- If the browser blocks even the in-click blank tab, `DownloadOriginal`
+  navigates the current tab to the file instead of failing.
+- The shared UI types (`DesignMainImage`, `BlockAsset`) keep `hasFile` optional
+  and a deprecated, never-populated `url?`, only so the frozen `.tsx` render
+  fixtures still typecheck. The Convex return types have neither gap.
+
 ### Gaps → issues
 
 | id | title | blocked by | size |
