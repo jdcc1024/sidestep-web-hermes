@@ -1,8 +1,8 @@
 // @vitest-environment node
 /// <reference types="vite/client" />
 // IMG-04 beyond the acceptance tests: GIF/SVG uploads and the backfill get a
-// preview scheduled, a preview-less asset carries no display URL (the original
-// stays only in `url`, for downloads), and the public form's picture is the
+// preview scheduled, a preview-less asset carries no display URL (and, since
+// IMG-05, no original URL either), and the public form's picture is the
 // preview alone. Node environment because `backfill` and `generate` live in a
 // "use node" module that loads sharp.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -165,7 +165,7 @@ describe("backfill / assetsNeedingPreview (IMG-04)", () => {
 });
 
 describe("captain reads without a preview (IMG-04)", () => {
-  it("should give displayUrl and displayContentType null in the summary, with url still the original", async () => {
+  it("should give displayUrl and displayContentType null in the summary, and no original URL", async () => {
     const s = await seed();
     const { storageId } = await insertAsset(s, {
       contentType: "image/png",
@@ -175,11 +175,13 @@ describe("captain reads without a preview (IMG-04)", () => {
 
     const [card] = await s.asOwner.query(api.designs.listMyDesigns, {});
     expect(card!.mainImage).toMatchObject({
-      url: originalUrl,
+      hasFile: true,
       displayUrl: null,
       displayContentType: null,
       contentType: "image/png",
     });
+    // IMG-05: the original leaves only through designs.originalUrl.
+    expect(JSON.stringify(card)).not.toContain(originalUrl!);
   });
 
   it("should give a GIF with a preview the preview's URL and image/webp as its display type, keeping contentType the GIF's", async () => {
