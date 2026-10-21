@@ -43,6 +43,8 @@ next-env.d.ts
 
 # autonomous loop artifacts (local-only; humans review these, git doesn't track them)
 .verify-receipt.json
+.e2e-receipt.json
+.e2e-logs/
 .auth/
 docs/review/loop-runs/
 docs/review/**/*.png

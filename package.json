@@ -13,6 +13,9 @@
     "verify": "node scripts/verify.mjs",
     "snap": "node scripts/snap.mjs",
     "e2e": "playwright test",
+    "e2e:full": "node scripts/e2e.mjs full",
+    "e2e:check": "node scripts/e2e.mjs check",
+    "e2e:smoke": "playwright test --grep @smoke",
     "test:frozen": "vitest run --config vitest.frozen.config.ts"
   },
   "dependencies": {
