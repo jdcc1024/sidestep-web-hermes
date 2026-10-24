@@ -11,6 +11,7 @@ import {
   canAccessOriginal,
   countDesignAssets,
   deleteDesignAsset,
+  hasOriginal,
   insertDesignAssets,
   mainAssetOf,
   mayDeleteAsset,
@@ -320,6 +321,12 @@ export const setMainAsset = mutation({
   args: { assetId: v.id("designAssets") },
   handler: async (ctx, { assetId }) => {
     const { asset } = await requireEditableAsset(ctx, assetId);
+    // The pool hides the button on a missing file; this is the backstop, and
+    // a missing original can't be the print file either (B-09).
+    if (!(await hasOriginal(ctx, asset.storageId)))
+      throw new ConvexError(
+        "That file is missing, so it can't be the main image.",
+      );
     await setMainDesignAsset(ctx, asset);
   },
 });

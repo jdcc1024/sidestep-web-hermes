@@ -40,7 +40,7 @@ export type UploadedFile = {
 // An asset row as a read hands it out: without the original's storage id,
 // because the id and the original's URL are both the file (IMG-05). The only
 // way to the original is `designs.originalUrl`, on Download. `hasFile` says
-// whether the original is still in storage (false → "Unavailable").
+// whether the original is still in storage (false → "File missing").
 // `displayUrl` is what every on-screen picture loads: the stored preview
 // (IMG-03), or null while there is none, never the original (IMG-04).
 // `displayContentType` is the preview's type when there's a `displayUrl`,
@@ -53,7 +53,7 @@ export type ResolvedAsset = Omit<Doc<"designAssets">, "storageId"> & {
 
 // Whether the original's bytes are still in storage. Reads the metadata row,
 // never a URL, so asking doesn't hand the file out.
-async function hasOriginal(
+export async function hasOriginal(
   ctx: QueryCtx | MutationCtx,
   storageId: Id<"_storage">,
 ): Promise<boolean> {
@@ -105,7 +105,7 @@ export async function listDesignAssets(
 
 // Every asset of a design as the pages read it: metadata, whether the
 // original is still there, and the preview's URL. `hasFile: false` means the
-// original is gone, so callers render "Unavailable" rather than a Download
+// original is gone, so callers render "File missing" rather than a Download
 // that can only fail.
 export async function resolveDesignAssets(
   ctx: QueryCtx | MutationCtx,
@@ -310,13 +310,19 @@ export async function setMainDesignAsset(
 // Deletes the row and the bytes, the stored preview's included. The caller is
 // responsible for the permission check and for stripping the id out of the
 // design's galleries — see convex/designs.ts removeAsset, which does both in
-// one mutation.
+// one mutation. A blob that's already gone is skipped: storage.delete throws
+// on it, which would strand the very row Remove is there to clean up (B-09).
 export async function deleteDesignAsset(
   ctx: MutationCtx,
   asset: Doc<"designAssets">,
 ): Promise<void> {
-  await ctx.storage.delete(asset.storageId);
-  if (asset.previewStorageId) await ctx.storage.delete(asset.previewStorageId);
+  if (await hasOriginal(ctx, asset.storageId))
+    await ctx.storage.delete(asset.storageId);
+  if (
+    asset.previewStorageId &&
+    (await ctx.db.system.get("_storage", asset.previewStorageId))
+  )
+    await ctx.storage.delete(asset.previewStorageId);
   await ctx.db.delete(asset._id);
 }
 
