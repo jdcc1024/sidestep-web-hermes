@@ -181,14 +181,16 @@ export function DesignAssetPool({
                     </DownloadOriginal>
                   ) : (
                     <span className="text-xs text-muted-foreground">
-                      Unavailable
+                      File missing
                     </span>
                   )}
 
                   <span className="ml-auto flex items-center gap-0.5">
                     {/* Only an image can represent the design, so a print
-                        template isn't offered as one. */}
-                    {isWebSafeImage(asset.contentType) &&
+                        template isn't offered as one, and nor is a file
+                        whose original is gone (B-09). */}
+                    {asset.hasFile &&
+                      isWebSafeImage(asset.contentType) &&
                       main?._id !== asset._id && (
                         <Button
                           type="button"

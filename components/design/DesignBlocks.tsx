@@ -32,7 +32,7 @@ export type BlockAsset = {
   contentType: string;
   // Whether the original is still in storage. Its URL is never here: Download
   // fetches it on click (IMG-05). Optional only for the frozen render-test
-  // fixtures; every read sets it, and a shape without it shows "Unavailable".
+  // fixtures; every read sets it, and a shape without it shows "File missing".
   hasFile?: boolean;
   /** @deprecated No read returns the original's URL since IMG-05; only the
    * frozen render-test fixtures still set it, and nothing renders it. */
@@ -188,7 +188,7 @@ function GalleryItem({ asset }: { asset: BlockAsset }) {
           Download
         </DownloadOriginal>
       ) : (
-        <span className="text-sm text-muted-foreground">Unavailable</span>
+        <span className="text-sm text-muted-foreground">File missing</span>
       )}
     </div>
   );
