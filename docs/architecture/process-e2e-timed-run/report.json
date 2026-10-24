@@ -1,0 +1,3297 @@
+{
+  "config": {
+    "argv": [
+      "/home/jdcc/.hermes/node/bin/node",
+      "/home/jdcc/sidestep-web-hermes/node_modules/.bin/playwright",
+      "test",
+      "--reporter=list,json,/home/jdcc/.hermes/profiles/ss-architect/cache/scratch/timed/step-reporter.mjs"
+    ],
+    "configFile": "/home/jdcc/sidestep-web-hermes/playwright.config.ts",
+    "rootDir": "/home/jdcc/sidestep-web-hermes/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/jdcc/sidestep-web-hermes/e2e/support/global-setup.ts",
+    "globalTeardown": "/home/jdcc/sidestep-web-hermes/e2e/support/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/jdcc/sidestep-web-hermes/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop",
+        "name": "desktop",
+        "testDir": "/home/jdcc/sidestep-web-hermes/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/home/jdcc/sidestep-web-hermes/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile",
+        "name": "mobile",
+        "testDir": "/home/jdcc/sidestep-web-hermes/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list"
+      ],
+      [
+        "json"
+      ],
+      [
+        "/home/jdcc/.hermes/profiles/ss-architect/cache/scratch/timed/step-reporter.mjs"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:8080",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "captain-image-presets.img01.spec.ts",
+      "file": "captain-image-presets.img01.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a captain opening the dashboard and then a design with a print-size PNG sees every picture and downloads under 1 MB of images, none straight from storage",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15881,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:40:47.878Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2beb876c75a0a5b8781b-da5ec0b12637dd1633e1",
+          "file": "captain-image-presets.img01.spec.ts",
+          "line": 59,
+          "column": 5
+        },
+        {
+          "title": "375px: on the design page a gallery picture opens full size (<= 2048w) and the file's download link still gives the original",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11501,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:41:03.908Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2beb876c75a0a5b8781b-9b0f063dbf3c5136f703",
+          "file": "captain-image-presets.img01.spec.ts",
+          "line": 102,
+          "column": 5
+        },
+        {
+          "title": "a captain opening the dashboard and then a design with a print-size PNG sees every picture and downloads under 1 MB of images, none straight from storage",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13329,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:48:40.789Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2beb876c75a0a5b8781b-5623df5322e5e1d94d49",
+          "file": "captain-image-presets.img01.spec.ts",
+          "line": 59,
+          "column": 5
+        },
+        {
+          "title": "375px: on the design page a gallery picture opens full size (<= 2048w) and the file's download link still gives the original",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12310,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:48:54.254Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2beb876c75a0a5b8781b-d1a1d923cbd52ba2e7ff",
+          "file": "captain-image-presets.img01.spec.ts",
+          "line": 102,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "home-carousel-image.u01.spec.ts",
+      "file": "home-carousel-image.u01.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a phone visitor sees the first carousel jersey, resized by /_next/image as WebP",
+          "ok": true,
+          "tags": [
+            "pinned-375",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1982,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:41:15.439Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f7c1995ad9caae3d9d2c-40b48b0b170ee66c31c0",
+          "file": "home-carousel-image.u01.spec.ts",
+          "line": 21,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "image-egress.img02.spec.ts",
+      "file": "image-egress.img02.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "the big PNG is stored once and reused: two designs share one original, each shows its own preview, and a second visit is all cache hits",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 22233,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:41:17.446Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "9e10670cb967a591f32b-9043f5040dc6594f68b8",
+          "file": "image-egress.img02.spec.ts",
+          "line": 69,
+          "column": 5
+        },
+        {
+          "title": "the big PNG is stored once and reused: two designs share one original, each shows its own preview, and a second visit is all cache hits",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 21845,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:49:06.587Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "9e10670cb967a591f32b-dce98f806ede6fd4ff6c",
+          "file": "image-egress.img02.spec.ts",
+          "line": 69,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "image-previews.0004.spec.ts",
+      "file": "image-previews.0004.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: a print-size PNG main picture shows on the form, the page downloads under 300 KB of images, and tap-to-enlarge never fetches the print file",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13362,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:41:39.704Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7bca104c8f432c3c698f-13f74b07a2901427788c",
+          "file": "image-previews.0004.spec.ts",
+          "line": 38,
+          "column": 5
+        },
+        {
+          "title": "375px: a print-size PNG main picture shows on the form, the page downloads under 300 KB of images, and tap-to-enlarge never fetches the print file",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13438,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:49:28.462Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7bca104c8f432c3c698f-8f4a9ef8cc6d82614010",
+          "file": "image-previews.0004.spec.ts",
+          "line": 38,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "order-form-player.spec.ts",
+      "file": "order-form-player.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a player submits through the captain's /run link and the captain sees the item",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12233,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:41:53.093Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a6fba887f286ac43c875-4c5b78e8a64180229af9",
+          "file": "order-form-player.spec.ts",
+          "line": 15,
+          "column": 5
+        },
+        {
+          "title": "a player submits through the captain's /run link and the captain sees the item",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10673,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:49:41.922Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a6fba887f286ac43c875-c81df372ca02e3484ae7",
+          "file": "order-form-player.spec.ts",
+          "line": 15,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "order-form-sizes.r205.spec.ts",
+      "file": "order-form-sizes.r205.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: a player fills one card as Sidestep #72 with S, M×3, XL and the captain sees one row with 5 jerseys, added by that player",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11108,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:42:05.354Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6b9f4836fdee3f995ce-5bc7ed5070afb09fabc4",
+          "file": "order-form-sizes.r205.spec.ts",
+          "line": 95,
+          "column": 5
+        },
+        {
+          "title": "375px: a second player with a different email adding Sidestep #72 in L joins the same row silently, and the edit sheet lists both players' sizes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13513,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:42:16.484Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6b9f4836fdee3f995ce-e067baf27a079424ef35",
+          "file": "order-form-sizes.r205.spec.ts",
+          "line": 126,
+          "column": 5
+        },
+        {
+          "title": "375px: a player fills one card as Sidestep #72 with S, M×3, XL and the captain sees one row with 5 jerseys, added by that player",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10555,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:49:52.622Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6b9f4836fdee3f995ce-1bb792ef35d27b69ffa8",
+          "file": "order-form-sizes.r205.spec.ts",
+          "line": 95,
+          "column": 5
+        },
+        {
+          "title": "375px: a second player with a different email adding Sidestep #72 in L joins the same row silently, and the edit sheet lists both players' sizes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 17676,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:50:03.199Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6b9f4836fdee3f995ce-a87dfa8ab44a1dd7117a",
+          "file": "order-form-sizes.r205.spec.ts",
+          "line": 126,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "order-form.spec.ts",
+      "file": "order-form.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "captain makes an order form, copies its link, and opens Form settings",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8454,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:42:30.027Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "52fa18ef5834c867852c-fc1cf346328650fd07af",
+          "file": "order-form.spec.ts",
+          "line": 15,
+          "column": 5
+        },
+        {
+          "title": "captain makes an order form, copies its link, and opens Form settings",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9085,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:50:20.909Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "52fa18ef5834c867852c-3075d647fc74038d6bb8",
+          "file": "order-form.spec.ts",
+          "line": 15,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "order-list-players.r202.spec.ts",
+      "file": "order-list-players.r202.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: a captain adds Sidestep #72 with 1 S, 3 M and 1 XL in one sheet and sees one player row",
+          "ok": true,
+          "tags": [
+            "pinned-375",
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6483,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:42:38.504Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c073ed4fd2a953f75901-0148eccb7728ae1ba677",
+          "file": "order-list-players.r202.spec.ts",
+          "line": 53,
+          "column": 5
+        },
+        {
+          "title": "adding ' sidestep ' #72 again with an L joins the player; lowering M to 2 updates row, design line and footer live",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8984,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:42:45.009Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c073ed4fd2a953f75901-93000057409640373be8",
+          "file": "order-list-players.r202.spec.ts",
+          "line": 74,
+          "column": 5
+        },
+        {
+          "title": "removing Sidestep #72 and pressing Undo brings the row back with the same sizes",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8463,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:42:54.013Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c073ed4fd2a953f75901-8de12eb0f73f63e09d1f",
+          "file": "order-list-players.r202.spec.ts",
+          "line": 112,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "order-lock.spec.ts",
+      "file": "order-lock.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "admin order page shows the same list and edits it while confirmed; confirming is refused while an item needs a size",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8502,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:02.500Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f1262d23f087fb729e1a-3659a3876c14cdf2706f",
+          "file": "order-lock.spec.ts",
+          "line": 110,
+          "column": 5
+        },
+        {
+          "title": "admin order page shows the same list and edits it while confirmed; confirming is refused while an item needs a size",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8312,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:50:30.020Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f1262d23f087fb729e1a-fe24aa6af4d6217d9076",
+          "file": "order-lock.spec.ts",
+          "line": 110,
+          "column": 5
+        }
+      ],
+      "suites": [
+        {
+          "title": "as a non-admin captain",
+          "file": "order-lock.spec.ts",
+          "line": 20,
+          "column": 6,
+          "specs": [
+            {
+              "title": "captain sees a locked list: note with a mailto link, no edit controls, CSV still works",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "needs a non-admin captain: set E2E_CAPTAIN_UID and E2E_CAPTAIN_PWD in .env.local",
+                      "location": {
+                        "file": "/home/jdcc/sidestep-web-hermes/e2e/order-lock.spec.ts",
+                        "line": 22,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-24T09:43:02.499Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "needs a non-admin captain: set E2E_CAPTAIN_UID and E2E_CAPTAIN_PWD in .env.local",
+                          "location": {
+                            "file": "/home/jdcc/sidestep-web-hermes/e2e/order-lock.spec.ts",
+                            "line": 22,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "f1262d23f087fb729e1a-7e4cc3c2352c5456462d",
+              "file": "order-lock.spec.ts",
+              "line": 27,
+              "column": 7
+            },
+            {
+              "title": "captain sees a locked list: note with a mailto link, no edit controls, CSV still works",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "needs a non-admin captain: set E2E_CAPTAIN_UID and E2E_CAPTAIN_PWD in .env.local",
+                      "location": {
+                        "file": "/home/jdcc/sidestep-web-hermes/e2e/order-lock.spec.ts",
+                        "line": 22,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-24T09:50:30.019Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "needs a non-admin captain: set E2E_CAPTAIN_UID and E2E_CAPTAIN_PWD in .env.local",
+                          "location": {
+                            "file": "/home/jdcc/sidestep-web-hermes/e2e/order-lock.spec.ts",
+                            "line": 22,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "f1262d23f087fb729e1a-10d1d005cc7f1f6e3b7b",
+              "file": "order-lock.spec.ts",
+              "line": 27,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "original-download.img05.spec.ts",
+      "file": "original-download.img05.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a captain clicks Download on a file on their design page and the original opens in a new tab; no Convex frame carried its URL before the click",
+          "ok": true,
+          "tags": [
+            "original-download"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9630,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:11.026Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "12df45ad6fa0357e78d9-2323e63ae061a3b91423",
+          "file": "original-download.img05.spec.ts",
+          "line": 35,
+          "column": 5
+        },
+        {
+          "title": "staff open an order in admin, click a linked design's file, and get the original (a design the admin doesn't own)",
+          "ok": true,
+          "tags": [
+            "original-download"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "needs E2E_CAPTAIN_UID/_PWD so the design is owned by someone other than the admin",
+                  "location": {
+                    "file": "/home/jdcc/sidestep-web-hermes/e2e/original-download.img05.spec.ts",
+                    "line": 88,
+                    "column": 10
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 1365,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:20.674Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "needs E2E_CAPTAIN_UID/_PWD so the design is owned by someone other than the admin",
+                      "location": {
+                        "file": "/home/jdcc/sidestep-web-hermes/e2e/original-download.img05.spec.ts",
+                        "line": 88,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "12df45ad6fa0357e78d9-00b601088e57cdb65cf8",
+          "file": "original-download.img05.spec.ts",
+          "line": 84,
+          "column": 5
+        },
+        {
+          "title": "a captain clicks Download on a file on their design page and the original opens in a new tab; no Convex frame carried its URL before the click",
+          "ok": true,
+          "tags": [
+            "original-download"
+          ],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9050,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:50:38.350Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "12df45ad6fa0357e78d9-0bf664d8bedfbe5ec11e",
+          "file": "original-download.img05.spec.ts",
+          "line": 35,
+          "column": 5
+        },
+        {
+          "title": "staff open an order in admin, click a linked design's file, and get the original (a design the admin doesn't own)",
+          "ok": true,
+          "tags": [
+            "original-download"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "needs E2E_CAPTAIN_UID/_PWD so the design is owned by someone other than the admin",
+                  "location": {
+                    "file": "/home/jdcc/sidestep-web-hermes/e2e/original-download.img05.spec.ts",
+                    "line": 88,
+                    "column": 10
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 1289,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:50:47.418Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "needs E2E_CAPTAIN_UID/_PWD so the design is owned by someone other than the admin",
+                      "location": {
+                        "file": "/home/jdcc/sidestep-web-hermes/e2e/original-download.img05.spec.ts",
+                        "line": 88,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "12df45ad6fa0357e78d9-1c3e42eb1958edf077bd",
+          "file": "original-download.img05.spec.ts",
+          "line": 84,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "paste-blank-cells.0004.spec.ts",
+      "file": "paste-blank-cells.0004.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: the Light block previews 11 new players and 19 jerseys, COACH R has no number and S×1, and Add keeps it that way",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6335,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:22.061Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bce080c0ceb079962a5b-053468d00ae8fe3c7ba3",
+          "file": "paste-blank-cells.0004.spec.ts",
+          "line": 57,
+          "column": 5
+        },
+        {
+          "title": "375px: a tab row with an empty number cell (Name⇥⇥S⇥1) is added with no number and size S",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6215,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:28.413Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bce080c0ceb079962a5b-979b48303c3986173f1b",
+          "file": "paste-blank-cells.0004.spec.ts",
+          "line": 98,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "paste-grouped.r204.spec.ts",
+      "file": "paste-grouped.r204.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: pasting three rows for Sidestep #72 previews one player with S, M×3, XL and adds one row with 5 jerseys",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6129,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:34.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "70e6210b4427b17f2d7c-48c8f384b10e45523acd",
+          "file": "paste-grouped.r204.spec.ts",
+          "line": 39,
+          "column": 5
+        },
+        {
+          "title": "375px: pasting 'Avery Quinn 7 L' where Avery Quinn #7 has M shows the 'already on' note and leaves one row with M and L",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7172,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:40.792Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "70e6210b4427b17f2d7c-319012aa859acefd5cfc",
+          "file": "paste-grouped.r204.spec.ts",
+          "line": 72,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "paste-not-columns.0004.spec.ts",
+      "file": "paste-not-columns.0004.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: pasting the raw customer message shows the not-columns notice and Add stays enabled",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5162,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:47.982Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c0045631c50433689f5e-7561a450496ce63d9b57",
+          "file": "paste-not-columns.0004.spec.ts",
+          "line": 78,
+          "column": 5
+        },
+        {
+          "title": "375px: pasting the converted Light block shows no not-columns notice, and Add is enabled",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5267,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:53.162Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c0045631c50433689f5e-7ddf0f496408dfd351c4",
+          "file": "paste-not-columns.0004.spec.ts",
+          "line": 94,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "paste-ordered-by.0004.spec.ts",
+      "file": "paste-ordered-by.0004.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: the Light block with an Ordered by column previews every player's owner, and Sizes added by lists the owner 'from a pasted list'",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6337,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:43:58.458Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7a779b06c2863f4b5786-f47d4a9fbbdd98110254",
+          "file": "paste-ordered-by.0004.spec.ts",
+          "line": 66,
+          "column": 5
+        },
+        {
+          "title": "375px: a paste mixing 4- and 5-column rows is accepted in full; owners only where given",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6565,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:44:04.812Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7a779b06c2863f4b5786-84a5b540fc7e49f7984e",
+          "file": "paste-ordered-by.0004.spec.ts",
+          "line": 113,
+          "column": 5
+        },
+        {
+          "title": "the admin order export's submitter name column holds the pasted owner, and is empty for a 4-column row",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8698,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:44:11.394Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7a779b06c2863f4b5786-ee038d1bfa802718c3d9",
+          "file": "paste-ordered-by.0004.spec.ts",
+          "line": 182,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "portal.smoke.spec.ts",
+      "file": "portal.smoke.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "captain opens the portal and an order",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6737,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:44:20.117Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8d0b8b0ca1f716415030-ef8b2581c761e1e8f9a6",
+          "file": "portal.smoke.spec.ts",
+          "line": 6,
+          "column": 5
+        },
+        {
+          "title": "captain opens the portal and an order",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6653,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:50:48.726Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8d0b8b0ca1f716415030-7331587bd58c6deda920",
+          "file": "portal.smoke.spec.ts",
+          "line": 6,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "preview-only.img04.spec.ts",
+      "file": "preview-only.img04.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a captain uploads an SVG: within 30 s the pool tile shows the picture, and no image on the page is the uploaded file's own storage URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6802,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:44:26.878Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5940f8e03920658b1d10-5ab31d04bf9ceaf1ebef",
+          "file": "preview-only.img04.spec.ts",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "title": "375px: a player opens an order form whose main picture has no preview yet and sees the placeholder, and nothing on the page names the original's storage URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10802,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:44:33.699Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5940f8e03920658b1d10-8fe7545afd1d6a7e7e38",
+          "file": "preview-only.img04.spec.ts",
+          "line": 94,
+          "column": 5
+        },
+        {
+          "title": "a captain uploads an SVG: within 30 s the pool tile shows the picture, and no image on the page is the uploaded file's own storage URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6767,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:50:55.395Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5940f8e03920658b1d10-65d8b13b6c782c1e362e",
+          "file": "preview-only.img04.spec.ts",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "title": "375px: a player opens an order form whose main picture has no preview yet and sees the placeholder, and nothing on the page names the original's storage URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10837,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:51:02.174Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5940f8e03920658b1d10-16790bf0a3747c2f2e1d",
+          "file": "preview-only.img04.spec.ts",
+          "line": 94,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "proxy-gate.u02.spec.ts",
+      "file": "proxy-gate.u02.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a signed-out visitor is sent from /portal to sign-in, but can open a player's /run form without signing in",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10057,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:44:44.528Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4c6345315dea8ad6dac4-8a9bca29726d85b832fc",
+          "file": "proxy-gate.u02.spec.ts",
+          "line": 24,
+          "column": 5
+        },
+        {
+          "title": "a signed-out visitor is sent from /portal to sign-in, but can open a player's /run form without signing in",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9829,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:51:13.029Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4c6345315dea8ad6dac4-068586db9cbd92b6d822",
+          "file": "proxy-gate.u02.spec.ts",
+          "line": 24,
+          "column": 5
+        }
+      ],
+      "suites": [
+        {
+          "title": "captain invite link",
+          "file": "proxy-gate.u02.spec.ts",
+          "line": 70,
+          "column": 6,
+          "specs": [
+            {
+              "title": "/invite?token=<id> lands on sign-up and sets the HTTP-only invite cookie",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2745,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-24T09:44:54.603Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4c6345315dea8ad6dac4-b7f5e96bd3343101bb84",
+              "file": "proxy-gate.u02.spec.ts",
+              "line": 73,
+              "column": 7
+            },
+            {
+              "title": "/invite?token=<id> lands on sign-up and sets the HTTP-only invite cookie",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3003,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-24T09:51:22.879Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4c6345315dea8ad6dac4-f9245654457796500e21",
+              "file": "proxy-gate.u02.spec.ts",
+              "line": 73,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "public-form.0004-lightbox.spec.ts",
+      "file": "public-form.0004-lightbox.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "0004 lightbox",
+          "file": "public-form.0004-lightbox.spec.ts",
+          "line": 124,
+          "column": 6,
+          "specs": [
+            {
+              "title": "a player opens a design's picture, sees it, and closes it with the ✕",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 13972,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-24T09:44:57.370Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dde54cb07af870b27456-39e1c103a440731fb01d",
+              "file": "public-form.0004-lightbox.spec.ts",
+              "line": 133,
+              "column": 7
+            },
+            {
+              "title": "Esc closes the lightbox, focus returns to the picture button, and it opens again",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop",
+                  "projectName": "desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 14174,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-24T09:45:11.357Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dde54cb07af870b27456-76952529759ef8fc647e",
+              "file": "public-form.0004-lightbox.spec.ts",
+              "line": 154,
+              "column": 7
+            },
+            {
+              "title": "a player opens a design's picture, sees it, and closes it with the ✕",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "sets its own viewport; runs once on the desktop project",
+                      "location": {
+                        "file": "/home/jdcc/sidestep-web-hermes/e2e/public-form.0004-lightbox.spec.ts",
+                        "line": 127,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 131,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-24T09:51:25.904Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "sets its own viewport; runs once on the desktop project",
+                          "location": {
+                            "file": "/home/jdcc/sidestep-web-hermes/e2e/public-form.0004-lightbox.spec.ts",
+                            "line": 127,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "dde54cb07af870b27456-29c9fa223e4a4a8ec2d6",
+              "file": "public-form.0004-lightbox.spec.ts",
+              "line": 133,
+              "column": 7
+            },
+            {
+              "title": "Esc closes the lightbox, focus returns to the picture button, and it opens again",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "sets its own viewport; runs once on the desktop project",
+                      "location": {
+                        "file": "/home/jdcc/sidestep-web-hermes/e2e/public-form.0004-lightbox.spec.ts",
+                        "line": 127,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "mobile",
+                  "projectName": "mobile",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 119,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-24T09:51:26.051Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "sets its own viewport; runs once on the desktop project",
+                          "location": {
+                            "file": "/home/jdcc/sidestep-web-hermes/e2e/public-form.0004-lightbox.spec.ts",
+                            "line": 127,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "dde54cb07af870b27456-49132849e94794a9f544",
+              "file": "public-form.0004-lightbox.spec.ts",
+              "line": 154,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "public-form.0004.spec.ts",
+      "file": "public-form.0004.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: a single-design form with a PNG main picture shows it above 'Your name', and tapping it opens it full size",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11113,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:45:25.558Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-4dbdbbc5e5d842d2cee2",
+          "file": "public-form.0004.spec.ts",
+          "line": 88,
+          "column": 5
+        },
+        {
+          "title": "375px: no picture, or only a PDF, shows no picture block and 'Design: <title>' under the intro",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15721,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:45:36.685Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-6aab4ab021816a456353",
+          "file": "public-form.0004.spec.ts",
+          "line": 116,
+          "column": 5
+        },
+        {
+          "title": "375px: a two-design form has a picture tile per design, and picking 'Away Kit' shows its title, not an id",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15493,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:45:52.420Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-7135f3538ce30e218123",
+          "file": "public-form.0004.spec.ts",
+          "line": 147,
+          "column": 5
+        },
+        {
+          "title": "375px: Name on jersey and Number share a row, and every size button is the same width",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8343,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:46:07.927Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-5d6c4cf78a870e2c10b0",
+          "file": "public-form.0004.spec.ts",
+          "line": 184,
+          "column": 7
+        },
+        {
+          "title": "1280px: Name on jersey and Number share a row, and every size button is the same width",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8264,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:46:16.287Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-b2da041bc8979cf96646",
+          "file": "public-form.0004.spec.ts",
+          "line": 184,
+          "column": 7
+        },
+        {
+          "title": "375px: pick-your-name: Sidestep's row closes with S×1 M×2 XL×1, Avery's opens, 4 jerseys, and Submit sends those 4",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 14799,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:46:24.568Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-f3359df4eb08fb8f3306",
+          "file": "public-form.0004.spec.ts",
+          "line": 223,
+          "column": 5
+        },
+        {
+          "title": "375px: pick-your-name: numbers 7, 12 and 72 share a right edge, and a 29-character name stays on one line, truncated",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12768,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:46:39.383Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-fbe12656ce8569c275c7",
+          "file": "public-form.0004.spec.ts",
+          "line": 283,
+          "column": 5
+        },
+        {
+          "title": "375px: a single-design form with a PNG main picture shows it above 'Your name', and tapping it opens it full size",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11555,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:51:26.194Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-25f58f152608e4ee2fd6",
+          "file": "public-form.0004.spec.ts",
+          "line": 88,
+          "column": 5
+        },
+        {
+          "title": "375px: no picture, or only a PDF, shows no picture block and 'Design: <title>' under the intro",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15091,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:51:37.769Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-df7941ad5787fcd89050",
+          "file": "public-form.0004.spec.ts",
+          "line": 116,
+          "column": 5
+        },
+        {
+          "title": "375px: a two-design form has a picture tile per design, and picking 'Away Kit' shows its title, not an id",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15515,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:51:52.882Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-7a21df12001e172126ec",
+          "file": "public-form.0004.spec.ts",
+          "line": 147,
+          "column": 5
+        },
+        {
+          "title": "375px: Name on jersey and Number share a row, and every size button is the same width",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8741,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:52:08.418Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-e660db2ce4fccbef0ec1",
+          "file": "public-form.0004.spec.ts",
+          "line": 184,
+          "column": 7
+        },
+        {
+          "title": "1280px: Name on jersey and Number share a row, and every size button is the same width",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8919,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:52:17.174Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-b525d89d501ea37dba45",
+          "file": "public-form.0004.spec.ts",
+          "line": 184,
+          "column": 7
+        },
+        {
+          "title": "375px: pick-your-name: Sidestep's row closes with S×1 M×2 XL×1, Avery's opens, 4 jerseys, and Submit sends those 4",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 14295,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:52:26.109Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-100ef293605e6daad84c",
+          "file": "public-form.0004.spec.ts",
+          "line": 223,
+          "column": 5
+        },
+        {
+          "title": "375px: pick-your-name: numbers 7, 12 and 72 share a right edge, and a 29-character name stays on one line, truncated",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12192,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:52:40.425Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "be1251b71ded49b4f9f6-442302cb1af0937b73de",
+          "file": "public-form.0004.spec.ts",
+          "line": 283,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "retire-flat-fields.r203.spec.ts",
+      "file": "retire-flat-fields.r203.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "admin exports an order with Sidestep #72 in S, M×3 and XL: the right sizes, and the jersey count matches the captain's footer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9088,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:46:52.171Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c186c1c38006aa1f963a-dc0113090a40517d5efa",
+          "file": "retire-flat-fields.r203.spec.ts",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "title": "a player who submitted through the order form signs in and sees their jersey with the right name, number and size",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12672,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:47:01.272Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c186c1c38006aa1f963a-642d0ad57906d74e4d44",
+          "file": "retire-flat-fields.r203.spec.ts",
+          "line": 103,
+          "column": 5
+        },
+        {
+          "title": "admin exports an order with Sidestep #72 in S, M×3 and XL: the right sizes, and the jersey count matches the captain's footer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8363,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:52:52.644Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c186c1c38006aa1f963a-5ffd756cc23bf36b06a8",
+          "file": "retire-flat-fields.r203.spec.ts",
+          "line": 47,
+          "column": 5
+        },
+        {
+          "title": "a player who submitted through the order form signs in and sees their jersey with the right name, number and size",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10311,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:53:01.020Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c186c1c38006aa1f963a-37bdc74c65b24734623c",
+          "file": "retire-flat-fields.r203.spec.ts",
+          "line": 103,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "roster-entries-legacy.r201.spec.ts",
+      "file": "roster-entries-legacy.r201.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "an order seeded with flat items shows the same list, counts and CSV after the roster tables arrive",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6761,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:47:13.962Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5c8c07a7756827a83881-1cc466ddb52d679000a2",
+          "file": "roster-entries-legacy.r201.spec.ts",
+          "line": 14,
+          "column": 5
+        },
+        {
+          "title": "an order seeded with flat items shows the same list, counts and CSV after the roster tables arrive",
+          "ok": true,
+          "tags": [
+            "smoke"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6620,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:53:11.354Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5c8c07a7756827a83881-35d73f79f9a24529bdd9",
+          "file": "roster-entries-legacy.r201.spec.ts",
+          "line": 14,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "size-chips.0004.spec.ts",
+      "file": "size-chips.0004.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "375px: a player with S×1 and M×3 shows chips S×1 and M×3 and the row has no 'Added by'",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6431,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:47:20.743Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8287978b98d52fa842c-1d57ca6a1a36653cb74d",
+          "file": "size-chips.0004.spec.ts",
+          "line": 98,
+          "column": 5
+        },
+        {
+          "title": "375px: no row says 'Added by', whether the captain or a player through the order form added the player",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12068,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:47:27.186Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8287978b98d52fa842c-dbb2cb06ac1ca6c843db",
+          "file": "size-chips.0004.spec.ts",
+          "line": 121,
+          "column": 5
+        },
+        {
+          "title": "375px: the design's blank entry reads 'Blank jerseys' with no 'Nothing printed' and no 'Added by'",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6196,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:47:39.270Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8287978b98d52fa842c-ad65d862438ec86472a3",
+          "file": "size-chips.0004.spec.ts",
+          "line": 152,
+          "column": 5
+        },
+        {
+          "title": "375px: ⋯ on a player with the captain's S×1 and Quinn's M×1 still lists both people and their sizes under 'Sizes added by'",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11434,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:47:45.483Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8287978b98d52fa842c-9d358a61f1007f787d3c",
+          "file": "size-chips.0004.spec.ts",
+          "line": 174,
+          "column": 5
+        },
+        {
+          "title": "375px: the order total reads '47 jerseys' then one list item per size in 'Sizes on this order', with no '·' between sizes",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6242,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:47:56.933Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8287978b98d52fa842c-e787f7d40ae881c87a0e",
+          "file": "size-chips.0004.spec.ts",
+          "line": 235,
+          "column": 5
+        },
+        {
+          "title": "375px: with 7 sizes in the total line the page has no horizontal scroll and no size×count is split across two lines",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5992,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:48:03.193Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8287978b98d52fa842c-bb52d58a081409407661",
+          "file": "size-chips.0004.spec.ts",
+          "line": 257,
+          "column": 5
+        },
+        {
+          "title": "375px: pasting 'Sidestep 72 S' and 'Sidestep 72 M 3' previews one player with chips S×1 and M×3",
+          "ok": true,
+          "tags": [
+            "pinned-375"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5287,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:48:09.198Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8287978b98d52fa842c-96cdd8c0902f4c711940",
+          "file": "size-chips.0004.spec.ts",
+          "line": 287,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "stored-preview.img03.spec.ts",
+      "file": "stored-preview.img03.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a captain uploads a print-size PNG: the tile and the dashboard chip show it from the stored preview, under 1 MB, never the original",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12162,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:48:14.504Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0f82daef808d8889bc48-0179ff5dff25bea49129",
+          "file": "stored-preview.img03.spec.ts",
+          "line": 64,
+          "column": 5
+        },
+        {
+          "title": "375px: a player opening the order form sees the picture, and neither the page nor its image URLs contain the original's storage URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13334,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:48:26.681Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0f82daef808d8889bc48-d767f77c39325f597e71",
+          "file": "stored-preview.img03.spec.ts",
+          "line": 110,
+          "column": 5
+        },
+        {
+          "title": "a captain uploads a print-size PNG: the tile and the dashboard chip show it from the stored preview, under 1 MB, never the original",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11466,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:53:17.992Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0f82daef808d8889bc48-78b765d66dafd3b7059a",
+          "file": "stored-preview.img03.spec.ts",
+          "line": 64,
+          "column": 5
+        },
+        {
+          "title": "375px: a player opening the order form sees the picture, and neither the page nor its image URLs contain the original's storage URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile",
+              "projectName": "mobile",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13821,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-24T09:53:29.470Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0f82daef808d8889bc48-437b85de580c586d6d4b",
+          "file": "stored-preview.img03.spec.ts",
+          "line": 110,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-24T09:40:38.521Z",
+    "duration": 784953.2139999999,
+    "expected": 76,
+    "skipped": 6,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
