@@ -410,3 +410,19 @@ export const attachFile = internalAction({
     return { ok: true as const, assetId };
   },
 });
+
+// Test-only (B-09): deletes an E2E asset's original blob and keeps its row, the
+// out-of-band loss that makes `hasFile` false. Refuses anything not on an
+// `E2E ` design. A preview blob, if any, is left alone.
+export const deleteOriginal = internalMutation({
+  args: { assetId: v.id("designAssets") },
+  handler: async (ctx, { assetId }) => {
+    const asset = await ctx.db.get(assetId);
+    const design = asset ? await ctx.db.get(asset.designId) : null;
+    if (!asset || !design || !design.title.startsWith(PREFIX))
+      throw new ConvexError("Not an E2E asset.");
+    if (await ctx.db.system.get("_storage", asset.storageId))
+      await ctx.storage.delete(asset.storageId);
+    return { ok: true as const };
+  },
+});

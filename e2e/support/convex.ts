@@ -275,3 +275,7 @@ export async function attachBigPng(
   if (withPreview) makePreview(assetId);
   return { bytes: png.length, storageId, assetId, reused };
 }
+
+/** Deletes an E2E asset's original blob and keeps its row (B-09): `hasFile` goes false. */
+export const deleteOriginal = (assetId: string) =>
+  run<{ ok: true }>("_e2e:deleteOriginal", { assetId });
