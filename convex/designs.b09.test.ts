@@ -60,6 +60,7 @@ async function seed() {
     await ctx.storage.delete(goneOriginal);
     await ctx.db.patch(designId, {
       blocks: [
+        { id: "o1", kind: "text", field: "overview", body: "x" },
         { id: "g1", kind: "gallery", assetIds: [present, gone] },
       ] as never,
     });
