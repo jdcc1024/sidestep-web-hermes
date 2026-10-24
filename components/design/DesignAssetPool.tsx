@@ -181,7 +181,7 @@ export function DesignAssetPool({
                     </DownloadOriginal>
                   ) : (
                     <span className="text-xs text-muted-foreground">
-                      File missing
+                      Missing — re-upload
                     </span>
                   )}
 

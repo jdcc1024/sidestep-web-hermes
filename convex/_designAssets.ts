@@ -40,7 +40,7 @@ export type UploadedFile = {
 // An asset row as a read hands it out: without the original's storage id,
 // because the id and the original's URL are both the file (IMG-05). The only
 // way to the original is `designs.originalUrl`, on Download. `hasFile` says
-// whether the original is still in storage (false → "File missing").
+// whether the original is still in storage (false → "Missing — re-upload").
 // `displayUrl` is what every on-screen picture loads: the stored preview
 // (IMG-03), or null while there is none, never the original (IMG-04).
 // `displayContentType` is the preview's type when there's a `displayUrl`,
@@ -105,8 +105,8 @@ export async function listDesignAssets(
 
 // Every asset of a design as the pages read it: metadata, whether the
 // original is still there, and the preview's URL. `hasFile: false` means the
-// original is gone, so callers render "File missing" rather than a Download
-// that can only fail.
+// original is gone, so callers render "Missing — re-upload" rather than a
+// Download that can only fail.
 export async function resolveDesignAssets(
   ctx: QueryCtx | MutationCtx,
   designId: Id<"designs">,

@@ -91,9 +91,10 @@ Server side:
   defence in depth for the hidden button, and a missing original can't be the
   print file.
 
-Label: **"File missing"** in both render sites (plain text, muted, as
-today). It says what happened without implying access. The wording is JCC's
-call (customer-facing), so the final word is pending.
+Label: **"Missing — re-upload"** in both render sites (plain text, muted, as
+today; "re-upload" is not a button or link). It says what happened and what to
+do, without implying access. JCC chose the wording at B-09 Gate 2
+(2026-10-24, option C).
 
 ## Done when
 1. An admin opens a design whose files are all in storage. Every file tile shows Download, and clicking one opens the original in a new tab.
