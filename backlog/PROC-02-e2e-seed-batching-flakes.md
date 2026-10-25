@@ -4,7 +4,7 @@
 
 ## Type: infrastructure
 
-## Size: S (~8 files; Claude ~$2–3; SDET ~$3)
+## Size: S (~7 files; Claude ~$2; SDET ~$2–3)
 
 ## Description
 
@@ -23,6 +23,10 @@ proves the estimate**. The timed run is
 - **P5: the 3 known flakes plus the `usePickMode` race are traced to file:line.**
   Two are test waits, one is a test race, and one is an app bug: an
   unretried Clerk call 500s admin pages.
+- **Scope after JCC's answer (#office-hours, 2026-10-25, "Q1. A / Q2. A"):**
+  this issue is **P4a, P4b and P5 b–d**, held until after the speed check
+  (t_d81a8104). The app bug (P5 a) moved to
+  `backlog/B-10-admin-currentuser-retry.md` and ships now on its own.
 
 JCC's goal for E2E, which every change here is checked against: *"catch error
 messages from next JS that show up while browsing each page, as well as the
@@ -81,7 +85,7 @@ Today `fixtures.ts:53-57` calls `cleanup(tag)` synchronously after every test
 
 | # | Where | Root cause | Fix |
 |---|---|---|---|
-| a | `app/admin/layout.tsx:15` (**app**) | `currentUser()` makes one Clerk Backend API call with no retry. On 10-21 it failed with `ClerkAPIResponseError … fetch failed` after 10.7 s, and `GET /admin/orders/<id>` returned 500 (dev log). That is the `order-lock.spec.ts:110` flake, and a real admin can hit it too | Wrap the call in a new `lib/transientRetry.ts` → `withTransientRetry(fn)`: **one** retry, only when `isTransientFetchError(err)` (no HTTP `status`, and the message or `errors[0].message` matches `fetch failed`, `ECONNRESET`, `ETIMEDOUT`, `EAI_AGAIN` or `socket hang up`). Anything else is rethrown at once. The admin decision is unchanged: `isAdminFromClerk(user?.privateMetadata)` |
+| a | `app/admin/layout.tsx:15` (**app**) | `currentUser()` has no retry; one dropped Clerk call 500s admin pages (`order-lock.spec.ts:110` flake) | **Moved to `backlog/B-10-admin-currentuser-retry.md`** (JCC, 2026-10-25: fix the admin 500 now as a bug). Not in this issue |
 | b | `e2e/proxy-gate.u02.spec.ts:57` | `visitor.goto("/portal")` waits for `load` across Clerk's dev handshake redirects to sign-in. One slow Clerk hop used up the 20 s navigation timeout, while our server answered `/portal` in 45–107 ms | `goto("/portal", { waitUntil: "commit" })`, then the existing `toHaveURL(/\/sign-in/)` (:58) and sign-in text (:59) with `{ timeout: 20_000 }` |
 | c | `e2e/stored-preview.img03.spec.ts:59-61` | In `waitForPreview`, the `naturalWidth > 0` poll uses the default 10 s, while the step before it on the same pipeline gets `PREVIEW_WAIT_MS` (30 s, :23). It failed at 10 s on 10-21 with no optimizer error logged | Give that poll `{ timeout: PREVIEW_WAIT_MS }` too. Image specs block lands when they fail, so this one matters |
 | d | `e2e/public-form.0004.spec.ts:46-57` (`usePickMode`) | `toBeChecked()` (:52) passes on the optimistic UI (`components/portal/OrderFormSettings.tsx:190-205`, `pending ?? run.namesMode`) before `setNamesMode` commits, so `reload()` (:53) can read the old mode. Seen in U-01 land run 191 | Replace :53–56 with `await expect(async () => { await page.reload(); await expect(radio).toBeChecked({ timeout: 2_000 }); }).toPass({ timeout: 20_000 })` |
@@ -91,45 +95,44 @@ It goes with P6, which stays deferred.
 
 ## Done when
 1. A full `npm run e2e:full` on the branch passes with **0 flaky**, and the timed-run step reporter (`docs/architecture/process-e2e-timed-run/tools/step-reporter.mjs`, run once with `--reporter=list,json,<that file>`) shows the `tag` fixture's total under 10 s (baseline 99 s) and summed test time at least 2 min under the 12.8 min baseline. (Evidence: both numbers and the receipt line in the handoff. Skip the timing part if JCC drops P4a/P4b.)
-2. `order-lock.spec.ts:110`, `proxy-gate.u02.spec.ts:24`, `stored-preview.img03.spec.ts:110` and the two `usePickMode` tests in `public-form.0004.spec.ts` pass 10/10 with `--repeat-each=10` in both projects where they run. (The real proof is the flake log card t_678ad8f6 staying empty for these over the next features. Say so in the handoff.)
-3. With the Clerk Backend API unreachable for one request (the dev forces one transport failure via a temporary local env flag or a monkey-patch that is not committed), an admin opening `/admin/orders/<id>` still sees the order. A non-admin still gets the 403 page. (Evidence: the dev's screenshot pair in the handoff.)
+2. `proxy-gate.u02.spec.ts:24`, `stored-preview.img03.spec.ts:110` and the two `usePickMode` tests in `public-form.0004.spec.ts` pass 10/10 with `--repeat-each=10` in both projects where they run. (The real proof is the flake log card t_678ad8f6 staying empty for these over the next features. Say so in the handoff. `order-lock.spec.ts:110` is B-10's.)
+
+(The old Done-when 3, admin still sees the order when one Clerk call fails, is B-10's Done-when 3.)
 
 ## Logic
-- `withTransientRetry` / `isTransientFetchError` (`lib/transientRetry.ts`): one transport failure then success → returns the value after exactly 2 calls; an error with an HTTP `status` (401/404/429/500) → rethrown after 1 call, never retried; two transport failures → throws the second error after 2 calls.
 - `e2eCleanupQueue` (`lib/e2eCleanupQueue.ts`): `drain()` resolves after every enqueued job has settled; one failing job → `drain()` rejects naming that job's label, and the other jobs still ran; `drain()` on an empty queue resolves.
 
 ## Dependencies
 - Blocked by: PROC-01 landed on `main` (t_26065634). This touches
   `e2e/support/` and three specs PROC-01 tagged.
-- Sequencing (PM, not technical): JCC was asked whether to hold this build
-  until the speed check after 3 features (t_d81a8104), so that check measures
-  PROC-01 alone. P4a/P4b change the e2e minutes it measures. P5 alone barely
-  does.
+- Not blocked by B-10: they share no file. B-10 will usually have landed
+  first; if so, `order-lock.spec.ts:110` should already be quiet.
+- Sequencing (PM, not technical): JCC decided on 2026-10-25 to hold this
+  build until the speed check after 3 features (t_d81a8104), so that check
+  measures PROC-01 alone. P4a/P4b change the e2e minutes it measures. P5 alone
+  barely does.
 
 ## Notes
 
 **Review checks (read the diff, not tests)**
-- `app/admin/layout.tsx` is a security file (see `sidestep-website-dev` security
-  invariants). The diff may only wrap `currentUser()`. Admin still comes from
-  `isAdminFromClerk(user?.privateMetadata)` and nothing else. No retry on
-  4xx/5xx, at most 2 calls in total, and no new caching of the user.
+- No app code changes: `app/admin/layout.tsx` and `lib/transientRetry.ts`
+  belong to B-10 and must not appear in this diff.
 - `playwright.config.ts` is unchanged: `retries: 0`, `expect.timeout` 10 s,
   `workers: 1`.
-- No test removed, no assertion loosened. Only the four waits in §3 b–d change.
+- No test removed, no assertion loosened. Only the three waits in §3 b–d change.
 - `e2e/support/convex.ts` still refuses a non-`dev:` deployment before it
   spawns anything (sync and async paths both).
 - No new dependency in `package.json`.
 
 **Who does what**
-- SDET (tests card): `lib/transientRetry.test.ts`, `lib/e2eCleanupQueue.test.ts`,
-  the three spec edits (§3 b–d), and the overlap check in §2.
-- Dev (build card): `lib/transientRetry.ts`, `lib/e2eCleanupQueue.ts`,
-  `app/admin/layout.tsx`, `e2e/support/convex.ts`, `e2e/support/fixtures.ts`.
-  Runs Done-when 1–3.
+- SDET (tests card): `lib/e2eCleanupQueue.test.ts`, the three spec edits
+  (§3 b–d), and the overlap check in §2.
+- Dev (build card): `lib/e2eCleanupQueue.ts`, `e2e/support/convex.ts`,
+  `e2e/support/fixtures.ts`. Runs Done-when 1–2.
 
-**Files likely touched (8)**
-- new: `lib/transientRetry.ts`, `lib/e2eCleanupQueue.ts` (+ their two `.test.ts`)
-- changed: `app/admin/layout.tsx`, `e2e/support/convex.ts`, `e2e/support/fixtures.ts`,
+**Files likely touched (7)**
+- new: `lib/e2eCleanupQueue.ts` (+ its `.test.ts`)
+- changed: `e2e/support/convex.ts`, `e2e/support/fixtures.ts`,
   `e2e/proxy-gate.u02.spec.ts`, `e2e/stored-preview.img03.spec.ts`,
   `e2e/public-form.0004.spec.ts`
 
