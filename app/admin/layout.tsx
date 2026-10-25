@@ -3,6 +3,7 @@ import { AdminShell } from "@/components/layout/AdminShell";
 import { AdminAuthGate } from "@/components/layout/AdminAuthGate";
 import { AdminFlagReconciler } from "@/components/layout/UserSync";
 import { isAdminFromClerk } from "@/lib/adminFlag";
+import { withTransientRetry } from "@/lib/transientRetry";
 
 // Reads Clerk private metadata server-side — it is never sent to the client.
 // Only the resulting boolean reaches the reconciler, which uses it to decide
@@ -12,7 +13,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await currentUser();
+  const user = await withTransientRetry(() => currentUser());
   const isAdmin = isAdminFromClerk(user?.privateMetadata);
 
   if (!isAdmin) {
